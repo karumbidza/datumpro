@@ -1,0 +1,25 @@
+# Minimal local-dev config for the Supabase CLI. Run `supabase start` to boot a
+# local Postgres + Auth stack, then `pnpm db:reset` to apply migrations.
+project_id = "datumpro"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+# Email OTP / magic link is the default sign-in for v1. SMS OTP (Africa's Talking)
+# is wired at the app layer.
+[auth.email]
+enable_signup = true

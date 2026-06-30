@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "DatumPro Field",
+    "slug": "datumpro-field",
+    "scheme": "datumpro",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "plugins": ["expo-router"],
+    "ios": { "supportsTablet": true },
+    "android": { "package": "app.datumpro.field" }
+  }
+}

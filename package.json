@@ -1,0 +1,25 @@
+{
+  "name": "datumpro",
+  "private": true,
+  "version": "0.1.0",
+  "description": "DatumPro — universal project management with remote monitoring & finance. By Grafaid Engineers.",
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "db:start": "supabase start",
+    "db:reset": "supabase db reset",
+    "db:diff": "supabase db diff",
+    "db:types": "supabase gen types typescript --local > packages/shared/src/db/database.types.ts"
+  },
+  "devDependencies": {
+    "turbo": "^2.1.3",
+    "typescript": "^5.6.3"
+  }
+}
