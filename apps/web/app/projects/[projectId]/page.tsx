@@ -49,6 +49,9 @@ export default async function ProjectDetailPage({
           <Link href={`/projects/${projectId}/finance`}>
             <Button variant="secondary">Finance</Button>
           </Link>
+          <Link href={`/projects/${projectId}/requests`}>
+            <Button variant="secondary">Requests</Button>
+          </Link>
           <Link href={`/projects/${projectId}/reports/new`}>
             <Button>New site report</Button>
           </Link>
