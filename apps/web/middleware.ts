@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { env } from '@/lib/env';
+
+type CookieToSet = { name: string; value: string; options?: CookieOptions };
 
 /** Refreshes the Supabase session cookie on every request and gates the
  *  authenticated app area. Unauthed users hitting /dashboard|/projects|/finance
@@ -16,7 +18,7 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet: CookieToSet[]) {
           for (const { name, value, options } of cookiesToSet) {
             response.cookies.set(name, value, options);
           }

@@ -1,6 +1,8 @@
 import { cookies } from 'next/headers';
-import { createServerClient } from '@supabase/ssr';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { env } from '@/lib/env';
+
+type CookieToSet = { name: string; value: string; options?: CookieOptions };
 
 /** Server-side Supabase client bound to the request's cookies. Use this in Server
  *  Components, Route Handlers, and Server Actions. RLS still applies — this is the
@@ -13,7 +15,7 @@ export async function createClient() {
       getAll() {
         return cookieStore.getAll();
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet: CookieToSet[]) {
         try {
           for (const { name, value, options } of cookiesToSet) {
             cookieStore.set(name, value, options);
