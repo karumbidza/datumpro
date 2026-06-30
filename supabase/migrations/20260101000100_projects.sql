@@ -50,6 +50,7 @@ create table public.milestones (
   target_date date,
   status      public.milestone_status not null default 'pending',
   created_at  timestamptz not null default now(),
+  constraint milestones_id_org_key unique (id, org_id),
   foreign key (project_id, org_id) references public.projects (id, org_id) on delete cascade
 );
 create index milestones_project_idx on public.milestones (project_id);

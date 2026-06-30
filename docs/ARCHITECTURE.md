@@ -58,5 +58,9 @@ Construction / marketing / IT share one project engine; an industry "pack" is pr
 1. **Foundation** (this scaffold) — monorepo, tenancy + projects schema + RLS, shared domain/access, web shell, auth.
 2. **Monitoring** — site reports + media, milestones; mobile offline capture + PowerSync.
 3. **Requests & approvals** — request types, approval chains + policies.
-4. **Finance** — budget/BOQ, invoices, payment schedule, POP, variations, Paynow + Inngest.
+4. **Finance** — schema ✅ (budget/BOQ, variations, invoices + lines, payment
+   schedule, payments, proof-of-payment, Paynow). Money is integer USD cents; line
+   totals are generated columns; cross-tenant references blocked by composite FKs;
+   POP enforces verifier ≠ submitter at the DB level (segregation of duties).
+   Next: app UI + Paynow integration + Inngest jobs.
 5. **Hardening** — notifications (Resend/Africa's Talking), Sentry, CI, reporting.

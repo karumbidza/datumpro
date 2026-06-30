@@ -6,6 +6,7 @@ import { ORG_ROLES } from '../access/roles';
 import { PROJECT_TYPES } from '../domain/projects';
 import { REQUEST_TYPES } from '../domain/requests';
 import { REPORT_STATUSES, WEATHER_OPTIONS } from '../domain/monitoring';
+import { PAYMENT_METHODS } from '../domain/finance';
 
 export const createOrgSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -66,3 +67,31 @@ export const createInvoiceSchema = z.object({
     .min(1),
 });
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;
+
+export const createBudgetLineSchema = z.object({
+  projectId: z.string().uuid(),
+  description: z.string().trim().min(1).max(300),
+  code: z.string().trim().max(40).optional(),
+  category: z.string().trim().max(80).optional(),
+  unit: z.string().trim().max(40).optional(),
+  quantity: z.number().positive().default(1),
+  rateCents: z.number().int().nonnegative().default(0),
+});
+export type CreateBudgetLineInput = z.infer<typeof createBudgetLineSchema>;
+
+export const createVariationSchema = z.object({
+  projectId: z.string().uuid(),
+  description: z.string().trim().min(1).max(2000),
+  reference: z.string().trim().max(60).optional(),
+  costImpactCents: z.number().int().default(0), // may be negative
+  timeImpactDays: z.number().int().default(0),
+});
+export type CreateVariationInput = z.infer<typeof createVariationSchema>;
+
+export const recordPaymentSchema = z.object({
+  invoiceId: z.string().uuid(),
+  amountCents: z.number().int().positive(),
+  method: z.enum(PAYMENT_METHODS).default('paynow'),
+  reference: z.string().trim().max(120).optional(),
+});
+export type RecordPaymentInput = z.infer<typeof recordPaymentSchema>;
