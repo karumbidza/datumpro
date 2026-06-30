@@ -7,6 +7,7 @@ import { PROJECT_TYPES } from '../domain/projects';
 import { REQUEST_TYPES } from '../domain/requests';
 import { REPORT_STATUSES, WEATHER_OPTIONS } from '../domain/monitoring';
 import { PAYMENT_METHODS } from '../domain/finance';
+import { TASK_PRIORITIES } from '../domain/tasks';
 
 export const createOrgSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -67,6 +68,27 @@ export const createInvoiceSchema = z.object({
     .min(1),
 });
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;
+
+export const createTaskSchema = z.object({
+  projectId: z.string().uuid(),
+  title: z.string().trim().min(2).max(200),
+  description: z.string().trim().max(5000).optional(),
+  priority: z.enum(TASK_PRIORITIES).default('medium'),
+  assigneeId: z.string().uuid().optional(),
+  milestoneId: z.string().uuid().optional(),
+  plannedStartDate: z.string().date().optional(),
+  plannedEndDate: z.string().date().optional(),
+  dueDate: z.string().date().optional(),
+});
+export type CreateTaskInput = z.infer<typeof createTaskSchema>;
+
+/** Completion sign-off — decision C: notes + at least one photo + declaration. */
+export const submitTaskSchema = z.object({
+  completionNotes: z.string().trim().min(10, 'Describe what was completed'),
+  photos: z.array(z.string()).min(1, 'At least one photo is required'),
+  declaration: z.literal(true, { errorMap: () => ({ message: 'You must confirm the declaration' }) }),
+});
+export type SubmitTaskInput = z.infer<typeof submitTaskSchema>;
 
 export const createBudgetLineSchema = z.object({
   projectId: z.string().uuid(),
