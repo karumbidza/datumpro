@@ -4,6 +4,14 @@
 -- Multi-tenancy is enforced in the DATABASE via Row-Level Security: every
 -- tenant-owned row carries `org_id`, and policies allow access only to members of
 -- that org. App code can't forget to scope a query — Postgres does it.
+--
+-- Security-by-design notes:
+--   • Helper functions are SECURITY DEFINER (to read org_members without RLS
+--     recursion) AND hardened with `set search_path = ''` + fully-qualified names,
+--     so they can't be subverted by a malicious object in another schema.
+--   • Policy predicates wrap auth/helper calls in `(select …)` so Postgres
+--     evaluates them once per statement (initplan) instead of once per row —
+--     this is what keeps RLS cheap as orgs/rows scale.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 create extension if not exists pgcrypto;
@@ -26,7 +34,10 @@ create table public.organizations (
   id         uuid primary key default gen_random_uuid(),
   name       text not null,
   slug       text unique,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- Referenced by composite FKs on child tables so a child's org_id is forced to
+  -- equal its parent's — no cross-tenant references possible (id is already unique).
+  unique (id)
 );
 
 create table public.org_members (
@@ -38,8 +49,10 @@ create table public.org_members (
   created_at timestamptz not null default now(),
   unique (org_id, user_id)
 );
-create index org_members_user_idx on public.org_members (user_id);
-create index org_members_org_idx  on public.org_members (org_id);
+-- (user_id, org_id) composite serves the membership lookup in is_org_member /
+-- org_role (both columns equality-filtered).
+create index org_members_user_org_idx on public.org_members (user_id, org_id);
+create index org_members_org_idx       on public.org_members (org_id);
 
 create table public.invitations (
   id          uuid primary key default gen_random_uuid(),
@@ -54,40 +67,37 @@ create table public.invitations (
 );
 create index invitations_org_idx on public.invitations (org_id);
 
--- ── Access helper functions ──────────────────────────────────────────────────
--- SECURITY DEFINER so they read org_members WITHOUT triggering RLS — this is what
--- prevents infinite recursion when a policy on org_members calls is_org_member().
+-- ── Access helper functions (SECURITY DEFINER + hardened search_path) ─────────
 create or replace function public.is_org_member(p_org_id uuid)
-returns boolean language sql stable security definer set search_path = public as $$
+returns boolean language sql stable security definer set search_path = '' as $$
   select exists (
     select 1 from public.org_members m
-    where m.org_id = p_org_id and m.user_id = auth.uid() and m.status = 'active'
+    where m.org_id = p_org_id and m.user_id = (select auth.uid()) and m.status = 'active'
   );
 $$;
 
 create or replace function public.org_role(p_org_id uuid)
-returns text language sql stable security definer set search_path = public as $$
+returns text language sql stable security definer set search_path = '' as $$
   select m.role::text from public.org_members m
-  where m.org_id = p_org_id and m.user_id = auth.uid() and m.status = 'active'
+  where m.org_id = p_org_id and m.user_id = (select auth.uid()) and m.status = 'active'
   limit 1;
 $$;
 
--- True if the current user shares any org with `p_user_id` (for visibility of
--- co-members' profiles).
+-- True if the current user shares any org with `p_user_id` (profile visibility).
 create or replace function public.shares_org(p_user_id uuid)
-returns boolean language sql stable security definer set search_path = public as $$
+returns boolean language sql stable security definer set search_path = '' as $$
   select exists (
     select 1
     from public.org_members me
     join public.org_members them on them.org_id = me.org_id
-    where me.user_id = auth.uid() and me.status = 'active'
+    where me.user_id = (select auth.uid()) and me.status = 'active'
       and them.user_id = p_user_id and them.status = 'active'
   );
 $$;
 
 -- ── Triggers: bootstrap profile on signup, owner membership on org creation ───
 create or replace function public.handle_new_user()
-returns trigger language plpgsql security definer set search_path = public as $$
+returns trigger language plpgsql security definer set search_path = '' as $$
 begin
   insert into public.profiles (id, email, display_name, avatar_url)
   values (
@@ -106,11 +116,11 @@ create trigger on_auth_user_created
   for each row execute function public.handle_new_user();
 
 create or replace function public.handle_new_org()
-returns trigger language plpgsql security definer set search_path = public as $$
+returns trigger language plpgsql security definer set search_path = '' as $$
 begin
-  if auth.uid() is not null then
+  if (select auth.uid()) is not null then
     insert into public.org_members (org_id, user_id, role, status)
-    values (new.id, auth.uid(), 'owner', 'active')
+    values (new.id, (select auth.uid()), 'owner', 'active')
     on conflict (org_id, user_id) do nothing;
   end if;
   return new;
@@ -129,30 +139,30 @@ alter table public.invitations   enable row level security;
 
 -- profiles: see yourself + anyone you share an org with; edit only yourself
 create policy profiles_select on public.profiles for select
-  using (id = auth.uid() or public.shares_org(id));
+  using (id = (select auth.uid()) or (select public.shares_org(id)));
 create policy profiles_update on public.profiles for update
-  using (id = auth.uid()) with check (id = auth.uid());
+  using (id = (select auth.uid())) with check (id = (select auth.uid()));
 
 -- organizations: members read; any authed user may create (trigger makes them
 -- owner); owners/admins update; owners delete
 create policy organizations_select on public.organizations for select
-  using (public.is_org_member(id));
+  using ((select public.is_org_member(id)));
 create policy organizations_insert on public.organizations for insert
-  with check (auth.uid() is not null);
+  with check ((select auth.uid()) is not null);
 create policy organizations_update on public.organizations for update
-  using (public.org_role(id) in ('owner', 'admin'))
-  with check (public.org_role(id) in ('owner', 'admin'));
+  using ((select public.org_role(id)) in ('owner', 'admin'))
+  with check ((select public.org_role(id)) in ('owner', 'admin'));
 create policy organizations_delete on public.organizations for delete
-  using (public.org_role(id) = 'owner');
+  using ((select public.org_role(id)) = 'owner');
 
 -- org_members: members see co-members; owners/admins manage
 create policy org_members_select on public.org_members for select
-  using (public.is_org_member(org_id));
+  using ((select public.is_org_member(org_id)));
 create policy org_members_write on public.org_members for all
-  using (public.org_role(org_id) in ('owner', 'admin'))
-  with check (public.org_role(org_id) in ('owner', 'admin'));
+  using ((select public.org_role(org_id)) in ('owner', 'admin'))
+  with check ((select public.org_role(org_id)) in ('owner', 'admin'));
 
 -- invitations: owners/admins only
 create policy invitations_manage on public.invitations for all
-  using (public.org_role(org_id) in ('owner', 'admin'))
-  with check (public.org_role(org_id) in ('owner', 'admin'));
+  using ((select public.org_role(org_id)) in ('owner', 'admin'))
+  with check ((select public.org_role(org_id)) in ('owner', 'admin'));

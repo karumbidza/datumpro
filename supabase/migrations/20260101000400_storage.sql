@@ -10,23 +10,34 @@ insert into storage.buckets (id, name, public)
 values ('project-media', 'project-media', false)
 on conflict (id) do nothing;
 
+-- Safe cast: a malformed object name would make a raw `::uuid` cast throw inside
+-- the policy. Return null instead → membership checks simply fail closed.
+create or replace function public.safe_uuid(p text)
+returns uuid language plpgsql immutable set search_path = '' as $$
+begin
+  return p::uuid;
+exception when others then
+  return null;
+end;
+$$;
+
 create policy "project-media read"
   on storage.objects for select to authenticated
   using (
     bucket_id = 'project-media'
-    and public.is_org_member(((storage.foldername(name))[1])::uuid)
+    and (select public.is_org_member(public.safe_uuid((storage.foldername(name))[1])))
   );
 
 create policy "project-media upload"
   on storage.objects for insert to authenticated
   with check (
     bucket_id = 'project-media'
-    and public.is_org_member(((storage.foldername(name))[1])::uuid)
+    and (select public.is_org_member(public.safe_uuid((storage.foldername(name))[1])))
   );
 
 create policy "project-media delete"
   on storage.objects for delete to authenticated
   using (
     bucket_id = 'project-media'
-    and public.org_role(((storage.foldername(name))[1])::uuid) in ('owner', 'admin', 'pm')
+    and (select public.org_role(public.safe_uuid((storage.foldername(name))[1]))) in ('owner', 'admin', 'pm')
   );

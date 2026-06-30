@@ -25,4 +25,4 @@ alter table public.audit_logs enable row level security;
 -- Read-only for org members; no insert/update/delete policy → only the service
 -- role (which bypasses RLS) can write. The log stays tamper-evident.
 create policy audit_logs_select on public.audit_logs for select
-  using (public.is_org_member(org_id));
+  using ((select public.is_org_member(org_id)));
