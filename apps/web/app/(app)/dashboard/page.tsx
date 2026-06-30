@@ -49,9 +49,11 @@ export default async function DashboardPage() {
             Here&apos;s what&apos;s happening across {active.name} today · {formatLongDate(new Date())}
           </p>
         </div>
-        <Link href="/projects/new">
-          <Button>New project</Button>
-        </Link>
+        {(active.role === 'owner' || active.role === 'admin') && (
+          <Link href="/projects/new">
+            <Button>New project</Button>
+          </Link>
+        )}
       </div>
 
       {/* Action-required stat cards */}

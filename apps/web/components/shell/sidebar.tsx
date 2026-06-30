@@ -215,6 +215,7 @@ function ProjectsTree({ projects }: { projects: SidebarProject[] }) {
     { title: 'Tasks', href: `/projects/${id}/tasks` },
     { title: 'Finance', href: `/projects/${id}/finance` },
     { title: 'Requests', href: `/projects/${id}/requests` },
+    { title: 'Team', href: `/projects/${id}/team` },
   ];
 
   return (

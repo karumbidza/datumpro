@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { listProjects } from '@/lib/data/projects';
+import { getActiveContext } from '@/lib/data/org';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,15 +23,18 @@ export default async function ProjectsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect('/sign-in');
 
-  const projects = await listProjects();
+  const [projects, ctx] = await Promise.all([listProjects(), getActiveContext()]);
+  const canCreate = ctx?.active?.role === 'owner' || ctx?.active?.role === 'admin';
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
       <header className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
-        <Link href="/projects/new">
-          <Button>New project</Button>
-        </Link>
+        {canCreate && (
+          <Link href="/projects/new">
+            <Button>New project</Button>
+          </Link>
+        )}
       </header>
 
       {projects.length === 0 ? (
