@@ -57,7 +57,11 @@ Construction / marketing / IT share one project engine; an industry "pack" is pr
 ## Build slices (sequencing)
 1. **Foundation** (this scaffold) — monorepo, tenancy + projects schema + RLS, shared domain/access, web shell, auth.
 2. **Monitoring** — site reports + media, milestones; mobile offline capture + PowerSync.
-3. **Requests & approvals** — request types, approval chains + policies.
+3. **Requests & approvals** — schema ✅. Requests (RFI/purchase/variation/access),
+   per-org approval policies, and an approval chain materialised by a SECURITY
+   DEFINER `submit_request()` (clients can't forge steps). DB triggers enforce
+   segregation of duties (requester ≠ approver) and finalise request status.
+   Next: app UI; wire approved variation requests → variation_orders.
 4. **Finance** — schema ✅ (budget/BOQ, variations, invoices + lines, payment
    schedule, payments, proof-of-payment, Paynow). Money is integer USD cents; line
    totals are generated columns; cross-tenant references blocked by composite FKs;
