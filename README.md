@@ -49,4 +49,5 @@ pnpm --filter @datumpro/web dev
 - **Auth is used only through `@datumpro/shared/auth`** so enterprise SSO can drop in later.
 - Apps depend on `@datumpro/shared`; the shared package depends on nothing framework-specific.
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the why behind these.
+See [`docs/LOCAL_SETUP.md`](docs/LOCAL_SETUP.md) for the full local + Claude Code
+setup, and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the why behind these.
