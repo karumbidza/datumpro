@@ -42,9 +42,14 @@ export default async function ProjectDetailPage({
             <p className="text-sm text-zinc-500 dark:text-zinc-400">{project.client_name}</p>
           )}
         </div>
-        <Link href={`/projects/${projectId}/reports/new`}>
-          <Button>New site report</Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href={`/projects/${projectId}/tasks`}>
+            <Button variant="secondary">Tasks</Button>
+          </Link>
+          <Link href={`/projects/${projectId}/reports/new`}>
+            <Button>New site report</Button>
+          </Link>
+        </div>
       </header>
 
       <Card>
