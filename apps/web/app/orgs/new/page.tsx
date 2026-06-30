@@ -17,14 +17,15 @@ export default async function NewOrgPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
       <Card>
-        <h1 className="text-lg font-semibold tracking-tight">Create your organisation</h1>
+        <h1 className="text-lg font-semibold tracking-tight">Create your company</h1>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          You&apos;ll be the owner. Add projects and teammates next.
+          This is your tenant — you&apos;ll be the owner. Create projects inside it and invite
+          teammates per project.
         </p>
         <form action={createOrg} className="mt-6 space-y-3">
           <input name="name" required placeholder="e.g. Grafaid Engineers" className={inputClass} />
           <Button type="submit" className="w-full">
-            Create organisation
+            Create company
           </Button>
         </form>
       </Card>

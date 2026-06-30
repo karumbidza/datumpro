@@ -130,7 +130,7 @@ function OrgSwitcher({
               {active.name}
             </span>
             <span className="block truncate text-xs text-zinc-500 dark:text-zinc-400">
-              {memberships.length} organisation{memberships.length !== 1 ? 's' : ''}
+              {memberships.length} compan{memberships.length !== 1 ? 'ies' : 'y'}
             </span>
           </span>
         </span>
@@ -142,7 +142,7 @@ function OrgSwitcher({
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute left-3 top-full z-50 w-60 rounded-md border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
             <p className="px-3 pt-3 text-[10px] font-medium uppercase tracking-wider text-zinc-400">
-              Organisations
+              Companies
             </p>
             <div className="p-1.5">
               {memberships.map((m) => (
@@ -172,7 +172,7 @@ function OrgSwitcher({
                 onClick={() => setOpen(false)}
                 className="flex items-center gap-2 rounded p-2 text-xs font-medium text-brand-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
               >
-                <Plus size={14} /> Create organisation
+                <Plus size={14} /> New company
               </Link>
             </div>
           </div>
