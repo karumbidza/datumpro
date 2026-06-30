@@ -1,6 +1,8 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { Card, CardTitle, CardValue } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { permissionsFor, type OrgRole } from '@datumpro/shared/access';
 
 /** Authenticated dashboard. Demonstrates the end-to-end path: session → active
@@ -22,18 +24,40 @@ export default async function DashboardPage() {
     .eq('status', 'active');
 
   const active = memberships?.[0];
-  const role = (active?.role ?? 'viewer') as OrgRole;
-  const orgName =
-    (active?.organizations as { name?: string } | null)?.name ?? 'No organisation yet';
+
+  // No organisation yet → send the user straight into onboarding.
+  if (!active) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Welcome to DatumPro</h1>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            Create your organisation to get started.
+          </p>
+        </div>
+        <Link href="/orgs/new">
+          <Button>Create organisation</Button>
+        </Link>
+      </main>
+    );
+  }
+
+  const role = (active.role ?? 'viewer') as OrgRole;
+  const orgName = (active.organizations as { name?: string } | null)?.name ?? 'Organisation';
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
-      <header className="mb-8">
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">{orgName}</p>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="mt-1 text-xs text-zinc-400">
-          Signed in as {user.email} · role: <span className="font-medium">{role}</span>
-        </p>
+      <header className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">{orgName}</p>
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="mt-1 text-xs text-zinc-400">
+            Signed in as {user.email} · role: <span className="font-medium">{role}</span>
+          </p>
+        </div>
+        <Link href="/projects">
+          <Button variant="secondary">Projects</Button>
+        </Link>
       </header>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">

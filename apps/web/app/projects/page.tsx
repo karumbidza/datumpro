@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { listProjects } from '@/lib/data/projects';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { formatUsd } from '@datumpro/shared/domain';
 
 const STATUS_TONE = {
@@ -25,11 +26,16 @@ export default async function ProjectsPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
-      <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
+      <header className="flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
+        <Link href="/projects/new">
+          <Button>New project</Button>
+        </Link>
+      </header>
 
       {projects.length === 0 ? (
         <p className="mt-6 text-sm text-zinc-500 dark:text-zinc-400">
-          No projects yet.
+          No projects yet — create your first one.
         </p>
       ) : (
         <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
