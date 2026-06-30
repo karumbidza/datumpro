@@ -25,7 +25,15 @@ export default function SignInPage() {
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     setBusy(false);
-    if (error) return setMessage({ kind: 'error', text: error.message });
+    if (error) {
+      const unconfirmed = /invalid login credentials|email not confirmed/i.test(error.message);
+      return setMessage({
+        kind: 'error',
+        text: unconfirmed
+          ? "Can't sign in — your email may not be confirmed. Confirm via the email link, or (for dev) disable “Confirm email” in Supabase → Auth → Email, then create the account again."
+          : error.message,
+      });
+    }
     window.location.assign('/dashboard'); // full reload so the server picks up the session
   }
 
@@ -44,7 +52,10 @@ export default function SignInPage() {
     setBusy(false);
     if (error) return setMessage({ kind: 'error', text: error.message });
     if (data.session) return window.location.assign('/dashboard'); // confirmation disabled → straight in
-    setMessage({ kind: 'info', text: 'Account created. Check your email to confirm, then sign in.' });
+    setMessage({
+      kind: 'info',
+      text: 'Account created, but email confirmation is ON. Click the link in your email to finish — or (for dev) turn off “Confirm email” in Supabase → Auth → Email, delete this user, and create again.',
+    });
   }
 
   async function magicLink(e: React.FormEvent) {
