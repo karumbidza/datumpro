@@ -8,6 +8,8 @@ import {
   type ProgressResult,
 } from '@datumpro/shared/domain';
 import type { TaskStatus } from '@datumpro/shared/domain';
+import { myOrgRole } from '@/lib/data/tasks';
+import { myProjectRole } from '@/lib/data/members';
 
 export interface TaskScheduleMeta {
   critical: boolean;
@@ -27,24 +29,17 @@ export interface ProjectSchedule {
 
 interface RawTask {
   id: string;
+  org_id: string;
   status: TaskStatus;
   planned_start_date: string | null;
   planned_end_date: string | null;
   due_date: string | null;
-  agreed_cost_cents: number | null;
 }
 
 function taskDuration(t: RawTask): number {
   if (t.planned_start_date && t.planned_end_date) return inclusiveDays(t.planned_start_date, t.planned_end_date);
   if (t.planned_start_date && t.due_date) return inclusiveDays(t.planned_start_date, t.due_date);
   return 1;
-}
-
-/** Earned-Value weight: the agreed contractor cost once a commitment is locked,
- *  otherwise planned duration. Cost-weighting is the industry standard; duration
- *  is the honest fallback before a price exists. */
-function taskWeight(t: RawTask, duration: number): number {
-  return t.agreed_cost_cents && t.agreed_cost_cents > 0 ? t.agreed_cost_cents : duration;
 }
 
 /** Run the CPM + earned-value engine over one project's tasks & dependencies.
@@ -54,16 +49,35 @@ export async function getProjectSchedule(projectId: string): Promise<ProjectSche
 
   const { data: taskData } = await supabase
     .from('tasks')
-    .select('id, status, planned_start_date, planned_end_date, due_date, agreed_cost_cents')
+    .select('id, org_id, status, planned_start_date, planned_end_date, due_date')
     .eq('project_id', projectId);
   const tasks = (taskData ?? []) as RawTask[];
   if (tasks.length === 0) return null;
 
+  const orgId = tasks[0]!.org_id;
   const ids = tasks.map((t) => t.id);
   const { data: depData } = await supabase
     .from('task_dependencies')
     .select('predecessor_id, successor_id, lag_days')
     .in('successor_id', ids);
+
+  // Cost-weighted Earned Value only for viewers allowed to see costs (staff / the
+  // project PM). Others get honest duration-weighting — never a peer's price.
+  const [orgRole, projectRoleValue] = await Promise.all([myOrgRole(orgId), myProjectRole(projectId)]);
+  const privileged =
+    orgRole === 'owner' || orgRole === 'admin' || orgRole === 'finance' || projectRoleValue === 'pm';
+
+  const costByTask = new Map<string, number>();
+  if (privileged) {
+    const { data: awarded } = await supabase
+      .from('task_quotes')
+      .select('task_id, cost_cents')
+      .eq('project_id', projectId)
+      .eq('status', 'awarded');
+    for (const q of (awarded ?? []) as { task_id: string; cost_cents: number | null }[]) {
+      if (q.cost_cents && q.cost_cents > 0) costByTask.set(q.task_id, q.cost_cents);
+    }
+  }
 
   const depsBySuccessor = new Map<string, { predecessorId: string; lagDays: number }[]>();
   for (const d of (depData ?? []) as { predecessor_id: string; successor_id: string; lag_days: number }[]) {
@@ -78,7 +92,7 @@ export async function getProjectSchedule(projectId: string): Promise<ProjectSche
       id: t.id,
       durationDays: duration,
       status: t.status,
-      weight: taskWeight(t, duration),
+      weight: costByTask.get(t.id) ?? duration,
       dependencies: depsBySuccessor.get(t.id) ?? [],
       plannedStart: t.planned_start_date,
       plannedEnd: t.planned_end_date ?? t.due_date,

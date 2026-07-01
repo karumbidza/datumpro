@@ -11,8 +11,8 @@ import {
 } from '@/lib/data/tasks';
 import { listProjectMembers, myProjectRole } from '@/lib/data/members';
 import { getProjectSchedule } from '@/lib/data/scheduling';
-import { getTaskCommitment, listTaskMedia } from '@/lib/data/commitments';
-import { CommitmentPanel } from '@/components/task/commitment-panel';
+import { listTaskQuotes, listTaskMedia } from '@/lib/data/quotes';
+import { QuotePanel } from '@/components/task/quote-panel';
 import { CompletionEvidence } from '@/components/task/completion-evidence';
 import { ExtensionPanel } from '@/components/task/extension-panel';
 import { Card, CardTitle } from '@/components/ui/card';
@@ -57,9 +57,8 @@ export default async function TaskDetailPage({
     taskOptions,
     activity,
     schedule,
-    commitment,
+    quotes,
     completionMedia,
-    quoteMedia,
     extensions,
   ] = await Promise.all([
     listProjectMembers(projectId),
@@ -69,9 +68,8 @@ export default async function TaskDetailPage({
     listProjectTaskOptions(projectId, taskId),
     listTaskActivity(taskId),
     getProjectSchedule(projectId),
-    getTaskCommitment(taskId),
+    listTaskQuotes(taskId),
     listTaskMedia(taskId, 'completion'),
-    listTaskMedia(taskId, 'quote'),
     listExtensionRequests(taskId),
   ]);
   const sched = schedule?.meta[taskId];
@@ -138,15 +136,14 @@ export default async function TaskDetailPage({
         )}
       </Card>
 
-      <CommitmentPanel
+      <QuotePanel
         taskId={taskId}
         projectId={projectId}
         orgId={task.org_id}
         canManage={canManage}
         currentUserId={user.id}
-        commitment={commitment}
+        quotes={quotes}
         contractors={contractors}
-        quoteMedia={quoteMedia}
       />
 
       {/* ── Dependencies — "this task starts after" ── */}

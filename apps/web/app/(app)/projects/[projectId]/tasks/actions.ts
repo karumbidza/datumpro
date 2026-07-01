@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { createTaskSchema } from '@datumpro/shared/validation';
-import { completionMediaCount } from '@/lib/data/commitments';
+import { completionMediaCount } from '@/lib/data/quotes';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -320,55 +320,61 @@ export async function resolveBlocker(formData: FormData) {
   revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
 }
 
-/* ── Contractor commitment (offer → respond → agree) ─────────────────────── */
+/* ── Multi-contractor quotes (invite → submit → award) ───────────────────── */
 
-/** PM offers the task to a contractor. Also assigns them so they can respond and,
- *  later, execute. One commitment per task. */
-export async function offerCommitment(formData: FormData) {
+/** PM invites one or more contractors to quote the task (blind bids). */
+export async function inviteQuotes(formData: FormData) {
   const { supabase, user } = await requireUser();
   const taskId = String(formData.get('taskId') ?? '');
-  const contractorId = String(formData.get('contractorId') ?? '');
-  if (!contractorId) throw new Error('Choose a contractor');
+  const contractorIds = formData.getAll('contractorIds').map(String).filter(Boolean);
+  if (contractorIds.length === 0) throw new Error('Select at least one contractor');
   const task = await loadTask(supabase, taskId);
   if (!task) throw new Error('Task not found');
 
-  const { error } = await supabase.from('task_commitments').insert({
-    org_id: task.org_id,
-    project_id: task.project_id,
-    task_id: taskId,
-    contractor_id: contractorId,
-    status: 'offered',
-    created_by: user.id,
-  });
-  if (error) {
-    if (/duplicate|unique/i.test(error.message)) throw new Error('This task already has a commitment');
-    throw new Error(error.message);
-  }
-  await supabase.from('tasks').update({ assignee_id: contractorId }).eq('id', taskId);
-  await logActivity(supabase, task, user.id, 'commitment', 'Offered the task to a contractor');
+  // Skip anyone already invited (unique task_id + contractor_id).
+  const { data: existing } = await supabase
+    .from('task_quotes')
+    .select('contractor_id')
+    .eq('task_id', taskId);
+  const already = new Set(((existing ?? []) as { contractor_id: string }[]).map((e) => e.contractor_id));
+  const rows = contractorIds
+    .filter((id) => !already.has(id))
+    .map((id) => ({
+      org_id: task.org_id,
+      project_id: task.project_id,
+      task_id: taskId,
+      contractor_id: id,
+      status: 'invited' as const,
+      created_by: user.id,
+    }));
+  if (rows.length === 0) throw new Error('Those contractors are already invited');
+
+  const { error } = await supabase.from('task_quotes').insert(rows);
+  if (error) throw new Error(error.message);
+  await logActivity(supabase, task, user.id, 'quote', `Invited ${rows.length} contractor(s) to quote`);
   revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
 }
 
-/** Contractor responds: accept (with cost/timeline/quote/terms), counter, or decline. */
-export async function respondCommitment(formData: FormData) {
+/** Contractor submits (or declines) their own quote. RLS restricts this to their row. */
+export async function submitQuote(formData: FormData) {
   const { supabase, user } = await requireUser();
   const taskId = String(formData.get('taskId') ?? '');
-  const decision = String(formData.get('decision') ?? ''); // accept | counter | decline
+  const decision = String(formData.get('decision') ?? ''); // submit | decline
   const task = await loadTask(supabase, taskId);
   if (!task) throw new Error('Task not found');
 
-  const status =
-    decision === 'decline' ? 'declined' : decision === 'counter' ? 'counter_proposed' : 'accepted';
-
-  const update: Record<string, unknown> = { status, responded_at: new Date().toISOString() };
-  if (decision !== 'decline') {
+  const update: Record<string, unknown> = { decided_at: new Date().toISOString() };
+  if (decision === 'decline') {
+    update.status = 'declined';
+  } else {
     const cost = Number(formData.get('costDollars') ?? 0);
     if (!Number.isFinite(cost) || cost <= 0) throw new Error('Enter your cost for this task');
+    update.status = 'submitted';
+    update.submitted_at = new Date().toISOString();
     update.cost_cents = Math.round(cost * 100);
     update.proposed_start = (formData.get('proposedStart') as string) || null;
     update.proposed_end = (formData.get('proposedEnd') as string) || null;
     update.justification = (formData.get('justification') as string)?.trim() || null;
-    update.quote_path = (formData.get('quotePath') as string) || null;
     const advancePct = Number(formData.get('advancePct') ?? 0);
     const retentionPct = Number(formData.get('retentionPct') ?? 0);
     update.payment_terms = {
@@ -377,54 +383,50 @@ export async function respondCommitment(formData: FormData) {
     };
   }
 
-  const { error } = await supabase.from('task_commitments').update(update).eq('task_id', taskId);
+  const { error } = await supabase
+    .from('task_quotes')
+    .update(update)
+    .eq('task_id', taskId)
+    .eq('contractor_id', user.id);
   if (error) throw new Error(error.message);
-  await logActivity(supabase, task, user.id, 'commitment', `Contractor response: ${status.replace('_', ' ')}`);
+  await logActivity(supabase, task, user.id, 'quote', decision === 'decline' ? 'Declined to quote' : 'Submitted a quote');
   revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
 }
 
-/** PM decides on the contractor's response: agree (locks cost → EV weight) or decline.
- *  The DB CHECK stops the contractor from agreeing their own commitment. */
-export async function decideCommitment(formData: FormData) {
+/** PM awards a submitted quote: winner → awarded, rivals → not_selected (kept for
+ *  audit), and the task is assigned to the winning contractor. The awarded quote's
+ *  cost becomes the Earned-Value weight (read privileged, never exposed per-task). */
+export async function awardQuote(formData: FormData) {
   const { supabase, user } = await requireUser();
   const taskId = String(formData.get('taskId') ?? '');
-  const decision = String(formData.get('decision') ?? ''); // agree | decline
+  const quoteId = String(formData.get('quoteId') ?? '');
   const task = await loadTask(supabase, taskId);
   if (!task) throw new Error('Task not found');
 
-  const { data: commitment } = await supabase
-    .from('task_commitments')
-    .select('cost_cents')
-    .eq('task_id', taskId)
+  const { data: quote } = await supabase
+    .from('task_quotes')
+    .select('contractor_id, status')
+    .eq('id', quoteId)
     .maybeSingle();
+  const winner = quote as { contractor_id: string; status: string } | null;
+  if (!winner) throw new Error('Quote not found');
+  if (winner.status !== 'submitted') throw new Error('Only a submitted quote can be awarded');
 
-  if (decision === 'agree') {
-    const agreedCost = (commitment as { cost_cents: number | null } | null)?.cost_cents ?? null;
-    const { error } = await supabase
-      .from('task_commitments')
-      .update({
-        status: 'agreed',
-        agreed_by: user.id,
-        agreed_cost_cents: agreedCost,
-        decided_at: new Date().toISOString(),
-      })
-      .eq('task_id', taskId);
-    if (error) {
-      if (/sod|check/i.test(error.message)) {
-        throw new Error("You can't agree your own commitment (segregation of duties).");
-      }
-      throw new Error(error.message);
-    }
-    await supabase.from('tasks').update({ agreed_cost_cents: agreedCost }).eq('id', taskId);
-    await logActivity(supabase, task, user.id, 'commitment', 'Agreed the commitment');
-  } else {
-    const { error } = await supabase
-      .from('task_commitments')
-      .update({ status: 'declined', decided_at: new Date().toISOString() })
-      .eq('task_id', taskId);
-    if (error) throw new Error(error.message);
-    await logActivity(supabase, task, user.id, 'commitment', 'Declined the commitment');
-  }
+  const now = new Date().toISOString();
+  // Rivals first, then the winner, so a task never has two awarded rows.
+  await supabase
+    .from('task_quotes')
+    .update({ status: 'not_selected', decided_at: now })
+    .eq('task_id', taskId)
+    .neq('id', quoteId);
+  const { error } = await supabase
+    .from('task_quotes')
+    .update({ status: 'awarded', decided_at: now })
+    .eq('id', quoteId);
+  if (error) throw new Error(error.message);
+
+  await supabase.from('tasks').update({ assignee_id: winner.contractor_id }).eq('id', taskId);
+  await logActivity(supabase, task, user.id, 'quote', 'Awarded the quote');
   revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
 }
 

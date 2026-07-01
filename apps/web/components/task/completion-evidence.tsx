@@ -2,7 +2,7 @@ import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { MediaUploader } from '@/components/task/media-uploader';
 import { removeTaskMedia } from '@/app/(app)/projects/[projectId]/tasks/actions';
-import type { TaskMediaRow } from '@/lib/data/commitments';
+import type { TaskMediaRow } from '@/lib/data/quotes';
 
 interface Props {
   taskId: string;
