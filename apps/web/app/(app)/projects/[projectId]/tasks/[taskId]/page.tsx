@@ -166,24 +166,18 @@ export default async function TaskDetailPage({
       <PaymentsPanel taskId={taskId} lines={payments} canManage={canManage} />
 
       {dm && (
-        <Card className="mt-6 overflow-hidden p-0">
-          <div className="border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
-            <CardTitle>Discussion</CardTitle>
-            <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-              Private to the project manager and the assigned contractor.
-            </p>
-          </div>
-          <ChatPanel
-            className="h-96"
-            conversationId={dm.id}
-            currentUserId={user.id}
-            meName={meName}
-            initialMessages={dm.messages}
-            othersReadSeq={dm.othersRead}
-            canPost
-            canModerate={canManage}
-          />
-        </Card>
+        <ChatPanel
+          className="mt-6 h-[520px]"
+          title="Task Discussion"
+          subtitle="Private to the project manager and the assigned contractor."
+          conversationId={dm.id}
+          currentUserId={user.id}
+          meName={meName}
+          initialMessages={dm.messages}
+          othersReadSeq={dm.othersRead}
+          canPost
+          canModerate={canManage}
+        />
       )}
 
       {/* ── Dependencies — "this task starts after" ── */}

@@ -26,16 +26,13 @@ export default async function ProjectChatPage({
   const conversationId = await getProjectConversationId(projectId);
 
   return (
-    <div className="flex h-full flex-col">
-      <header className="border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
-        <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 hover:underline">
-          ← {project.name}
-        </Link>
-        <h1 className="mt-1 text-lg font-semibold tracking-tight">Project chat</h1>
-      </header>
+    <div className="flex h-full flex-col px-4 py-4 xl:px-8">
+      <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 hover:underline">
+        ← {project.name}
+      </Link>
 
       {!conversationId ? (
-        <div className="p-6">
+        <div className="mt-3">
           <Card>
             <p className="text-sm text-zinc-500 dark:text-zinc-400">
               The project group chat is for the delivery team. Contractors use their per-task
@@ -57,7 +54,8 @@ export default async function ProjectChatPage({
           const canModerate = orgRole === 'owner' || orgRole === 'admin' || projectRole === 'pm';
           return (
             <ChatPanel
-              className="min-h-0 flex-1"
+              className="mt-3 min-h-0 flex-1"
+              title="Project Chat"
               conversationId={conversationId}
               currentUserId={user.id}
               meName={meName}

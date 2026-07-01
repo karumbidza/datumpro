@@ -12,6 +12,7 @@ import {
 } from '@/app/(app)/projects/[projectId]/chat/actions';
 import type { ChatMessage } from '@/lib/data/chat';
 import { Button } from '@/components/ui/button';
+import { MessageCircle, Paperclip } from '@/components/icons';
 
 const EMOJIS = ['👍', '❤️', '😂', '🎉', '✅'];
 
@@ -23,11 +24,19 @@ interface Props {
   othersReadSeq: number;
   canPost: boolean;
   canModerate?: boolean;
+  title?: string;
+  subtitle?: string;
   className?: string;
 }
 
-function timeLabel(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+function fullTime(iso: string): string {
+  return new Date(iso).toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 export function ChatPanel({
@@ -38,6 +47,8 @@ export function ChatPanel({
   othersReadSeq,
   canPost,
   canModerate = false,
+  title,
+  subtitle,
   className = '',
 }: Props) {
   const supabase = useMemo(() => createClient(), []);
@@ -89,7 +100,6 @@ export function ChatPanel({
     [currentUserId],
   );
 
-  // Realtime private channel: signalling (data via server actions on each event).
   useEffect(() => {
     let active = true;
     (async () => {
@@ -129,7 +139,6 @@ export function ChatPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
-  // Presence heartbeat for the offline indicator.
   useEffect(() => {
     const iv = setInterval(() => {
       void supabase.from('profiles').update({ last_active_at: new Date().toISOString() }).eq('id', currentUserId);
@@ -141,7 +150,7 @@ export function ChatPanel({
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  function onInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function onInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     setInput(e.target.value);
     const now = Date.now();
     if (now - lastTypingSent.current > 1500) {
@@ -150,8 +159,7 @@ export function ChatPanel({
     }
   }
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submit() {
     const body = input.trim();
     if (!body || sending) return;
     setSending(true);
@@ -183,111 +191,122 @@ export function ChatPanel({
   const typingNames = Object.values(typing);
 
   return (
-    <div className={`flex flex-col ${className}`}>
-      {onlineOthers > 0 && (
-        <div className="border-b border-zinc-100 px-4 py-1.5 text-[11px] text-green-600 dark:border-zinc-800 dark:text-green-400">
-          ● {onlineOthers} online
-        </div>
+    <div className={`flex flex-col rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950 ${className}`}>
+      {title && (
+        <header className="flex items-center gap-2 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+          <MessageCircle size={18} className="text-zinc-500" />
+          <h2 className="text-sm font-semibold text-zinc-900 dark:text-white">
+            {title} <span className="text-zinc-400">({messages.length})</span>
+          </h2>
+          {onlineOthers > 0 && (
+            <span className="ml-auto flex items-center gap-1 text-[11px] text-green-600 dark:text-green-400">
+              ● {onlineOthers} online
+            </span>
+          )}
+        </header>
+      )}
+      {subtitle && (
+        <p className="border-b border-zinc-100 px-4 py-1.5 text-[11px] text-zinc-400 dark:border-zinc-800">
+          {subtitle}
+        </p>
       )}
 
-      <div className="flex-1 space-y-1 overflow-y-auto p-4">
+      <div className="flex-1 space-y-3 overflow-y-auto p-4">
         {messages.length === 0 ? (
-          <p className="py-8 text-center text-sm text-zinc-400">No messages yet — say hello.</p>
+          <p className="py-8 text-center text-sm text-zinc-400">No messages yet — start the discussion.</p>
         ) : (
           messages.map((m) => {
             const mine = m.senderId === currentUserId;
             const parent = m.parentMessageId ? msgById.get(m.parentMessageId) : null;
             return (
-              <div key={m.id} className={`group flex ${mine ? 'justify-end' : 'justify-start'}`}>
-                <div className="max-w-[78%]">
-                  {parent && (
-                    <p className={`mb-0.5 truncate border-l-2 border-zinc-300 pl-2 text-[11px] text-zinc-400 ${mine ? 'text-right' : ''}`}>
-                      ↩ {parent.senderName}: {(parent.body ?? 'message').slice(0, 40)}
-                    </p>
-                  )}
-                  <div
-                    className={`rounded-2xl px-3 py-2 text-sm ${
-                      mine ? 'bg-brand-500 text-white' : 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100'
-                    }`}
-                  >
-                    {!mine && <p className="mb-0.5 text-[11px] font-medium opacity-70">{m.senderName}</p>}
-                    {editingId === m.id ? (
-                      <div className="flex items-center gap-1">
-                        <input
-                          value={editingBody}
-                          onChange={(e) => setEditingBody(e.target.value)}
-                          className="w-48 rounded bg-white/20 px-1 text-sm outline-none"
-                          autoFocus
-                        />
-                        <button onClick={saveEdit} className="text-xs underline">save</button>
-                        <button onClick={() => setEditingId(null)} className="text-xs opacity-70">cancel</button>
-                      </div>
-                    ) : m.deletedAt ? (
-                      <p className="italic opacity-60">message deleted</p>
-                    ) : (
-                      <p className="whitespace-pre-wrap break-words">{m.body}</p>
-                    )}
-                    <p className={`mt-0.5 text-right text-[10px] ${mine ? 'text-white/70' : 'text-zinc-400'}`}>
-                      {timeLabel(m.createdAt)}
-                      {m.editedAt && !m.deletedAt && ' · edited'}
-                    </p>
-                  </div>
+              <div key={m.id} className={`group flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
+                <p className="mb-1 flex items-center gap-1.5 text-[11px] text-zinc-400">
+                  <span className="font-medium text-zinc-600 dark:text-zinc-300">{m.senderName}</span>
+                  <span>· {fullTime(m.createdAt)}</span>
+                  {m.editedAt && !m.deletedAt && <span>· edited</span>}
+                </p>
 
-                  {/* reaction chips */}
-                  {m.reactions.length > 0 && (
-                    <div className={`mt-1 flex flex-wrap gap-1 ${mine ? 'justify-end' : ''}`}>
-                      {m.reactions.map((r) => (
-                        <button
-                          key={r.emoji}
-                          onClick={() => onReact(m.id, r.emoji)}
-                          className={`rounded-full border px-1.5 py-0.5 text-[11px] ${
-                            r.mine
-                              ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10'
-                              : 'border-zinc-200 dark:border-zinc-700'
-                          }`}
-                        >
-                          {r.emoji} {r.count}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                {parent && (
+                  <p className={`mb-1 max-w-[80%] truncate border-l-2 border-zinc-300 pl-2 text-[11px] text-zinc-400 ${mine ? 'text-right' : ''}`}>
+                    ↩ {parent.senderName}: {(parent.body ?? 'message').slice(0, 48)}
+                  </p>
+                )}
 
-                  {/* hover action bar */}
-                  {!m.deletedAt && (
-                    <div className={`mt-0.5 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 ${mine ? 'justify-end' : ''}`}>
-                      {EMOJIS.map((e) => (
-                        <button key={e} onClick={() => onReact(m.id, e)} className="text-sm hover:scale-110" title="React">
-                          {e}
-                        </button>
-                      ))}
-                      <button
-                        onClick={() => setReplyTo({ id: m.id, name: m.senderName, snippet: m.body ?? '' })}
-                        className="text-[11px] text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
-                      >
-                        Reply
-                      </button>
-                      {mine && (
-                        <button
-                          onClick={() => {
-                            setEditingId(m.id);
-                            setEditingBody(m.body ?? '');
-                          }}
-                          className="text-[11px] text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
-                        >
-                          Edit
-                        </button>
-                      )}
-                      {(mine || canModerate) && (
-                        <button
-                          onClick={() => deleteMessage(m.id).then(refresh)}
-                          className="text-[11px] text-zinc-400 hover:text-red-500"
-                        >
-                          Delete
-                        </button>
-                      )}
+                <div
+                  className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${
+                    mine
+                      ? 'bg-brand-50 text-zinc-900 dark:bg-brand-500/15 dark:text-zinc-100'
+                      : 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100'
+                  }`}
+                >
+                  {editingId === m.id ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        value={editingBody}
+                        onChange={(e) => setEditingBody(e.target.value)}
+                        className="w-48 rounded bg-white/60 px-1 text-sm outline-none dark:bg-zinc-900"
+                        autoFocus
+                      />
+                      <button onClick={saveEdit} className="text-xs text-brand-600 underline">save</button>
+                      <button onClick={() => setEditingId(null)} className="text-xs opacity-60">cancel</button>
                     </div>
+                  ) : m.deletedAt ? (
+                    <p className="italic opacity-60">message deleted</p>
+                  ) : (
+                    <p className="whitespace-pre-wrap break-words">{m.body}</p>
                   )}
                 </div>
+
+                {m.reactions.length > 0 && (
+                  <div className={`mt-1 flex flex-wrap gap-1 ${mine ? 'justify-end' : ''}`}>
+                    {m.reactions.map((r) => (
+                      <button
+                        key={r.emoji}
+                        onClick={() => onReact(m.id, r.emoji)}
+                        className={`rounded-full border px-1.5 py-0.5 text-[11px] ${
+                          r.mine ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-zinc-200 dark:border-zinc-700'
+                        }`}
+                      >
+                        {r.emoji} {r.count}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {!m.deletedAt && (
+                  <div className={`mt-0.5 flex gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 ${mine ? 'justify-end' : ''}`}>
+                    {EMOJIS.map((e) => (
+                      <button key={e} onClick={() => onReact(m.id, e)} className="text-sm hover:scale-110" title="React">
+                        {e}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setReplyTo({ id: m.id, name: m.senderName, snippet: m.body ?? '' })}
+                      className="text-[11px] text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                    >
+                      Reply
+                    </button>
+                    {mine && (
+                      <button
+                        onClick={() => {
+                          setEditingId(m.id);
+                          setEditingBody(m.body ?? '');
+                        }}
+                        className="text-[11px] text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                      >
+                        Edit
+                      </button>
+                    )}
+                    {(mine || canModerate) && (
+                      <button
+                        onClick={() => deleteMessage(m.id).then(refresh)}
+                        className="text-[11px] text-zinc-400 hover:text-red-500"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })
@@ -307,25 +326,42 @@ export function ChatPanel({
       )}
 
       {canPost && (
-        <form onSubmit={onSubmit} className="border-t border-zinc-200 p-3 dark:border-zinc-800">
+        <div className="p-3">
           {replyTo && (
             <div className="mb-2 flex items-center justify-between rounded bg-zinc-100 px-2 py-1 text-[11px] text-zinc-500 dark:bg-zinc-800">
               <span className="truncate">↩ Replying to {replyTo.name}: {replyTo.snippet.slice(0, 40)}</span>
               <button type="button" onClick={() => setReplyTo(null)} className="ml-2">✕</button>
             </div>
           )}
-          <div className="flex items-center gap-2">
-            <input
+          <div className="rounded-lg border border-zinc-200 focus-within:border-brand-500 dark:border-zinc-700">
+            <textarea
               value={input}
               onChange={onInputChange}
-              placeholder="Message…"
-              className="flex-1 rounded-full border border-zinc-200 bg-transparent px-4 py-2 text-sm outline-none focus:border-brand-500 dark:border-zinc-700"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  void submit();
+                }
+              }}
+              rows={2}
+              placeholder="Write a comment…"
+              className="w-full resize-none bg-transparent px-3 py-2 text-sm outline-none"
             />
-            <Button type="submit" disabled={sending || !input.trim()}>
-              Send
-            </Button>
+            <div className="flex items-center justify-between px-2 pb-2">
+              <button
+                type="button"
+                title="Media attachments arrive in the next update"
+                className="cursor-not-allowed p-1 text-zinc-300 dark:text-zinc-600"
+              >
+                <Paperclip size={16} />
+              </button>
+              <Button type="button" onClick={submit} disabled={sending || !input.trim()}>
+                Post
+              </Button>
+            </div>
           </div>
-        </form>
+          <p className="mt-1 text-[10px] text-zinc-400">Press ⌘/Ctrl + Enter to post.</p>
+        </div>
       )}
     </div>
   );
