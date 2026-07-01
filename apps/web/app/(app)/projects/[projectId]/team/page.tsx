@@ -13,10 +13,17 @@ import { PROJECT_ROLES } from '@datumpro/shared/access';
 const inputClass =
   'w-full rounded-md border border-zinc-200 bg-transparent px-2.5 py-1.5 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
 
-const ROLE_TONE = { pm: 'blue', contributor: 'green', client: 'amber', viewer: 'neutral' } as const;
+const ROLE_TONE = {
+  pm: 'blue',
+  contractor: 'blue',
+  contributor: 'green',
+  client: 'amber',
+  viewer: 'neutral',
+} as const;
 
 const ROLE_BLURB: Record<string, string> = {
   pm: 'Manages the project — tasks, members, schedule.',
+  contractor: 'Executes tasks under an agreed commitment (cost, timeline, terms).',
   contributor: 'Does the work — updates assigned tasks, submits reports.',
   client: 'External stakeholder — sees progress and their invoices.',
   viewer: 'Read-only access to this project.',

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { createTaskSchema } from '@datumpro/shared/validation';
+import { completionMediaCount } from '@/lib/data/commitments';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -32,7 +33,9 @@ async function logActivity(
 async function loadTask(supabase: Awaited<ReturnType<typeof createClient>>, taskId: string) {
   const { data } = await supabase
     .from('tasks')
-    .select('id, org_id, project_id, status, due_date, sla_clock_paused_at, sla_total_paused_ms')
+    .select(
+      'id, org_id, project_id, status, due_date, sla_clock_paused_at, sla_total_paused_ms, requires_photo_on_complete',
+    )
     .eq('id', taskId)
     .maybeSingle();
   return data as
@@ -44,6 +47,7 @@ async function loadTask(supabase: Awaited<ReturnType<typeof createClient>>, task
         due_date: string | null;
         sla_clock_paused_at: string | null;
         sla_total_paused_ms: number;
+        requires_photo_on_complete: boolean;
       }
     | null;
 }
@@ -197,6 +201,12 @@ export async function submitTask(formData: FormData) {
 
   const task = await loadTask(supabase, taskId);
   if (!task) throw new Error('Task not found');
+
+  // Evidence gate: photo/video proof is mandatory unless the task opts out.
+  if (task.requires_photo_on_complete && (await completionMediaCount(taskId)) === 0) {
+    throw new Error('Attach at least one completion photo or video before submitting.');
+  }
+
   const { error } = await supabase
     .from('tasks')
     .update({
@@ -205,6 +215,7 @@ export async function submitTask(formData: FormData) {
       submitted_at: new Date().toISOString(),
       submitted_by: user.id,
       completion_notes: notes,
+      closing_report: notes,
       declaration_confirmed: true,
     })
     .eq('id', taskId);
@@ -306,5 +317,152 @@ export async function resolveBlocker(formData: FormData) {
     .eq('id', taskId);
   if (error) throw new Error(error.message);
   await logActivity(supabase, task, user.id, 'blocker', 'Blocker resolved — deadline credited');
+  revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
+}
+
+/* ── Contractor commitment (offer → respond → agree) ─────────────────────── */
+
+/** PM offers the task to a contractor. Also assigns them so they can respond and,
+ *  later, execute. One commitment per task. */
+export async function offerCommitment(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const taskId = String(formData.get('taskId') ?? '');
+  const contractorId = String(formData.get('contractorId') ?? '');
+  if (!contractorId) throw new Error('Choose a contractor');
+  const task = await loadTask(supabase, taskId);
+  if (!task) throw new Error('Task not found');
+
+  const { error } = await supabase.from('task_commitments').insert({
+    org_id: task.org_id,
+    project_id: task.project_id,
+    task_id: taskId,
+    contractor_id: contractorId,
+    status: 'offered',
+    created_by: user.id,
+  });
+  if (error) {
+    if (/duplicate|unique/i.test(error.message)) throw new Error('This task already has a commitment');
+    throw new Error(error.message);
+  }
+  await supabase.from('tasks').update({ assignee_id: contractorId }).eq('id', taskId);
+  await logActivity(supabase, task, user.id, 'commitment', 'Offered the task to a contractor');
+  revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
+}
+
+/** Contractor responds: accept (with cost/timeline/quote/terms), counter, or decline. */
+export async function respondCommitment(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const taskId = String(formData.get('taskId') ?? '');
+  const decision = String(formData.get('decision') ?? ''); // accept | counter | decline
+  const task = await loadTask(supabase, taskId);
+  if (!task) throw new Error('Task not found');
+
+  const status =
+    decision === 'decline' ? 'declined' : decision === 'counter' ? 'counter_proposed' : 'accepted';
+
+  const update: Record<string, unknown> = { status, responded_at: new Date().toISOString() };
+  if (decision !== 'decline') {
+    const cost = Number(formData.get('costDollars') ?? 0);
+    if (!Number.isFinite(cost) || cost <= 0) throw new Error('Enter your cost for this task');
+    update.cost_cents = Math.round(cost * 100);
+    update.proposed_start = (formData.get('proposedStart') as string) || null;
+    update.proposed_end = (formData.get('proposedEnd') as string) || null;
+    update.justification = (formData.get('justification') as string)?.trim() || null;
+    update.quote_path = (formData.get('quotePath') as string) || null;
+    const advancePct = Number(formData.get('advancePct') ?? 0);
+    const retentionPct = Number(formData.get('retentionPct') ?? 0);
+    update.payment_terms = {
+      advancePct: advancePct > 0 ? advancePct : undefined,
+      retentionPct: retentionPct > 0 ? retentionPct : undefined,
+    };
+  }
+
+  const { error } = await supabase.from('task_commitments').update(update).eq('task_id', taskId);
+  if (error) throw new Error(error.message);
+  await logActivity(supabase, task, user.id, 'commitment', `Contractor response: ${status.replace('_', ' ')}`);
+  revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
+}
+
+/** PM decides on the contractor's response: agree (locks cost → EV weight) or decline.
+ *  The DB CHECK stops the contractor from agreeing their own commitment. */
+export async function decideCommitment(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const taskId = String(formData.get('taskId') ?? '');
+  const decision = String(formData.get('decision') ?? ''); // agree | decline
+  const task = await loadTask(supabase, taskId);
+  if (!task) throw new Error('Task not found');
+
+  const { data: commitment } = await supabase
+    .from('task_commitments')
+    .select('cost_cents')
+    .eq('task_id', taskId)
+    .maybeSingle();
+
+  if (decision === 'agree') {
+    const agreedCost = (commitment as { cost_cents: number | null } | null)?.cost_cents ?? null;
+    const { error } = await supabase
+      .from('task_commitments')
+      .update({
+        status: 'agreed',
+        agreed_by: user.id,
+        agreed_cost_cents: agreedCost,
+        decided_at: new Date().toISOString(),
+      })
+      .eq('task_id', taskId);
+    if (error) {
+      if (/sod|check/i.test(error.message)) {
+        throw new Error("You can't agree your own commitment (segregation of duties).");
+      }
+      throw new Error(error.message);
+    }
+    await supabase.from('tasks').update({ agreed_cost_cents: agreedCost }).eq('id', taskId);
+    await logActivity(supabase, task, user.id, 'commitment', 'Agreed the commitment');
+  } else {
+    const { error } = await supabase
+      .from('task_commitments')
+      .update({ status: 'declined', decided_at: new Date().toISOString() })
+      .eq('task_id', taskId);
+    if (error) throw new Error(error.message);
+    await logActivity(supabase, task, user.id, 'commitment', 'Declined the commitment');
+  }
+  revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
+}
+
+/* ── Task media (evidence, quotes) ───────────────────────────────────────── */
+
+/** Record a file already uploaded to Storage by the browser client. */
+export async function recordTaskMedia(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const taskId = String(formData.get('taskId') ?? '');
+  const storagePath = String(formData.get('storagePath') ?? '');
+  const kind = String(formData.get('kind') ?? 'photo');
+  const purpose = String(formData.get('purpose') ?? 'completion');
+  const caption = (formData.get('caption') as string)?.trim() || null;
+  if (!storagePath) throw new Error('No file uploaded');
+  const task = await loadTask(supabase, taskId);
+  if (!task) throw new Error('Task not found');
+
+  const { error } = await supabase.from('task_media').insert({
+    org_id: task.org_id,
+    project_id: task.project_id,
+    task_id: taskId,
+    kind,
+    purpose,
+    storage_path: storagePath,
+    caption,
+    uploaded_by: user.id,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
+}
+
+export async function removeTaskMedia(formData: FormData) {
+  const { supabase } = await requireUser();
+  const taskId = String(formData.get('taskId') ?? '');
+  const mediaId = String(formData.get('mediaId') ?? '');
+  const task = await loadTask(supabase, taskId);
+  if (!task) throw new Error('Task not found');
+  const { error } = await supabase.from('task_media').delete().eq('id', mediaId).eq('task_id', taskId);
+  if (error) throw new Error(error.message);
   revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
 }

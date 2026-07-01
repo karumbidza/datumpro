@@ -10,6 +10,9 @@ import {
 } from '@/lib/data/tasks';
 import { listProjectMembers, myProjectRole } from '@/lib/data/members';
 import { getProjectSchedule } from '@/lib/data/scheduling';
+import { getTaskCommitment, listTaskMedia } from '@/lib/data/commitments';
+import { CommitmentPanel } from '@/components/task/commitment-panel';
+import { CompletionEvidence } from '@/components/task/completion-evidence';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -45,23 +48,43 @@ export default async function TaskDetailPage({
   const task = await getTask(taskId);
   if (!task) notFound();
 
-  const [members, orgRole, projectRole, dependencies, taskOptions, activity, schedule] =
-    await Promise.all([
-      listProjectMembers(projectId),
-      myOrgRole(task.org_id),
-      myProjectRole(projectId),
-      listTaskDependencies(taskId),
-      listProjectTaskOptions(projectId, taskId),
-      listTaskActivity(taskId),
-      getProjectSchedule(projectId),
-    ]);
+  const [
+    members,
+    orgRole,
+    projectRole,
+    dependencies,
+    taskOptions,
+    activity,
+    schedule,
+    commitment,
+    completionMedia,
+    quoteMedia,
+  ] = await Promise.all([
+    listProjectMembers(projectId),
+    myOrgRole(task.org_id),
+    myProjectRole(projectId),
+    listTaskDependencies(taskId),
+    listProjectTaskOptions(projectId, taskId),
+    listTaskActivity(taskId),
+    getProjectSchedule(projectId),
+    getTaskCommitment(taskId),
+    listTaskMedia(taskId, 'completion'),
+    listTaskMedia(taskId, 'quote'),
+  ]);
   const sched = schedule?.meta[taskId];
+
+  const contractorMembers = members.filter((m) => m.role === 'contractor');
+  const contractors = (contractorMembers.length > 0 ? contractorMembers : members).map((m) => ({
+    userId: m.userId,
+    name: m.name,
+  }));
 
   const assigneeName = members.find((m) => m.userId === task.assignee_id)?.name ?? 'Unassigned';
   const isLead = !!orgRole && (TASK_SIGNOFF_ROLES as readonly string[]).includes(orgRole);
   const isAssignee = task.assignee_id === user.id;
   const canAct = isAssignee || isLead;
   const canManage = orgRole === 'owner' || orgRole === 'admin' || projectRole === 'pm';
+  const canUpload = task.status !== 'done' && (isAssignee || canManage);
 
   const usedPredecessors = new Set(dependencies.map((d) => d.predecessorId));
   const addable = taskOptions.filter((t) => !usedPredecessors.has(t.id));
@@ -110,6 +133,17 @@ export default async function TaskDetailPage({
           <p className="text-zinc-600 dark:text-zinc-300">📝 {task.completion_notes}</p>
         )}
       </Card>
+
+      <CommitmentPanel
+        taskId={taskId}
+        projectId={projectId}
+        orgId={task.org_id}
+        canManage={canManage}
+        currentUserId={user.id}
+        commitment={commitment}
+        contractors={contractors}
+        quoteMedia={quoteMedia}
+      />
 
       {/* ── Dependencies — "this task starts after" ── */}
       <Card className="mt-6">
@@ -178,6 +212,15 @@ export default async function TaskDetailPage({
           </form>
         )}
       </Card>
+
+      <CompletionEvidence
+        taskId={taskId}
+        projectId={projectId}
+        orgId={task.org_id}
+        media={completionMedia}
+        canUpload={canUpload}
+        canManage={canManage}
+      />
 
       {/* Status-aware actions. The DB enforces the real rules (e.g. only a lead
           can approve to DONE) regardless of what's shown. */}

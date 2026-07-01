@@ -9,7 +9,7 @@
 export const ORG_ROLES = ['owner', 'admin', 'finance', 'pm', 'member', 'viewer'] as const;
 export type OrgRole = (typeof ORG_ROLES)[number];
 
-export const PROJECT_ROLES = ['pm', 'contributor', 'client', 'viewer'] as const;
+export const PROJECT_ROLES = ['pm', 'contractor', 'contributor', 'client', 'viewer'] as const;
 export type ProjectRole = (typeof PROJECT_ROLES)[number];
 
 /**
