@@ -84,7 +84,7 @@ export default async function TaskDetailPage({
   const dm = dmConversationId
     ? {
         id: dmConversationId,
-        messages: await listMessages(dmConversationId),
+        messages: await listMessages(dmConversationId, user.id),
         othersRead: await othersMaxReadSeq(dmConversationId, user.id),
       }
     : null;
@@ -179,9 +179,9 @@ export default async function TaskDetailPage({
             currentUserId={user.id}
             meName={meName}
             initialMessages={dm.messages}
-            initialNames={chatNames}
             othersReadSeq={dm.othersRead}
             canPost
+            canModerate={canManage}
           />
         </Card>
       )}

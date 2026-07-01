@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getProject } from '@/lib/data/projects';
-import { listProjectMembers } from '@/lib/data/members';
+import { listProjectMembers, myProjectRole } from '@/lib/data/members';
+import { myOrgRole } from '@/lib/data/tasks';
 import { getProjectConversationId, listMessages, othersMaxReadSeq } from '@/lib/data/chat';
 import { ChatPanel } from '@/components/chat/chat-panel';
 import { Card } from '@/components/ui/card';
@@ -44,13 +45,16 @@ export default async function ProjectChatPage({
         </div>
       ) : (
         await (async () => {
-          const [messages, members] = await Promise.all([
-            listMessages(conversationId),
+          const [messages, members, orgRole, projectRole, othersRead] = await Promise.all([
+            listMessages(conversationId, user.id),
             listProjectMembers(projectId),
+            myOrgRole(project.org_id),
+            myProjectRole(projectId),
+            othersMaxReadSeq(conversationId, user.id),
           ]);
-          const othersRead = await othersMaxReadSeq(conversationId, user.id);
           const names = Object.fromEntries(members.map((m) => [m.userId, m.name]));
           const meName = names[user.id] ?? user.email?.split('@')[0] ?? 'You';
+          const canModerate = orgRole === 'owner' || orgRole === 'admin' || projectRole === 'pm';
           return (
             <ChatPanel
               className="min-h-0 flex-1"
@@ -58,9 +62,9 @@ export default async function ProjectChatPage({
               currentUserId={user.id}
               meName={meName}
               initialMessages={messages}
-              initialNames={names}
               othersReadSeq={othersRead}
               canPost
+              canModerate={canModerate}
             />
           );
         })()

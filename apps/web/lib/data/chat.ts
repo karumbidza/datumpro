@@ -1,5 +1,11 @@
 import { createClient } from '@/lib/supabase/server';
 
+export interface MessageReaction {
+  emoji: string;
+  count: number;
+  mine: boolean;
+}
+
 export interface ChatMessage {
   id: string;
   seq: number;
@@ -10,6 +16,7 @@ export interface ChatMessage {
   editedAt: string | null;
   deletedAt: string | null;
   parentMessageId: string | null;
+  reactions: MessageReaction[];
 }
 
 /** The project's group-chat conversation id — or null if the caller can't access
@@ -38,8 +45,12 @@ export async function getTaskConversationId(taskId: string): Promise<string | nu
   return (data as { id: string } | null)?.id ?? null;
 }
 
-/** Most recent messages (ascending), with sender display names resolved. */
-export async function listMessages(conversationId: string, limit = 50): Promise<ChatMessage[]> {
+/** Most recent messages (ascending), with sender names + aggregated reactions. */
+export async function listMessages(
+  conversationId: string,
+  meId: string,
+  limit = 50,
+): Promise<ChatMessage[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from('messages')
@@ -58,7 +69,12 @@ export async function listMessages(conversationId: string, limit = 50): Promise<
     parent_message_id: string | null;
   }[]).reverse();
 
-  const names = await resolveNames(rows.map((r) => r.sender_id));
+  const ids = rows.map((r) => r.id);
+  const [names, reactions] = await Promise.all([
+    resolveNames(rows.map((r) => r.sender_id)),
+    aggregateReactions(conversationId, ids, meId),
+  ]);
+
   return rows.map((r) => ({
     id: r.id,
     seq: r.seq,
@@ -69,7 +85,39 @@ export async function listMessages(conversationId: string, limit = 50): Promise<
     editedAt: r.edited_at,
     deletedAt: r.deleted_at,
     parentMessageId: r.parent_message_id,
+    reactions: reactions.get(r.id) ?? [],
   }));
+}
+
+async function aggregateReactions(
+  conversationId: string,
+  messageIds: string[],
+  meId: string,
+): Promise<Map<string, MessageReaction[]>> {
+  const out = new Map<string, MessageReaction[]>();
+  if (messageIds.length === 0) return out;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('message_reactions')
+    .select('message_id, emoji, user_id')
+    .eq('conversation_id', conversationId);
+  const rows = (data ?? []) as { message_id: string; emoji: string; user_id: string }[];
+  const byMsg = new Map<string, Map<string, { count: number; mine: boolean }>>();
+  for (const r of rows) {
+    const m = byMsg.get(r.message_id) ?? new Map();
+    const cur = m.get(r.emoji) ?? { count: 0, mine: false };
+    cur.count += 1;
+    if (r.user_id === meId) cur.mine = true;
+    m.set(r.emoji, cur);
+    byMsg.set(r.message_id, m);
+  }
+  for (const [mid, emap] of byMsg) {
+    out.set(
+      mid,
+      [...emap.entries()].map(([emoji, v]) => ({ emoji, count: v.count, mine: v.mine })),
+    );
+  }
+  return out;
 }
 
 /** Highest read cursor among OTHER participants — drives the "Seen" indicator. */
