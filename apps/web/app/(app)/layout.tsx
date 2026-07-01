@@ -21,7 +21,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <div className="flex h-screen overflow-hidden bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
       <Sidebar
         projects={projects}
-        companyName={ctx.active.name}
+        orgs={ctx.memberships}
+        activeOrgId={ctx.active.orgId}
         email={ctx.email}
         canCreate={canCreate}
         myTaskCount={myTaskCount}

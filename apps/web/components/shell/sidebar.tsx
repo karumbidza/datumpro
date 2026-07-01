@@ -18,12 +18,13 @@ import {
   BrandMark,
   type IconComponent,
 } from '@/components/icons';
-import type { SidebarProject } from '@/lib/data/org';
-import { signOut } from '@/app/(app)/actions';
+import type { SidebarProject, OrgMembershipSummary } from '@/lib/data/org';
+import { signOut, setActiveOrg } from '@/app/(app)/actions';
 
 interface SidebarProps {
   projects: SidebarProject[];
-  companyName: string;
+  orgs: OrgMembershipSummary[];
+  activeOrgId: string;
   email: string | null;
   canCreate: boolean;
   myTaskCount: number;
@@ -43,7 +44,7 @@ function activeProjectId(pathname: string): string | null {
   return !id || id === 'new' ? null : id;
 }
 
-export function Sidebar({ projects, companyName, email, canCreate, myTaskCount }: SidebarProps) {
+export function Sidebar({ projects, orgs, activeOrgId, email, canCreate, myTaskCount }: SidebarProps) {
   const pathname = usePathname();
   const activeId = activeProjectId(pathname);
   const activeProject = projects.find((p) => p.id === activeId) ?? null;
@@ -116,7 +117,7 @@ export function Sidebar({ projects, companyName, email, canCreate, myTaskCount }
       </nav>
 
       <div className="border-t border-zinc-200 p-3 dark:border-zinc-800">
-        <p className="truncate text-[11px] font-medium text-zinc-600 dark:text-zinc-300">{companyName}</p>
+        <OrgSwitcher orgs={orgs} activeOrgId={activeOrgId} />
         <div className="mt-1 flex items-center justify-between gap-2">
           <p className="min-w-0 flex-1 truncate text-xs text-zinc-500 dark:text-zinc-400">{email}</p>
           <form action={signOut}>
@@ -131,6 +132,64 @@ export function Sidebar({ projects, companyName, email, canCreate, myTaskCount }
         </div>
       </div>
     </aside>
+  );
+}
+
+/** Company name that expands into an org switcher. Each org is its own tiny form
+ *  posting to setActiveOrg (a server action that flips the cookie + redirects). */
+function OrgSwitcher({ orgs, activeOrgId }: { orgs: OrgMembershipSummary[]; activeOrgId: string }) {
+  const [open, setOpen] = useState(false);
+  const active = orgs.find((o) => o.orgId === activeOrgId);
+  const activeName = active?.name ?? 'Organisation';
+
+  return (
+    <div className="relative">
+      {open && (
+        <>
+          <button
+            type="button"
+            aria-label="Close menu"
+            className="fixed inset-0 z-10 cursor-default"
+            onClick={() => setOpen(false)}
+          />
+          <div className="absolute bottom-full left-0 right-0 z-20 mb-1 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+            <p className="px-3 py-1.5 text-[10px] uppercase tracking-wide text-zinc-400">
+              Organisations
+            </p>
+            {orgs.map((o) => (
+              <form key={o.orgId} action={setActiveOrg}>
+                <input type="hidden" name="orgId" value={o.orgId} />
+                <button
+                  type="submit"
+                  className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                >
+                  <span className="min-w-0 truncate text-zinc-700 dark:text-zinc-200">{o.name}</span>
+                  {o.orgId === activeOrgId && <Check size={14} className="shrink-0 text-brand-600" />}
+                </button>
+              </form>
+            ))}
+            <Link
+              href="/orgs/new"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 border-t border-zinc-100 px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              <Plus size={14} /> New organisation
+            </Link>
+          </div>
+        </>
+      )}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-2 rounded px-1 py-0.5 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800"
+        title="Switch organisation"
+      >
+        <span className="truncate text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
+          {activeName}
+        </span>
+        <ChevronDown size={12} className="shrink-0 text-zinc-400" />
+      </button>
+    </div>
   );
 }
 
