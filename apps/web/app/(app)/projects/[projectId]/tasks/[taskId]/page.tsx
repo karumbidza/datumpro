@@ -171,6 +171,8 @@ export default async function TaskDetailPage({
           title="Task Discussion"
           subtitle="Private to the project manager and the assigned contractor."
           conversationId={dm.id}
+          orgId={task.org_id}
+          projectId={projectId}
           currentUserId={user.id}
           meName={meName}
           initialMessages={dm.messages}

@@ -20,24 +20,62 @@ export async function loadMessages(conversationId: string): Promise<ChatMessage[
   return listMessages(conversationId, user.id);
 }
 
-/** Insert a message (optionally a threaded reply). Returns the new row for
- *  optimistic render. */
-export async function sendMessage(conversationId: string, body: string, parentMessageId?: string) {
+/** Metadata for a file the client has already uploaded to the `chat-media`
+ *  bucket. The bytes never pass through the server action — only the key. */
+export interface AttachmentInput {
+  kind: 'image' | 'video' | 'audio' | 'document';
+  storagePath: string;
+  mime?: string | null;
+  filename?: string | null;
+  sizeBytes?: number | null;
+  durationSeconds?: number | null;
+  width?: number | null;
+  height?: number | null;
+}
+
+/** Insert a message (optionally a threaded reply, optionally with attachments the
+ *  client already uploaded). Returns the new row for optimistic render. A message
+ *  with attachments may have an empty body. */
+export async function sendMessage(
+  conversationId: string,
+  body: string,
+  parentMessageId?: string,
+  attachments?: AttachmentInput[],
+) {
   const trimmed = body.trim();
-  if (!trimmed) return null;
+  const atts = attachments ?? [];
+  if (!trimmed && atts.length === 0) return null;
   const { supabase, user } = await requireUser();
   const { data, error } = await supabase
     .from('messages')
     .insert({
       conversation_id: conversationId,
       sender_id: user.id,
-      body: trimmed,
+      body: trimmed || null,
       parent_message_id: parentMessageId ?? null,
     })
     .select('id, seq, created_at')
     .single();
   if (error) throw new Error(error.message);
-  return data as { id: string; seq: number; created_at: string };
+  const message = data as { id: string; seq: number; created_at: string };
+
+  if (atts.length > 0) {
+    const { error: attErr } = await supabase.from('message_attachments').insert(
+      atts.map((a) => ({
+        message_id: message.id,
+        kind: a.kind,
+        storage_path: a.storagePath,
+        mime: a.mime ?? null,
+        filename: a.filename ?? null,
+        size_bytes: a.sizeBytes ?? null,
+        duration_seconds: a.durationSeconds ?? null,
+        width: a.width ?? null,
+        height: a.height ?? null,
+      })),
+    );
+    if (attErr) throw new Error(attErr.message);
+  }
+  return message;
 }
 
 export async function editMessage(messageId: string, body: string) {

@@ -6,6 +6,20 @@ export interface MessageReaction {
   mine: boolean;
 }
 
+export type AttachmentKind = 'image' | 'video' | 'audio' | 'document';
+
+export interface ChatAttachment {
+  id: string;
+  kind: AttachmentKind;
+  url: string | null; // signed URL (short-lived); null if signing failed
+  mime: string | null;
+  filename: string | null;
+  sizeBytes: number | null;
+  durationSeconds: number | null;
+  width: number | null;
+  height: number | null;
+}
+
 export interface ChatMessage {
   id: string;
   seq: number;
@@ -17,6 +31,7 @@ export interface ChatMessage {
   deletedAt: string | null;
   parentMessageId: string | null;
   reactions: MessageReaction[];
+  attachments: ChatAttachment[];
 }
 
 /** The project's group-chat conversation id — or null if the caller can't access
@@ -70,9 +85,10 @@ export async function listMessages(
   }[]).reverse();
 
   const ids = rows.map((r) => r.id);
-  const [names, reactions] = await Promise.all([
+  const [names, reactions, attachments] = await Promise.all([
     resolveNames(rows.map((r) => r.sender_id)),
     aggregateReactions(conversationId, ids, meId),
+    loadAttachments(ids),
   ]);
 
   return rows.map((r) => ({
@@ -86,7 +102,60 @@ export async function listMessages(
     deletedAt: r.deleted_at,
     parentMessageId: r.parent_message_id,
     reactions: reactions.get(r.id) ?? [],
+    attachments: r.deleted_at ? [] : attachments.get(r.id) ?? [],
   }));
+}
+
+/** Attachments for the loaded messages, with freshly signed URLs (one batched
+ *  createSignedUrls call). Storage SELECT RLS gates signing — a caller who can't
+ *  reach the conversation gets no URL. */
+async function loadAttachments(messageIds: string[]): Promise<Map<string, ChatAttachment[]>> {
+  const out = new Map<string, ChatAttachment[]>();
+  if (messageIds.length === 0) return out;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('message_attachments')
+    .select('id, message_id, kind, storage_path, mime, filename, size_bytes, duration_seconds, width, height')
+    .in('message_id', messageIds)
+    .order('created_at', { ascending: true });
+  const rows = (data ?? []) as {
+    id: string;
+    message_id: string;
+    kind: string;
+    storage_path: string;
+    mime: string | null;
+    filename: string | null;
+    size_bytes: number | null;
+    duration_seconds: number | null;
+    width: number | null;
+    height: number | null;
+  }[];
+  if (rows.length === 0) return out;
+
+  const paths = [...new Set(rows.map((r) => r.storage_path))];
+  const { data: signed } = await supabase.storage.from('chat-media').createSignedUrls(paths, 60 * 60);
+  const urlByPath = new Map<string, string>();
+  for (const s of (signed ?? []) as { path: string | null; signedUrl: string | null }[]) {
+    if (s.path && s.signedUrl) urlByPath.set(s.path, s.signedUrl);
+  }
+
+  for (const r of rows) {
+    const att: ChatAttachment = {
+      id: r.id,
+      kind: (['image', 'video', 'audio', 'document'].includes(r.kind) ? r.kind : 'document') as AttachmentKind,
+      url: urlByPath.get(r.storage_path) ?? null,
+      mime: r.mime,
+      filename: r.filename,
+      sizeBytes: r.size_bytes,
+      durationSeconds: r.duration_seconds,
+      width: r.width,
+      height: r.height,
+    };
+    const list = out.get(r.message_id) ?? [];
+    list.push(att);
+    out.set(r.message_id, list);
+  }
+  return out;
 }
 
 async function aggregateReactions(

@@ -57,6 +57,8 @@ export default async function ProjectChatPage({
               className="mt-3 min-h-0 flex-1"
               title="Project Chat"
               conversationId={conversationId}
+              orgId={project.org_id}
+              projectId={projectId}
               currentUserId={user.id}
               meName={meName}
               initialMessages={messages}

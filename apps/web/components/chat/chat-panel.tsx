@@ -9,15 +9,19 @@ import {
   deleteMessage,
   toggleReaction,
   markRead,
+  type AttachmentInput,
 } from '@/app/(app)/projects/[projectId]/chat/actions';
-import type { ChatMessage } from '@/lib/data/chat';
+import type { ChatAttachment, ChatMessage } from '@/lib/data/chat';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, Paperclip } from '@/components/icons';
+import { MessageCircle, Paperclip, Mic, Square, X, Download, FileText } from '@/components/icons';
 
 const EMOJIS = ['👍', '❤️', '😂', '🎉', '✅'];
+const MAX_FILE_BYTES = 50 * 1024 * 1024; // 50 MB per file
 
 interface Props {
   conversationId: string;
+  orgId: string;
+  projectId: string;
   currentUserId: string;
   meName: string;
   initialMessages: ChatMessage[];
@@ -27,6 +31,22 @@ interface Props {
   title?: string;
   subtitle?: string;
   className?: string;
+}
+
+type AttachmentKind = AttachmentInput['kind'];
+
+interface PendingAttachment {
+  localId: string;
+  kind: AttachmentKind;
+  file: Blob;
+  filename: string;
+  mime: string;
+  sizeBytes: number;
+  ext: string;
+  previewUrl: string;
+  width?: number;
+  height?: number;
+  durationSeconds?: number;
 }
 
 function fullTime(iso: string): string {
@@ -39,8 +59,84 @@ function fullTime(iso: string): string {
   });
 }
 
+function kindFromMime(mime: string): AttachmentKind {
+  if (mime.startsWith('image/')) return 'image';
+  if (mime.startsWith('video/')) return 'video';
+  if (mime.startsWith('audio/')) return 'audio';
+  return 'document';
+}
+
+function extFromName(name: string, mime: string): string {
+  const dot = name.lastIndexOf('.');
+  if (dot >= 0 && dot < name.length - 1) return name.slice(dot + 1).toLowerCase();
+  const sub = mime.split('/')[1] ?? 'bin';
+  return sub.split(';')[0] || 'bin';
+}
+
+function formatBytes(n: number | null): string {
+  if (!n) return '';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** Read pixel dimensions of an image blob (best-effort). */
+function imageDimensions(url: string): Promise<{ width: number; height: number } | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+
+/** Inline render for a persisted attachment (signed URL from the data layer). */
+function AttachmentView({ a }: { a: ChatAttachment }) {
+  if (!a.url) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-xs text-zinc-400 dark:border-zinc-700">
+        <FileText size={14} /> {a.filename ?? 'Attachment'} · unavailable
+      </div>
+    );
+  }
+  if (a.kind === 'image') {
+    return (
+      <a href={a.url} target="_blank" rel="noreferrer" className="block">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={a.url}
+          alt={a.filename ?? 'image'}
+          className="max-h-64 max-w-full rounded-lg border border-zinc-200 object-cover dark:border-zinc-700"
+        />
+      </a>
+    );
+  }
+  if (a.kind === 'video') {
+    return <video src={a.url} controls className="max-h-64 max-w-full rounded-lg" />;
+  }
+  if (a.kind === 'audio') {
+    return <audio src={a.url} controls className="w-56 max-w-full" />;
+  }
+  return (
+    <a
+      href={a.url}
+      target="_blank"
+      rel="noreferrer"
+      download={a.filename ?? undefined}
+      className="flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-xs text-zinc-700 hover:border-brand-400 dark:border-zinc-700 dark:text-zinc-200"
+    >
+      <FileText size={16} className="shrink-0 text-zinc-400" />
+      <span className="max-w-[180px] truncate">{a.filename ?? 'Document'}</span>
+      {a.sizeBytes ? <span className="text-zinc-400">· {formatBytes(a.sizeBytes)}</span> : null}
+      <Download size={14} className="ml-auto shrink-0 text-zinc-400" />
+    </a>
+  );
+}
+
 export function ChatPanel({
   conversationId,
+  orgId,
+  projectId,
   currentUserId,
   meName,
   initialMessages,
@@ -61,13 +157,28 @@ export function ChatPanel({
   const [replyTo, setReplyTo] = useState<{ id: string; name: string; snippet: string } | null>(null);
   const [typing, setTyping] = useState<Record<string, string>>({});
   const [onlineOthers, setOnlineOthers] = useState(0);
+  const [pending, setPending] = useState<PendingAttachment[]>([]);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [recording, setRecording] = useState(false);
+  const [recSeconds, setRecSeconds] = useState(0);
 
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const lastSeqRef = useRef(initialMessages.at(-1)?.seq ?? 0);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const lastTypingSent = useRef(0);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recChunks = useRef<Blob[]>([]);
+  const recTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recStart = useRef(0);
+  const pendingRef = useRef<PendingAttachment[]>([]);
   const msgById = useMemo(() => new Map(messages.map((m) => [m.id, m])), [messages]);
+
+  // Keep a ref of pending so the unmount cleanup can revoke object URLs.
+  useEffect(() => {
+    pendingRef.current = pending;
+  }, [pending]);
 
   const broadcast = useCallback((event: string, payload: Record<string, unknown>) => {
     channelRef.current?.send({ type: 'broadcast', event, payload });
@@ -150,6 +261,15 @@ export function ChatPanel({
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Unmount: revoke any pending previews and tear down an in-flight recording.
+  useEffect(() => {
+    return () => {
+      pendingRef.current.forEach((a) => URL.revokeObjectURL(a.previewUrl));
+      if (recTimer.current) clearInterval(recTimer.current);
+      if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
+    };
+  }, []);
+
   function onInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     setInput(e.target.value);
     const now = Date.now();
@@ -159,19 +279,142 @@ export function ChatPanel({
     }
   }
 
+  /** Upload one blob to the conversation-keyed chat-media path, returning the
+   *  attachment metadata to persist. Storage RLS authorizes the write. */
+  const uploadOne = useCallback(
+    async (a: PendingAttachment): Promise<AttachmentInput> => {
+      const path = `${orgId}/${projectId}/chat/${conversationId}/${crypto.randomUUID()}.${a.ext}`;
+      const { error } = await supabase.storage
+        .from('chat-media')
+        .upload(path, a.file, { contentType: a.mime, upsert: false });
+      if (error) throw new Error(error.message);
+      return {
+        kind: a.kind,
+        storagePath: path,
+        mime: a.mime,
+        filename: a.filename,
+        sizeBytes: a.sizeBytes,
+        durationSeconds: a.durationSeconds ?? null,
+        width: a.width ?? null,
+        height: a.height ?? null,
+      };
+    },
+    [supabase, orgId, projectId, conversationId],
+  );
+
   async function submit() {
     const body = input.trim();
-    if (!body || sending) return;
+    const toSend = pending;
+    if ((!body && toSend.length === 0) || sending) return;
     setSending(true);
-    setInput('');
+    setUploadError(null);
     const parent = replyTo?.id;
-    setReplyTo(null);
     try {
-      await sendMessage(conversationId, body, parent);
+      const uploaded = toSend.length > 0 ? await Promise.all(toSend.map(uploadOne)) : undefined;
+      await sendMessage(conversationId, body, parent, uploaded);
+      setInput('');
+      setReplyTo(null);
+      toSend.forEach((a) => URL.revokeObjectURL(a.previewUrl));
+      setPending([]);
       await refresh();
+    } catch (e) {
+      setUploadError(e instanceof Error ? e.message : 'Upload failed');
     } finally {
       setSending(false);
     }
+  }
+
+  const addFiles = useCallback((files: FileList | File[]) => {
+    setUploadError(null);
+    const next: PendingAttachment[] = [];
+    for (const file of Array.from(files)) {
+      if (file.size > MAX_FILE_BYTES) {
+        setUploadError(`"${file.name}" exceeds the 50 MB limit.`);
+        continue;
+      }
+      const mime = file.type || 'application/octet-stream';
+      const kind = kindFromMime(mime);
+      next.push({
+        localId: crypto.randomUUID(),
+        kind,
+        file,
+        filename: file.name,
+        mime,
+        sizeBytes: file.size,
+        ext: extFromName(file.name, mime),
+        previewUrl: URL.createObjectURL(file),
+      });
+    }
+    if (next.length === 0) return;
+    setPending((p) => [...p, ...next]);
+    // Fill in image dimensions asynchronously.
+    for (const a of next) {
+      if (a.kind === 'image') {
+        void imageDimensions(a.previewUrl).then((dim) => {
+          if (!dim) return;
+          setPending((p) => p.map((x) => (x.localId === a.localId ? { ...x, ...dim } : x)));
+        });
+      }
+    }
+  }, []);
+
+  function removePending(localId: string) {
+    setPending((p) => {
+      const target = p.find((x) => x.localId === localId);
+      if (target) URL.revokeObjectURL(target.previewUrl);
+      return p.filter((x) => x.localId !== localId);
+    });
+  }
+
+  async function startRecording() {
+    setUploadError(null);
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      setUploadError('Voice recording is not supported in this browser.');
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+      const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      recChunks.current = [];
+      rec.ondataavailable = (e) => e.data.size > 0 && recChunks.current.push(e.data);
+      rec.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        if (recTimer.current) clearInterval(recTimer.current);
+        const type = rec.mimeType || 'audio/webm';
+        const blob = new Blob(recChunks.current, { type });
+        const seconds = Math.round((Date.now() - recStart.current) / 1000);
+        const previewUrl = URL.createObjectURL(blob);
+        setPending((p) => [
+          ...p,
+          {
+            localId: crypto.randomUUID(),
+            kind: 'audio',
+            file: blob,
+            filename: `voice-note.${type.includes('webm') ? 'webm' : 'ogg'}`,
+            mime: type,
+            sizeBytes: blob.size,
+            ext: type.includes('webm') ? 'webm' : 'ogg',
+            previewUrl,
+            durationSeconds: seconds,
+          },
+        ]);
+        setRecording(false);
+        setRecSeconds(0);
+      };
+      recorderRef.current = rec;
+      recStart.current = Date.now();
+      rec.start();
+      setRecording(true);
+      setRecSeconds(0);
+      recTimer.current = setInterval(() => setRecSeconds((s) => s + 1), 1000);
+    } catch {
+      setUploadError('Microphone access was denied.');
+    }
+  }
+
+  function stopRecording() {
+    recorderRef.current?.state !== 'inactive' && recorderRef.current?.stop();
   }
 
   async function onReact(id: string, emoji: string) {
@@ -232,30 +475,40 @@ export function ChatPanel({
                   </p>
                 )}
 
-                <div
-                  className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${
-                    mine
-                      ? 'bg-brand-50 text-zinc-900 dark:bg-brand-500/15 dark:text-zinc-100'
-                      : 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100'
-                  }`}
-                >
-                  {editingId === m.id ? (
-                    <div className="flex items-center gap-1">
-                      <input
-                        value={editingBody}
-                        onChange={(e) => setEditingBody(e.target.value)}
-                        className="w-48 rounded bg-white/60 px-1 text-sm outline-none dark:bg-zinc-900"
-                        autoFocus
-                      />
-                      <button onClick={saveEdit} className="text-xs text-brand-600 underline">save</button>
-                      <button onClick={() => setEditingId(null)} className="text-xs opacity-60">cancel</button>
-                    </div>
-                  ) : m.deletedAt ? (
-                    <p className="italic opacity-60">message deleted</p>
-                  ) : (
-                    <p className="whitespace-pre-wrap break-words">{m.body}</p>
-                  )}
-                </div>
+                {(editingId === m.id || m.deletedAt || m.body) && (
+                  <div
+                    className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${
+                      mine
+                        ? 'bg-brand-50 text-zinc-900 dark:bg-brand-500/15 dark:text-zinc-100'
+                        : 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100'
+                    }`}
+                  >
+                    {editingId === m.id ? (
+                      <div className="flex items-center gap-1">
+                        <input
+                          value={editingBody}
+                          onChange={(e) => setEditingBody(e.target.value)}
+                          className="w-48 rounded bg-white/60 px-1 text-sm outline-none dark:bg-zinc-900"
+                          autoFocus
+                        />
+                        <button onClick={saveEdit} className="text-xs text-brand-600 underline">save</button>
+                        <button onClick={() => setEditingId(null)} className="text-xs opacity-60">cancel</button>
+                      </div>
+                    ) : m.deletedAt ? (
+                      <p className="italic opacity-60">message deleted</p>
+                    ) : (
+                      <p className="whitespace-pre-wrap break-words">{m.body}</p>
+                    )}
+                  </div>
+                )}
+
+                {!m.deletedAt && m.attachments.length > 0 && (
+                  <div className={`mt-1 flex max-w-[80%] flex-col gap-1 ${mine ? 'items-end' : 'items-start'}`}>
+                    {m.attachments.map((a) => (
+                      <AttachmentView key={a.id} a={a} />
+                    ))}
+                  </div>
+                )}
 
                 {m.reactions.length > 0 && (
                   <div className={`mt-1 flex flex-wrap gap-1 ${mine ? 'justify-end' : ''}`}>
@@ -333,6 +586,41 @@ export function ChatPanel({
               <button type="button" onClick={() => setReplyTo(null)} className="ml-2">✕</button>
             </div>
           )}
+
+          {pending.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-2">
+              {pending.map((a) => (
+                <div
+                  key={a.localId}
+                  className="relative flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-1.5 pr-6 text-[11px] dark:border-zinc-700 dark:bg-zinc-900"
+                >
+                  {a.kind === 'image' ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={a.previewUrl} alt={a.filename} className="h-10 w-10 rounded object-cover" />
+                  ) : a.kind === 'audio' ? (
+                    <span className="flex items-center gap-1 text-zinc-600 dark:text-zinc-300">
+                      <Mic size={14} /> Voice note{a.durationSeconds ? ` · ${a.durationSeconds}s` : ''}
+                    </span>
+                  ) : (
+                    <span className="flex max-w-[160px] items-center gap-1 truncate text-zinc-600 dark:text-zinc-300">
+                      <FileText size={14} /> {a.filename}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removePending(a.localId)}
+                    className="absolute right-1 top-1 text-zinc-400 hover:text-red-500"
+                    aria-label="Remove attachment"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {uploadError && <p className="mb-2 text-[11px] text-red-500">{uploadError}</p>}
+
           <div className="rounded-lg border border-zinc-200 focus-within:border-brand-500 dark:border-zinc-700">
             <textarea
               value={input}
@@ -347,16 +635,57 @@ export function ChatPanel({
               placeholder="Write a comment…"
               className="w-full resize-none bg-transparent px-3 py-2 text-sm outline-none"
             />
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              hidden
+              onChange={(e) => {
+                if (e.target.files) addFiles(e.target.files);
+                e.target.value = '';
+              }}
+            />
             <div className="flex items-center justify-between px-2 pb-2">
-              <button
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={sending || recording}
+                  title="Attach a file"
+                  className="p-1 text-zinc-400 hover:text-zinc-700 disabled:opacity-40 dark:hover:text-zinc-200"
+                >
+                  <Paperclip size={16} />
+                </button>
+                {recording ? (
+                  <button
+                    type="button"
+                    onClick={stopRecording}
+                    title="Stop recording"
+                    className="flex items-center gap-1 rounded p-1 text-red-500"
+                  >
+                    <Square size={16} />
+                    <span className="text-[11px] tabular-nums">
+                      {Math.floor(recSeconds / 60)}:{String(recSeconds % 60).padStart(2, '0')}
+                    </span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={startRecording}
+                    disabled={sending}
+                    title="Record a voice note"
+                    className="p-1 text-zinc-400 hover:text-zinc-700 disabled:opacity-40 dark:hover:text-zinc-200"
+                  >
+                    <Mic size={16} />
+                  </button>
+                )}
+              </div>
+              <Button
                 type="button"
-                title="Media attachments arrive in the next update"
-                className="cursor-not-allowed p-1 text-zinc-300 dark:text-zinc-600"
+                onClick={submit}
+                disabled={sending || recording || (!input.trim() && pending.length === 0)}
               >
-                <Paperclip size={16} />
-              </button>
-              <Button type="button" onClick={submit} disabled={sending || !input.trim()}>
-                Post
+                {sending ? 'Sending…' : 'Post'}
               </Button>
             </div>
           </div>
