@@ -23,3 +23,8 @@ site_url = "http://localhost:3000"
 # is wired at the app layer.
 [auth.email]
 enable_signup = true
+
+# chat-push is invoked by a Database Webhook, not an end-user JWT. It authorizes
+# itself with the CHAT_PUSH_SECRET shared-secret header, so skip JWT verification.
+[functions.chat-push]
+verify_jwt = false

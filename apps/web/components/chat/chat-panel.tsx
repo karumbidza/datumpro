@@ -15,6 +15,7 @@ import {
 import type { ChatAttachment, ChatMessage, ChatSearchResult } from '@/lib/data/chat';
 import { Button } from '@/components/ui/button';
 import { MessageCircle, Paperclip, Mic, Square, X, Download, FileText, Search } from '@/components/icons';
+import { NotifyToggle } from '@/components/chat/notify-toggle';
 
 const EMOJIS = ['👍', '❤️', '😂', '🎉', '✅'];
 const MAX_FILE_BYTES = 50 * 1024 * 1024; // 50 MB per file
@@ -505,6 +506,7 @@ export function ChatPanel({
                 ● {onlineOthers} online
               </span>
             )}
+            <NotifyToggle />
             <button
               type="button"
               onClick={() => (searchOpen ? closeSearch() : setSearchOpen(true))}

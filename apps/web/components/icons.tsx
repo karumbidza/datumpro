@@ -255,6 +255,22 @@ export const ImageIcon: IconComponent = (p) => (
   </Icon>
 );
 
+export const Bell: IconComponent = (p) => (
+  <Icon {...p}>
+    <path d="M10.268 21a2 2 0 0 0 3.464 0" />
+    <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" />
+  </Icon>
+);
+
+export const BellOff: IconComponent = (p) => (
+  <Icon {...p}>
+    <path d="M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5" />
+    <path d="M17 17H4a1 1 0 0 1-.74-1.673C4.59 13.956 6 12.499 6 8a6 6 0 0 1 .3-1.9" />
+    <path d="M10.268 21a2 2 0 0 0 3.464 0" />
+    <path d="m2 2 20 20" />
+  </Icon>
+);
+
 /** Brand mark — the dark rounded-square logo used in the workspace switcher. */
 export function BrandMark({ size = 32 }: { size?: number }) {
   return (
