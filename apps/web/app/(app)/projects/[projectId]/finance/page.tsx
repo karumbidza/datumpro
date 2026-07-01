@@ -3,11 +3,14 @@ import { redirect, notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getProject } from '@/lib/data/projects';
 import { listBudgetLines, listInvoices, financeSummary } from '@/lib/data/finance';
+import { listProjectPayments } from '@/lib/data/payments';
 import { addBudgetLine } from './actions';
 import { Card, CardTitle, CardValue } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatUsd } from '@datumpro/shared/domain';
+
+const PAY_TONE = { paid: 'green', invoiced: 'blue', pending: 'neutral' } as const;
 
 const inputClass =
   'w-full rounded-md border border-zinc-200 bg-transparent px-2.5 py-1.5 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
@@ -24,10 +27,11 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
 
   const project = await getProject(projectId);
   if (!project) notFound();
-  const [summary, budget, invoices] = await Promise.all([
+  const [summary, budget, invoices, payments] = await Promise.all([
     financeSummary(projectId),
     listBudgetLines(projectId),
     listInvoices(projectId),
+    listProjectPayments(projectId),
   ]);
 
   return (
@@ -100,6 +104,53 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
             </ul>
           )}
         </div>
+      </section>
+
+      {/* Contractor payments (buy-side; RLS shows only what the viewer may see) */}
+      <section className="mt-8">
+        <h2 className="mb-3 text-sm font-semibold">Contractor payments</h2>
+        <Card>
+          <div className="grid grid-cols-3 gap-4 border-b border-zinc-100 pb-4 dark:border-zinc-800">
+            <div>
+              <p className="text-xs text-zinc-500">Committed</p>
+              <p className="text-lg font-semibold tabular-nums">{formatUsd(payments.summary.committedCents)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-zinc-500">Paid</p>
+              <p className="text-lg font-semibold tabular-nums">{formatUsd(payments.summary.paidCents)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-zinc-500">Outstanding</p>
+              <p className="text-lg font-semibold tabular-nums">{formatUsd(payments.summary.outstandingCents)}</p>
+            </div>
+          </div>
+          {payments.lines.length === 0 ? (
+            <p className="pt-4 text-sm text-zinc-500 dark:text-zinc-400">
+              No contractor draws yet — they&apos;re generated when a quote is awarded.
+            </p>
+          ) : (
+            <ul className="divide-y divide-zinc-100 pt-2 dark:divide-zinc-800">
+              {payments.lines.map((l) => (
+                <li key={l.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                  <div className="min-w-0">
+                    {l.taskId ? (
+                      <Link href={`/projects/${projectId}/tasks/${l.taskId}`} className="font-medium hover:underline">
+                        {l.taskTitle ?? 'Task'}
+                      </Link>
+                    ) : (
+                      <span className="font-medium">{l.name}</span>
+                    )}
+                    <span className="ml-2 text-xs text-zinc-400">{l.name}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="tabular-nums">{formatUsd(l.amountCents)}</span>
+                    <Badge tone={PAY_TONE[l.status]}>{l.status}</Badge>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
       </section>
     </main>
   );

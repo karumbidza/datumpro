@@ -12,7 +12,9 @@ import {
 import { listProjectMembers, myProjectRole } from '@/lib/data/members';
 import { getProjectSchedule } from '@/lib/data/scheduling';
 import { listTaskQuotes, listTaskMedia } from '@/lib/data/quotes';
+import { listTaskPayments } from '@/lib/data/payments';
 import { QuotePanel } from '@/components/task/quote-panel';
+import { PaymentsPanel } from '@/components/task/payments-panel';
 import { CompletionEvidence } from '@/components/task/completion-evidence';
 import { ExtensionPanel } from '@/components/task/extension-panel';
 import { Card, CardTitle } from '@/components/ui/card';
@@ -72,6 +74,7 @@ export default async function TaskDetailPage({
     listTaskMedia(taskId, 'completion'),
     listExtensionRequests(taskId),
   ]);
+  const payments = await listTaskPayments(taskId);
   const sched = schedule?.meta[taskId];
 
   const contractorMembers = members.filter((m) => m.role === 'contractor');
@@ -145,6 +148,8 @@ export default async function TaskDetailPage({
         quotes={quotes}
         contractors={contractors}
       />
+
+      <PaymentsPanel taskId={taskId} lines={payments} canManage={canManage} />
 
       {/* ── Dependencies — "this task starts after" ── */}
       <Card className="mt-6">

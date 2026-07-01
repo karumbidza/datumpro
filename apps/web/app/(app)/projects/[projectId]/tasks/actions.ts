@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { createTaskSchema } from '@datumpro/shared/validation';
+import { parsePaymentTerms } from '@datumpro/shared/domain';
 import { completionMediaCount } from '@/lib/data/quotes';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -405,10 +406,12 @@ export async function awardQuote(formData: FormData) {
 
   const { data: quote } = await supabase
     .from('task_quotes')
-    .select('contractor_id, status')
+    .select('contractor_id, status, cost_cents, payment_terms')
     .eq('id', quoteId)
     .maybeSingle();
-  const winner = quote as { contractor_id: string; status: string } | null;
+  const winner = quote as
+    | { contractor_id: string; status: string; cost_cents: number | null; payment_terms: unknown }
+    | null;
   if (!winner) throw new Error('Quote not found');
   if (winner.status !== 'submitted') throw new Error('Only a submitted quote can be awarded');
 
@@ -426,7 +429,52 @@ export async function awardQuote(formData: FormData) {
   if (error) throw new Error(error.message);
 
   await supabase.from('tasks').update({ assignee_id: winner.contractor_id }).eq('id', taskId);
-  await logActivity(supabase, task, user.id, 'quote', 'Awarded the quote');
+
+  // Generate the contractor payment schedule from the awarded terms (once).
+  const cost = winner.cost_cents ?? 0;
+  if (cost > 0) {
+    const { count: existing } = await supabase
+      .from('payment_schedule')
+      .select('id', { count: 'exact', head: true })
+      .eq('task_id', taskId);
+    if (!existing) {
+      const terms = parsePaymentTerms(winner.payment_terms);
+      const advance = terms.advancePct ? Math.round((cost * terms.advancePct) / 100) : 0;
+      const retention = terms.retentionPct ? Math.round((cost * terms.retentionPct) / 100) : 0;
+      const balance = cost - advance - retention;
+      const base = { org_id: task.org_id, project_id: task.project_id, task_id: taskId, status: 'pending' as const };
+      const draws: { name: string; amount_cents: number; kind: string }[] = [];
+      if (advance > 0) draws.push({ name: `Advance (${terms.advancePct}%)`, amount_cents: advance, kind: 'advance' });
+      if (balance > 0) draws.push({ name: 'On completion', amount_cents: balance, kind: 'completion' });
+      if (retention > 0) draws.push({ name: `Retention (${terms.retentionPct}%)`, amount_cents: retention, kind: 'retention' });
+      if (draws.length > 0) {
+        await supabase.from('payment_schedule').insert(draws.map((d) => ({ ...base, ...d })));
+      }
+    }
+  }
+
+  await logActivity(supabase, task, user.id, 'quote', 'Awarded the quote — payment schedule generated');
+  revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
+}
+
+/* ── Contractor payments ─────────────────────────────────────────────────── */
+
+/** Mark a scheduled draw as paid (finance/PM). Optional payment reference. */
+export async function markPaymentPaid(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const taskId = String(formData.get('taskId') ?? '');
+  const scheduleId = String(formData.get('scheduleId') ?? '');
+  const reference = (formData.get('reference') as string)?.trim() || null;
+  const task = await loadTask(supabase, taskId);
+  if (!task) throw new Error('Task not found');
+
+  const { error } = await supabase
+    .from('payment_schedule')
+    .update({ status: 'paid', paid_at: new Date().toISOString(), paid_reference: reference })
+    .eq('id', scheduleId)
+    .eq('task_id', taskId);
+  if (error) throw new Error(error.message);
+  await logActivity(supabase, task, user.id, 'payment', 'Recorded a contractor payment');
   revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
 }
 
