@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/server';
 import { createTaskSchema } from '@datumpro/shared/validation';
 import { parsePaymentTerms } from '@datumpro/shared/domain';
 import { completionMediaCount } from '@/lib/data/quotes';
+import { emailUser } from '@/lib/email/notify';
+import { extensionDecisionEmail, quoteAwardedEmail, appUrl } from '@/lib/email/templates';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -35,7 +37,7 @@ async function loadTask(supabase: Awaited<ReturnType<typeof createClient>>, task
   const { data } = await supabase
     .from('tasks')
     .select(
-      'id, org_id, project_id, status, due_date, sla_clock_paused_at, sla_total_paused_ms, requires_photo_on_complete',
+      'id, org_id, project_id, title, status, due_date, sla_clock_paused_at, sla_total_paused_ms, requires_photo_on_complete',
     )
     .eq('id', taskId)
     .maybeSingle();
@@ -44,6 +46,7 @@ async function loadTask(supabase: Awaited<ReturnType<typeof createClient>>, task
         id: string;
         org_id: string;
         project_id: string;
+        title: string;
         status: string;
         due_date: string | null;
         sla_clock_paused_at: string | null;
@@ -454,6 +457,19 @@ export async function awardQuote(formData: FormData) {
   }
 
   await logActivity(supabase, task, user.id, 'quote', 'Awarded the quote — payment schedule generated');
+  const { data: org } = await supabase
+    .from('organizations')
+    .select('name')
+    .eq('id', task.org_id)
+    .single();
+  await emailUser(
+    winner.contractor_id,
+    quoteAwardedEmail({
+      taskTitle: task.title,
+      orgName: (org as { name?: string } | null)?.name ?? 'The client',
+      url: `${appUrl()}/projects/${task.project_id}/tasks/${taskId}`,
+    }),
+  );
   revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
 }
 
@@ -553,10 +569,11 @@ export async function decideExtension(formData: FormData) {
 
   const { data: reqRow } = await supabase
     .from('task_extension_requests')
-    .select('proposed_due_date')
+    .select('proposed_due_date, requested_by')
     .eq('id', requestId)
     .maybeSingle();
-  const proposed = (reqRow as { proposed_due_date: string } | null)?.proposed_due_date ?? null;
+  const extReq = reqRow as { proposed_due_date: string; requested_by: string | null } | null;
+  const proposed = extReq?.proposed_due_date ?? null;
 
   const status = decision === 'approve' ? 'approved' : 'rejected';
   const { error } = await supabase
@@ -574,5 +591,15 @@ export async function decideExtension(formData: FormData) {
       .eq('id', taskId);
   }
   await logActivity(supabase, task, user.id, 'extension', `Extension ${status}`);
+  await emailUser(
+    extReq?.requested_by,
+    extensionDecisionEmail({
+      taskTitle: task.title,
+      decision: status,
+      deciderName: user.email?.split('@')[0] ?? 'The project manager',
+      url: `${appUrl()}/projects/${task.project_id}/tasks/${taskId}`,
+      newDate: status === 'approved' && proposed ? proposed : undefined,
+    }),
+  );
   revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
 }

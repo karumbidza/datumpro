@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { createRequestSchema } from '@datumpro/shared/validation';
+import { emailUser } from '@/lib/email/notify';
+import { approvalDecisionEmail, appUrl } from '@/lib/email/templates';
 
 async function ctx() {
   const supabase = await createClient();
@@ -85,6 +87,26 @@ export async function decideApproval(formData: FormData) {
         : error.message,
     );
   }
-  // The finalize trigger updates the request status automatically.
+  // The finalize trigger updates the request status automatically. Notify the
+  // requester only once the request reaches a terminal decision.
+  const { data: req } = await supabase
+    .from('requests')
+    .select('title, raised_by, status')
+    .eq('id', requestId)
+    .single();
+  const r = req as { title: string; raised_by: string | null; status: string } | null;
+  if (r && (r.status === 'approved' || r.status === 'rejected')) {
+    await emailUser(
+      r.raised_by,
+      approvalDecisionEmail({
+        requesterName: 'there',
+        title: r.title,
+        decision: r.status,
+        deciderName: user.email?.split('@')[0] ?? 'A manager',
+        url: `${appUrl()}/projects/${projectId}/requests/${requestId}`,
+        note: (formData.get('comment') as string) || undefined,
+      }),
+    );
+  }
   revalidatePath(`/projects/${projectId}/requests/${requestId}`);
 }
