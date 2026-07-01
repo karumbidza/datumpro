@@ -20,9 +20,9 @@ describe('computeSchedule', () => {
     const r = computeSchedule([task('A', 2), task('B', 3, [['A', 0]]), task('C', 1, [['B', 0]])]);
     expect(r.hasCycle).toBe(false);
     expect(r.projectDurationDays).toBe(6);
-    expect(r.tasks.A.es).toBe(0);
-    expect(r.tasks.B.es).toBe(2);
-    expect(r.tasks.C.es).toBe(5);
+    expect(r.tasks.A!.es).toBe(0);
+    expect(r.tasks.B!.es).toBe(2);
+    expect(r.tasks.C!.es).toBe(5);
     expect(r.criticalPath).toEqual(['A', 'B', 'C']);
   });
 
@@ -35,14 +35,14 @@ describe('computeSchedule', () => {
       task('D', 1, [['B', 0], ['C', 0]]),
     ]);
     expect(r.projectDurationDays).toBe(6);
-    expect(r.tasks.C.float).toBe(2);
-    expect(r.tasks.C.critical).toBe(false);
+    expect(r.tasks.C!.float).toBe(2);
+    expect(r.tasks.C!.critical).toBe(false);
     expect(r.criticalPath).toEqual(['A', 'B', 'D']);
   });
 
   it('honours lag', () => {
     const r = computeSchedule([task('A', 1), task('B', 1, [['A', 2]])]);
-    expect(r.tasks.B.es).toBe(3); // finish A(1) + lag(2)
+    expect(r.tasks.B!.es).toBe(3); // finish A(1) + lag(2)
     expect(r.projectDurationDays).toBe(4);
   });
 

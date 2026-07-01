@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Web + shared are what the pilot ships. The Expo app is validated once the
+      # native workstream begins; skipping it here keeps CI off React Native's
+      # heavier toolchain.
+      - name: Typecheck & unit tests
+        run: pnpm turbo run typecheck test --filter=@datumpro/web --filter=@datumpro/shared
+
+      - name: Build web
+        run: pnpm turbo run build --filter=@datumpro/web
+        env:
+          # Placeholders: the build compiles without contacting Supabase; real
+          # values are injected at deploy time.
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+          NEXT_PUBLIC_APP_URL: https://example.com
