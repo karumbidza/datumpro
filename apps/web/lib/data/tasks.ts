@@ -22,6 +22,15 @@ export interface TaskActivityRow {
   userName: string;
 }
 
+export interface ExtensionRequestRow {
+  id: string;
+  proposedDueDate: string;
+  reason: string | null;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  requesterName: string | null;
+  createdAt: string;
+}
+
 export interface TaskRow {
   id: string;
   org_id: string;
@@ -194,5 +203,45 @@ export async function listTaskActivity(taskId: string): Promise<TaskActivityRow[
     message: r.message,
     createdAt: r.created_at,
     userName: r.user_id ? names.get(r.user_id) ?? 'Member' : 'System',
+  }));
+}
+
+/** Extension requests on a task, newest first, with requester names. */
+export async function listExtensionRequests(taskId: string): Promise<ExtensionRequestRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('task_extension_requests')
+    .select('id, proposed_due_date, reason, status, requested_by, created_at')
+    .eq('task_id', taskId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  const rows = (data ?? []) as {
+    id: string;
+    proposed_due_date: string;
+    reason: string | null;
+    status: ExtensionRequestRow['status'];
+    requested_by: string | null;
+    created_at: string;
+  }[];
+  const ids = [...new Set(rows.map((r) => r.requested_by).filter(Boolean))] as string[];
+  let names = new Map<string, string>();
+  if (ids.length > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, display_name, email')
+      .in('id', ids);
+    names = new Map(
+      ((profiles ?? []) as { id: string; display_name: string | null; email: string | null }[]).map(
+        (p) => [p.id, p.display_name || p.email || 'Member'],
+      ),
+    );
+  }
+  return rows.map((r) => ({
+    id: r.id,
+    proposedDueDate: r.proposed_due_date,
+    reason: r.reason,
+    status: r.status,
+    requesterName: r.requested_by ? names.get(r.requested_by) ?? null : null,
+    createdAt: r.created_at,
   }));
 }

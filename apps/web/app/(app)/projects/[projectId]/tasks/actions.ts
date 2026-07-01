@@ -466,3 +466,63 @@ export async function removeTaskMedia(formData: FormData) {
   if (error) throw new Error(error.message);
   revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
 }
+
+/* ── Extension requests ──────────────────────────────────────────────────── */
+
+/** Executor (assignee/contractor) asks for a new due date. */
+export async function requestExtension(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const taskId = String(formData.get('taskId') ?? '');
+  const proposedDueDate = String(formData.get('proposedDueDate') ?? '');
+  const reason = (formData.get('reason') as string)?.trim() || null;
+  if (!proposedDueDate) throw new Error('Choose a proposed new due date');
+  const task = await loadTask(supabase, taskId);
+  if (!task) throw new Error('Task not found');
+
+  const { error } = await supabase.from('task_extension_requests').insert({
+    org_id: task.org_id,
+    project_id: task.project_id,
+    task_id: taskId,
+    requested_by: user.id,
+    proposed_due_date: proposedDueDate,
+    reason,
+  });
+  if (error) throw new Error(error.message);
+  await logActivity(supabase, task, user.id, 'extension', `Requested extension to ${proposedDueDate}`);
+  revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
+}
+
+/** PM approves (shifts the deadline → CPM recomputes) or rejects. */
+export async function decideExtension(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const taskId = String(formData.get('taskId') ?? '');
+  const requestId = String(formData.get('requestId') ?? '');
+  const decision = String(formData.get('decision') ?? ''); // approve | reject
+  const task = await loadTask(supabase, taskId);
+  if (!task) throw new Error('Task not found');
+
+  const { data: reqRow } = await supabase
+    .from('task_extension_requests')
+    .select('proposed_due_date')
+    .eq('id', requestId)
+    .maybeSingle();
+  const proposed = (reqRow as { proposed_due_date: string } | null)?.proposed_due_date ?? null;
+
+  const status = decision === 'approve' ? 'approved' : 'rejected';
+  const { error } = await supabase
+    .from('task_extension_requests')
+    .update({ status, decided_by: user.id, decided_at: new Date().toISOString() })
+    .eq('id', requestId)
+    .eq('task_id', taskId);
+  if (error) throw new Error(error.message);
+
+  if (decision === 'approve' && proposed) {
+    // Shift the working deadline; baseline stays frozen so variance is visible.
+    await supabase
+      .from('tasks')
+      .update({ due_date: proposed, planned_end_date: proposed })
+      .eq('id', taskId);
+  }
+  await logActivity(supabase, task, user.id, 'extension', `Extension ${status}`);
+  revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
+}

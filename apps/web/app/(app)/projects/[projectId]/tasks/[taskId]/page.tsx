@@ -7,16 +7,17 @@ import {
   listTaskDependencies,
   listProjectTaskOptions,
   listTaskActivity,
+  listExtensionRequests,
 } from '@/lib/data/tasks';
 import { listProjectMembers, myProjectRole } from '@/lib/data/members';
 import { getProjectSchedule } from '@/lib/data/scheduling';
 import { getTaskCommitment, listTaskMedia } from '@/lib/data/commitments';
 import { CommitmentPanel } from '@/components/task/commitment-panel';
 import { CompletionEvidence } from '@/components/task/completion-evidence';
+import { ExtensionPanel } from '@/components/task/extension-panel';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { TASK_SIGNOFF_ROLES } from '@datumpro/shared/domain';
 import {
   startTask,
   submitTask,
@@ -59,6 +60,7 @@ export default async function TaskDetailPage({
     commitment,
     completionMedia,
     quoteMedia,
+    extensions,
   ] = await Promise.all([
     listProjectMembers(projectId),
     myOrgRole(task.org_id),
@@ -70,6 +72,7 @@ export default async function TaskDetailPage({
     getTaskCommitment(taskId),
     listTaskMedia(taskId, 'completion'),
     listTaskMedia(taskId, 'quote'),
+    listExtensionRequests(taskId),
   ]);
   const sched = schedule?.meta[taskId];
 
@@ -80,11 +83,12 @@ export default async function TaskDetailPage({
   }));
 
   const assigneeName = members.find((m) => m.userId === task.assignee_id)?.name ?? 'Unassigned';
-  const isLead = !!orgRole && (TASK_SIGNOFF_ROLES as readonly string[]).includes(orgRole);
   const isAssignee = task.assignee_id === user.id;
-  const canAct = isAssignee || isLead;
+  // Sign-off authority mirrors the DB guard: org admin OR the project's PM.
   const canManage = orgRole === 'owner' || orgRole === 'admin' || projectRole === 'pm';
+  const canAct = isAssignee || canManage;
   const canUpload = task.status !== 'done' && (isAssignee || canManage);
+  const canRequestExtension = task.status !== 'done' && (isAssignee || canManage);
 
   const usedPredecessors = new Set(dependencies.map((d) => d.predecessorId));
   const addable = taskOptions.filter((t) => !usedPredecessors.has(t.id));
@@ -222,6 +226,13 @@ export default async function TaskDetailPage({
         canManage={canManage}
       />
 
+      <ExtensionPanel
+        taskId={taskId}
+        canManage={canManage}
+        canRequest={canRequestExtension}
+        requests={extensions}
+      />
+
       {/* Status-aware actions. The DB enforces the real rules (e.g. only a lead
           can approve to DONE) regardless of what's shown. */}
       {task.status !== 'done' && canAct && (
@@ -257,7 +268,7 @@ export default async function TaskDetailPage({
             </>
           )}
 
-          {task.status === 'submitted' && isLead && (
+          {task.status === 'submitted' && canManage && (
             <Card>
               <CardTitle>Review submission</CardTitle>
               <form action={approveTask} className="mt-3">
@@ -272,7 +283,7 @@ export default async function TaskDetailPage({
             </Card>
           )}
 
-          {task.status === 'blocked' && isLead && (
+          {task.status === 'blocked' && canManage && (
             <form action={resolveBlocker}>
               <input type="hidden" name="taskId" value={taskId} />
               <Button type="submit">Resolve blocker (resume, credit deadline)</Button>
