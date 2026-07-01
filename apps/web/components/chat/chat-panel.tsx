@@ -9,11 +9,12 @@ import {
   deleteMessage,
   toggleReaction,
   markRead,
+  searchMessages,
   type AttachmentInput,
 } from '@/app/(app)/projects/[projectId]/chat/actions';
-import type { ChatAttachment, ChatMessage } from '@/lib/data/chat';
+import type { ChatAttachment, ChatMessage, ChatSearchResult } from '@/lib/data/chat';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, Paperclip, Mic, Square, X, Download, FileText } from '@/components/icons';
+import { MessageCircle, Paperclip, Mic, Square, X, Download, FileText, Search } from '@/components/icons';
 
 const EMOJIS = ['👍', '❤️', '😂', '🎉', '✅'];
 const MAX_FILE_BYTES = 50 * 1024 * 1024; // 50 MB per file
@@ -78,6 +79,29 @@ function formatBytes(n: number | null): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** Highlight the query's bare words inside a result snippet (client-side, cosmetic
+ *  only — the actual matching is done by Postgres). Quotes/operators are ignored. */
+function highlight(text: string, query: string): React.ReactNode {
+  const terms = query
+    .replace(/["'()|]/g, ' ')
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length > 1 && !['or', 'and', 'not'].includes(t.toLowerCase()));
+  if (terms.length === 0) return text;
+  const escaped = terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const re = new RegExp(`(${escaped.join('|')})`, 'ig');
+  const parts = text.split(re);
+  return parts.map((p, i) =>
+    re.test(p) ? (
+      <mark key={i} className="rounded bg-amber-200 px-0.5 text-inherit dark:bg-amber-500/40">
+        {p}
+      </mark>
+    ) : (
+      <span key={i}>{p}</span>
+    ),
+  );
 }
 
 /** Read pixel dimensions of an image blob (best-effort). */
@@ -161,6 +185,10 @@ export function ChatPanel({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
   const [recSeconds, setRecSeconds] = useState(0);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<ChatSearchResult[] | null>(null);
+  const [searching, setSearching] = useState(false);
 
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const lastSeqRef = useRef(initialMessages.at(-1)?.seq ?? 0);
@@ -269,6 +297,36 @@ export function ChatPanel({
       if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
     };
   }, []);
+
+  // Debounced full-text search over the conversation.
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q) {
+      setSearchResults(null);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    let active = true;
+    const t = setTimeout(async () => {
+      try {
+        const res = await searchMessages(conversationId, q);
+        if (active) setSearchResults(res);
+      } finally {
+        if (active) setSearching(false);
+      }
+    }, 300);
+    return () => {
+      active = false;
+      clearTimeout(t);
+    };
+  }, [searchQuery, conversationId]);
+
+  function closeSearch() {
+    setSearchOpen(false);
+    setSearchQuery('');
+    setSearchResults(null);
+  }
 
   function onInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     setInput(e.target.value);
@@ -441,12 +499,44 @@ export function ChatPanel({
           <h2 className="text-sm font-semibold text-zinc-900 dark:text-white">
             {title} <span className="text-zinc-400">({messages.length})</span>
           </h2>
-          {onlineOthers > 0 && (
-            <span className="ml-auto flex items-center gap-1 text-[11px] text-green-600 dark:text-green-400">
-              ● {onlineOthers} online
-            </span>
-          )}
+          <div className="ml-auto flex items-center gap-2">
+            {onlineOthers > 0 && (
+              <span className="flex items-center gap-1 text-[11px] text-green-600 dark:text-green-400">
+                ● {onlineOthers} online
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => (searchOpen ? closeSearch() : setSearchOpen(true))}
+              title={searchOpen ? 'Close search' : 'Search messages'}
+              className={`rounded p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
+                searchOpen ? 'text-brand-600' : 'text-zinc-400'
+              }`}
+            >
+              {searchOpen ? <X size={16} /> : <Search size={16} />}
+            </button>
+          </div>
         </header>
+      )}
+
+      {searchOpen && (
+        <div className="border-b border-zinc-200 px-4 py-2 dark:border-zinc-800">
+          <div className="flex items-center gap-2 rounded-lg border border-zinc-200 px-2 focus-within:border-brand-500 dark:border-zinc-700">
+            <Search size={14} className="text-zinc-400" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              autoFocus
+              placeholder="Search this conversation…"
+              className="w-full bg-transparent py-1.5 text-sm outline-none"
+            />
+            {searchQuery && (
+              <button type="button" onClick={() => setSearchQuery('')} className="text-zinc-400 hover:text-zinc-600">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        </div>
       )}
       {subtitle && (
         <p className="border-b border-zinc-100 px-4 py-1.5 text-[11px] text-zinc-400 dark:border-zinc-800">
@@ -454,6 +544,37 @@ export function ChatPanel({
         </p>
       )}
 
+      {searchOpen && searchResults !== null ? (
+        <div className="flex-1 space-y-2 overflow-y-auto p-4">
+          {searching && searchResults.length === 0 ? (
+            <p className="py-8 text-center text-sm text-zinc-400">Searching…</p>
+          ) : searchResults.length === 0 ? (
+            <p className="py-8 text-center text-sm text-zinc-400">
+              No messages match “{searchQuery.trim()}”.
+            </p>
+          ) : (
+            <>
+              <p className="text-[11px] uppercase tracking-wide text-zinc-400">
+                {searchResults.length} match{searchResults.length === 1 ? '' : 'es'}
+              </p>
+              {searchResults.map((r) => (
+                <div
+                  key={r.id}
+                  className="rounded-lg border border-zinc-200 p-2.5 dark:border-zinc-800"
+                >
+                  <p className="mb-1 flex items-center gap-1.5 text-[11px] text-zinc-400">
+                    <span className="font-medium text-zinc-600 dark:text-zinc-300">{r.senderName}</span>
+                    <span>· {fullTime(r.createdAt)}</span>
+                  </p>
+                  <p className="whitespace-pre-wrap break-words text-sm text-zinc-800 dark:text-zinc-200">
+                    {highlight(r.body, searchQuery)}
+                  </p>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      ) : (
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
         {messages.length === 0 ? (
           <p className="py-8 text-center text-sm text-zinc-400">No messages yet — start the discussion.</p>
@@ -571,6 +692,7 @@ export function ChatPanel({
         )}
         <div ref={bottomRef} />
       </div>
+      )}
 
       {typingNames.length > 0 && (
         <p className="px-4 pb-1 text-[11px] italic text-zinc-400">

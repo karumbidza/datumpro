@@ -2,7 +2,12 @@
 
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { listMessages, type ChatMessage } from '@/lib/data/chat';
+import {
+  listMessages,
+  searchMessages as searchMessagesData,
+  type ChatMessage,
+  type ChatSearchResult,
+} from '@/lib/data/chat';
 
 async function requireUser() {
   const supabase = await createClient();
@@ -76,6 +81,15 @@ export async function sendMessage(
     if (attErr) throw new Error(attErr.message);
   }
   return message;
+}
+
+/** Full-text search within a conversation (RLS-scoped). */
+export async function searchMessages(
+  conversationId: string,
+  query: string,
+): Promise<ChatSearchResult[]> {
+  await requireUser();
+  return searchMessagesData(conversationId, query);
 }
 
 export async function editMessage(messageId: string, body: string) {

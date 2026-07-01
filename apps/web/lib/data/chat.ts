@@ -158,6 +158,53 @@ async function loadAttachments(messageIds: string[]): Promise<Map<string, ChatAt
   return out;
 }
 
+export interface ChatSearchResult {
+  id: string;
+  seq: number;
+  body: string;
+  senderId: string;
+  senderName: string;
+  createdAt: string;
+}
+
+/** Full-text search within one conversation. RLS scopes the query to messages the
+ *  caller may read; `websearch` parsing makes arbitrary user input safe (no tsquery
+ *  syntax errors, no injection). Matches the generated column's 'simple' config. */
+export async function searchMessages(
+  conversationId: string,
+  query: string,
+  limit = 30,
+): Promise<ChatSearchResult[]> {
+  const q = query.trim();
+  if (!q) return [];
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('messages')
+    .select('id, seq, body, sender_id, created_at')
+    .eq('conversation_id', conversationId)
+    .is('deleted_at', null)
+    .textSearch('search_tsv', q, { type: 'websearch', config: 'simple' })
+    .order('seq', { ascending: false })
+    .limit(limit);
+  const rows = (data ?? []) as {
+    id: string;
+    seq: number;
+    body: string | null;
+    sender_id: string;
+    created_at: string;
+  }[];
+  if (rows.length === 0) return [];
+  const names = await resolveNames(rows.map((r) => r.sender_id));
+  return rows.map((r) => ({
+    id: r.id,
+    seq: r.seq,
+    body: r.body ?? '',
+    senderId: r.sender_id,
+    senderName: names.get(r.sender_id) ?? 'Member',
+    createdAt: r.created_at,
+  }));
+}
+
 async function aggregateReactions(
   conversationId: string,
   messageIds: string[],
