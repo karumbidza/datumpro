@@ -35,26 +35,36 @@ function isOverdue(task: { due_date: string | null; status: TaskStatus }): boole
   return !Number.isNaN(due.getTime()) && due.getTime() < Date.now();
 }
 
-/** Aggregate everything the dashboard renders for one org in a few scoped queries.
- *  RLS keeps the result to orgs the caller belongs to; we additionally pin org_id
- *  so a multi-org user sees only the active org. */
-export async function getDashboardData(orgId: string): Promise<DashboardData> {
+/** Aggregate everything a dashboard renders in a few scoped queries. RLS keeps the
+ *  result to what the caller can see (company staff → all; project-scoped → their
+ *  projects). `orgId` pins the active company; an optional `projectId` narrows it
+ *  to a single project's Overview. */
+export async function getDashboardData(orgId: string, projectId?: string): Promise<DashboardData> {
   const supabase = await createClient();
 
+  let tasksQuery = supabase
+    .from('tasks')
+    .select(
+      'id, title, status, sla_status, project_id, assignee_id, planned_start_date, planned_end_date, due_date',
+    )
+    .eq('org_id', orgId);
+  let projectsQuery = supabase.from('projects').select('id, name').eq('org_id', orgId);
+  let requestsQuery = supabase
+    .from('requests')
+    .select('id', { count: 'exact', head: true })
+    .eq('org_id', orgId)
+    .eq('status', 'submitted');
+
+  if (projectId) {
+    tasksQuery = tasksQuery.eq('project_id', projectId);
+    projectsQuery = projectsQuery.eq('id', projectId);
+    requestsQuery = requestsQuery.eq('project_id', projectId);
+  }
+
   const [tasksRes, projectsRes, openRequestsRes] = await Promise.all([
-    supabase
-      .from('tasks')
-      .select(
-        'id, title, status, sla_status, project_id, assignee_id, planned_start_date, planned_end_date, due_date',
-      )
-      .eq('org_id', orgId)
-      .order('created_at', { ascending: true }),
-    supabase.from('projects').select('id, name').eq('org_id', orgId),
-    supabase
-      .from('requests')
-      .select('id', { count: 'exact', head: true })
-      .eq('org_id', orgId)
-      .eq('status', 'submitted'),
+    tasksQuery.order('created_at', { ascending: true }),
+    projectsQuery,
+    requestsQuery,
   ]);
 
   type RawTask = {

@@ -15,15 +15,16 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   }
 
   const { projects, myTaskCount } = await getSidebarData(ctx.active.orgId, ctx.userId);
+  const canCreate = ctx.active.role === 'owner' || ctx.active.role === 'admin';
 
   return (
     <div className="flex h-screen overflow-hidden bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
       <Sidebar
-        memberships={ctx.memberships}
-        active={ctx.active}
         projects={projects}
-        myTaskCount={myTaskCount}
+        companyName={ctx.active.name}
         email={ctx.email}
+        canCreate={canCreate}
+        myTaskCount={myTaskCount}
       />
       <main className="flex-1 overflow-y-auto">{children}</main>
     </div>

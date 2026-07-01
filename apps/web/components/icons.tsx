@@ -184,6 +184,22 @@ export const LogOut: IconComponent = (p) => (
   </Icon>
 );
 
+export const DollarSign: IconComponent = (p) => (
+  <Icon {...p}>
+    <path d="M12 2v20" />
+    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+  </Icon>
+);
+
+export const FileText: IconComponent = (p) => (
+  <Icon {...p}>
+    <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+    <path d="M14 2v5h5" />
+    <path d="M9 13h6" />
+    <path d="M9 17h6" />
+  </Icon>
+);
+
 /** Brand mark — the dark rounded-square logo used in the workspace switcher. */
 export function BrandMark({ size = 32 }: { size?: number }) {
   return (

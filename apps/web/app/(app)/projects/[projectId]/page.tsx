@@ -2,12 +2,15 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getProject, listMilestones, listRecentReports } from '@/lib/data/projects';
+import { getDashboardData } from '@/lib/data/dashboard';
+import { StatCards } from '@/components/dashboard/stat-cards';
+import { TimelineOverview } from '@/components/dashboard/timeline-overview';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 
-export default async function ProjectDetailPage({
+export default async function ProjectOverviewPage({
   params,
 }: {
   params: Promise<{ projectId: string }>;
@@ -23,7 +26,8 @@ export default async function ProjectDetailPage({
   const project = await getProject(projectId);
   if (!project) notFound();
 
-  const [milestones, reports] = await Promise.all([
+  const [{ counts, tasks }, milestones, reports] = await Promise.all([
+    getDashboardData(project.org_id, projectId),
     listMilestones(projectId),
     listRecentReports(projectId),
   ]);
@@ -31,35 +35,27 @@ export default async function ProjectDetailPage({
   const latestProgress = reports[0]?.progress_pct ?? 0;
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-10">
-      <header className="mb-8 flex items-start justify-between gap-4">
+    <div className="mx-auto max-w-6xl space-y-8 px-6 py-8 xl:px-10">
+      <header className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
         <div>
-          <Link href="/projects" className="text-xs text-zinc-500 hover:underline">
-            ← Projects
-          </Link>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">{project.name}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
           {project.client_name && (
             <p className="text-sm text-zinc-500 dark:text-zinc-400">{project.client_name}</p>
           )}
         </div>
         <div className="flex gap-2">
-          <Link href={`/projects/${projectId}/tasks`}>
-            <Button variant="secondary">Tasks</Button>
-          </Link>
-          <Link href={`/projects/${projectId}/finance`}>
-            <Button variant="secondary">Finance</Button>
-          </Link>
-          <Link href={`/projects/${projectId}/requests`}>
-            <Button variant="secondary">Requests</Button>
-          </Link>
-          <Link href={`/projects/${projectId}/team`}>
-            <Button variant="secondary">Team</Button>
-          </Link>
           <Link href={`/projects/${projectId}/reports/new`}>
-            <Button>New site report</Button>
+            <Button variant="secondary">New site report</Button>
+          </Link>
+          <Link href={`/projects/${projectId}/tasks/new`}>
+            <Button>New task</Button>
           </Link>
         </div>
       </header>
+
+      <StatCards counts={counts} />
+
+      <TimelineOverview tasks={tasks} />
 
       <Card>
         <CardTitle>Latest reported progress</CardTitle>
@@ -69,7 +65,7 @@ export default async function ProjectDetailPage({
         </div>
       </Card>
 
-      <section className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div>
           <h2 className="mb-3 text-sm font-semibold">Milestones</h2>
           {milestones.length === 0 ? (
@@ -122,6 +118,6 @@ export default async function ProjectDetailPage({
           )}
         </div>
       </section>
-    </main>
+    </div>
   );
 }
