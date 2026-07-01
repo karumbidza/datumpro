@@ -11,6 +11,14 @@ const inputClass =
 
 type Method = 'password' | 'magiclink';
 
+/** Post-auth destination from ?next=, restricted to same-site relative paths so
+ *  it can't be turned into an open redirect. Defaults to the dashboard. */
+function safeNext(): string {
+  if (typeof window === 'undefined') return '/dashboard';
+  const n = new URLSearchParams(window.location.search).get('next');
+  return n && n.startsWith('/') && !n.startsWith('//') ? n : '/dashboard';
+}
+
 export default function SignInPage() {
   const [method, setMethod] = useState<Method>('password');
   const [email, setEmail] = useState('');
@@ -34,7 +42,7 @@ export default function SignInPage() {
           : error.message,
       });
     }
-    window.location.assign('/dashboard'); // full reload so the server picks up the session
+    window.location.assign(safeNext()); // full reload so the server picks up the session
   }
 
   async function signUp() {
@@ -47,11 +55,11 @@ export default function SignInPage() {
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
-      options: { emailRedirectTo: `${env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/dashboard` },
+      options: { emailRedirectTo: `${env.NEXT_PUBLIC_APP_URL}/auth/callback?next=${encodeURIComponent(safeNext())}` },
     });
     setBusy(false);
     if (error) return setMessage({ kind: 'error', text: error.message });
-    if (data.session) return window.location.assign('/dashboard'); // confirmation disabled → straight in
+    if (data.session) return window.location.assign(safeNext()); // confirmation disabled → straight in
     setMessage({
       kind: 'info',
       text: 'Account created, but email confirmation is ON. Click the link in your email to finish — or (for dev) turn off “Confirm email” in Supabase → Auth → Email, delete this user, and create again.',
@@ -65,7 +73,7 @@ export default function SignInPage() {
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim(),
-      options: { emailRedirectTo: `${env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/dashboard` },
+      options: { emailRedirectTo: `${env.NEXT_PUBLIC_APP_URL}/auth/callback?next=${encodeURIComponent(safeNext())}` },
     });
     setBusy(false);
     if (error) return setMessage({ kind: 'error', text: error.message });

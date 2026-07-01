@@ -61,6 +61,7 @@ export function Sidebar({ projects, orgs, activeOrgId, email, canCreate, myTaskC
     : [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
         { name: 'All projects', href: '/projects', icon: FolderOpen },
+        ...(canCreate ? [{ name: 'Members', href: '/org/members', icon: Users }] : []),
       ];
 
   const isActive = (href: string) =>

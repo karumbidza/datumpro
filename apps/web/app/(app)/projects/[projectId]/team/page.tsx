@@ -117,8 +117,11 @@ export default async function ProjectTeamPage({
             <CardTitle>Add a teammate</CardTitle>
             {addable.length === 0 ? (
               <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-                Everyone in this company is already on the project. To bring in someone new, add
-                them to the company first (invites by email are coming with the onboarding flow).
+                Everyone in this company is already on the project. To bring in someone new,{' '}
+                <Link href="/org/members" className="text-brand-600 hover:underline">
+                  invite them to the company
+                </Link>{' '}
+                first, then add them here.
               </p>
             ) : (
               <form action={addProjectMember} className="mt-3 flex flex-wrap items-end gap-3">
