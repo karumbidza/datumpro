@@ -3,8 +3,10 @@ import { notFound, redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getProject, listMilestones, listRecentReports } from '@/lib/data/projects';
 import { getDashboardData } from '@/lib/data/dashboard';
+import { getProjectSchedule } from '@/lib/data/scheduling';
 import { StatCards } from '@/components/dashboard/stat-cards';
 import { TimelineOverview } from '@/components/dashboard/timeline-overview';
+import { ScheduleSummary } from '@/components/project/schedule-summary';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -26,10 +28,11 @@ export default async function ProjectOverviewPage({
   const project = await getProject(projectId);
   if (!project) notFound();
 
-  const [{ counts, tasks }, milestones, reports] = await Promise.all([
+  const [{ counts, tasks }, milestones, reports, schedule] = await Promise.all([
     getDashboardData(project.org_id, projectId),
     listMilestones(projectId),
     listRecentReports(projectId),
+    getProjectSchedule(projectId),
   ]);
 
   const latestProgress = reports[0]?.progress_pct ?? 0;
@@ -54,6 +57,8 @@ export default async function ProjectOverviewPage({
       </header>
 
       <StatCards counts={counts} />
+
+      {schedule && <ScheduleSummary data={schedule} />}
 
       <TimelineOverview tasks={tasks} />
 

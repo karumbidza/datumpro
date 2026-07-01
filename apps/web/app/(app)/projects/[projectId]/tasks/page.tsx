@@ -3,6 +3,7 @@ import { redirect, notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getProject } from '@/lib/data/projects';
 import { listTasksByProject, type TaskRow } from '@/lib/data/tasks';
+import { getProjectSchedule } from '@/lib/data/scheduling';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -31,7 +32,10 @@ export default async function TaskBoardPage({
 
   const project = await getProject(projectId);
   if (!project) notFound();
-  const tasks = await listTasksByProject(projectId);
+  const [tasks, schedule] = await Promise.all([
+    listTasksByProject(projectId),
+    getProjectSchedule(projectId),
+  ]);
 
   const byStatus = (s: TaskStatus): TaskRow[] => tasks.filter((t) => t.status === s);
 
@@ -71,6 +75,19 @@ export default async function TaskBoardPage({
                           <Badge tone={PRIORITY_TONE[t.priority]}>{t.priority}</Badge>
                           {t.due_date && <span className="text-[11px] text-zinc-400">{t.due_date}</span>}
                         </div>
+                        {t.status !== 'done' &&
+                          schedule?.meta[t.id] &&
+                          (schedule.meta[t.id]!.critical ? (
+                            <p className="mt-2 text-[10px] font-medium uppercase tracking-wide text-red-600 dark:text-red-400">
+                              ● Critical path
+                            </p>
+                          ) : (
+                            schedule.meta[t.id]!.floatDays > 0 && (
+                              <p className="mt-2 text-[10px] text-zinc-400">
+                                {schedule.meta[t.id]!.floatDays}d slack
+                              </p>
+                            )
+                          ))}
                         {t.status === 'blocked' && t.blocker_description && (
                           <p className="mt-2 line-clamp-2 text-[11px] text-amber-600 dark:text-amber-400">
                             🚧 {t.blocker_description}

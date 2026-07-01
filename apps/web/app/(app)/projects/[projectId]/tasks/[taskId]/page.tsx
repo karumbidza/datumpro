@@ -9,6 +9,7 @@ import {
   listTaskActivity,
 } from '@/lib/data/tasks';
 import { listProjectMembers, myProjectRole } from '@/lib/data/members';
+import { getProjectSchedule } from '@/lib/data/scheduling';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -44,14 +45,17 @@ export default async function TaskDetailPage({
   const task = await getTask(taskId);
   if (!task) notFound();
 
-  const [members, orgRole, projectRole, dependencies, taskOptions, activity] = await Promise.all([
-    listProjectMembers(projectId),
-    myOrgRole(task.org_id),
-    myProjectRole(projectId),
-    listTaskDependencies(taskId),
-    listProjectTaskOptions(projectId, taskId),
-    listTaskActivity(taskId),
-  ]);
+  const [members, orgRole, projectRole, dependencies, taskOptions, activity, schedule] =
+    await Promise.all([
+      listProjectMembers(projectId),
+      myOrgRole(task.org_id),
+      myProjectRole(projectId),
+      listTaskDependencies(taskId),
+      listProjectTaskOptions(projectId, taskId),
+      listTaskActivity(taskId),
+      getProjectSchedule(projectId),
+    ]);
+  const sched = schedule?.meta[taskId];
 
   const assigneeName = members.find((m) => m.userId === task.assignee_id)?.name ?? 'Unassigned';
   const isLead = !!orgRole && (TASK_SIGNOFF_ROLES as readonly string[]).includes(orgRole);
@@ -83,6 +87,12 @@ export default async function TaskDetailPage({
         <Row label="Assignee" value={assigneeName} />
         <Row label="Priority" value={task.priority} />
         <Row label="SLA" value={task.sla_status.replace('_', ' ')} />
+        {task.status !== 'done' && sched && (
+          <Row
+            label="Schedule"
+            value={sched.critical ? 'On critical path' : `${sched.floatDays}d slack`}
+          />
+        )}
         {task.planned_start_date && <Row label="Start" value={task.planned_start_date} />}
         {task.due_date && <Row label="Due" value={task.due_date} />}
         {task.description && <p className="pt-2 text-zinc-600 dark:text-zinc-300">{task.description}</p>}
