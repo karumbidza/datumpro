@@ -1,15 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import {
-  loadMessages,
   sendMessage,
   editMessage,
   deleteMessage,
   toggleReaction,
   markRead,
   searchMessages,
+  loadEarlier,
+  loadSince,
+  loadOne,
   type AttachmentInput,
 } from '@/app/(app)/projects/[projectId]/chat/actions';
 import type { ChatAttachment, ChatMessage, ChatSearchResult } from '@/lib/data/chat';
@@ -190,10 +192,16 @@ export function ChatPanel({
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<ChatSearchResult[] | null>(null);
   const [searching, setSearching] = useState(false);
+  const [loadingEarlier, setLoadingEarlier] = useState(false);
+  const [hasMore, setHasMore] = useState(initialMessages.length >= 50);
 
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const lastSeqRef = useRef(initialMessages.at(-1)?.seq ?? 0);
+  const earliestSeqRef = useRef(initialMessages[0]?.seq ?? 0);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const shouldScrollRef = useRef(true); // scroll to bottom on first paint
+  const prependAnchor = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const lastTypingSent = useRef(0);
@@ -213,16 +221,43 @@ export function ChatPanel({
     channelRef.current?.send({ type: 'broadcast', event, payload });
   }, []);
 
-  const refresh = useCallback(async () => {
-    const msgs = await loadMessages(conversationId);
-    setMessages(msgs);
-    const maxSeq = msgs.at(-1)?.seq ?? 0;
-    lastSeqRef.current = Math.max(lastSeqRef.current, maxSeq);
-    if (maxSeq > 0) {
-      await markRead(conversationId, maxSeq);
-      broadcast('read', { userId: currentUserId, seq: maxSeq });
+  /** Upsert messages by id and keep the list seq-sorted. `scroll` requests a
+   *  jump to the newest row once the DOM updates (new/own messages only). */
+  const applyMessages = useCallback((incoming: ChatMessage[], scroll: boolean) => {
+    if (incoming.length === 0) return;
+    setMessages((prev) => {
+      const map = new Map(prev.map((m) => [m.id, m]));
+      for (const m of incoming) map.set(m.id, m);
+      return [...map.values()].sort((a, b) => a.seq - b.seq);
+    });
+    if (scroll) shouldScrollRef.current = true;
+  }, []);
+
+  /** Pull only messages newer than our cursor (new-message + reconnect delta),
+   *  then advance the read cursor. Replaces the old full-window reload. */
+  const syncNew = useCallback(async () => {
+    // Drain in pages so a long offline gap (> one page) never leaves a hole.
+    for (let guard = 0; guard < 20; guard++) {
+      const fresh = await loadSince(conversationId, lastSeqRef.current);
+      if (fresh.length === 0) break;
+      applyMessages(fresh, true);
+      lastSeqRef.current = Math.max(lastSeqRef.current, fresh.at(-1)!.seq);
+      if (fresh.length < 200) break; // page not full → caught up
     }
-  }, [conversationId, currentUserId, broadcast]);
+    if (lastSeqRef.current > 0) {
+      await markRead(conversationId, lastSeqRef.current);
+      broadcast('read', { userId: currentUserId, seq: lastSeqRef.current });
+    }
+  }, [conversationId, currentUserId, broadcast, applyMessages]);
+
+  /** Refetch a single visible message after an edit / delete / reaction. */
+  const applyOne = useCallback(
+    async (id: string) => {
+      const m = await loadOne(conversationId, id);
+      if (m) applyMessages([m], false);
+    },
+    [conversationId, applyMessages],
+  );
 
   const showTyping = useCallback(
     (p: { userId?: string; name?: string } | undefined) => {
@@ -251,8 +286,15 @@ export function ChatPanel({
         config: { private: true, broadcast: { self: false }, presence: { key: currentUserId } },
       });
       channel
-        .on('broadcast', { event: 'message' }, () => active && void refresh())
-        .on('broadcast', { event: 'reaction' }, () => active && void refresh())
+        .on('broadcast', { event: 'message' }, ({ payload }) => {
+          if (!active) return;
+          // INSERT → fetch just the new tail; UPDATE (edit/delete) → refetch that row.
+          if (payload?.op === 'UPDATE' && payload?.id) void applyOne(String(payload.id));
+          else void syncNew();
+        })
+        .on('broadcast', { event: 'reaction' }, ({ payload }) => {
+          if (active && payload?.messageId) void applyOne(String(payload.messageId));
+        })
         .on('broadcast', { event: 'typing' }, ({ payload }) => active && showTyping(payload))
         .on('broadcast', { event: 'read' }, ({ payload }) => {
           if (active && payload?.userId !== currentUserId) {
@@ -267,11 +309,14 @@ export function ChatPanel({
           setOnlineOthers(ids.size);
         })
         .subscribe((status) => {
-          if (status === 'SUBSCRIBED') void channel.track({ user_id: currentUserId, name: meName });
+          if (status === 'SUBSCRIBED') {
+            void channel.track({ user_id: currentUserId, name: meName });
+            // Initial sync AND reconnect resync land here — pull anything missed.
+            if (active) void syncNew();
+          }
         });
       channelRef.current = channel;
     })();
-    void refresh();
     return () => {
       active = false;
       if (channelRef.current) supabase.removeChannel(channelRef.current);
@@ -286,9 +331,36 @@ export function ChatPanel({
     return () => clearInterval(iv);
   }, [supabase, currentUserId]);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  // Scroll to newest only when a new/own message asked for it; edits, reactions
+  // and prepends (load-earlier) leave the viewport where it is.
+  useLayoutEffect(() => {
+    if (prependAnchor.current != null && scrollRef.current) {
+      // Keep the first previously-visible row pinned after prepending older ones.
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight - prependAnchor.current;
+      prependAnchor.current = null;
+      return;
+    }
+    if (shouldScrollRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      shouldScrollRef.current = false;
+    }
   }, [messages]);
+
+  async function onLoadEarlier() {
+    if (loadingEarlier || !hasMore) return;
+    setLoadingEarlier(true);
+    if (scrollRef.current) prependAnchor.current = scrollRef.current.scrollHeight;
+    try {
+      const older = await loadEarlier(conversationId, earliestSeqRef.current);
+      if (older.length) {
+        earliestSeqRef.current = older[0]!.seq;
+        applyMessages(older, false);
+      }
+      if (older.length < 50) setHasMore(false);
+    } finally {
+      setLoadingEarlier(false);
+    }
+  }
 
   // Unmount: revoke any pending previews and tear down an in-flight recording.
   useEffect(() => {
@@ -375,7 +447,8 @@ export function ChatPanel({
       setReplyTo(null);
       toSend.forEach((a) => URL.revokeObjectURL(a.previewUrl));
       setPending([]);
-      await refresh();
+      shouldScrollRef.current = true;
+      await syncNew();
     } catch (e) {
       setUploadError(e instanceof Error ? e.message : 'Upload failed');
     } finally {
@@ -479,14 +552,15 @@ export function ChatPanel({
   async function onReact(id: string, emoji: string) {
     await toggleReaction(id, emoji);
     broadcast('reaction', { messageId: id });
-    await refresh();
+    await applyOne(id);
   }
 
   async function saveEdit() {
     if (!editingId) return;
-    await editMessage(editingId, editingBody);
+    const id = editingId;
+    await editMessage(id, editingBody);
     setEditingId(null);
-    await refresh();
+    await applyOne(id);
   }
 
   const lastOwn = [...messages].reverse().find((m) => m.senderId === currentUserId);
@@ -577,7 +651,19 @@ export function ChatPanel({
           )}
         </div>
       ) : (
-      <div className="flex-1 space-y-3 overflow-y-auto p-4">
+      <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-4">
+        {hasMore && messages.length > 0 && (
+          <div className="flex justify-center pb-1">
+            <button
+              type="button"
+              onClick={onLoadEarlier}
+              disabled={loadingEarlier}
+              className="rounded-full border border-zinc-200 px-3 py-1 text-[11px] text-zinc-500 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+            >
+              {loadingEarlier ? 'Loading…' : 'Load earlier messages'}
+            </button>
+          </div>
+        )}
         {messages.length === 0 ? (
           <p className="py-8 text-center text-sm text-zinc-400">No messages yet — start the discussion.</p>
         ) : (
@@ -675,7 +761,7 @@ export function ChatPanel({
                     )}
                     {(mine || canModerate) && (
                       <button
-                        onClick={() => deleteMessage(m.id).then(refresh)}
+                        onClick={() => deleteMessage(m.id).then(() => applyOne(m.id))}
                         className="text-[11px] text-zinc-400 hover:text-red-500"
                       >
                         Delete

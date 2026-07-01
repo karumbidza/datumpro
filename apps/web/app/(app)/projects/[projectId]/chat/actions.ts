@@ -4,6 +4,9 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import {
   listMessages,
+  listMessagesBefore,
+  listMessagesSince,
+  getMessage,
   searchMessages as searchMessagesData,
   type ChatMessage,
   type ChatSearchResult,
@@ -81,6 +84,27 @@ export async function sendMessage(
     if (attErr) throw new Error(attErr.message);
   }
   return message;
+}
+
+/** A page of older messages (seq < beforeSeq) for infinite-scroll-up. */
+export async function loadEarlier(
+  conversationId: string,
+  beforeSeq: number,
+): Promise<ChatMessage[]> {
+  const { user } = await requireUser();
+  return listMessagesBefore(conversationId, user.id, beforeSeq);
+}
+
+/** Only messages newer than sinceSeq — the new-message / reconnect delta. */
+export async function loadSince(conversationId: string, sinceSeq: number): Promise<ChatMessage[]> {
+  const { user } = await requireUser();
+  return listMessagesSince(conversationId, user.id, sinceSeq);
+}
+
+/** One freshly-hydrated message — for an edit/delete/reaction to a visible row. */
+export async function loadOne(conversationId: string, messageId: string): Promise<ChatMessage | null> {
+  const { user } = await requireUser();
+  return getMessage(conversationId, user.id, messageId);
 }
 
 /** Full-text search within a conversation (RLS-scoped). */

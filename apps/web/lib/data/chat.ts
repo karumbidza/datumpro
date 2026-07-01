@@ -60,37 +60,30 @@ export async function getTaskConversationId(taskId: string): Promise<string | nu
   return (data as { id: string } | null)?.id ?? null;
 }
 
-/** Most recent messages (ascending), with sender names + aggregated reactions. */
-export async function listMessages(
-  conversationId: string,
-  meId: string,
-  limit = 50,
-): Promise<ChatMessage[]> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from('messages')
-    .select('id, seq, body, sender_id, created_at, edited_at, deleted_at, parent_message_id')
-    .eq('conversation_id', conversationId)
-    .order('seq', { ascending: false })
-    .limit(limit);
-  const rows = ((data ?? []) as {
-    id: string;
-    seq: number;
-    body: string | null;
-    sender_id: string;
-    created_at: string;
-    edited_at: string | null;
-    deleted_at: string | null;
-    parent_message_id: string | null;
-  }[]).reverse();
+const MESSAGE_COLS =
+  'id, seq, body, sender_id, created_at, edited_at, deleted_at, parent_message_id';
 
+interface MessageRow {
+  id: string;
+  seq: number;
+  body: string | null;
+  sender_id: string;
+  created_at: string;
+  edited_at: string | null;
+  deleted_at: string | null;
+  parent_message_id: string | null;
+}
+
+/** Resolve names + reactions + attachments for a set of rows (one batched call
+ *  each) and shape them into ChatMessages. Shared by every list/fetch path. */
+async function hydrate(rows: MessageRow[], meId: string): Promise<ChatMessage[]> {
+  if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
   const [names, reactions, attachments] = await Promise.all([
     resolveNames(rows.map((r) => r.sender_id)),
-    aggregateReactions(conversationId, ids, meId),
+    aggregateReactions(ids, meId),
     loadAttachments(ids),
   ]);
-
   return rows.map((r) => ({
     id: r.id,
     seq: r.seq,
@@ -104,6 +97,80 @@ export async function listMessages(
     reactions: reactions.get(r.id) ?? [],
     attachments: r.deleted_at ? [] : attachments.get(r.id) ?? [],
   }));
+}
+
+/** Most recent messages (ascending), with sender names + aggregated reactions. */
+export async function listMessages(
+  conversationId: string,
+  meId: string,
+  limit = 50,
+): Promise<ChatMessage[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('messages')
+    .select(MESSAGE_COLS)
+    .eq('conversation_id', conversationId)
+    .order('seq', { ascending: false })
+    .limit(limit);
+  const rows = ((data ?? []) as MessageRow[]).reverse();
+  return hydrate(rows, meId);
+}
+
+/** A page of OLDER messages (seq < beforeSeq), ascending — for "load earlier". */
+export async function listMessagesBefore(
+  conversationId: string,
+  meId: string,
+  beforeSeq: number,
+  limit = 50,
+): Promise<ChatMessage[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('messages')
+    .select(MESSAGE_COLS)
+    .eq('conversation_id', conversationId)
+    .lt('seq', beforeSeq)
+    .order('seq', { ascending: false })
+    .limit(limit);
+  const rows = ((data ?? []) as MessageRow[]).reverse();
+  return hydrate(rows, meId);
+}
+
+/** Only messages NEWER than sinceSeq (ascending) — the reconnect / new-message
+ *  delta. Bounded so a long offline gap still returns a sane payload. */
+export async function listMessagesSince(
+  conversationId: string,
+  meId: string,
+  sinceSeq: number,
+  limit = 200,
+): Promise<ChatMessage[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('messages')
+    .select(MESSAGE_COLS)
+    .eq('conversation_id', conversationId)
+    .gt('seq', sinceSeq)
+    .order('seq', { ascending: true })
+    .limit(limit);
+  return hydrate((data ?? []) as MessageRow[], meId);
+}
+
+/** A single message, freshly hydrated — for edit / delete / reaction updates to a
+ *  row that is already on screen. Null if it no longer resolves. */
+export async function getMessage(
+  conversationId: string,
+  meId: string,
+  messageId: string,
+): Promise<ChatMessage | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('messages')
+    .select(MESSAGE_COLS)
+    .eq('conversation_id', conversationId)
+    .eq('id', messageId)
+    .maybeSingle();
+  if (!data) return null;
+  const [m] = await hydrate([data as MessageRow], meId);
+  return m ?? null;
 }
 
 /** Attachments for the loaded messages, with freshly signed URLs (one batched
@@ -206,7 +273,6 @@ export async function searchMessages(
 }
 
 async function aggregateReactions(
-  conversationId: string,
   messageIds: string[],
   meId: string,
 ): Promise<Map<string, MessageReaction[]>> {
@@ -216,7 +282,7 @@ async function aggregateReactions(
   const { data } = await supabase
     .from('message_reactions')
     .select('message_id, emoji, user_id')
-    .eq('conversation_id', conversationId);
+    .in('message_id', messageIds);
   const rows = (data ?? []) as { message_id: string; emoji: string; user_id: string }[];
   const byMsg = new Map<string, Map<string, { count: number; mine: boolean }>>();
   for (const r of rows) {
