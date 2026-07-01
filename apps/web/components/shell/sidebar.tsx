@@ -10,6 +10,7 @@ import {
   CheckSquare,
   DollarSign,
   FileText,
+  MessageSquare,
   ChevronDown,
   Check,
   Plus,
@@ -53,6 +54,7 @@ export function Sidebar({ projects, companyName, email, canCreate, myTaskCount }
         { name: 'Tasks', href: `/projects/${activeProject.id}/tasks`, icon: CheckSquare },
         { name: 'Finance', href: `/projects/${activeProject.id}/finance`, icon: DollarSign },
         { name: 'Requests', href: `/projects/${activeProject.id}/requests`, icon: FileText },
+        { name: 'Chat', href: `/projects/${activeProject.id}/chat`, icon: MessageSquare },
         { name: 'Team', href: `/projects/${activeProject.id}/team`, icon: Users },
       ]
     : [

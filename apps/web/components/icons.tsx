@@ -184,6 +184,12 @@ export const LogOut: IconComponent = (p) => (
   </Icon>
 );
 
+export const MessageSquare: IconComponent = (p) => (
+  <Icon {...p}>
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+  </Icon>
+);
+
 export const DollarSign: IconComponent = (p) => (
   <Icon {...p}>
     <path d="M12 2v20" />

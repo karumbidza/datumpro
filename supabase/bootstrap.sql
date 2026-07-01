@@ -1,5 +1,5 @@
 -- DatumPro — consolidated schema bootstrap (generated from supabase/migrations/*).
--- Paste into Supabase Studio → SQL Editor → Run (fresh project).
+-- Paste into Supabase Studio > SQL Editor > Run (fresh project).
 
 
 -- ═══════════════════════════════════════════════════════════════════════
@@ -174,6 +174,7 @@ create policy invitations_manage on public.invitations for all
   using ((select public.org_role(org_id)) in ('owner', 'admin'))
   with check ((select public.org_role(org_id)) in ('owner', 'admin'));
 
+
 -- ═══════════════════════════════════════════════════════════════════════
 -- migration: 20260101000100_projects.sql
 -- ═══════════════════════════════════════════════════════════════════════
@@ -257,6 +258,7 @@ create policy milestones_write on public.milestones for all
   using ((select public.org_role(org_id)) in ('owner', 'admin', 'pm'))
   with check ((select public.org_role(org_id)) in ('owner', 'admin', 'pm'));
 
+
 -- ═══════════════════════════════════════════════════════════════════════
 -- migration: 20260101000200_audit.sql
 -- ═══════════════════════════════════════════════════════════════════════
@@ -288,6 +290,7 @@ alter table public.audit_logs enable row level security;
 -- role (which bypasses RLS) can write. The log stays tamper-evident.
 create policy audit_logs_select on public.audit_logs for select
   using ((select public.is_org_member(org_id)));
+
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- migration: 20260101000300_monitoring.sql
@@ -374,6 +377,7 @@ create policy report_media_insert on public.report_media for insert
 create policy report_media_delete on public.report_media for delete
   using ((select public.org_role(org_id)) in ('owner', 'admin', 'pm'));
 
+
 -- ═══════════════════════════════════════════════════════════════════════
 -- migration: 20260101000400_storage.sql
 -- ═══════════════════════════════════════════════════════════════════════
@@ -420,6 +424,7 @@ create policy "project-media delete"
     bucket_id = 'project-media'
     and (select public.org_role(public.safe_uuid((storage.foldername(name))[1]))) in ('owner', 'admin', 'pm')
   );
+
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- migration: 20260101000500_finance.sql
@@ -674,6 +679,7 @@ create policy paynow_transactions_write on public.paynow_transactions for all
   using ((select public.org_role(org_id)) in ('owner', 'admin', 'finance'))
   with check ((select public.org_role(org_id)) in ('owner', 'admin', 'finance'));
 
+
 -- ═══════════════════════════════════════════════════════════════════════
 -- migration: 20260101000600_requests.sql
 -- ═══════════════════════════════════════════════════════════════════════
@@ -870,6 +876,7 @@ create policy approvals_decide on public.approvals for update
     or (select public.org_role(org_id)) in ('owner', 'admin')
   )
   with check (approver_id = (select auth.uid()));
+
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- migration: 20260101000700_tasks.sql
@@ -2039,8 +2046,11 @@ create policy conversation_participants_write on public.conversation_participant
   using ((select public.is_org_staff(org_id)) or (select public.project_role(project_id)) = 'pm')
   with check ((select public.is_org_staff(org_id)) or (select public.project_role(project_id)) = 'pm');
 
--- read cursor (each user manages only their own; no auth meaning)
-create policy chat_read_state_rw on public.chat_read_state for all
+-- read cursor: participants may READ every cursor in a conversation they can
+-- access (for "seen by"); each user may only WRITE their own row.
+create policy chat_read_state_select on public.chat_read_state for select
+  using ((select public.can_access_conversation(conversation_id)));
+create policy chat_read_state_write on public.chat_read_state for all
   using (user_id = (select auth.uid()))
   with check (user_id = (select auth.uid()));
 
@@ -2124,3 +2134,28 @@ create policy "chat-media delete" on storage.objects for delete to authenticated
     bucket_id = 'chat-media'
     and (select public.can_access_conversation(public.safe_uuid((storage.foldername(name))[4])))
   );
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Mark-read: writes per-recipient receipts (WhatsApp model) + the read cursor in
+-- one round-trip. SECURITY INVOKER so RLS still applies (a user only writes their
+-- own receipts/cursor and can only read messages they may access).
+-- ─────────────────────────────────────────────────────────────────────────────
+create or replace function public.mark_conversation_read(p_conversation_id uuid, p_upto_seq bigint)
+returns void language plpgsql security invoker set search_path = '' as $$
+begin
+  insert into public.message_receipts (message_id, user_id, read_at)
+  select m.id, (select auth.uid()), now()
+  from public.messages m
+  where m.conversation_id = p_conversation_id
+    and m.seq <= p_upto_seq
+    and m.sender_id <> (select auth.uid())
+  on conflict (message_id, user_id)
+    do update set read_at = coalesce(public.message_receipts.read_at, excluded.read_at);
+
+  insert into public.chat_read_state (conversation_id, user_id, last_read_seq)
+  values (p_conversation_id, (select auth.uid()), p_upto_seq)
+  on conflict (conversation_id, user_id)
+    do update set last_read_seq = greatest(public.chat_read_state.last_read_seq, excluded.last_read_seq),
+                  updated_at = now();
+end;
+$$;

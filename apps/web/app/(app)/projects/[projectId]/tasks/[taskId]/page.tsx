@@ -13,8 +13,10 @@ import { listProjectMembers, myProjectRole } from '@/lib/data/members';
 import { getProjectSchedule } from '@/lib/data/scheduling';
 import { listTaskQuotes, listTaskMedia } from '@/lib/data/quotes';
 import { listTaskPayments } from '@/lib/data/payments';
+import { getTaskConversationId, listMessages, othersMaxReadSeq } from '@/lib/data/chat';
 import { QuotePanel } from '@/components/task/quote-panel';
 import { PaymentsPanel } from '@/components/task/payments-panel';
+import { ChatPanel } from '@/components/chat/chat-panel';
 import { CompletionEvidence } from '@/components/task/completion-evidence';
 import { ExtensionPanel } from '@/components/task/extension-panel';
 import { Card, CardTitle } from '@/components/ui/card';
@@ -76,6 +78,18 @@ export default async function TaskDetailPage({
   ]);
   const payments = await listTaskPayments(taskId);
   const sched = schedule?.meta[taskId];
+
+  // Task DM (created on assignment; visible only to staff / PM / the assigned contractor).
+  const dmConversationId = await getTaskConversationId(taskId);
+  const dm = dmConversationId
+    ? {
+        id: dmConversationId,
+        messages: await listMessages(dmConversationId),
+        othersRead: await othersMaxReadSeq(dmConversationId, user.id),
+      }
+    : null;
+  const chatNames = Object.fromEntries(members.map((m) => [m.userId, m.name]));
+  const meName = chatNames[user.id] ?? user.email?.split('@')[0] ?? 'You';
 
   const contractorMembers = members.filter((m) => m.role === 'contractor');
   const contractors = (contractorMembers.length > 0 ? contractorMembers : members).map((m) => ({
@@ -150,6 +164,27 @@ export default async function TaskDetailPage({
       />
 
       <PaymentsPanel taskId={taskId} lines={payments} canManage={canManage} />
+
+      {dm && (
+        <Card className="mt-6 overflow-hidden p-0">
+          <div className="border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+            <CardTitle>Discussion</CardTitle>
+            <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+              Private to the project manager and the assigned contractor.
+            </p>
+          </div>
+          <ChatPanel
+            className="h-96"
+            conversationId={dm.id}
+            currentUserId={user.id}
+            meName={meName}
+            initialMessages={dm.messages}
+            initialNames={chatNames}
+            othersReadSeq={dm.othersRead}
+            canPost
+          />
+        </Card>
+      )}
 
       {/* ── Dependencies — "this task starts after" ── */}
       <Card className="mt-6">

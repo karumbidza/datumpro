@@ -323,8 +323,11 @@ create policy conversation_participants_write on public.conversation_participant
   using ((select public.is_org_staff(org_id)) or (select public.project_role(project_id)) = 'pm')
   with check ((select public.is_org_staff(org_id)) or (select public.project_role(project_id)) = 'pm');
 
--- read cursor (each user manages only their own; no auth meaning)
-create policy chat_read_state_rw on public.chat_read_state for all
+-- read cursor: participants may READ every cursor in a conversation they can
+-- access (for "seen by"); each user may only WRITE their own row.
+create policy chat_read_state_select on public.chat_read_state for select
+  using ((select public.can_access_conversation(conversation_id)));
+create policy chat_read_state_write on public.chat_read_state for all
   using (user_id = (select auth.uid()))
   with check (user_id = (select auth.uid()));
 
@@ -408,3 +411,28 @@ create policy "chat-media delete" on storage.objects for delete to authenticated
     bucket_id = 'chat-media'
     and (select public.can_access_conversation(public.safe_uuid((storage.foldername(name))[4])))
   );
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Mark-read: writes per-recipient receipts (WhatsApp model) + the read cursor in
+-- one round-trip. SECURITY INVOKER so RLS still applies (a user only writes their
+-- own receipts/cursor and can only read messages they may access).
+-- ─────────────────────────────────────────────────────────────────────────────
+create or replace function public.mark_conversation_read(p_conversation_id uuid, p_upto_seq bigint)
+returns void language plpgsql security invoker set search_path = '' as $$
+begin
+  insert into public.message_receipts (message_id, user_id, read_at)
+  select m.id, (select auth.uid()), now()
+  from public.messages m
+  where m.conversation_id = p_conversation_id
+    and m.seq <= p_upto_seq
+    and m.sender_id <> (select auth.uid())
+  on conflict (message_id, user_id)
+    do update set read_at = coalesce(public.message_receipts.read_at, excluded.read_at);
+
+  insert into public.chat_read_state (conversation_id, user_id, last_read_seq)
+  values (p_conversation_id, (select auth.uid()), p_upto_seq)
+  on conflict (conversation_id, user_id)
+    do update set last_read_seq = greatest(public.chat_read_state.last_read_seq, excluded.last_read_seq),
+                  updated_at = now();
+end;
+$$;
