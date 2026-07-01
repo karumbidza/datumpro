@@ -113,4 +113,58 @@ export function quoteAwardedEmail(opts: { taskTitle: string; orgName: string; ur
   };
 }
 
+export function slaEmail(opts: {
+  taskTitle: string;
+  kind: 'at_risk' | 'breached';
+  dueDate: string | null;
+  url: string;
+}) {
+  const breached = opts.kind === 'breached';
+  const due = opts.dueDate ? new Date(opts.dueDate).toLocaleDateString('en-GB') : 'soon';
+  return {
+    subject: breached ? `Overdue: ${opts.taskTitle}` : `Due soon: ${opts.taskTitle}`,
+    html: layout({
+      heading: breached ? 'Task overdue' : 'Task due soon',
+      intro: breached
+        ? `<strong>${opts.taskTitle}</strong> passed its due date (${due}) and isn’t finished yet. It’s now flagged as breached.`
+        : `<strong>${opts.taskTitle}</strong> is due ${due}. It’s been flagged at risk so it doesn’t slip.`,
+      ctaLabel: 'Open task',
+      ctaHref: opts.url,
+    }),
+  };
+}
+
+export function digestEmail(opts: {
+  name: string;
+  openCount: number;
+  overdue: { title: string; url: string }[];
+  dueTodayCount: number;
+  dashboardUrl: string;
+}) {
+  const list =
+    opts.overdue.length > 0
+      ? `<div style="font-size:13px;color:#52525b">Overdue:</div>
+         <ul style="margin:6px 0 0;padding-left:18px;font-size:13px;color:#3f3f46">
+           ${opts.overdue
+             .map((o) => `<li><a href="${o.url}" style="color:#4f46e5;text-decoration:none">${o.title}</a></li>`)
+             .join('')}
+         </ul>`
+      : '';
+  return {
+    subject: `Your DatumPro summary — ${opts.openCount} open task${opts.openCount === 1 ? '' : 's'}`,
+    html: layout({
+      heading: `Good morning, ${opts.name}`,
+      intro: `You have <strong>${opts.openCount}</strong> open task${
+        opts.openCount === 1 ? '' : 's'
+      }${opts.dueTodayCount > 0 ? `, <strong>${opts.dueTodayCount}</strong> due today` : ''}${
+        opts.overdue.length > 0 ? `, and <strong>${opts.overdue.length}</strong> overdue` : ''
+      }.`,
+      bodyHtml: list,
+      ctaLabel: 'Open my tasks',
+      ctaHref: opts.dashboardUrl,
+      footnote: 'Daily summary from DatumPro. You can turn these off in your notification settings.',
+    }),
+  };
+}
+
 export { appUrl };
