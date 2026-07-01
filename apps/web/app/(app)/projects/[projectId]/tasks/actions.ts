@@ -97,6 +97,80 @@ export async function createTask(formData: FormData) {
   redirect(`/projects/${projectId}/tasks/${(created as { id: string }).id}`);
 }
 
+export async function updateTask(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const taskId = String(formData.get('taskId') ?? '');
+  const task = await loadTask(supabase, taskId);
+  if (!task) throw new Error('Task not found');
+
+  const title = String(formData.get('title') ?? '').trim();
+  if (title.length < 2) throw new Error('Title is required');
+
+  const { error } = await supabase
+    .from('tasks')
+    .update({
+      title,
+      description: (formData.get('description') as string)?.trim() || null,
+      priority: (formData.get('priority') as string) || 'medium',
+      assignee_id: (formData.get('assigneeId') as string) || null,
+      planned_start_date: (formData.get('plannedStartDate') as string) || null,
+      planned_end_date: (formData.get('plannedEndDate') as string) || null,
+      due_date: (formData.get('dueDate') as string) || null,
+    })
+    .eq('id', taskId);
+  if (error) throw new Error(error.message);
+
+  await logActivity(supabase, task, user.id, 'updated', 'Task details updated');
+  revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
+  redirect(`/projects/${task.project_id}/tasks/${taskId}`);
+}
+
+/** Add a predecessor dependency (predecessor must finish, plus lag, before this
+ *  task). The DB rejects cycles and duplicates; we translate those to clear
+ *  messages. RLS limits this to the project's PM / org admins. */
+export async function addDependency(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const taskId = String(formData.get('taskId') ?? '');
+  const predecessorId = String(formData.get('predecessorId') ?? '');
+  const lagDaysRaw = Number(formData.get('lagDays') ?? 0);
+  if (!predecessorId) throw new Error('Choose a predecessor task');
+  if (predecessorId === taskId) throw new Error('A task cannot depend on itself');
+
+  const task = await loadTask(supabase, taskId);
+  if (!task) throw new Error('Task not found');
+
+  const { error } = await supabase.from('task_dependencies').insert({
+    org_id: task.org_id,
+    predecessor_id: predecessorId,
+    successor_id: taskId,
+    lag_days: Number.isFinite(lagDaysRaw) ? Math.trunc(lagDaysRaw) : 0,
+  });
+  if (error) {
+    if (/circular/i.test(error.message)) throw new Error('That would create a circular dependency');
+    if (/duplicate|unique/i.test(error.message)) throw new Error('That dependency already exists');
+    throw new Error(error.message);
+  }
+  await logActivity(supabase, task, user.id, 'dependency', 'Added a dependency');
+  revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
+}
+
+export async function removeDependency(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const taskId = String(formData.get('taskId') ?? '');
+  const dependencyId = String(formData.get('dependencyId') ?? '');
+  const task = await loadTask(supabase, taskId);
+  if (!task) throw new Error('Task not found');
+
+  const { error } = await supabase
+    .from('task_dependencies')
+    .delete()
+    .eq('id', dependencyId)
+    .eq('successor_id', taskId);
+  if (error) throw new Error(error.message);
+  await logActivity(supabase, task, user.id, 'dependency', 'Removed a dependency');
+  revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
+}
+
 export async function startTask(formData: FormData) {
   const { supabase, user } = await requireUser();
   const taskId = String(formData.get('taskId') ?? '');

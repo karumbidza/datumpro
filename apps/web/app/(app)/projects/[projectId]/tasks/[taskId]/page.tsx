@@ -1,12 +1,28 @@
 import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { getTask, listOrgMembers, myOrgRole } from '@/lib/data/tasks';
+import {
+  getTask,
+  myOrgRole,
+  listTaskDependencies,
+  listProjectTaskOptions,
+  listTaskActivity,
+} from '@/lib/data/tasks';
+import { listProjectMembers, myProjectRole } from '@/lib/data/members';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { TASK_SIGNOFF_ROLES } from '@datumpro/shared/domain';
-import { startTask, submitTask, approveTask, rejectTask, raiseBlocker, resolveBlocker } from '../actions';
+import {
+  startTask,
+  submitTask,
+  approveTask,
+  rejectTask,
+  raiseBlocker,
+  resolveBlocker,
+  addDependency,
+  removeDependency,
+} from '../actions';
 
 const inputClass =
   'w-full rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
@@ -28,11 +44,23 @@ export default async function TaskDetailPage({
   const task = await getTask(taskId);
   if (!task) notFound();
 
-  const [members, role] = await Promise.all([listOrgMembers(task.org_id), myOrgRole(task.org_id)]);
+  const [members, orgRole, projectRole, dependencies, taskOptions, activity] = await Promise.all([
+    listProjectMembers(projectId),
+    myOrgRole(task.org_id),
+    myProjectRole(projectId),
+    listTaskDependencies(taskId),
+    listProjectTaskOptions(projectId, taskId),
+    listTaskActivity(taskId),
+  ]);
+
   const assigneeName = members.find((m) => m.userId === task.assignee_id)?.name ?? 'Unassigned';
-  const isLead = !!role && (TASK_SIGNOFF_ROLES as readonly string[]).includes(role);
+  const isLead = !!orgRole && (TASK_SIGNOFF_ROLES as readonly string[]).includes(orgRole);
   const isAssignee = task.assignee_id === user.id;
   const canAct = isAssignee || isLead;
+  const canManage = orgRole === 'owner' || orgRole === 'admin' || projectRole === 'pm';
+
+  const usedPredecessors = new Set(dependencies.map((d) => d.predecessorId));
+  const addable = taskOptions.filter((t) => !usedPredecessors.has(t.id));
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-10">
@@ -41,13 +69,21 @@ export default async function TaskDetailPage({
       </Link>
       <div className="mt-1 flex items-start justify-between gap-4">
         <h1 className="text-2xl font-semibold tracking-tight">{task.title}</h1>
-        <Badge tone={STATUS_TONE[task.status]}>{task.status.replace('_', ' ')}</Badge>
+        <div className="flex items-center gap-2">
+          <Badge tone={STATUS_TONE[task.status]}>{task.status.replace('_', ' ')}</Badge>
+          {canManage && task.status !== 'done' && (
+            <Link href={`/projects/${projectId}/tasks/${taskId}/edit`}>
+              <Button variant="secondary">Edit</Button>
+            </Link>
+          )}
+        </div>
       </div>
 
       <Card className="mt-6 space-y-2 text-sm">
         <Row label="Assignee" value={assigneeName} />
         <Row label="Priority" value={task.priority} />
         <Row label="SLA" value={task.sla_status.replace('_', ' ')} />
+        {task.planned_start_date && <Row label="Start" value={task.planned_start_date} />}
         {task.due_date && <Row label="Due" value={task.due_date} />}
         {task.description && <p className="pt-2 text-zinc-600 dark:text-zinc-300">{task.description}</p>}
         {task.status === 'blocked' && task.blocker_description && (
@@ -62,6 +98,74 @@ export default async function TaskDetailPage({
         )}
         {task.completion_notes && (
           <p className="text-zinc-600 dark:text-zinc-300">📝 {task.completion_notes}</p>
+        )}
+      </Card>
+
+      {/* ── Dependencies — "this task starts after" ── */}
+      <Card className="mt-6">
+        <CardTitle>Dependencies</CardTitle>
+        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+          Predecessors that must finish (plus any lag) before this task can start.
+        </p>
+
+        {dependencies.length === 0 ? (
+          <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">No dependencies.</p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {dependencies.map((d) => (
+              <li
+                key={d.id}
+                className="flex items-center justify-between gap-3 rounded-md border border-zinc-100 p-2 dark:border-zinc-800"
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  <Link
+                    href={`/projects/${projectId}/tasks/${d.predecessorId}`}
+                    className="truncate text-sm font-medium hover:underline"
+                  >
+                    {d.title}
+                  </Link>
+                  <Badge tone={STATUS_TONE[d.status]}>{d.status.replace('_', ' ')}</Badge>
+                  {d.lagDays > 0 && <span className="text-[11px] text-zinc-400">+{d.lagDays}d lag</span>}
+                </div>
+                {canManage && (
+                  <form action={removeDependency}>
+                    <input type="hidden" name="taskId" value={taskId} />
+                    <input type="hidden" name="dependencyId" value={d.id} />
+                    <Button type="submit" variant="ghost">
+                      Remove
+                    </Button>
+                  </form>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {canManage && addable.length > 0 && (
+          <form
+            action={addDependency}
+            className="mt-4 flex flex-wrap items-end gap-3 border-t border-zinc-100 pt-4 dark:border-zinc-800"
+          >
+            <input type="hidden" name="taskId" value={taskId} />
+            <div className="min-w-48 flex-1">
+              <label className="mb-1 block text-xs font-medium">Starts after</label>
+              <select name="predecessorId" required defaultValue="" className={inputClass}>
+                <option value="" disabled>
+                  Select a task…
+                </option>
+                {addable.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="w-24">
+              <label className="mb-1 block text-xs font-medium">Lag (days)</label>
+              <input type="number" name="lagDays" min={0} defaultValue={0} className={inputClass} />
+            </div>
+            <Button type="submit">Add</Button>
+          </form>
         )}
       </Card>
 
@@ -122,6 +226,24 @@ export default async function TaskDetailPage({
             </form>
           )}
         </div>
+      )}
+
+      {/* ── Activity timeline ── */}
+      {activity.length > 0 && (
+        <section className="mt-8">
+          <h2 className="mb-3 text-sm font-semibold">Activity</h2>
+          <ol className="space-y-3 border-l border-zinc-200 pl-4 dark:border-zinc-800">
+            {activity.map((a) => (
+              <li key={a.id} className="relative">
+                <span className="absolute -left-[21px] top-1.5 size-2 rounded-full bg-zinc-300 dark:bg-zinc-600" />
+                <p className="text-sm text-zinc-700 dark:text-zinc-200">{a.message}</p>
+                <p className="text-[11px] text-zinc-400">
+                  {a.userName} · {new Date(a.createdAt).toLocaleString()}
+                </p>
+              </li>
+            ))}
+          </ol>
+        </section>
       )}
     </main>
   );

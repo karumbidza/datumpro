@@ -1,6 +1,27 @@
 import { createClient } from '@/lib/supabase/server';
 import type { TaskStatus, TaskPriority, TaskSlaStatus } from '@datumpro/shared/domain';
 
+export interface TaskDependencyRow {
+  id: string;
+  predecessorId: string;
+  title: string;
+  status: TaskStatus;
+  lagDays: number;
+}
+
+export interface TaskOption {
+  id: string;
+  title: string;
+}
+
+export interface TaskActivityRow {
+  id: string;
+  type: string;
+  message: string;
+  createdAt: string;
+  userName: string;
+}
+
 export interface TaskRow {
   id: string;
   org_id: string;
@@ -92,4 +113,86 @@ export async function myOrgRole(orgId: string): Promise<string | null> {
     .eq('status', 'active')
     .maybeSingle();
   return (data as { role: string } | null)?.role ?? null;
+}
+
+/** Predecessors of a task — the tasks that must complete (plus lag) before it.
+ *  Two queries: the edges, then the predecessor tasks' titles/status. */
+export async function listTaskDependencies(taskId: string): Promise<TaskDependencyRow[]> {
+  const supabase = await createClient();
+  const { data: edges, error } = await supabase
+    .from('task_dependencies')
+    .select('id, predecessor_id, lag_days')
+    .eq('successor_id', taskId);
+  if (error) throw error;
+  const rows = (edges ?? []) as { id: string; predecessor_id: string; lag_days: number }[];
+  if (rows.length === 0) return [];
+
+  const { data: preds } = await supabase
+    .from('tasks')
+    .select('id, title, status')
+    .in('id', rows.map((r) => r.predecessor_id));
+  const byId = new Map(
+    ((preds ?? []) as { id: string; title: string; status: TaskStatus }[]).map((p) => [p.id, p]),
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    predecessorId: r.predecessor_id,
+    title: byId.get(r.predecessor_id)?.title ?? 'Task',
+    status: byId.get(r.predecessor_id)?.status ?? 'todo',
+    lagDays: r.lag_days,
+  }));
+}
+
+/** Other tasks in the project — candidate predecessors for a new dependency. */
+export async function listProjectTaskOptions(
+  projectId: string,
+  excludeTaskId: string,
+): Promise<TaskOption[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('id, title')
+    .eq('project_id', projectId)
+    .neq('id', excludeTaskId)
+    .order('title', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as TaskOption[];
+}
+
+/** Task timeline/audit entries, newest first, with actor names. */
+export async function listTaskActivity(taskId: string): Promise<TaskActivityRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('task_activity')
+    .select('id, type, message, created_at, user_id')
+    .eq('task_id', taskId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  const rows = (data ?? []) as {
+    id: string;
+    type: string;
+    message: string;
+    created_at: string;
+    user_id: string | null;
+  }[];
+  const ids = [...new Set(rows.map((r) => r.user_id).filter(Boolean))] as string[];
+  let names = new Map<string, string>();
+  if (ids.length > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, display_name, email')
+      .in('id', ids);
+    names = new Map(
+      ((profiles ?? []) as { id: string; display_name: string | null; email: string | null }[]).map(
+        (p) => [p.id, p.display_name || p.email || 'Member'],
+      ),
+    );
+  }
+  return rows.map((r) => ({
+    id: r.id,
+    type: r.type,
+    message: r.message,
+    createdAt: r.created_at,
+    userName: r.user_id ? names.get(r.user_id) ?? 'Member' : 'System',
+  }));
 }
