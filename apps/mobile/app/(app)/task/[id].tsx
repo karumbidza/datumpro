@@ -1,12 +1,13 @@
 import { useCallback, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
-import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { getTask, type TaskDetail } from '../../../lib/data/tasks';
 import { Badge } from '../../../components/badge';
 import { formatDate, slaLabel, slaTone, statusLabel } from '../../../lib/ui';
 
 export default function TaskDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -48,6 +49,10 @@ export default function TaskDetailScreen() {
         <Badge label={slaLabel(task.slaStatus)} tone={slaTone(task.slaStatus)} />
       </View>
 
+      <Pressable style={styles.discussion} onPress={() => router.push(`/(app)/chat/${task.id}`)}>
+        <Text style={styles.discussionText}>Open discussion</Text>
+      </Pressable>
+
       <Field label="Status" value={statusLabel(task.status)} />
       <Field label="Priority" value={task.priority} />
       <Field label="Due" value={formatDate(task.dueDate)} />
@@ -84,4 +89,13 @@ const styles = StyleSheet.create({
   value: { fontSize: 14, color: '#3f3f46', fontWeight: '500' },
   block: { gap: 6, marginTop: 8 },
   body: { fontSize: 14, color: '#3f3f46', lineHeight: 20 },
+  discussion: {
+    backgroundColor: '#eef2ff',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  discussionText: { color: '#4338ca', fontWeight: '600' },
 });
+
