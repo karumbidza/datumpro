@@ -6,7 +6,7 @@ import { useFocusEffect } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { useSession } from '../../../lib/auth';
 import { Card, Avatar } from '../../../components/ui';
-import { theme } from '../../../lib/theme';
+import { theme, contentWidth } from '../../../lib/theme';
 
 interface Profile {
   name: string;
@@ -93,7 +93,7 @@ export default function More() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.color.bg },
-  content: { padding: 20 },
+  content: { padding: 20, ...contentWidth },
   title: { fontSize: 24, fontWeight: '800', color: theme.color.text },
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   name: { fontSize: 17, fontWeight: '700', color: theme.color.text },

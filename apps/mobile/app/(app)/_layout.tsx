@@ -18,6 +18,7 @@ export default function AppLayout() {
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="project/[id]" options={{ title: 'Project' }} />
+      <Stack.Screen name="new-task" options={{ title: 'New task', presentation: 'modal' }} />
       <Stack.Screen name="task/[id]" options={{ title: 'Task' }} />
       <Stack.Screen name="chat/[taskId]" options={{ title: 'Task discussion' }} />
     </Stack>

@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { getHomeData, type HomeData } from '../../../lib/data/home';
 import { Card, ProgressBar, StatTile, Avatar } from '../../../components/ui';
-import { theme } from '../../../lib/theme';
+import { theme, contentWidth } from '../../../lib/theme';
 
 export default function Home() {
   const router = useRouter();
@@ -130,7 +130,7 @@ function firstName(name: string): string {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.color.bg },
-  content: { padding: 20, paddingBottom: 32 },
+  content: { padding: 20, paddingBottom: 32, ...contentWidth },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   brandDot: {
     width: 40,

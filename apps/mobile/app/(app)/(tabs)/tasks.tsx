@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { listMyTasks, type MyTask } from '../../../lib/data/tasks';
 import { TaskCard } from '../../../components/task-card';
-import { theme } from '../../../lib/theme';
+import { theme, contentWidth } from '../../../lib/theme';
 
 type Filter = 'all' | 'in_progress' | 'completed' | 'overdue';
 const FILTERS: { key: Filter; label: string }[] = [
@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 12, fontWeight: '600', color: theme.color.muted },
   chipTextActive: { color: '#fff' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  listContent: { padding: 16, gap: 10 },
+  listContent: { padding: 16, gap: 10, ...contentWidth },
   emptyWrap: { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
   empty: { color: theme.color.subtle, fontSize: 14 },
 });

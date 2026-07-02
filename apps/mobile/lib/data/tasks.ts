@@ -27,6 +27,29 @@ export interface TaskPermissions {
   canManage: boolean; // org owner/admin, or the project's PM
 }
 
+/** Can the current user manage (create/assign/approve) in this project? */
+export async function canManageProject(orgId: string, projectId: string): Promise<boolean> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const me = user?.id ?? '';
+  const [{ data: orgRow }, { data: projRow }] = await Promise.all([
+    supabase.from('org_members').select('role').eq('org_id', orgId).eq('user_id', me).maybeSingle(),
+    supabase.from('project_members').select('role').eq('project_id', projectId).eq('user_id', me).maybeSingle(),
+  ]);
+  const orgRole = (orgRow as { role: string } | null)?.role ?? null;
+  const projectRole = (projRow as { role: string } | null)?.role ?? null;
+  return orgRole === 'owner' || orgRole === 'admin' || projectRole === 'pm';
+}
+
+/** canManageProject, but looks up the org from the project id first. */
+export async function canManageProjectById(projectId: string): Promise<boolean> {
+  const { data } = await supabase.from('projects').select('org_id').eq('id', projectId).maybeSingle();
+  const orgId = (data as { org_id: string } | null)?.org_id;
+  if (!orgId) return false;
+  return canManageProject(orgId, projectId);
+}
+
 export async function getTaskPermissions(
   orgId: string,
   projectId: string,

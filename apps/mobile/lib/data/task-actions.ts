@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { createTaskSchema } from '@datumpro/shared/validation';
 
 /**
  * Task lifecycle transitions, mirroring the web server actions. These run under
@@ -82,6 +83,54 @@ export async function approveTask(params: { taskId: string; orgId: string; dueDa
     );
   }
   await logActivity(params.orgId, params.taskId, 'status', `Approved — ${onTime ? 'on time' : 'late'}`);
+}
+
+/** Create a task in a project (project lead — RLS enforces). Returns the new id.
+ *  Validates with the same shared schema the web uses. */
+export async function createTask(input: {
+  projectId: string;
+  title: string;
+  description?: string;
+  priority: string;
+  assigneeId?: string | null;
+  dueDate?: string | null;
+}): Promise<string> {
+  const parsed = createTaskSchema.safeParse({
+    projectId: input.projectId,
+    title: input.title,
+    description: input.description || undefined,
+    priority: input.priority || 'medium',
+    assigneeId: input.assigneeId || undefined,
+    dueDate: input.dueDate || undefined,
+  });
+  if (!parsed.success) throw new Error(parsed.error.issues.map((i) => i.message).join(', '));
+
+  const { data: project } = await supabase
+    .from('projects')
+    .select('org_id')
+    .eq('id', input.projectId)
+    .maybeSingle();
+  if (!project) throw new Error('Project not found or access denied.');
+  const orgId = (project as { org_id: string }).org_id;
+
+  const { data: created, error } = await supabase
+    .from('tasks')
+    .insert({
+      org_id: orgId,
+      project_id: input.projectId,
+      title: parsed.data.title,
+      description: parsed.data.description ?? null,
+      priority: parsed.data.priority,
+      assignee_id: parsed.data.assigneeId ?? null,
+      due_date: parsed.data.dueDate ?? null,
+      created_by: await meId(),
+    })
+    .select('id')
+    .single();
+  if (error) throw new Error(error.message);
+  const id = (created as { id: string }).id;
+  await logActivity(orgId, id, 'created', 'Task created');
+  return id;
 }
 
 /** submitted → in_progress with a reason (project lead). */

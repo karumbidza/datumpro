@@ -19,7 +19,13 @@ export const theme = {
     dangerSoft: '#fee2e2',
   },
   radius: { sm: 12, md: 18, lg: 24, pill: 999 },
+  // Cap content width so phones fill the screen but tablets / landscape stay
+  // readable (centered column). Applied to scroll/list content containers.
+  maxWidth: 640,
 } as const;
+
+/** Centered, width-capped content container — spread into contentContainerStyle. */
+export const contentWidth = { width: '100%', maxWidth: theme.maxWidth, alignSelf: 'center' } as const;
 
 export type Tone = { bg: string; fg: string; bar: string };
 

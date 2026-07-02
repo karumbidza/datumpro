@@ -7,7 +7,7 @@ import { TaskPhotos } from '../../../components/task-photos';
 import { TaskActions } from '../../../components/task-actions';
 import { Card, Pill, ProgressBar } from '../../../components/ui';
 import { formatDate, slaLabel, statusLabel } from '../../../lib/ui';
-import { theme, slaTone, statusProgress } from '../../../lib/theme';
+import { theme, slaTone, statusProgress, contentWidth } from '../../../lib/theme';
 
 export default function TaskDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -108,7 +108,7 @@ function Field({ label, value, last }: { label: string; value: string; last?: bo
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.color.bg },
-  content: { padding: 16, gap: 12 },
+  content: { padding: 16, gap: 12, ...contentWidth },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.color.bg },
   muted: { color: theme.color.muted },
   title: { fontSize: 22, fontWeight: '800', color: theme.color.text },

@@ -1,18 +1,23 @@
 import { useCallback, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
-import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { listProjectTasks, type MyTask } from '../../../lib/data/tasks';
+import { View, Text, FlatList, Pressable, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { listProjectTasks, canManageProjectById, type MyTask } from '../../../lib/data/tasks';
 import { TaskCard } from '../../../components/task-card';
-import { theme } from '../../../lib/theme';
+import { theme, contentWidth } from '../../../lib/theme';
 
 export default function ProjectScreen() {
   const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
+  const router = useRouter();
   const [tasks, setTasks] = useState<MyTask[]>([]);
+  const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    setTasks(await listProjectTasks(String(id)));
+    const [rows, manage] = await Promise.all([listProjectTasks(String(id)), canManageProjectById(String(id))]);
+    setTasks(rows);
+    setCanManage(manage);
     setLoading(false);
     setRefreshing(false);
   }, [id]);
@@ -25,7 +30,22 @@ export default function ProjectScreen() {
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: name ?? 'Project' }} />
+      <Stack.Screen
+        options={{
+          title: name ?? 'Project',
+          headerRight: () =>
+            canManage ? (
+              <Pressable
+                onPress={() =>
+                  router.push({ pathname: '/(app)/new-task', params: { projectId: String(id), projectName: name ?? '' } })
+                }
+                hitSlop={8}
+              >
+                <Ionicons name="add" size={26} color="#fff" />
+              </Pressable>
+            ) : null,
+        }}
+      />
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator />
@@ -58,7 +78,7 @@ export default function ProjectScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.color.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  listContent: { padding: 16, gap: 10 },
+  listContent: { padding: 16, gap: 10, ...contentWidth },
   count: { fontSize: 12, color: theme.color.subtle, marginBottom: 4 },
   emptyWrap: { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
   empty: { color: theme.color.subtle, fontSize: 14 },
