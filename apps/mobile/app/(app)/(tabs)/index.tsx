@@ -58,11 +58,13 @@ export default function Home() {
         <Text style={styles.greeting}>
           Hey {data ? firstName(data.displayName) : '…'}, 👋
         </Text>
-        <Text style={styles.subGreeting}>Here’s your project update.</Text>
+        <Text style={styles.subGreeting}>
+          {data?.isManager ? 'Here’s how your projects are tracking.' : 'Here’s your work today.'}
+        </Text>
 
         {/* Portfolio snapshot */}
         <Card style={{ marginTop: 18 }}>
-          <Text style={styles.cardLabel}>Portfolio snapshot</Text>
+          <Text style={styles.cardLabel}>{data?.isManager ? 'Portfolio snapshot' : 'Your progress'}</Text>
           <Text style={styles.bigPct}>{data?.portfolioPct ?? 0}%</Text>
           <Text style={styles.cardHint}>
             {data ? `${data.doneTasks} of ${data.totalTasks} tasks complete` : 'Loading…'}
@@ -119,7 +121,7 @@ export default function Home() {
 
         {/* Projects */}
         <View style={styles.sectionHead}>
-          <Text style={styles.sectionTitle}>Projects</Text>
+          <Text style={styles.sectionTitle}>{data?.isManager ? 'Projects' : 'My projects'}</Text>
           <Text style={styles.sectionCount}>{data?.projects.length ?? 0}</Text>
         </View>
         {(data?.projects ?? []).length === 0 ? (

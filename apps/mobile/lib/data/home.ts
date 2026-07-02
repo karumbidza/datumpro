@@ -10,6 +10,9 @@ export interface ProjectProgress {
 
 export interface HomeData {
   displayName: string;
+  /** True when the viewer runs anything — org owner/admin/PM, or the PM of any
+   *  project. Drives manager vs field-worker framing on the Home screen. */
+  isManager: boolean;
   projects: ProjectProgress[];
   portfolioPct: number;
   totalTasks: number;
@@ -99,11 +102,18 @@ export async function getHomeData(): Promise<HomeData> {
   const me = user?.id ?? '';
   const today = new Date().toISOString().slice(0, 10);
 
-  const [{ data: profile }, { data: projectRows }, { data: taskRows }] = await Promise.all([
-    supabase.from('profiles').select('display_name, email').eq('id', me).maybeSingle(),
-    supabase.from('projects').select('id, name').order('created_at', { ascending: false }),
-    supabase.from('tasks').select('id, status, sla_status, due_date, project_id, assignee_id'),
-  ]);
+  const [{ data: profile }, { data: projectRows }, { data: taskRows }, { data: orgRoles }, { data: pmSeats }] =
+    await Promise.all([
+      supabase.from('profiles').select('display_name, email').eq('id', me).maybeSingle(),
+      supabase.from('projects').select('id, name').order('created_at', { ascending: false }),
+      supabase.from('tasks').select('id, status, sla_status, due_date, project_id, assignee_id'),
+      supabase.from('org_members').select('role').eq('user_id', me).eq('status', 'active'),
+      supabase.from('project_members').select('project_id').eq('user_id', me).eq('role', 'pm').limit(1),
+    ]);
+
+  const isManager =
+    ((orgRoles ?? []) as { role: string }[]).some((r) => ['owner', 'admin', 'pm'].includes(r.role)) ||
+    ((pmSeats ?? []) as { project_id: string }[]).length > 0;
 
   const projects = (projectRows ?? []) as { id: string; name: string }[];
   const tasks = (taskRows ?? []) as {
@@ -155,6 +165,7 @@ export async function getHomeData(): Promise<HomeData> {
 
   return {
     displayName,
+    isManager,
     projects: projectProgress,
     portfolioPct: totalTasks === 0 ? 0 : Math.round((doneTasks / totalTasks) * 100),
     totalTasks,
