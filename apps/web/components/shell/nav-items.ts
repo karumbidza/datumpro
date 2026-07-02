@@ -2,6 +2,7 @@ import {
   LayoutDashboard,
   FolderOpen,
   Users,
+  Building,
   CheckSquare,
   DollarSign,
   Wallet,
@@ -47,7 +48,7 @@ export function computeNav(
     { name: 'All projects', href: '/projects', icon: FolderOpen },
     { name: 'My payments', href: '/payments', icon: Wallet },
     ...(canViewFinance ? [{ name: 'Finance', href: '/finance', icon: DollarSign }] : []),
-    ...(canManageMembers ? [{ name: 'Members', href: '/org/members', icon: Users }] : []),
+    ...(canManageMembers ? [{ name: 'Organization', href: '/org', icon: Building }] : []),
   ];
 }
 
