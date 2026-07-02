@@ -65,7 +65,22 @@ export default function ProjectScreen() {
             />
           }
           ListHeaderComponent={
-            tasks.length > 0 ? <Text style={styles.count}>{tasks.length} tasks</Text> : null
+            <View style={styles.header}>
+              <Pressable
+                style={styles.teamChat}
+                onPress={() =>
+                  router.push({
+                    pathname: '/(app)/project-chat/[projectId]',
+                    params: { projectId: String(id), name: name ?? '' },
+                  })
+                }
+              >
+                <Ionicons name="chatbubbles-outline" size={18} color={theme.color.accent} />
+                <Text style={styles.teamChatText}>Team channel</Text>
+                <Ionicons name="chevron-forward" size={16} color={theme.color.subtle} style={{ marginLeft: 'auto' }} />
+              </Pressable>
+              {tasks.length > 0 && <Text style={styles.count}>{tasks.length} tasks</Text>}
+            </View>
           }
           ListEmptyComponent={<Text style={styles.empty}>No tasks in this project yet.</Text>}
           renderItem={({ item }) => <TaskCard task={item} subtitle={`Priority: ${item.priority}`} />}
@@ -79,6 +94,19 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.color.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { padding: 16, gap: 10, ...contentWidth },
+  header: { gap: 10, marginBottom: 4 },
+  teamChat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: theme.color.card,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  teamChatText: { fontSize: 15, fontWeight: '600', color: theme.color.text },
   count: { fontSize: 12, color: theme.color.subtle, marginBottom: 4 },
   emptyWrap: { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
   empty: { color: theme.color.subtle, fontSize: 14 },

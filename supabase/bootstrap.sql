@@ -1459,6 +1459,9 @@ create table public.task_media (
   purpose      text not null default 'completion',  -- completion | quote | progress
   storage_path text not null,
   caption      text,
+  gps_lat      double precision,                    -- where the photo was taken
+  gps_lng      double precision,
+  captured_at  timestamptz,
   uploaded_by  uuid references auth.users(id) on delete set null,
   created_at   timestamptz not null default now(),
   foreign key (task_id, org_id)    references public.tasks (id, org_id)    on delete cascade,
