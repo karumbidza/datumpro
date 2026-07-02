@@ -43,7 +43,7 @@ export default async function ProjectsPage() {
           No projects yet — create your first one.
         </p>
       ) : (
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="mt-6 flex flex-col gap-2">
           {projects.map((p) => (
             <ProjectOverviewCard key={p.id} project={p} />
           ))}
