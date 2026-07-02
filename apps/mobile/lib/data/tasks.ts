@@ -13,9 +13,39 @@ export interface MyTask {
 
 export interface TaskDetail extends MyTask {
   orgId: string;
+  assigneeId: string | null;
+  requiresPhoto: boolean;
   description: string | null;
   plannedStartDate: string | null;
   plannedEndDate: string | null;
+}
+
+/** The current user's role relative to a task's project — drives which actions
+ *  (start/submit vs approve/reject) are offered. */
+export interface TaskPermissions {
+  isAssignee: boolean;
+  canManage: boolean; // org owner/admin, or the project's PM
+}
+
+export async function getTaskPermissions(
+  orgId: string,
+  projectId: string,
+  assigneeId: string | null,
+): Promise<TaskPermissions> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const me = user?.id ?? null;
+  const [{ data: orgRow }, { data: projRow }] = await Promise.all([
+    supabase.from('org_members').select('role').eq('org_id', orgId).eq('user_id', me ?? '').maybeSingle(),
+    supabase.from('project_members').select('role').eq('project_id', projectId).eq('user_id', me ?? '').maybeSingle(),
+  ]);
+  const orgRole = (orgRow as { role: string } | null)?.role ?? null;
+  const projectRole = (projRow as { role: string } | null)?.role ?? null;
+  return {
+    isAssignee: !!me && assigneeId === me,
+    canManage: orgRole === 'owner' || orgRole === 'admin' || projectRole === 'pm',
+  };
 }
 
 type ProjectJoin = { name: string | null } | { name: string | null }[] | null;
@@ -94,7 +124,7 @@ export async function getTask(id: string): Promise<TaskDetail | null> {
   const { data } = await supabase
     .from('tasks')
     .select(
-      'id, org_id, title, description, status, sla_status, due_date, priority, project_id, planned_start_date, planned_end_date, projects(name)',
+      'id, org_id, title, description, status, sla_status, due_date, priority, project_id, assignee_id, requires_photo_on_complete, planned_start_date, planned_end_date, projects(name)',
     )
     .eq('id', id)
     .maybeSingle();
@@ -109,6 +139,8 @@ export async function getTask(id: string): Promise<TaskDetail | null> {
     due_date: string | null;
     priority: string;
     project_id: string;
+    assignee_id: string | null;
+    requires_photo_on_complete: boolean | null;
     planned_start_date: string | null;
     planned_end_date: string | null;
     projects: ProjectJoin;
@@ -116,6 +148,8 @@ export async function getTask(id: string): Promise<TaskDetail | null> {
   return {
     id: t.id,
     orgId: t.org_id,
+    assigneeId: t.assignee_id,
+    requiresPhoto: !!t.requires_photo_on_complete,
     title: t.title,
     description: t.description,
     status: t.status,

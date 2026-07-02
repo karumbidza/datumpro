@@ -2,8 +2,9 @@ import { useCallback, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { getTask, type TaskDetail } from '../../../lib/data/tasks';
+import { getTask, getTaskPermissions, type TaskDetail, type TaskPermissions } from '../../../lib/data/tasks';
 import { TaskPhotos } from '../../../components/task-photos';
+import { TaskActions } from '../../../components/task-actions';
 import { Card, Pill, ProgressBar } from '../../../components/ui';
 import { formatDate, slaLabel, statusLabel } from '../../../lib/ui';
 import { theme, slaTone, statusProgress } from '../../../lib/theme';
@@ -12,21 +13,25 @@ export default function TaskDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [task, setTask] = useState<TaskDetail | null>(null);
+  const [perms, setPerms] = useState<TaskPermissions | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    const t = await getTask(String(id));
+    setTask(t);
+    setPerms(t ? await getTaskPermissions(t.orgId, t.projectId, t.assigneeId) : null);
+    setLoading(false);
+  }, [id]);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
       setLoading(true);
-      getTask(String(id)).then((t) => {
-        if (!active) return;
-        setTask(t);
-        setLoading(false);
-      });
+      void load();
       return () => {
         active = false;
       };
-    }, [id]),
+    }, [load]),
   );
 
   if (loading) {
@@ -69,6 +74,8 @@ export default function TaskDetailScreen() {
         <Ionicons name="chatbubble-ellipses-outline" size={16} color={theme.color.accent} />
         <Text style={styles.discussionText}>Open discussion</Text>
       </Pressable>
+
+      {perms && <TaskActions task={task} perms={perms} onChanged={load} />}
 
       <Card>
         <Field label="Priority" value={task.priority} />
