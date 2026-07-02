@@ -16,7 +16,13 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/auth';
-import { listMessages, sendMessage, sendPhotoMessage, type ChatMessage } from '../lib/data/chat';
+import {
+  listMessages,
+  sendMessage,
+  sendPhotoMessage,
+  markConversationRead,
+  type ChatMessage,
+} from '../lib/data/chat';
 
 /** The chat surface — message list, realtime sync, text + photo composer. Shared
  *  by the task discussion and the project team channel; the parent resolves the
@@ -40,6 +46,8 @@ export function ChatThread({
 
   const reload = useCallback(async (id: string) => {
     setMessages(await listMessages(id));
+    // Opening / viewing the thread clears its unread state.
+    void markConversationRead(id);
   }, []);
 
   useEffect(() => {

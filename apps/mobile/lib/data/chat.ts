@@ -161,6 +161,49 @@ async function resolveImages(messageIds: string[]): Promise<Map<string, string>>
   return out;
 }
 
+/** Unread messages in a conversation for the current user: those with a higher
+ *  seq than my read cursor, sent by someone else. */
+export async function getUnreadCount(conversationId: string): Promise<number> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const me = user?.id;
+  if (!me) return 0;
+
+  const { data: rs } = await supabase
+    .from('chat_read_state')
+    .select('last_read_seq')
+    .eq('conversation_id', conversationId)
+    .eq('user_id', me)
+    .maybeSingle();
+  const lastRead = (rs as { last_read_seq: number } | null)?.last_read_seq ?? 0;
+
+  const { count } = await supabase
+    .from('messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('conversation_id', conversationId)
+    .gt('seq', lastRead)
+    .neq('sender_id', me);
+  return count ?? 0;
+}
+
+/** Mark everything in the conversation read up to its latest message. */
+export async function markConversationRead(conversationId: string): Promise<void> {
+  const { data } = await supabase
+    .from('messages')
+    .select('seq')
+    .eq('conversation_id', conversationId)
+    .order('seq', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const maxSeq = (data as { seq: number } | null)?.seq;
+  if (!maxSeq) return;
+  await supabase.rpc('mark_conversation_read', {
+    p_conversation_id: conversationId,
+    p_upto_seq: maxSeq,
+  });
+}
+
 async function resolveNames(ids: string[]): Promise<Map<string, string>> {
   const unique = [...new Set(ids)];
   if (unique.length === 0) return new Map();

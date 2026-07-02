@@ -3,6 +3,7 @@ import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Pressable } from
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getTask, getTaskPermissions, type TaskDetail, type TaskPermissions } from '../../../lib/data/tasks';
+import { getTaskConversationId, getUnreadCount } from '../../../lib/data/chat';
 import { TaskPhotos } from '../../../components/task-photos';
 import { TaskActions } from '../../../components/task-actions';
 import { Card, Pill, ProgressBar } from '../../../components/ui';
@@ -14,12 +15,15 @@ export default function TaskDetailScreen() {
   const router = useRouter();
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [perms, setPerms] = useState<TaskPermissions | null>(null);
+  const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     const t = await getTask(String(id));
     setTask(t);
     setPerms(t ? await getTaskPermissions(t.orgId, t.projectId, t.assigneeId) : null);
+    const conv = await getTaskConversationId(String(id));
+    setUnread(conv ? await getUnreadCount(conv) : 0);
     setLoading(false);
   }, [id]);
 
@@ -73,6 +77,11 @@ export default function TaskDetailScreen() {
       <Pressable style={styles.discussion} onPress={() => router.push(`/(app)/chat/${task.id}`)}>
         <Ionicons name="chatbubble-ellipses-outline" size={16} color={theme.color.accent} />
         <Text style={styles.discussionText}>Open discussion</Text>
+        {unread > 0 && (
+          <View style={styles.unread}>
+            <Text style={styles.unreadText}>{unread > 99 ? '99+' : unread}</Text>
+          </View>
+        )}
       </Pressable>
 
       {perms && <TaskActions task={task} perms={perms} onChanged={load} />}
@@ -125,6 +134,16 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   discussionText: { color: theme.color.accent, fontWeight: '700' },
+  unread: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    backgroundColor: theme.color.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unreadText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   fieldRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
