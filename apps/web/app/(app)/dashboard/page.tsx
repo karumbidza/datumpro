@@ -4,7 +4,6 @@ import { createClient } from '@/lib/supabase/server';
 import { getActiveContext } from '@/lib/data/org';
 import { getDashboardData } from '@/lib/data/dashboard';
 import { getPortfolioData } from '@/lib/data/portfolio';
-import { StatCards } from '@/components/dashboard/stat-cards';
 import { TimelineOverview } from '@/components/dashboard/timeline-overview';
 import { KpiRow } from '@/components/dashboard/kpi-row';
 import { InsightBanner } from '@/components/dashboard/insight-banner';
@@ -63,14 +62,11 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      {/* Headline insight (auto-surfaced worst signal) */}
+      {/* Attention surface — every live signal as a chip */}
       <InsightBanner counts={counts} />
 
-      {/* Portfolio KPIs */}
+      {/* Portfolio KPIs — the single stat row */}
       <KpiRow kpis={portfolio.kpis} />
-
-      {/* Action-required cards */}
-      <StatCards counts={counts} />
 
       {/* Charts */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
