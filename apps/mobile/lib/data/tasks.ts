@@ -24,7 +24,8 @@ function projectName(p: ProjectJoin): string {
   return row?.name ?? 'Project';
 }
 
-/** Open tasks assigned to the signed-in user, soonest due first. RLS scopes it. */
+/** Tasks assigned to the signed-in user (all states, soonest due first). RLS
+ *  scopes it; the Tasks screen filters by state client-side. */
 export async function listMyTasks(): Promise<MyTask[]> {
   const {
     data: { user },
@@ -35,7 +36,6 @@ export async function listMyTasks(): Promise<MyTask[]> {
     .from('tasks')
     .select('id, title, status, sla_status, due_date, priority, project_id, projects(name)')
     .eq('assignee_id', user.id)
-    .neq('status', 'done')
     .order('due_date', { ascending: true, nullsFirst: false });
 
   return ((data ?? []) as {

@@ -1,10 +1,12 @@
 import { useCallback, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { getTask, type TaskDetail } from '../../../lib/data/tasks';
-import { Badge } from '../../../components/badge';
 import { TaskPhotos } from '../../../components/task-photos';
-import { formatDate, slaLabel, slaTone, statusLabel } from '../../../lib/ui';
+import { Card, Pill, ProgressBar } from '../../../components/ui';
+import { formatDate, slaLabel, statusLabel } from '../../../lib/ui';
+import { theme, slaTone, statusProgress } from '../../../lib/theme';
 
 export default function TaskDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -42,63 +44,89 @@ export default function TaskDetailScreen() {
     );
   }
 
+  const tone = slaTone(task.slaStatus);
+  const pct = statusProgress(task.status);
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Stack.Screen options={{ title: task.projectName }} />
+
       <Text style={styles.title}>{task.title}</Text>
       <View style={styles.badges}>
-        <Badge label={slaLabel(task.slaStatus)} tone={slaTone(task.slaStatus)} />
+        <Pill label={slaLabel(task.slaStatus)} tone={tone} />
+        <Pill
+          label={statusLabel(task.status)}
+          tone={{ bg: '#eef0f2', fg: theme.color.muted, bar: theme.color.muted }}
+        />
+      </View>
+
+      <View style={styles.progressRow}>
+        <ProgressBar value={pct} color={tone.bar} />
+        <Text style={styles.pct}>{pct}%</Text>
       </View>
 
       <Pressable style={styles.discussion} onPress={() => router.push(`/(app)/chat/${task.id}`)}>
+        <Ionicons name="chatbubble-ellipses-outline" size={16} color={theme.color.accent} />
         <Text style={styles.discussionText}>Open discussion</Text>
       </Pressable>
 
-      <Field label="Status" value={statusLabel(task.status)} />
-      <Field label="Priority" value={task.priority} />
-      <Field label="Due" value={formatDate(task.dueDate)} />
-      <Field label="Planned" value={`${formatDate(task.plannedStartDate)} → ${formatDate(task.plannedEndDate)}`} />
+      <Card>
+        <Field label="Priority" value={task.priority} />
+        <Field label="Due" value={formatDate(task.dueDate)} />
+        <Field label="Planned" value={`${formatDate(task.plannedStartDate)} → ${formatDate(task.plannedEndDate)}`} last />
+      </Card>
 
       {task.description ? (
-        <View style={styles.block}>
-          <Text style={styles.label}>Description</Text>
+        <Card>
+          <Text style={styles.blockLabel}>Description</Text>
           <Text style={styles.body}>{task.description}</Text>
-        </View>
+        </Card>
       ) : null}
 
-      <TaskPhotos orgId={task.orgId} projectId={task.projectId} taskId={task.id} />
+      <Card>
+        <TaskPhotos orgId={task.orgId} projectId={task.projectId} taskId={task.id} />
+      </Card>
     </ScrollView>
   );
 }
 
-function Field({ label, value }: { label: string; value: string }) {
+function Field({ label, value, last }: { label: string; value: string; last?: boolean }) {
   return (
-    <View style={styles.fieldRow}>
-      <Text style={styles.label}>{label}</Text>
-      <Text style={styles.value}>{value}</Text>
+    <View style={[styles.fieldRow, last && { borderBottomWidth: 0 }]}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <Text style={styles.fieldValue}>{value}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#fff' },
-  content: { padding: 20, gap: 12 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
-  muted: { color: '#71717a' },
-  title: { fontSize: 20, fontWeight: '700', color: '#18181b' },
+  screen: { flex: 1, backgroundColor: theme.color.bg },
+  content: { padding: 16, gap: 12 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.color.bg },
+  muted: { color: theme.color.muted },
+  title: { fontSize: 22, fontWeight: '800', color: theme.color.text },
   badges: { flexDirection: 'row', gap: 8 },
-  fieldRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#f4f4f5' },
-  label: { fontSize: 12, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: 0.5 },
-  value: { fontSize: 14, color: '#3f3f46', fontWeight: '500' },
-  block: { gap: 6, marginTop: 8 },
-  body: { fontSize: 14, color: '#3f3f46', lineHeight: 20 },
+  progressRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  pct: { fontSize: 13, fontWeight: '700', color: theme.color.text, width: 42, textAlign: 'right' },
   discussion: {
-    backgroundColor: '#eef2ff',
-    borderRadius: 10,
-    paddingVertical: 12,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: theme.color.accentSoft,
+    borderRadius: theme.radius.md,
+    paddingVertical: 14,
   },
-  discussionText: { color: '#4338ca', fontWeight: '600' },
+  discussionText: { color: theme.color.accent, fontWeight: '700' },
+  fieldRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 9,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.color.border,
+  },
+  fieldLabel: { fontSize: 12, color: theme.color.subtle, textTransform: 'uppercase', letterSpacing: 0.5 },
+  fieldValue: { fontSize: 14, color: theme.color.text, fontWeight: '500' },
+  blockLabel: { fontSize: 12, color: theme.color.subtle, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
+  body: { fontSize: 14, color: theme.color.text, lineHeight: 21 },
 });
-

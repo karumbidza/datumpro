@@ -1,4 +1,4 @@
-/** Shared presentation helpers for the field app. */
+/** Text/label helpers for the field app. Colour tones live in lib/theme.ts. */
 
 export function formatDate(iso: string | null): string {
   if (!iso) return '—';
@@ -27,25 +27,4 @@ const SLA_LABEL: Record<string, string> = {
 };
 export function slaLabel(s: string): string {
   return SLA_LABEL[s] ?? s;
-}
-
-export interface Tone {
-  bg: string;
-  fg: string;
-}
-/** Colour tone for an SLA status chip. */
-export function slaTone(s: string): Tone {
-  switch (s) {
-    case 'breached':
-      return { bg: '#fee2e2', fg: '#b91c1c' };
-    case 'at_risk':
-      return { bg: '#fef3c7', fg: '#b45309' };
-    case 'blocked':
-      return { bg: '#e5e7eb', fg: '#374151' };
-    case 'resolved_on_time':
-    case 'on_track':
-      return { bg: '#dcfce7', fg: '#15803d' };
-    default:
-      return { bg: '#eef2ff', fg: '#4338ca' };
-  }
 }

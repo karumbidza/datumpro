@@ -11,12 +11,14 @@ export default function AppLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: '#0a0a0a' },
+        headerStyle: { backgroundColor: '#0e0e10' },
         headerTintColor: '#fff',
         headerTitleStyle: { fontWeight: '600' },
       }}
     >
-      <Stack.Screen name="tasks" options={{ title: 'My Tasks' }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="task/[id]" options={{ title: 'Task' }} />
+      <Stack.Screen name="chat/[taskId]" options={{ title: 'Task discussion' }} />
     </Stack>
   );
 }

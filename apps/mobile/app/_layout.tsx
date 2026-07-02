@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SessionProvider, useSession } from '../lib/auth';
 
 /** Redirects between the sign-in screen and the app based on session state. */
@@ -19,7 +20,7 @@ function AuthGate() {
     if (!session) {
       if (!inAuthScreen) router.replace('/sign-in');
     } else if (!inApp) {
-      router.replace('/(app)/tasks');
+      router.replace('/(app)/(tabs)');
     }
   }, [session, loading, segments, router]);
 
@@ -35,9 +36,11 @@ function AuthGate() {
 
 export default function RootLayout() {
   return (
-    <SessionProvider>
-      <StatusBar style="auto" />
-      <AuthGate />
-    </SessionProvider>
+    <SafeAreaProvider>
+      <SessionProvider>
+        <StatusBar style="auto" />
+        <AuthGate />
+      </SessionProvider>
+    </SafeAreaProvider>
   );
 }
