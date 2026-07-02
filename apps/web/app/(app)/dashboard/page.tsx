@@ -1,18 +1,30 @@
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveContext } from '@/lib/data/org';
 import { getDashboardData } from '@/lib/data/dashboard';
 import { getPortfolioData } from '@/lib/data/portfolio';
+import {
+  homePersona,
+  listPendingSignoffs,
+  listMyOpenTasks,
+  listManagedProjects,
+} from '@/lib/data/home';
+import { listMyPayments } from '@/lib/data/payments';
 import { TimelineOverview } from '@/components/dashboard/timeline-overview';
 import { KpiRow } from '@/components/dashboard/kpi-row';
 import { InsightBanner } from '@/components/dashboard/insight-banner';
 import { StatusChart, ProgressTrend } from '@/components/dashboard/portfolio-charts';
 import { RecentProjectsTable, UpcomingTasksTable } from '@/components/dashboard/portfolio-tables';
+import { ApprovalsInbox } from '@/components/dashboard/approvals-inbox';
+import { MyTasksCard } from '@/components/dashboard/my-tasks-card';
+import { ManagedProjectsCard } from '@/components/dashboard/managed-projects-card';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatLongDate } from '@/lib/date';
-import { can, permissionsFor } from '@datumpro/shared/access';
+import { can } from '@datumpro/shared/access';
+import { formatUsd } from '@datumpro/shared/domain';
 
 export default async function DashboardPage() {
   const ctx = await getActiveContext();
@@ -37,66 +49,124 @@ export default async function DashboardPage() {
 
   const { active } = ctx;
   const canCreate = can(active.role, 'project:create');
-  const [{ counts, tasks }, portfolio, displayName] = await Promise.all([
-    getDashboardData(active.orgId),
-    getPortfolioData(active.orgId),
+  const persona = homePersona(active.role);
+  const [displayName, signoffs] = await Promise.all([
     resolveDisplayName(ctx.userId, ctx.email),
+    listPendingSignoffs(active.orgId, ctx.userId, active.role),
   ]);
 
-  return (
-    <div className="mx-auto max-w-6xl space-y-8 px-6 py-8 xl:px-10">
-      {/* Welcome header */}
-      <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-        <div>
-          <h1 className="mb-1 text-xl font-semibold tracking-tight text-zinc-900 dark:text-white sm:text-2xl">
-            Welcome back, {displayName}
-          </h1>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            Here&apos;s what&apos;s happening across {active.name} today · {formatLongDate(new Date())}
-          </p>
+  const newProject = canCreate ? (
+    <Link href="/projects/new">
+      <Button>New project</Button>
+    </Link>
+  ) : null;
+
+  // ── Portfolio home — owner / admin / finance ──────────────────────────────
+  if (persona === 'portfolio') {
+    const [{ counts, tasks }, portfolio] = await Promise.all([
+      getDashboardData(active.orgId),
+      getPortfolioData(active.orgId),
+    ]);
+    return (
+      <div className="mx-auto max-w-6xl space-y-8 px-6 py-8 xl:px-10">
+        <Greeting
+          name={displayName}
+          subtitle={`Here's what's happening across ${active.name} today · ${formatLongDate(new Date())}`}
+          action={newProject}
+        />
+        {signoffs.length > 0 && <ApprovalsInbox items={signoffs} />}
+        <InsightBanner counts={counts} />
+        <KpiRow kpis={portfolio.kpis} />
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <StatusChart data={portfolio.statusDistribution} />
+          <ProgressTrend series={portfolio.progressSeries} />
         </div>
-        {canCreate && (
-          <Link href="/projects/new">
-            <Button>New project</Button>
-          </Link>
-        )}
+        <TimelineOverview tasks={tasks} />
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <UpcomingTasksTable tasks={portfolio.upcomingTasks} />
+          <RecentProjectsTable projects={portfolio.recentProjects} />
+        </div>
       </div>
+    );
+  }
 
-      {/* Attention surface — every live signal as a chip */}
-      <InsightBanner counts={counts} />
-
-      {/* Portfolio KPIs — the single stat row */}
-      <KpiRow kpis={portfolio.kpis} />
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <StatusChart data={portfolio.statusDistribution} />
-        <ProgressTrend series={portfolio.progressSeries} />
+  // ── Delivery cockpit — PM ─────────────────────────────────────────────────
+  if (persona === 'delivery') {
+    const [managed, myTasks] = await Promise.all([
+      listManagedProjects(active.orgId, ctx.userId, active.role),
+      listMyOpenTasks(ctx.userId),
+    ]);
+    return (
+      <div className="mx-auto max-w-5xl space-y-6 px-6 py-8">
+        <Greeting
+          name={displayName}
+          subtitle={`Your delivery overview · ${formatLongDate(new Date())}`}
+          action={newProject}
+        />
+        {signoffs.length > 0 && <ApprovalsInbox items={signoffs} />}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <ManagedProjectsCard projects={managed} />
+          <MyTasksCard tasks={myTasks} />
+        </div>
       </div>
+    );
+  }
 
-      {/* Timeline / Gantt (all projects) */}
-      <TimelineOverview tasks={tasks} />
+  // ── Personal home — member / contractor / viewer ──────────────────────────
+  const [myTasks, myPay] = await Promise.all([
+    listMyOpenTasks(ctx.userId),
+    listMyPayments(ctx.userId),
+  ]);
+  const hasPay = myPay.summary.earnedCents > 0;
+  return (
+    <div className="mx-auto max-w-3xl space-y-6 px-6 py-8">
+      <Greeting name={displayName} subtitle={`Here's your work today · ${formatLongDate(new Date())}`} />
+      {signoffs.length > 0 && <ApprovalsInbox items={signoffs} />}
+      <MyTasksCard tasks={myTasks} />
+      {hasPay && (
+        <Card>
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle>My payments</CardTitle>
+            <Link href="/payments" className="text-xs font-medium text-brand-600 hover:underline dark:text-brand-400">
+              View all →
+            </Link>
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-3 text-sm">
+            <Stat label="Earned" value={formatUsd(myPay.summary.earnedCents)} />
+            <Stat label="Awaiting" value={formatUsd(myPay.summary.claimedCents)} tone="amber" />
+            <Stat label="Paid" value={formatUsd(myPay.summary.paidCents)} tone="green" />
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
 
-      {/* Tables */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <UpcomingTasksTable tasks={portfolio.upcomingTasks} />
-        <RecentProjectsTable projects={portfolio.recentProjects} />
+function Greeting({ name, subtitle, action }: { name: string; subtitle: string; action?: ReactNode }) {
+  return (
+    <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+      <div>
+        <h1 className="mb-1 text-xl font-semibold tracking-tight text-zinc-900 dark:text-white sm:text-2xl">
+          Welcome back, {name}
+        </h1>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">{subtitle}</p>
       </div>
+      {action}
+    </div>
+  );
+}
 
-      {/* Capabilities */}
-      <Card>
-        <CardTitle>Your capabilities</CardTitle>
-        <ul className="mt-3 flex flex-wrap gap-2">
-          {permissionsFor(active.role).map((p) => (
-            <li
-              key={p}
-              className="rounded-full border border-zinc-200 px-2 py-0.5 text-xs text-zinc-600 dark:border-zinc-800 dark:text-zinc-300"
-            >
-              {p}
-            </li>
-          ))}
-        </ul>
-      </Card>
+function Stat({ label, value, tone }: { label: string; value: string; tone?: 'amber' | 'green' }) {
+  const color =
+    tone === 'amber'
+      ? 'text-amber-600 dark:text-amber-400'
+      : tone === 'green'
+        ? 'text-green-600 dark:text-green-400'
+        : 'text-zinc-900 dark:text-white';
+  return (
+    <div>
+      <p className="text-xs text-zinc-500">{label}</p>
+      <p className={`font-semibold tabular-nums ${color}`}>{value}</p>
     </div>
   );
 }
