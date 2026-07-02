@@ -4,22 +4,18 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard,
-  FolderOpen,
   Users,
+  FolderOpen,
   CheckSquare,
-  DollarSign,
-  FileText,
-  MessageSquare,
   ChevronDown,
   Check,
   Plus,
   LogOut,
   BrandMark,
-  type IconComponent,
 } from '@/components/icons';
 import type { SidebarProject, OrgMembershipSummary } from '@/lib/data/org';
 import { signOut, setActiveOrg } from '@/app/(app)/actions';
+import { activeProjectId, computeNav, isNavActive } from '@/components/shell/nav-items';
 
 interface SidebarProps {
   projects: SidebarProject[];
@@ -30,45 +26,13 @@ interface SidebarProps {
   myTaskCount: number;
 }
 
-interface NavItem {
-  name: string;
-  href: string;
-  icon: IconComponent;
-}
-
-/** Parse the active project id from the URL (source of truth — no cookie to go
- *  stale). `/projects/<id>/…` → id; `/projects/new` and `/projects` → none. */
-function activeProjectId(pathname: string): string | null {
-  const m = pathname.match(/^\/projects\/([^/]+)/);
-  const id = m?.[1];
-  return !id || id === 'new' ? null : id;
-}
-
 export function Sidebar({ projects, orgs, activeOrgId, email, canCreate, myTaskCount }: SidebarProps) {
   const pathname = usePathname();
   const activeId = activeProjectId(pathname);
   const activeProject = projects.find((p) => p.id === activeId) ?? null;
 
-  const nav: NavItem[] = activeProject
-    ? [
-        { name: 'Overview', href: `/projects/${activeProject.id}`, icon: LayoutDashboard },
-        { name: 'Tasks', href: `/projects/${activeProject.id}/tasks`, icon: CheckSquare },
-        { name: 'Finance', href: `/projects/${activeProject.id}/finance`, icon: DollarSign },
-        { name: 'Requests', href: `/projects/${activeProject.id}/requests`, icon: FileText },
-        { name: 'Chat', href: `/projects/${activeProject.id}/chat`, icon: MessageSquare },
-        { name: 'Team', href: `/projects/${activeProject.id}/team`, icon: Users },
-      ]
-    : [
-        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-        { name: 'All projects', href: '/projects', icon: FolderOpen },
-        ...(canCreate ? [{ name: 'Members', href: '/org/members', icon: Users }] : []),
-      ];
-
-  const isActive = (href: string) =>
-    href === pathname ||
-    // Overview is exact; deeper items match their subtree.
-    (href !== `/projects/${activeProject?.id}` && pathname.startsWith(`${href}/`)) ||
-    (href === '/projects' && pathname === '/projects');
+  const nav = computeNav(activeProject, canCreate);
+  const isActive = (href: string) => isNavActive(href, pathname, activeProject);
 
   return (
     <aside className="hidden h-screen w-64 shrink-0 flex-col border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 md:flex">
@@ -120,7 +84,13 @@ export function Sidebar({ projects, orgs, activeOrgId, email, canCreate, myTaskC
       <div className="border-t border-zinc-200 p-3 dark:border-zinc-800">
         <OrgSwitcher orgs={orgs} activeOrgId={activeOrgId} />
         <div className="mt-1 flex items-center justify-between gap-2">
-          <p className="min-w-0 flex-1 truncate text-xs text-zinc-500 dark:text-zinc-400">{email}</p>
+          <Link
+            href="/account"
+            title="Account settings"
+            className="min-w-0 flex-1 truncate text-xs text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white"
+          >
+            {email}
+          </Link>
           <form action={signOut}>
             <button
               type="submit"

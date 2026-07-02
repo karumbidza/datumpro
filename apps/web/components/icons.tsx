@@ -218,6 +218,14 @@ export const FileText: IconComponent = (p) => (
   </Icon>
 );
 
+export const Menu: IconComponent = (p) => (
+  <Icon {...p}>
+    <path d="M4 6h16" />
+    <path d="M4 12h16" />
+    <path d="M4 18h16" />
+  </Icon>
+);
+
 export const Mic: IconComponent = (p) => (
   <Icon {...p}>
     <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
