@@ -34,7 +34,9 @@ A QR code appears in the terminal. Open **Expo Go** on your phone and scan it
 over your local network — your phone and computer must be on the same Wi-Fi. Edit a
 file and it hot-reloads instantly.
 
-> Runs today in Expo Go: sign-in, My Tasks, task detail, and real-time task chat.
+> Runs today in Expo Go: sign-in, My Tasks, task detail, real-time task chat, and
+> **site photo capture**. **Push notifications** need a dev build + an EAS
+> projectId (see below) — they no-op silently in Expo Go.
 
 ## 3. Building real installable apps (later)
 
@@ -67,4 +69,14 @@ app/                       expo-router screens (file = route)
   (app)/task/[id].tsx      task detail
   (app)/chat/[taskId].tsx  real-time task chat
 lib/                       supabase client, auth context, data + UI helpers
+  push.ts                  Expo push-token registration (needs a dev build)
+components/task-photos.tsx camera/library capture → project-media
 ```
+
+## Enabling push notifications
+
+Push requires a dev/production build and an EAS project. After `eas build:configure`,
+EAS writes an `extra.eas.projectId` into the config — `lib/push.ts` reads it and
+registers the device token into `push_subscriptions` (platform `expo`) on app open.
+The existing `chat-push` Edge Function then delivers to the device. Nothing to wire
+by hand beyond running the dev build.

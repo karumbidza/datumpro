@@ -1,6 +1,13 @@
+import { useEffect } from 'react';
 import { Stack } from 'expo-router';
+import { registerForPush } from '../../lib/push';
 
 export default function AppLayout() {
+  // We're past the auth gate here, so a session exists — register for push once.
+  useEffect(() => {
+    void registerForPush();
+  }, []);
+
   return (
     <Stack
       screenOptions={{
