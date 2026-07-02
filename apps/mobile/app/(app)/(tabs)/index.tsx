@@ -3,17 +3,25 @@ import { View, Text, ScrollView, StyleSheet, RefreshControl, Pressable } from 'r
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { getHomeData, type HomeData } from '../../../lib/data/home';
+import {
+  getHomeData,
+  listPendingSignoffs,
+  type HomeData,
+  type PendingSignoff,
+} from '../../../lib/data/home';
 import { Card, ProgressBar, StatTile, Avatar } from '../../../components/ui';
 import { theme, contentWidth } from '../../../lib/theme';
 
 export default function Home() {
   const router = useRouter();
   const [data, setData] = useState<HomeData | null>(null);
+  const [signoffs, setSignoffs] = useState<PendingSignoff[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    setData(await getHomeData());
+    const [home, pending] = await Promise.all([getHomeData(), listPendingSignoffs()]);
+    setData(home);
+    setSignoffs(pending);
     setRefreshing(false);
   }, []);
 
@@ -76,6 +84,38 @@ export default function Home() {
           <StatTile label="At risk" value={data?.myAtRisk ?? 0} accent={theme.color.warning} />
           <StatTile label="Overdue" value={data?.myOverdue ?? 0} accent={theme.color.danger} />
         </View>
+
+        {/* Awaiting your sign-off (managers only; empty for field users) */}
+        {signoffs.length > 0 && (
+          <>
+            <View style={styles.sectionHead}>
+              <Text style={styles.sectionTitle}>Awaiting your sign-off</Text>
+              <View style={styles.approvalCount}>
+                <Text style={styles.approvalCountText}>{signoffs.length}</Text>
+              </View>
+            </View>
+            <View style={{ gap: 10 }}>
+              {signoffs.map((s) => (
+                <Pressable key={s.id} onPress={() => router.push(`/(app)/task/${s.id}`)}>
+                  <Card>
+                    <View style={styles.approvalRow}>
+                      <View style={styles.approvalDot} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.projName} numberOfLines={1}>
+                          {s.title}
+                        </Text>
+                        <Text style={styles.projMeta}>
+                          {s.projectName} · {s.assigneeName}
+                        </Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={16} color={theme.color.subtle} />
+                    </View>
+                  </Card>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        )}
 
         {/* Projects */}
         <View style={styles.sectionHead}>
@@ -168,6 +208,18 @@ const styles = StyleSheet.create({
   projRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   projPct: { fontSize: 15, fontWeight: '700', color: theme.color.accent },
   projMeta: { fontSize: 12, color: theme.color.subtle, marginTop: 6 },
+  approvalCount: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    paddingHorizontal: 6,
+    backgroundColor: theme.color.warningSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  approvalCountText: { fontSize: 12, fontWeight: '700', color: theme.color.warning },
+  approvalRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  approvalDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.color.warning },
   viewTasks: {
     flexDirection: 'row',
     alignItems: 'center',

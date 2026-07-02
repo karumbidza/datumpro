@@ -19,6 +19,76 @@ export interface HomeData {
   myAtRisk: number;
 }
 
+export interface PendingSignoff {
+  id: string;
+  title: string;
+  projectName: string;
+  assigneeName: string;
+}
+
+/** Tasks awaiting the current user's sign-off — submitted tasks on projects
+ *  where they're the project PM, plus every submitted task in orgs where they're
+ *  owner/admin. Mirrors can_manage_project; each row deep-links to the task,
+ *  where Approve/Reject already live. Empty for pure field users. */
+export async function listPendingSignoffs(): Promise<PendingSignoff[]> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const me = user?.id;
+  if (!me) return [];
+
+  const [{ data: pmRows }, { data: adminRows }] = await Promise.all([
+    supabase.from('project_members').select('project_id').eq('user_id', me).eq('role', 'pm'),
+    supabase
+      .from('org_members')
+      .select('org_id')
+      .eq('user_id', me)
+      .eq('status', 'active')
+      .in('role', ['owner', 'admin']),
+  ]);
+  const pmProjects = ((pmRows ?? []) as { project_id: string }[]).map((r) => r.project_id);
+  const adminOrgs = ((adminRows ?? []) as { org_id: string }[]).map((r) => r.org_id);
+  if (pmProjects.length === 0 && adminOrgs.length === 0) return [];
+
+  const ors: string[] = [];
+  if (pmProjects.length) ors.push(`project_id.in.(${pmProjects.join(',')})`);
+  if (adminOrgs.length) ors.push(`org_id.in.(${adminOrgs.join(',')})`);
+
+  const { data } = await supabase
+    .from('tasks')
+    .select('id, title, project_id, assignee_id')
+    .eq('status', 'submitted')
+    .or(ors.join(','))
+    .order('submitted_at', { ascending: true });
+  const rows = (data ?? []) as {
+    id: string;
+    title: string;
+    project_id: string;
+    assignee_id: string | null;
+  }[];
+  if (rows.length === 0) return [];
+
+  const projectIds = [...new Set(rows.map((r) => r.project_id))];
+  const userIds = [...new Set(rows.map((r) => r.assignee_id).filter(Boolean))] as string[];
+  const [{ data: projs }, profsRes] = await Promise.all([
+    supabase.from('projects').select('id, name').in('id', projectIds),
+    userIds.length
+      ? supabase.from('profiles').select('id, display_name').in('id', userIds)
+      : Promise.resolve({ data: [] as { id: string; display_name: string | null }[] }),
+  ]);
+  const pName = new Map(((projs ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name]));
+  const uName = new Map(
+    ((profsRes.data ?? []) as { id: string; display_name: string | null }[]).map((u) => [u.id, u.display_name]),
+  );
+
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    projectName: pName.get(r.project_id) ?? 'Project',
+    assigneeName: r.assignee_id ? uName.get(r.assignee_id) ?? 'Someone' : 'Unassigned',
+  }));
+}
+
 /** One round-trip of everything the Home dashboard needs. RLS scopes the rows to
  *  what this user may see, so the same query naturally adapts to their role:
  *  a manager sees every project's tasks, a foreman only their own. */
