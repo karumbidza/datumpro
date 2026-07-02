@@ -161,6 +161,104 @@ async function resolveImages(messageIds: string[]): Promise<Map<string, string>>
   return out;
 }
 
+export interface InboxItem {
+  conversationId: string;
+  type: 'project' | 'task_dm';
+  title: string;
+  subtitle: string;
+  taskId: string | null;
+  projectId: string;
+  lastBody: string | null; // '📷 Photo' for image-only messages
+  lastAt: string | null;
+  unread: number;
+}
+
+/** Every conversation the user can see, newest-active first, each with a last-
+ *  message preview and unread count — the Messages inbox. One bounded messages
+ *  fetch drives previews + unread in memory (no per-conversation round trips). */
+export async function listInbox(): Promise<InboxItem[]> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const me = user?.id;
+  if (!me) return [];
+
+  const { data: convRows } = await supabase
+    .from('conversations')
+    .select('id, type, task_id, project_id')
+    .eq('status', 'active')
+    .order('updated_at', { ascending: false })
+    .limit(80);
+  const convs = (convRows ?? []) as {
+    id: string;
+    type: 'project' | 'task_dm';
+    task_id: string | null;
+    project_id: string;
+  }[];
+  if (convs.length === 0) return [];
+  const convIds = convs.map((c) => c.id);
+
+  const taskIds = [...new Set(convs.map((c) => c.task_id).filter(Boolean))] as string[];
+  const projIds = [...new Set(convs.map((c) => c.project_id))];
+  const [tasksRes, projsRes, readRes, msgRes] = await Promise.all([
+    taskIds.length
+      ? supabase.from('tasks').select('id, title').in('id', taskIds)
+      : Promise.resolve({ data: [] as { id: string; title: string }[] }),
+    supabase.from('projects').select('id, name').in('id', projIds),
+    supabase.from('chat_read_state').select('conversation_id, last_read_seq').eq('user_id', me),
+    supabase
+      .from('messages')
+      .select('conversation_id, body, created_at, seq, sender_id')
+      .in('conversation_id', convIds)
+      .order('seq', { ascending: false })
+      .limit(400),
+  ]);
+
+  const taskName = new Map(((tasksRes.data ?? []) as { id: string; title: string }[]).map((t) => [t.id, t.title]));
+  const projName = new Map(((projsRes.data ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name]));
+  const lastRead = new Map(
+    ((readRes.data ?? []) as { conversation_id: string; last_read_seq: number }[]).map((r) => [
+      r.conversation_id,
+      r.last_read_seq,
+    ]),
+  );
+
+  const msgs = (msgRes.data ?? []) as {
+    conversation_id: string;
+    body: string | null;
+    created_at: string;
+    seq: number;
+    sender_id: string;
+  }[];
+  const latest = new Map<string, { body: string | null; created_at: string }>();
+  const unread = new Map<string, number>();
+  for (const m of msgs) {
+    // rows are seq-desc, so the first seen per conversation is the latest
+    if (!latest.has(m.conversation_id)) latest.set(m.conversation_id, { body: m.body, created_at: m.created_at });
+    if (m.seq > (lastRead.get(m.conversation_id) ?? 0) && m.sender_id !== me) {
+      unread.set(m.conversation_id, (unread.get(m.conversation_id) ?? 0) + 1);
+    }
+  }
+
+  const items: InboxItem[] = convs.map((c) => {
+    const lm = latest.get(c.id) ?? null;
+    const pName = projName.get(c.project_id) ?? 'Project';
+    return {
+      conversationId: c.id,
+      type: c.type,
+      title: c.type === 'task_dm' ? (c.task_id ? taskName.get(c.task_id) ?? 'Task' : 'Task') : pName,
+      subtitle: c.type === 'task_dm' ? `${pName} · Task discussion` : 'Team channel',
+      taskId: c.task_id,
+      projectId: c.project_id,
+      lastBody: lm ? lm.body ?? '📷 Photo' : null,
+      lastAt: lm?.created_at ?? null,
+      unread: unread.get(c.id) ?? 0,
+    };
+  });
+  items.sort((a, b) => (b.lastAt ?? '').localeCompare(a.lastAt ?? ''));
+  return items;
+}
+
 /** Unread messages in a conversation for the current user: those with a higher
  *  seq than my read cursor, sent by someone else. */
 export async function getUnreadCount(conversationId: string): Promise<number> {
