@@ -152,14 +152,17 @@ export async function getInvoiceDetail(invoiceId: string): Promise<InvoiceDetail
   };
 }
 
-/** Project money summary in cents: budget, invoiced, paid, outstanding.
- *  Payments carry invoice_id (not project_id), so paid is computed via the
- *  project's invoices. */
+/** Project money summary in cents. Two directions:
+ *   • in  — budget, invoiced (to client), paid (by client), outstanding.
+ *   • out — committedCost (all contractor draws) and costToDate (draws paid).
+ *  Payments carry invoice_id (not project_id), so client `paid` is computed via
+ *  the project's invoices; contractor cost comes from payment_schedule. */
 export async function financeSummary(projectId: string) {
   const supabase = await createClient();
-  const [budget, invoicesRes] = await Promise.all([
+  const [budget, invoicesRes, drawsRes] = await Promise.all([
     supabase.from('budget_lines').select('budget_amount_cents').eq('project_id', projectId),
     supabase.from('invoices').select('id, total_cents, status').eq('project_id', projectId),
+    supabase.from('payment_schedule').select('amount_cents, status').eq('project_id', projectId),
   ]);
 
   const budgetCents = ((budget.data ?? []) as { budget_amount_cents: number }[]).reduce(
@@ -181,5 +184,18 @@ export async function financeSummary(projectId: string) {
       .reduce((a, p) => a + p.amount_cents, 0);
   }
 
-  return { budgetCents, invoicedCents, paidCents, outstandingCents: invoicedCents - paidCents };
+  const draws = (drawsRes.data ?? []) as { amount_cents: number; status: string }[];
+  const committedCostCents = draws.reduce((a, d) => a + (d.amount_cents ?? 0), 0);
+  const costToDateCents = draws
+    .filter((d) => d.status === 'paid')
+    .reduce((a, d) => a + (d.amount_cents ?? 0), 0);
+
+  return {
+    budgetCents,
+    invoicedCents,
+    paidCents,
+    outstandingCents: invoicedCents - paidCents,
+    committedCostCents,
+    costToDateCents,
+  };
 }

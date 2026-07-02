@@ -5,6 +5,7 @@ import { getProject } from '@/lib/data/projects';
 import { listBudgetBilling, listInvoices, financeSummary } from '@/lib/data/finance';
 import { listProjectPayments } from '@/lib/data/payments';
 import { addBudgetLine } from './actions';
+import { BudgetVsCost } from '@/components/finance/budget-vs-cost';
 import { Card, CardTitle, CardValue } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -51,6 +52,16 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
         <Card><CardTitle>Paid</CardTitle><CardValue>{formatUsd(summary.paidCents)}</CardValue></Card>
         <Card><CardTitle>Outstanding</CardTitle><CardValue>{formatUsd(summary.outstandingCents)}</CardValue></Card>
       </section>
+
+      {(summary.budgetCents > 0 || summary.committedCostCents > 0) && (
+        <section className="mt-6">
+          <BudgetVsCost
+            budgetCents={summary.budgetCents}
+            committedCostCents={summary.committedCostCents}
+            costToDateCents={summary.costToDateCents}
+          />
+        </section>
+      )}
 
       <section className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div>

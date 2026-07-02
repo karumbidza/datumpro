@@ -9,6 +9,8 @@ export interface ProjectFinanceRow {
   invoicedCents: number;
   paidCents: number;
   outstandingCents: number;
+  /** Contractor cost paid out so far (money out) — draws with status 'paid'. */
+  costToDateCents: number;
 }
 
 export interface OrgFinanceOverview {
@@ -17,6 +19,7 @@ export interface OrgFinanceOverview {
     invoicedCents: number;
     paidCents: number;
     outstandingCents: number;
+    costToDateCents: number;
   };
   /** Collection rate = paid / invoiced (0–1); null when nothing is invoiced. */
   collectionRate: number | null;
@@ -31,7 +34,7 @@ export interface OrgFinanceOverview {
 export async function orgFinanceOverview(orgId: string): Promise<OrgFinanceOverview> {
   const supabase = await createClient();
 
-  const [projectsRes, budgetRes, invoicesRes, paymentsRes] = await Promise.all([
+  const [projectsRes, budgetRes, invoicesRes, paymentsRes, drawsRes] = await Promise.all([
     supabase
       .from('projects')
       .select('id, name, status')
@@ -40,6 +43,7 @@ export async function orgFinanceOverview(orgId: string): Promise<OrgFinanceOverv
     supabase.from('budget_lines').select('project_id, budget_amount_cents').eq('org_id', orgId),
     supabase.from('invoices').select('id, project_id, status, total_cents').eq('org_id', orgId),
     supabase.from('payments').select('invoice_id, amount_cents, status').eq('org_id', orgId),
+    supabase.from('payment_schedule').select('project_id, amount_cents, status').eq('org_id', orgId),
   ]);
 
   const projects = (projectsRes.data ?? []) as { id: string; name: string; status: string }[];
@@ -55,6 +59,11 @@ export async function orgFinanceOverview(orgId: string): Promise<OrgFinanceOverv
     amount_cents: number;
     status: string;
   }[];
+  const draws = (drawsRes.data ?? []) as {
+    project_id: string;
+    amount_cents: number;
+    status: string;
+  }[];
 
   // Seed a row per project so the whole portfolio shows, including £0 projects.
   const rows = new Map<string, ProjectFinanceRow>();
@@ -67,6 +76,7 @@ export async function orgFinanceOverview(orgId: string): Promise<OrgFinanceOverv
       invoicedCents: 0,
       paidCents: 0,
       outstandingCents: 0,
+      costToDateCents: 0,
     });
   }
 
@@ -91,6 +101,12 @@ export async function orgFinanceOverview(orgId: string): Promise<OrgFinanceOverv
     if (row) row.paidCents += pay.amount_cents ?? 0;
   }
 
+  for (const draw of draws) {
+    if (draw.status !== 'paid') continue;
+    const row = rows.get(draw.project_id);
+    if (row) row.costToDateCents += draw.amount_cents ?? 0;
+  }
+
   const projectRows = [...rows.values()];
   for (const row of projectRows) {
     row.outstandingCents = row.invoicedCents - row.paidCents;
@@ -102,9 +118,10 @@ export async function orgFinanceOverview(orgId: string): Promise<OrgFinanceOverv
       acc.invoicedCents += r.invoicedCents;
       acc.paidCents += r.paidCents;
       acc.outstandingCents += r.outstandingCents;
+      acc.costToDateCents += r.costToDateCents;
       return acc;
     },
-    { budgetCents: 0, invoicedCents: 0, paidCents: 0, outstandingCents: 0 },
+    { budgetCents: 0, invoicedCents: 0, paidCents: 0, outstandingCents: 0, costToDateCents: 0 },
   );
 
   return {
