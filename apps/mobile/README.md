@@ -29,10 +29,27 @@ From the repo root:
 pnpm --filter @datumpro/mobile dev
 ```
 
-A QR code appears in the terminal. Open **Expo Go** on your phone and scan it
-(Android: scan from inside Expo Go · iOS: scan with the Camera app). The app loads
-over your local network — your phone and computer must be on the same Wi-Fi. Edit a
-file and it hot-reloads instantly.
+A QR code appears in the terminal.
+
+- **iPhone:** open the built-in **Camera** app, point it at the QR, tap the yellow
+  banner → it opens in Expo Go. (Do *not* scan from inside Expo Go — that's
+  Android-only.)
+- **Android:** scan from inside Expo Go.
+
+Your phone and computer must be on the **same Wi-Fi**. Edit a file → it hot-reloads.
+
+**Run it on your own computer, not in a cloud/remote shell** — your phone connects
+to the dev server over the local network. If you only have the code in the cloud,
+clone the repo to your machine first, then `pnpm install` and run the command above.
+
+### If the QR won't connect (restrictive Wi-Fi, or running remotely)
+
+```bash
+pnpm --filter @datumpro/mobile dev:tunnel
+```
+
+Tunnel mode routes the connection through Expo's servers, so the phone connects even
+on a different network. (First run may install `@expo/ngrok` — accept the prompt.)
 
 > Runs today in Expo Go: sign-in, My Tasks, task detail, real-time task chat, and
 > **site photo capture**. **Push notifications** need a dev build + an EAS
