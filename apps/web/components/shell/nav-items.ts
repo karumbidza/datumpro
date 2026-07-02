@@ -26,7 +26,11 @@ export function activeProjectId(pathname: string): string | null {
 
 /** The nav shown for the current context: project-scoped when inside a project,
  *  otherwise the org-level nav. Shared by the desktop sidebar and mobile drawer. */
-export function computeNav(activeProject: SidebarProject | null, canCreate: boolean): NavItem[] {
+export function computeNav(
+  activeProject: SidebarProject | null,
+  canCreate: boolean,
+  canViewFinance = false,
+): NavItem[] {
   if (activeProject) {
     return [
       { name: 'Overview', href: `/projects/${activeProject.id}`, icon: LayoutDashboard },
@@ -40,6 +44,7 @@ export function computeNav(activeProject: SidebarProject | null, canCreate: bool
   return [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'All projects', href: '/projects', icon: FolderOpen },
+    ...(canViewFinance ? [{ name: 'Finance', href: '/finance', icon: DollarSign }] : []),
     ...(canCreate ? [{ name: 'Members', href: '/org/members', icon: Users }] : []),
   ];
 }

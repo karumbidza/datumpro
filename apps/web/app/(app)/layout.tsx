@@ -17,6 +17,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   const { projects, myTaskCount } = await getSidebarData(ctx.active.orgId, ctx.userId);
   const canCreate = ctx.active.role === 'owner' || ctx.active.role === 'admin';
+  const canViewFinance = canCreate || ctx.active.role === 'finance';
 
   return (
     <div className="flex h-screen overflow-hidden bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
@@ -26,6 +27,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         activeOrgId={ctx.active.orgId}
         email={ctx.email}
         canCreate={canCreate}
+        canViewFinance={canViewFinance}
         myTaskCount={myTaskCount}
       />
       <div className="flex min-w-0 flex-1 flex-col">
@@ -35,6 +37,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           activeOrgId={ctx.active.orgId}
           email={ctx.email}
           canCreate={canCreate}
+          canViewFinance={canViewFinance}
         />
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
