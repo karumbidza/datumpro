@@ -29,7 +29,7 @@ export function activeProjectId(pathname: string): string | null {
  *  otherwise the org-level nav. Shared by the desktop sidebar and mobile drawer. */
 export function computeNav(
   activeProject: SidebarProject | null,
-  canCreate: boolean,
+  canManageMembers: boolean,
   canViewFinance = false,
 ): NavItem[] {
   if (activeProject) {
@@ -47,7 +47,7 @@ export function computeNav(
     { name: 'All projects', href: '/projects', icon: FolderOpen },
     { name: 'My payments', href: '/payments', icon: Wallet },
     ...(canViewFinance ? [{ name: 'Finance', href: '/finance', icon: DollarSign }] : []),
-    ...(canCreate ? [{ name: 'Members', href: '/org/members', icon: Users }] : []),
+    ...(canManageMembers ? [{ name: 'Members', href: '/org/members', icon: Users }] : []),
   ];
 }
 

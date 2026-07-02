@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getActiveContext } from '@/lib/data/org';
+import { can } from '@datumpro/shared/access';
 import { orgFinanceOverview } from '@/lib/data/finance-portfolio';
 import { Card, CardTitle, CardValue } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,16 +15,17 @@ const STATUS_TONE: Record<string, 'neutral' | 'blue' | 'green' | 'amber'> = {
   archived: 'neutral',
 };
 
-/** Org-wide finance hub — the portfolio money view for owners, admins and the
- *  finance role. Gated here and by RLS. Per-project detail lives at
+/** Org-wide finance hub — the portfolio money view for owners, admins, finance
+ *  and delivery PMs. Gated here and by RLS. Per-project detail lives at
  *  /projects/[id]/finance; this is the roll-up above it. */
 export default async function OrgFinancePage() {
   const ctx = await getActiveContext();
   if (!ctx) redirect('/sign-in');
   if (!ctx.active) redirect('/orgs/new');
 
-  const canView =
-    ctx.active.role === 'owner' || ctx.active.role === 'admin' || ctx.active.role === 'finance';
+  // Owners, admins, finance and delivery PMs see the portfolio roll-up; RLS
+  // still scopes the underlying rows to what each caller may read.
+  const canView = can(ctx.active.role, 'finance:view') && ctx.active.role !== 'viewer';
   if (!canView) redirect('/dashboard');
 
   const { totals, collectionRate, projects } = await orgFinanceOverview(ctx.active.orgId);

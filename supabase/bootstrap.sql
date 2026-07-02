@@ -1124,9 +1124,13 @@ $$;
 
 -- Can the caller READ this project's data? Company staff see all; otherwise the
 -- caller must be a member of the project.
+-- Company staff (owner/admin/finance) and org PMs see across the org; everyone
+-- else is scoped to the projects they're a member of.
 create or replace function public.can_view_project(p_project_id uuid, p_org_id uuid)
 returns boolean language sql stable security definer set search_path = '' as $$
-  select public.is_org_staff(p_org_id) or public.is_project_member(p_project_id);
+  select public.is_org_staff(p_org_id)
+      or public.org_role(p_org_id) = 'pm'
+      or public.is_project_member(p_project_id);
 $$;
 
 -- Can the caller MANAGE this project (create tasks/milestones, add members, …)?
@@ -1183,7 +1187,7 @@ create policy projects_select on public.projects for select
   using ((select public.can_view_project(id, org_id)));
 drop policy if exists projects_write on public.projects;          -- replaced by split policies
 create policy projects_insert on public.projects for insert
-  with check ((select public.is_org_admin(org_id)));
+  with check ((select public.is_org_admin(org_id)) or (select public.org_role(org_id)) = 'pm');
 create policy projects_update on public.projects for update
   using ((select public.can_manage_project(id, org_id)))
   with check ((select public.can_manage_project(id, org_id)));

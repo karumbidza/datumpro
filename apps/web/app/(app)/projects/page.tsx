@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { can } from '@datumpro/shared/access';
 import { listProjectsOverview } from '@/lib/data/projects-overview';
 import { getActiveContext } from '@/lib/data/org';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,7 @@ export default async function ProjectsPage() {
   if (!user) redirect('/sign-in');
 
   const [projects, ctx] = await Promise.all([listProjectsOverview(), getActiveContext()]);
-  const canCreate = ctx?.active?.role === 'owner' || ctx?.active?.role === 'admin';
+  const canCreate = ctx?.active ? can(ctx.active.role, 'project:create') : false;
 
   const totalTasks = projects.reduce((s, p) => s + p.totalTasks, 0);
   const doneTasks = projects.reduce((s, p) => s + p.doneTasks, 0);

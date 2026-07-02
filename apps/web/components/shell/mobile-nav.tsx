@@ -13,18 +13,19 @@ interface Props {
   orgs: OrgMembershipSummary[];
   activeOrgId: string;
   email: string | null;
-  canCreate: boolean;
+  canManageMembers: boolean;
+  canCreateProject: boolean;
   canViewFinance: boolean;
 }
 
 /** Mobile-only top bar + slide-over drawer. The desktop sidebar is hidden below
  *  `md`, so this is the sole navigation on phones. */
-export function MobileNav({ projects, orgs, activeOrgId, email, canCreate, canViewFinance }: Props) {
+export function MobileNav({ projects, orgs, activeOrgId, email, canManageMembers, canViewFinance }: Props) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
   const activeProject = projects.find((p) => p.id === activeProjectId(pathname)) ?? null;
-  const nav = computeNav(activeProject, canCreate, canViewFinance);
+  const nav = computeNav(activeProject, canManageMembers, canViewFinance);
   const activeOrgName = orgs.find((o) => o.orgId === activeOrgId)?.name ?? 'DatumPro';
 
   // Close the drawer whenever the route changes.

@@ -12,7 +12,7 @@ import { RecentProjectsTable, UpcomingTasksTable } from '@/components/dashboard/
 import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatLongDate } from '@/lib/date';
-import { permissionsFor } from '@datumpro/shared/access';
+import { can, permissionsFor } from '@datumpro/shared/access';
 
 export default async function DashboardPage() {
   const ctx = await getActiveContext();
@@ -36,7 +36,7 @@ export default async function DashboardPage() {
   }
 
   const { active } = ctx;
-  const canCreate = active.role === 'owner' || active.role === 'admin';
+  const canCreate = can(active.role, 'project:create');
   const [{ counts, tasks }, portfolio, displayName] = await Promise.all([
     getDashboardData(active.orgId),
     getPortfolioData(active.orgId),

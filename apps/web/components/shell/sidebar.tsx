@@ -22,17 +22,18 @@ interface SidebarProps {
   orgs: OrgMembershipSummary[];
   activeOrgId: string;
   email: string | null;
-  canCreate: boolean;
+  canManageMembers: boolean;
+  canCreateProject: boolean;
   canViewFinance: boolean;
   myTaskCount: number;
 }
 
-export function Sidebar({ projects, orgs, activeOrgId, email, canCreate, canViewFinance, myTaskCount }: SidebarProps) {
+export function Sidebar({ projects, orgs, activeOrgId, email, canManageMembers, canCreateProject, canViewFinance, myTaskCount }: SidebarProps) {
   const pathname = usePathname();
   const activeId = activeProjectId(pathname);
   const activeProject = projects.find((p) => p.id === activeId) ?? null;
 
-  const nav = computeNav(activeProject, canCreate, canViewFinance);
+  const nav = computeNav(activeProject, canManageMembers, canViewFinance);
   const isActive = (href: string) => isNavActive(href, pathname, activeProject);
 
   return (
@@ -40,7 +41,7 @@ export function Sidebar({ projects, orgs, activeOrgId, email, canCreate, canView
       <ProjectSwitcher
         projects={projects}
         activeProject={activeProject}
-        canCreate={canCreate}
+        canCreate={canCreateProject}
       />
 
       <nav className="flex-1 overflow-y-auto p-2">
