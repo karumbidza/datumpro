@@ -19,6 +19,7 @@ import { PaymentsPanel } from '@/components/task/payments-panel';
 import { ChatPanel } from '@/components/chat/chat-panel';
 import { CompletionEvidence } from '@/components/task/completion-evidence';
 import { ExtensionPanel } from '@/components/task/extension-panel';
+import { TaskTabs, type TaskTab } from '@/components/task/task-tabs';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -108,66 +109,78 @@ export default async function TaskDetailPage({
   const usedPredecessors = new Set(dependencies.map((d) => d.predecessorId));
   const addable = taskOptions.filter((t) => !usedPredecessors.has(t.id));
 
-  return (
-    <main className="mx-auto max-w-2xl px-6 py-10">
-      <Link href={`/projects/${projectId}/tasks`} className="text-xs text-zinc-500 hover:underline">
-        ← Tasks
-      </Link>
-      <div className="mt-1 flex items-start justify-between gap-4">
-        <h1 className="text-2xl font-semibold tracking-tight">{task.title}</h1>
-        <div className="flex items-center gap-2">
-          <Badge tone={STATUS_TONE[task.status]}>{task.status.replace('_', ' ')}</Badge>
-          {canManage && task.status !== 'done' && (
-            <Link href={`/projects/${projectId}/tasks/${taskId}/edit`}>
-              <Button variant="secondary">Edit</Button>
-            </Link>
-          )}
-        </div>
+  // Status-aware workflow actions stay in the always-visible overview zone so
+  // the primary CTA is never buried behind a tab. The DB enforces the real
+  // rules (e.g. only a lead can approve to DONE) regardless of what's shown.
+  const workflowActions =
+    task.status !== 'done' && canAct ? (
+      <div className="mt-6 space-y-4">
+        {task.status === 'todo' && (
+          <form action={startTask}>
+            <input type="hidden" name="taskId" value={taskId} />
+            <Button type="submit">Start task</Button>
+          </form>
+        )}
+
+        {task.status === 'in_progress' && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Card>
+              <CardTitle>Submit for sign-off</CardTitle>
+              <form action={submitTask} className="mt-3 space-y-3">
+                <input type="hidden" name="taskId" value={taskId} />
+                <textarea name="notes" rows={3} required placeholder="What was completed?" className={inputClass} />
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" name="declaration" /> I confirm this work is complete and accurate.
+                </label>
+                <Button type="submit">Submit</Button>
+              </form>
+            </Card>
+            <Card>
+              <CardTitle>Raise a blocker</CardTitle>
+              <form action={raiseBlocker} className="mt-3 space-y-3">
+                <input type="hidden" name="taskId" value={taskId} />
+                <textarea name="description" rows={2} required placeholder="What's blocking you?" className={inputClass} />
+                <Button type="submit" variant="secondary">Raise blocker</Button>
+              </form>
+            </Card>
+          </div>
+        )}
+
+        {task.status === 'submitted' && canManage && (
+          <Card>
+            <CardTitle>Review submission</CardTitle>
+            <form action={approveTask} className="mt-3">
+              <input type="hidden" name="taskId" value={taskId} />
+              <Button type="submit">Approve (mark done)</Button>
+            </form>
+            <form action={rejectTask} className="mt-3 space-y-2 border-t border-zinc-100 pt-3 dark:border-zinc-800">
+              <input type="hidden" name="taskId" value={taskId} />
+              <textarea name="reason" rows={2} required placeholder="Reason for sending back" className={inputClass} />
+              <Button type="submit" variant="secondary">Reject</Button>
+            </form>
+          </Card>
+        )}
+
+        {task.status === 'blocked' && canManage && (
+          <form action={resolveBlocker}>
+            <input type="hidden" name="taskId" value={taskId} />
+            <Button type="submit">Resolve blocker (resume, credit deadline)</Button>
+          </form>
+        )}
       </div>
+    ) : null;
 
-      <Card className="mt-6 space-y-2 text-sm">
-        <Row label="Assignee" value={assigneeName} />
-        <Row label="Priority" value={task.priority} />
-        <Row label="SLA" value={task.sla_status.replace('_', ' ')} />
-        {task.status !== 'done' && sched && (
-          <Row
-            label="Schedule"
-            value={sched.critical ? 'On critical path' : `${sched.floatDays}d slack`}
-          />
-        )}
-        {task.planned_start_date && <Row label="Start" value={task.planned_start_date} />}
-        {task.due_date && <Row label="Due" value={task.due_date} />}
-        {task.description && <p className="pt-2 text-zinc-600 dark:text-zinc-300">{task.description}</p>}
-        {task.status === 'blocked' && task.blocker_description && (
-          <p className="rounded-md bg-amber-50 p-2 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
-            🚧 {task.blocker_description}
-          </p>
-        )}
-        {task.rejection_reason && task.status === 'in_progress' && (
-          <p className="rounded-md bg-red-50 p-2 text-red-700 dark:bg-red-500/10 dark:text-red-400">
-            ✗ Sent back: {task.rejection_reason}
-          </p>
-        )}
-        {task.completion_notes && (
-          <p className="text-zinc-600 dark:text-zinc-300">📝 {task.completion_notes}</p>
-        )}
-      </Card>
+  // Deep detail lives in tabs so the page reads at a glance instead of one long
+  // scroll. Tabs only appear when they have something to show.
+  const tabs: TaskTab[] = [];
 
-      <QuotePanel
-        taskId={taskId}
-        projectId={projectId}
-        orgId={task.org_id}
-        canManage={canManage}
-        currentUserId={user.id}
-        quotes={quotes}
-        contractors={contractors}
-      />
-
-      <PaymentsPanel taskId={taskId} lines={payments} canManage={canManage} />
-
-      {dm && (
+  if (dm) {
+    tabs.push({
+      key: 'discussion',
+      label: 'Discussion',
+      content: (
         <ChatPanel
-          className="mt-6 h-[520px]"
+          className="h-[520px]"
           title="Task Discussion"
           subtitle="Private to the project manager and the assigned contractor."
           conversationId={dm.id}
@@ -180,10 +193,16 @@ export default async function TaskDetailPage({
           canPost
           canModerate={canManage}
         />
-      )}
+      ),
+    });
+  }
 
-      {/* ── Dependencies — "this task starts after" ── */}
-      <Card className="mt-6">
+  tabs.push({
+    key: 'dependencies',
+    label: 'Dependencies',
+    count: dependencies.length,
+    content: (
+      <Card>
         <CardTitle>Dependencies</CardTitle>
         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
           Predecessors that must finish (plus any lag) before this task can start.
@@ -249,7 +268,40 @@ export default async function TaskDetailPage({
           </form>
         )}
       </Card>
+    ),
+  });
 
+  tabs.push({
+    key: 'quotes',
+    label: 'Quotes',
+    count: quotes.length,
+    content: (
+      <QuotePanel
+        taskId={taskId}
+        projectId={projectId}
+        orgId={task.org_id}
+        canManage={canManage}
+        currentUserId={user.id}
+        quotes={quotes}
+        contractors={contractors}
+      />
+    ),
+  });
+
+  if (payments.length > 0) {
+    tabs.push({
+      key: 'payments',
+      label: 'Payments',
+      count: payments.length,
+      content: <PaymentsPanel taskId={taskId} lines={payments} canManage={canManage} />,
+    });
+  }
+
+  tabs.push({
+    key: 'evidence',
+    label: 'Evidence',
+    count: completionMedia.length,
+    content: (
       <CompletionEvidence
         taskId={taskId}
         projectId={projectId}
@@ -258,90 +310,93 @@ export default async function TaskDetailPage({
         canUpload={canUpload}
         canManage={canManage}
       />
+    ),
+  });
 
+  tabs.push({
+    key: 'extensions',
+    label: 'Extensions',
+    count: extensions.length,
+    content: (
       <ExtensionPanel
         taskId={taskId}
         canManage={canManage}
         canRequest={canRequestExtension}
         requests={extensions}
       />
+    ),
+  });
 
-      {/* Status-aware actions. The DB enforces the real rules (e.g. only a lead
-          can approve to DONE) regardless of what's shown. */}
-      {task.status !== 'done' && canAct && (
-        <div className="mt-6 space-y-4">
-          {task.status === 'todo' && (
-            <form action={startTask}>
-              <input type="hidden" name="taskId" value={taskId} />
-              <Button type="submit">Start task</Button>
-            </form>
-          )}
+  if (activity.length > 0) {
+    tabs.push({
+      key: 'activity',
+      label: 'Activity',
+      count: activity.length,
+      content: (
+        <ol className="space-y-3 border-l border-zinc-200 pl-4 dark:border-zinc-800">
+          {activity.map((a) => (
+            <li key={a.id} className="relative">
+              <span className="absolute -left-[21px] top-1.5 size-2 rounded-full bg-zinc-300 dark:bg-zinc-600" />
+              <p className="text-sm text-zinc-700 dark:text-zinc-200">{a.message}</p>
+              <p className="text-[11px] text-zinc-400">
+                {a.userName} · {new Date(a.createdAt).toLocaleString()}
+              </p>
+            </li>
+          ))}
+        </ol>
+      ),
+    });
+  }
 
-          {task.status === 'in_progress' && (
-            <>
-              <Card>
-                <CardTitle>Submit for sign-off</CardTitle>
-                <form action={submitTask} className="mt-3 space-y-3">
-                  <input type="hidden" name="taskId" value={taskId} />
-                  <textarea name="notes" rows={3} required placeholder="What was completed?" className={inputClass} />
-                  <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" name="declaration" /> I confirm this work is complete and accurate.
-                  </label>
-                  <Button type="submit">Submit</Button>
-                </form>
-              </Card>
-              <Card>
-                <CardTitle>Raise a blocker</CardTitle>
-                <form action={raiseBlocker} className="mt-3 space-y-3">
-                  <input type="hidden" name="taskId" value={taskId} />
-                  <textarea name="description" rows={2} required placeholder="What's blocking you?" className={inputClass} />
-                  <Button type="submit" variant="secondary">Raise blocker</Button>
-                </form>
-              </Card>
-            </>
-          )}
-
-          {task.status === 'submitted' && canManage && (
-            <Card>
-              <CardTitle>Review submission</CardTitle>
-              <form action={approveTask} className="mt-3">
-                <input type="hidden" name="taskId" value={taskId} />
-                <Button type="submit">Approve (mark done)</Button>
-              </form>
-              <form action={rejectTask} className="mt-3 space-y-2 border-t border-zinc-100 pt-3 dark:border-zinc-800">
-                <input type="hidden" name="taskId" value={taskId} />
-                <textarea name="reason" rows={2} required placeholder="Reason for sending back" className={inputClass} />
-                <Button type="submit" variant="secondary">Reject</Button>
-              </form>
-            </Card>
-          )}
-
-          {task.status === 'blocked' && canManage && (
-            <form action={resolveBlocker}>
-              <input type="hidden" name="taskId" value={taskId} />
-              <Button type="submit">Resolve blocker (resume, credit deadline)</Button>
-            </form>
+  return (
+    <main className="mx-auto max-w-3xl px-6 py-10">
+      <Link href={`/projects/${projectId}/tasks`} className="text-xs text-zinc-500 hover:underline">
+        ← Tasks
+      </Link>
+      <div className="mt-1 flex items-start justify-between gap-4">
+        <h1 className="text-2xl font-semibold tracking-tight">{task.title}</h1>
+        <div className="flex items-center gap-2">
+          <Badge tone={STATUS_TONE[task.status]}>{task.status.replace('_', ' ')}</Badge>
+          {canManage && task.status !== 'done' && (
+            <Link href={`/projects/${projectId}/tasks/${taskId}/edit`}>
+              <Button variant="secondary">Edit</Button>
+            </Link>
           )}
         </div>
-      )}
+      </div>
 
-      {/* ── Activity timeline ── */}
-      {activity.length > 0 && (
-        <section className="mt-8">
-          <h2 className="mb-3 text-sm font-semibold">Activity</h2>
-          <ol className="space-y-3 border-l border-zinc-200 pl-4 dark:border-zinc-800">
-            {activity.map((a) => (
-              <li key={a.id} className="relative">
-                <span className="absolute -left-[21px] top-1.5 size-2 rounded-full bg-zinc-300 dark:bg-zinc-600" />
-                <p className="text-sm text-zinc-700 dark:text-zinc-200">{a.message}</p>
-                <p className="text-[11px] text-zinc-400">
-                  {a.userName} · {new Date(a.createdAt).toLocaleString()}
-                </p>
-              </li>
-            ))}
-          </ol>
-        </section>
-      )}
+      {/* Overview — at a glance + act. Everything else is tabbed below. */}
+      <Card className="mt-6 space-y-2 text-sm">
+        <Row label="Assignee" value={assigneeName} />
+        <Row label="Priority" value={task.priority} />
+        <Row label="SLA" value={task.sla_status.replace('_', ' ')} />
+        {task.status !== 'done' && sched && (
+          <Row
+            label="Schedule"
+            value={sched.critical ? 'On critical path' : `${sched.floatDays}d slack`}
+          />
+        )}
+        {task.planned_start_date && <Row label="Start" value={task.planned_start_date} />}
+        {task.due_date && <Row label="Due" value={task.due_date} />}
+        {task.description && <p className="pt-2 text-zinc-600 dark:text-zinc-300">{task.description}</p>}
+        {task.status === 'blocked' && task.blocker_description && (
+          <p className="rounded-md bg-amber-50 p-2 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
+            🚧 {task.blocker_description}
+          </p>
+        )}
+        {task.rejection_reason && task.status === 'in_progress' && (
+          <p className="rounded-md bg-red-50 p-2 text-red-700 dark:bg-red-500/10 dark:text-red-400">
+            ✗ Sent back: {task.rejection_reason}
+          </p>
+        )}
+        {task.completion_notes && (
+          <p className="text-zinc-600 dark:text-zinc-300">📝 {task.completion_notes}</p>
+        )}
+      </Card>
+
+      {workflowActions}
+
+      <TaskTabs tabs={tabs} />
     </main>
   );
 }
