@@ -59,6 +59,36 @@ export async function listMyTasks(): Promise<MyTask[]> {
   }));
 }
 
+/** Every task in a project (RLS-scoped: managers/PMs see all, members see the
+ *  project's tasks). Ordered by due date. */
+export async function listProjectTasks(projectId: string): Promise<MyTask[]> {
+  const { data } = await supabase
+    .from('tasks')
+    .select('id, title, status, sla_status, due_date, priority, project_id, projects(name)')
+    .eq('project_id', projectId)
+    .order('due_date', { ascending: true, nullsFirst: false });
+
+  return ((data ?? []) as {
+    id: string;
+    title: string;
+    status: string;
+    sla_status: string;
+    due_date: string | null;
+    priority: string;
+    project_id: string;
+    projects: ProjectJoin;
+  }[]).map((t) => ({
+    id: t.id,
+    title: t.title,
+    status: t.status,
+    slaStatus: t.sla_status,
+    dueDate: t.due_date,
+    priority: t.priority,
+    projectId: t.project_id,
+    projectName: projectName(t.projects),
+  }));
+}
+
 /** A single task's detail (RLS-scoped). */
 export async function getTask(id: string): Promise<TaskDetail | null> {
   const { data } = await supabase

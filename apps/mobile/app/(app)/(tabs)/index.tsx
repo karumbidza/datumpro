@@ -87,20 +87,30 @@ export default function Home() {
         ) : (
           <View style={{ gap: 10 }}>
             {data!.projects.map((p) => (
-              <Card key={p.id}>
-                <View style={styles.projRow}>
-                  <Text style={styles.projName} numberOfLines={1}>
-                    {p.name}
+              <Pressable
+                key={p.id}
+                onPress={() =>
+                  router.push({ pathname: '/(app)/project/[id]', params: { id: p.id, name: p.name } })
+                }
+              >
+                <Card>
+                  <View style={styles.projRow}>
+                    <Text style={styles.projName} numberOfLines={1}>
+                      {p.name}
+                    </Text>
+                    <View style={styles.projRight}>
+                      <Text style={styles.projPct}>{p.pct}%</Text>
+                      <Ionicons name="chevron-forward" size={16} color={theme.color.subtle} />
+                    </View>
+                  </View>
+                  <View style={{ marginTop: 8 }}>
+                    <ProgressBar value={p.pct} />
+                  </View>
+                  <Text style={styles.projMeta}>
+                    {p.done}/{p.total} tasks done
                   </Text>
-                  <Text style={styles.projPct}>{p.pct}%</Text>
-                </View>
-                <View style={{ marginTop: 8 }}>
-                  <ProgressBar value={p.pct} />
-                </View>
-                <Text style={styles.projMeta}>
-                  {p.done}/{p.total} tasks done
-                </Text>
-              </Card>
+                </Card>
+              </Pressable>
             ))}
           </View>
         )}
@@ -155,6 +165,7 @@ const styles = StyleSheet.create({
   empty: { color: theme.color.subtle, fontSize: 14 },
   projRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   projName: { fontSize: 15, fontWeight: '600', color: theme.color.text, flex: 1, marginRight: 8 },
+  projRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   projPct: { fontSize: 15, fontWeight: '700', color: theme.color.accent },
   projMeta: { fontSize: 12, color: theme.color.subtle, marginTop: 6 },
   viewTasks: {
