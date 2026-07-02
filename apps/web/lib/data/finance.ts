@@ -51,6 +51,66 @@ export async function listBudgetLines(projectId: string): Promise<BudgetLineRow[
   return (data ?? []) as BudgetLineRow[];
 }
 
+export interface BudgetBillingRow {
+  id: string;
+  description: string;
+  category: string | null;
+  budgetCents: number;
+  billedCents: number;
+  remainingCents: number;
+}
+
+/** Budget/BOQ lines with how much has already been invoiced against each
+ *  (via invoice_lines.budget_line_id, excluding void invoices). Powers both
+ *  the "billed vs budget" view and the invoice builder's remaining amounts. */
+export async function listBudgetBilling(projectId: string): Promise<BudgetBillingRow[]> {
+  const supabase = await createClient();
+  const [linesRes, invoicesRes] = await Promise.all([
+    supabase
+      .from('budget_lines')
+      .select('id, description, category, budget_amount_cents')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: true }),
+    supabase.from('invoices').select('id, status').eq('project_id', projectId),
+  ]);
+
+  const lines = (linesRes.data ?? []) as {
+    id: string;
+    description: string;
+    category: string | null;
+    budget_amount_cents: number;
+  }[];
+  const liveInvoiceIds = ((invoicesRes.data ?? []) as { id: string; status: string }[])
+    .filter((i) => i.status !== 'void')
+    .map((i) => i.id);
+
+  const billed = new Map<string, number>();
+  if (liveInvoiceIds.length > 0) {
+    const { data: ilRows } = await supabase
+      .from('invoice_lines')
+      .select('budget_line_id, amount_cents')
+      .in('invoice_id', liveInvoiceIds)
+      .not('budget_line_id', 'is', null);
+    for (const il of (ilRows ?? []) as { budget_line_id: string | null; amount_cents: number }[]) {
+      if (!il.budget_line_id) continue;
+      billed.set(il.budget_line_id, (billed.get(il.budget_line_id) ?? 0) + (il.amount_cents ?? 0));
+    }
+  }
+
+  return lines.map((l) => {
+    const budgetCents = l.budget_amount_cents ?? 0;
+    const billedCents = billed.get(l.id) ?? 0;
+    return {
+      id: l.id,
+      description: l.description,
+      category: l.category,
+      budgetCents,
+      billedCents,
+      remainingCents: budgetCents - billedCents,
+    };
+  });
+}
+
 export async function listInvoices(projectId: string): Promise<InvoiceRow[]> {
   const supabase = await createClient();
   const { data, error } = await supabase

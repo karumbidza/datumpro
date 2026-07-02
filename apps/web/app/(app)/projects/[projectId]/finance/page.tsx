@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getProject } from '@/lib/data/projects';
-import { listBudgetLines, listInvoices, financeSummary } from '@/lib/data/finance';
+import { listBudgetBilling, listInvoices, financeSummary } from '@/lib/data/finance';
 import { listProjectPayments } from '@/lib/data/payments';
 import { addBudgetLine } from './actions';
 import { Card, CardTitle, CardValue } from '@/components/ui/card';
@@ -29,7 +29,7 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
   if (!project) notFound();
   const [summary, budget, invoices, payments] = await Promise.all([
     financeSummary(projectId),
-    listBudgetLines(projectId),
+    listBudgetBilling(projectId),
     listInvoices(projectId),
     listProjectPayments(projectId),
   ]);
@@ -56,12 +56,32 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
               <p className="text-sm text-zinc-500 dark:text-zinc-400">No budget lines yet.</p>
             ) : (
               <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                {budget.map((b) => (
-                  <li key={b.id} className="flex items-center justify-between gap-3 py-2 text-sm">
-                    <span>{b.description}</span>
-                    <span className="tabular-nums text-zinc-500">{formatUsd(b.budget_amount_cents)}</span>
-                  </li>
-                ))}
+                {budget.map((b) => {
+                  const pct = b.budgetCents > 0 ? Math.min(100, (b.billedCents / b.budgetCents) * 100) : 0;
+                  const over = b.remainingCents < 0;
+                  return (
+                    <li key={b.id} className="py-2 text-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="min-w-0 truncate">{b.description}</span>
+                        <span className="shrink-0 tabular-nums text-zinc-500">
+                          {formatUsd(b.budgetCents)}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex items-center gap-2">
+                        <div className="h-1 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                          <div
+                            className={`h-full rounded-full ${over ? 'bg-amber-500' : 'bg-brand-500'}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <span className="shrink-0 text-[11px] tabular-nums text-zinc-400">
+                          {formatUsd(b.billedCents)} billed
+                          {over && <span className="text-amber-600 dark:text-amber-400"> · over</span>}
+                        </span>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
             <form action={addBudgetLine} className="mt-4 flex flex-wrap items-end gap-2 border-t border-zinc-100 pt-4 dark:border-zinc-800">

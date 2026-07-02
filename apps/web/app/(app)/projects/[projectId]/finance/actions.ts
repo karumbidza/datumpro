@@ -45,7 +45,12 @@ export async function createInvoice(formData: FormData) {
   const projectId = String(formData.get('projectId') ?? '');
   const orgId = await projectOrg(supabase, projectId);
 
-  let lines: { description: string; quantity: number; unitPriceCents: number }[] = [];
+  let lines: {
+    description: string;
+    quantity: number;
+    unitPriceCents: number;
+    budgetLineId?: string | null;
+  }[] = [];
   try {
     lines = JSON.parse(String(formData.get('lines') ?? '[]'));
   } catch {
@@ -78,6 +83,10 @@ export async function createInvoice(formData: FormData) {
     lines.map((l) => ({
       org_id: orgId,
       invoice_id: invoiceId,
+      // Link back to the BOQ line when the row was pulled from the budget, so
+      // billed-vs-budget stays accurate. The composite FK (budget_line_id, org_id)
+      // keeps it tenant-consistent.
+      budget_line_id: l.budgetLineId || null,
       description: l.description.trim(),
       quantity: l.quantity,
       unit_price_cents: l.unitPriceCents,
