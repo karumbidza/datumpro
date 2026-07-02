@@ -3,6 +3,7 @@ import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Pressable } from
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { getTask, type TaskDetail } from '../../../lib/data/tasks';
 import { Badge } from '../../../components/badge';
+import { TaskPhotos } from '../../../components/task-photos';
 import { formatDate, slaLabel, slaTone, statusLabel } from '../../../lib/ui';
 
 export default function TaskDetailScreen() {
@@ -64,6 +65,8 @@ export default function TaskDetailScreen() {
           <Text style={styles.body}>{task.description}</Text>
         </View>
       ) : null}
+
+      <TaskPhotos orgId={task.orgId} projectId={task.projectId} taskId={task.id} />
     </ScrollView>
   );
 }

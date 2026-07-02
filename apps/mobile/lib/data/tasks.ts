@@ -12,6 +12,7 @@ export interface MyTask {
 }
 
 export interface TaskDetail extends MyTask {
+  orgId: string;
   description: string | null;
   plannedStartDate: string | null;
   plannedEndDate: string | null;
@@ -63,13 +64,14 @@ export async function getTask(id: string): Promise<TaskDetail | null> {
   const { data } = await supabase
     .from('tasks')
     .select(
-      'id, title, description, status, sla_status, due_date, priority, project_id, planned_start_date, planned_end_date, projects(name)',
+      'id, org_id, title, description, status, sla_status, due_date, priority, project_id, planned_start_date, planned_end_date, projects(name)',
     )
     .eq('id', id)
     .maybeSingle();
   if (!data) return null;
   const t = data as {
     id: string;
+    org_id: string;
     title: string;
     description: string | null;
     status: string;
@@ -83,6 +85,7 @@ export async function getTask(id: string): Promise<TaskDetail | null> {
   };
   return {
     id: t.id,
+    orgId: t.org_id,
     title: t.title,
     description: t.description,
     status: t.status,
