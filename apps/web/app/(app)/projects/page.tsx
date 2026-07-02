@@ -1,20 +1,10 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { listProjects } from '@/lib/data/projects';
+import { listProjectsOverview } from '@/lib/data/projects-overview';
 import { getActiveContext } from '@/lib/data/org';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { formatUsd } from '@datumpro/shared/domain';
-
-const STATUS_TONE = {
-  active: 'green',
-  planning: 'blue',
-  on_hold: 'amber',
-  completed: 'neutral',
-  archived: 'neutral',
-} as const;
+import { ProjectOverviewCard } from '@/components/projects/project-overview-card';
 
 export default async function ProjectsPage() {
   const supabase = await createClient();
@@ -23,13 +13,24 @@ export default async function ProjectsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect('/sign-in');
 
-  const [projects, ctx] = await Promise.all([listProjects(), getActiveContext()]);
+  const [projects, ctx] = await Promise.all([listProjectsOverview(), getActiveContext()]);
   const canCreate = ctx?.active?.role === 'owner' || ctx?.active?.role === 'admin';
+
+  const totalTasks = projects.reduce((s, p) => s + p.totalTasks, 0);
+  const doneTasks = projects.reduce((s, p) => s + p.doneTasks, 0);
+  const portfolioPct = totalTasks === 0 ? 0 : Math.round((doneTasks / totalTasks) * 100);
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
       <header className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
+          {projects.length > 0 && (
+            <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
+              {projects.length} project{projects.length === 1 ? '' : 's'} · {portfolioPct}% overall progress
+            </p>
+          )}
+        </div>
         {canCreate && (
           <Link href="/projects/new">
             <Button>New project</Button>
@@ -42,30 +43,11 @@ export default async function ProjectsPage() {
           No projects yet — create your first one.
         </p>
       ) : (
-        <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {projects.map((p) => (
-            <li key={p.id}>
-              <Link href={`/projects/${p.id}`}>
-                <Card className="transition-colors hover:border-zinc-300 dark:hover:border-zinc-700">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h2 className="text-sm font-semibold">{p.name}</h2>
-                      {p.client_name && (
-                        <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                          {p.client_name}
-                        </p>
-                      )}
-                    </div>
-                    <Badge tone={STATUS_TONE[p.status]}>{p.status.replace('_', ' ')}</Badge>
-                  </div>
-                  <p className="mt-4 text-xs text-zinc-500 dark:text-zinc-400">
-                    Contract {formatUsd(p.contract_value_cents)}
-                  </p>
-                </Card>
-              </Link>
-            </li>
+            <ProjectOverviewCard key={p.id} project={p} />
           ))}
-        </ul>
+        </div>
       )}
     </main>
   );
