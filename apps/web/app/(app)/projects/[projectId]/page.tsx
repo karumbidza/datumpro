@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server';
 import { getProject, listMilestones, listRecentReports } from '@/lib/data/projects';
 import { getDashboardData } from '@/lib/data/dashboard';
 import { getProjectSchedule } from '@/lib/data/scheduling';
+import { myOrgRole } from '@/lib/data/tasks';
+import { MilestonesPanel } from '@/components/project/milestones-panel';
 import { StatCards } from '@/components/dashboard/stat-cards';
 import { TimelineOverview } from '@/components/dashboard/timeline-overview';
 import { ScheduleSummary } from '@/components/project/schedule-summary';
@@ -28,13 +30,15 @@ export default async function ProjectOverviewPage({
   const project = await getProject(projectId);
   if (!project) notFound();
 
-  const [{ counts, tasks }, milestones, reports, schedule] = await Promise.all([
+  const [{ counts, tasks }, milestones, reports, schedule, orgRole] = await Promise.all([
     getDashboardData(project.org_id, projectId),
     listMilestones(projectId),
     listRecentReports(projectId),
     getProjectSchedule(projectId),
+    myOrgRole(project.org_id),
   ]);
 
+  const canManageMilestones = orgRole === 'owner' || orgRole === 'admin' || orgRole === 'pm';
   const latestProgress = reports[0]?.progress_pct ?? 0;
 
   return (
@@ -71,28 +75,7 @@ export default async function ProjectOverviewPage({
       </Card>
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div>
-          <h2 className="mb-3 text-sm font-semibold">Milestones</h2>
-          {milestones.length === 0 ? (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">No milestones yet.</p>
-          ) : (
-            <ul className="space-y-2">
-              {milestones.map((m) => (
-                <li key={m.id}>
-                  <Card>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm">{m.name}</span>
-                      <Badge tone={m.status === 'done' ? 'green' : 'neutral'}>{m.status}</Badge>
-                    </div>
-                    {m.target_date && (
-                      <p className="mt-1 text-xs text-zinc-400">Target {m.target_date}</p>
-                    )}
-                  </Card>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <MilestonesPanel projectId={projectId} milestones={milestones} canManage={canManageMilestones} />
 
         <div>
           <h2 className="mb-3 text-sm font-semibold">Recent site reports</h2>
