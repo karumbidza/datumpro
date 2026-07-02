@@ -548,6 +548,9 @@ create table public.payment_schedule (
   due_date     date,
   amount_cents bigint not null default 0,
   status       public.schedule_status not null default 'pending',
+  claimed_at   timestamptz,
+  claimed_by   uuid references auth.users(id) on delete set null,
+  claim_note   text,
   created_at   timestamptz not null default now(),
   foreign key (project_id, org_id)   references public.projects (id, org_id)   on delete cascade,
   foreign key (milestone_id, org_id) references public.milestones (id, org_id),
@@ -2365,3 +2368,42 @@ begin
   return inv.org_id;
 end;
 $$;
+
+-- ── Payment claims (progress applications) ───────────────────────────────────
+-- Defined after the helpers above (is_task_assignee / is_org_staff /
+-- project_role). A contractor raises a progress claim against their own pending
+-- draw ('pending' → 'invoiced'); finance/PM then pay it. SECURITY DEFINER so a
+-- contractor can only flip status + record the claim, never amounts.
+create or replace function public.submit_payment_claim(p_schedule_id uuid, p_note text)
+returns void language plpgsql security definer set search_path = '' as $$
+declare r public.payment_schedule%rowtype;
+begin
+  select * into r from public.payment_schedule where id = p_schedule_id;
+  if not found then raise exception 'Draw not found'; end if;
+  if r.task_id is null or not public.is_task_assignee(r.task_id) then
+    raise exception 'Only the assigned contractor can claim this draw';
+  end if;
+  if r.status <> 'pending' then raise exception 'This draw has already been claimed'; end if;
+  update public.payment_schedule
+     set status = 'invoiced', claimed_at = now(),
+         claimed_by = (select auth.uid()), claim_note = nullif(btrim(p_note), '')
+   where id = p_schedule_id;
+end; $$;
+grant execute on function public.submit_payment_claim(uuid, text) to authenticated;
+
+-- Finance/PM send a claim back ('invoiced' → 'pending'), clearing claim metadata.
+create or replace function public.reject_payment_claim(p_schedule_id uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+declare r public.payment_schedule%rowtype;
+begin
+  select * into r from public.payment_schedule where id = p_schedule_id;
+  if not found then raise exception 'Draw not found'; end if;
+  if not ((select public.is_org_staff(r.org_id)) or (select public.project_role(r.project_id)) = 'pm') then
+    raise exception 'Only finance or the project manager can reject a claim';
+  end if;
+  if r.status <> 'invoiced' then raise exception 'Only a claimed draw can be rejected'; end if;
+  update public.payment_schedule
+     set status = 'pending', claimed_at = null, claimed_by = null, claim_note = null
+   where id = p_schedule_id;
+end; $$;
+grant execute on function public.reject_payment_claim(uuid) to authenticated;

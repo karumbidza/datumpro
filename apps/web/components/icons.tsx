@@ -209,6 +209,14 @@ export const DollarSign: IconComponent = (p) => (
   </Icon>
 );
 
+export const Wallet: IconComponent = (p) => (
+  <Icon {...p}>
+    <path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2" />
+    <path d="M3 7h16a2 2 0 0 1 2 2v0a2 2 0 0 1-2 2H3" />
+    <path d="M16 11h.01" />
+  </Icon>
+);
+
 export const FileText: IconComponent = (p) => (
   <Icon {...p}>
     <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />

@@ -10,7 +10,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatUsd } from '@datumpro/shared/domain';
 
-const PAY_TONE = { paid: 'green', invoiced: 'blue', pending: 'neutral' } as const;
+const PAY_STATUS = {
+  pending: { tone: 'neutral', label: 'not claimed' },
+  invoiced: { tone: 'blue', label: 'awaiting payment' },
+  paid: { tone: 'green', label: 'paid' },
+} as const;
 
 const inputClass =
   'w-full rounded-md border border-zinc-200 bg-transparent px-2.5 py-1.5 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
@@ -164,7 +168,7 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="tabular-nums">{formatUsd(l.amountCents)}</span>
-                    <Badge tone={PAY_TONE[l.status]}>{l.status}</Badge>
+                    <Badge tone={PAY_STATUS[l.status].tone}>{PAY_STATUS[l.status].label}</Badge>
                   </div>
                 </li>
               ))}

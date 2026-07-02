@@ -492,6 +492,50 @@ export async function markPaymentPaid(formData: FormData) {
   if (error) throw new Error(error.message);
   await logActivity(supabase, task, user.id, 'payment', 'Recorded a contractor payment');
   revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
+  revalidatePath('/payments');
+}
+
+/** Contractor raises a progress claim against their own pending draw
+ *  ('pending' → 'invoiced'). The DB function enforces that only the assignee
+ *  can claim, and only a pending draw. */
+export async function submitPaymentClaim(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const scheduleId = String(formData.get('scheduleId') ?? '');
+  const taskId = String(formData.get('taskId') ?? '');
+  const note = (formData.get('note') as string)?.trim() || '';
+  if (!scheduleId) throw new Error('Missing draw');
+
+  const { error } = await supabase.rpc('submit_payment_claim', {
+    p_schedule_id: scheduleId,
+    p_note: note,
+  });
+  if (error) throw new Error(error.message);
+
+  const task = taskId ? await loadTask(supabase, taskId) : null;
+  if (task) {
+    await logActivity(supabase, task, user.id, 'payment', 'Submitted a payment claim');
+    revalidatePath(`/projects/${task.project_id}/tasks/${task.id}`);
+  }
+  revalidatePath('/payments');
+}
+
+/** Finance/PM sends a claim back ('invoiced' → 'pending'). The DB function
+ *  enforces that only finance or the project PM may reject. */
+export async function rejectPaymentClaim(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const scheduleId = String(formData.get('scheduleId') ?? '');
+  const taskId = String(formData.get('taskId') ?? '');
+  if (!scheduleId) throw new Error('Missing draw');
+
+  const { error } = await supabase.rpc('reject_payment_claim', { p_schedule_id: scheduleId });
+  if (error) throw new Error(error.message);
+
+  const task = taskId ? await loadTask(supabase, taskId) : null;
+  if (task) {
+    await logActivity(supabase, task, user.id, 'payment', 'Rejected a payment claim');
+    revalidatePath(`/projects/${task.project_id}/tasks/${task.id}`);
+  }
+  revalidatePath('/payments');
 }
 
 /* ── Task media (evidence, quotes) ───────────────────────────────────────── */

@@ -13,6 +13,8 @@ export interface PaymentLine {
   paidAt: string | null;
   paidReference: string | null;
   dueDate: string | null;
+  claimedAt: string | null;
+  claimNote: string | null;
 }
 
 export interface PaymentSummary {
@@ -21,7 +23,8 @@ export interface PaymentSummary {
   outstandingCents: number;
 }
 
-const COLUMNS = 'id, task_id, name, kind, amount_cents, status, paid_at, paid_reference, due_date';
+const COLUMNS =
+  'id, task_id, name, kind, amount_cents, status, paid_at, paid_reference, due_date, claimed_at, claim_note';
 
 function toLine(r: RawLine, taskTitle: string | null): PaymentLine {
   return {
@@ -35,6 +38,8 @@ function toLine(r: RawLine, taskTitle: string | null): PaymentLine {
     paidAt: r.paid_at,
     paidReference: r.paid_reference,
     dueDate: r.due_date,
+    claimedAt: r.claimed_at,
+    claimNote: r.claim_note,
   };
 }
 
@@ -48,6 +53,8 @@ interface RawLine {
   paid_at: string | null;
   paid_reference: string | null;
   due_date: string | null;
+  claimed_at: string | null;
+  claim_note: string | null;
 }
 
 /** Payment draws for one task. RLS: staff, the project PM, and the assigned
@@ -90,4 +97,72 @@ export async function listProjectPayments(
     lines,
     summary: { committedCents, paidCents, outstandingCents: committedCents - paidCents },
   };
+}
+
+export interface MyPaymentLine extends PaymentLine {
+  projectId: string;
+  projectName: string;
+}
+
+export interface MyPaymentsSummary {
+  earnedCents: number;
+  claimedCents: number;
+  paidCents: number;
+  outstandingCents: number;
+}
+
+/** The signed-in contractor's own draws across every project — their earnings
+ *  view. Scoped to tasks assigned to them (staff/PM would otherwise see all
+ *  draws under RLS). earned = every draw; claimed = awaiting payment;
+ *  paid = settled; outstanding = earned − paid. */
+export async function listMyPayments(
+  userId: string,
+): Promise<{ lines: MyPaymentLine[]; summary: MyPaymentsSummary }> {
+  const supabase = await createClient();
+
+  const { data: myTasks } = await supabase
+    .from('tasks')
+    .select('id, title, project_id')
+    .eq('assignee_id', userId);
+  const tasks = (myTasks ?? []) as { id: string; title: string; project_id: string }[];
+  if (tasks.length === 0) {
+    return { lines: [], summary: { earnedCents: 0, claimedCents: 0, paidCents: 0, outstandingCents: 0 } };
+  }
+
+  const taskMeta = new Map(tasks.map((t) => [t.id, t]));
+  const { data: drawRows } = await supabase
+    .from('payment_schedule')
+    .select(`${COLUMNS}, project_id`)
+    .in(
+      'task_id',
+      tasks.map((t) => t.id),
+    )
+    .order('created_at', { ascending: false });
+  const rows = (drawRows ?? []) as (RawLine & { project_id: string })[];
+
+  const projectIds = [...new Set(rows.map((r) => r.project_id))];
+  let projectNames = new Map<string, string>();
+  if (projectIds.length > 0) {
+    const { data: projects } = await supabase.from('projects').select('id, name').in('id', projectIds);
+    projectNames = new Map(((projects ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name]));
+  }
+
+  const lines: MyPaymentLine[] = rows.map((r) => ({
+    ...toLine(r, r.task_id ? taskMeta.get(r.task_id)?.title ?? null : null),
+    projectId: r.project_id,
+    projectName: projectNames.get(r.project_id) ?? 'Project',
+  }));
+
+  const summary = lines.reduce(
+    (acc, l) => {
+      acc.earnedCents += l.amountCents;
+      if (l.status === 'paid') acc.paidCents += l.amountCents;
+      if (l.status === 'invoiced') acc.claimedCents += l.amountCents;
+      return acc;
+    },
+    { earnedCents: 0, claimedCents: 0, paidCents: 0, outstandingCents: 0 },
+  );
+  summary.outstandingCents = summary.earnedCents - summary.paidCents;
+
+  return { lines, summary };
 }

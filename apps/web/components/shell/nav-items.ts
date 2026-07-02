@@ -4,6 +4,7 @@ import {
   Users,
   CheckSquare,
   DollarSign,
+  Wallet,
   FileText,
   MessageSquare,
   type IconComponent,
@@ -44,6 +45,7 @@ export function computeNav(
   return [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'All projects', href: '/projects', icon: FolderOpen },
+    { name: 'My payments', href: '/payments', icon: Wallet },
     ...(canViewFinance ? [{ name: 'Finance', href: '/finance', icon: DollarSign }] : []),
     ...(canCreate ? [{ name: 'Members', href: '/org/members', icon: Users }] : []),
   ];

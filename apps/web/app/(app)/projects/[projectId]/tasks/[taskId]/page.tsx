@@ -293,7 +293,9 @@ export default async function TaskDetailPage({
       key: 'payments',
       label: 'Payments',
       count: payments.length,
-      content: <PaymentsPanel taskId={taskId} lines={payments} canManage={canManage} />,
+      content: (
+        <PaymentsPanel taskId={taskId} lines={payments} canManage={canManage} isAssignee={isAssignee} />
+      ),
     });
   }
 
