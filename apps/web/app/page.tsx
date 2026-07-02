@@ -1,8 +1,16 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
 import { Button } from '@/components/ui/button';
 
-/** Minimal public landing — the real marketing site can replace this later. */
-export default function HomePage() {
+/** Public landing. Signed-in users skip straight to their dashboard. */
+export default async function HomePage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user) redirect('/dashboard');
+
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col items-center justify-center gap-6 px-6 text-center">
       <div>

@@ -4,9 +4,17 @@ import './globals.css';
 import { ServiceWorkerRegister } from '@/components/pwa/sw-register';
 
 export const metadata: Metadata = {
-  title: 'DatumPro',
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
+  title: { default: 'DatumPro', template: '%s · DatumPro' },
   description: 'Universal project management with remote monitoring & finance. By Grafaid Engineers.',
   applicationName: 'DatumPro',
+  openGraph: {
+    title: 'DatumPro',
+    description: 'Remote project monitoring, approvals, and finance — from one source of truth.',
+    siteName: 'DatumPro',
+    type: 'website',
+    images: ['/icon-512.png'],
+  },
   manifest: '/manifest.webmanifest',
   appleWebApp: { capable: true, title: 'DatumPro', statusBarStyle: 'black-translucent' },
   icons: {
