@@ -7,7 +7,9 @@ import { supabase } from './supabase';
 /** Show notifications while the app is foregrounded. */
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    // SDK 54 split shouldShowAlert into banner + list.
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
   }),
