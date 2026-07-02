@@ -1,0 +1,121 @@
+'use client';
+
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { ORG_ROLES, PROJECT_ROLES } from '@datumpro/shared/access';
+import { updateOrgMemberRole, removeOrgMember, assignMemberToProject } from '@/app/(app)/org/members/actions';
+
+const inputClass =
+  'rounded-md border border-zinc-200 bg-transparent px-2 py-1 text-xs outline-none focus:border-brand-500 dark:border-zinc-800';
+
+// Owner is transferred, not assigned — keep it out of the editable options.
+const ASSIGNABLE_ORG_ROLES = ORG_ROLES.filter((r) => r !== 'owner');
+
+interface Member {
+  userId: string;
+  name: string;
+  email: string | null;
+  role: string;
+}
+
+export function MembersRoster({
+  orgId,
+  members,
+  projects,
+  meId,
+  isAdmin,
+}: {
+  orgId: string;
+  members: Member[];
+  projects: { id: string; name: string }[];
+  meId: string;
+  isAdmin: boolean;
+}) {
+  return (
+    <div className="space-y-2">
+      {members.map((m) => {
+        const isSelf = m.userId === meId;
+        const editable = isAdmin && !isSelf && m.role !== 'owner';
+        return (
+          <Card key={m.userId}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">
+                  {m.name}
+                  {isSelf && <span className="text-zinc-400"> · you</span>}
+                </p>
+                {m.email && <p className="truncate text-xs text-zinc-500">{m.email}</p>}
+              </div>
+
+              <div className="flex items-center gap-2">
+                {editable ? (
+                  <form action={updateOrgMemberRole}>
+                    <input type="hidden" name="orgId" value={orgId} />
+                    <input type="hidden" name="userId" value={m.userId} />
+                    <select
+                      name="role"
+                      defaultValue={m.role}
+                      onChange={(e) => e.currentTarget.form?.requestSubmit()}
+                      className={inputClass}
+                    >
+                      {ASSIGNABLE_ORG_ROLES.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                    </select>
+                  </form>
+                ) : (
+                  <Badge tone={m.role === 'owner' ? 'amber' : m.role === 'admin' ? 'blue' : 'neutral'}>
+                    {m.role}
+                  </Badge>
+                )}
+                {editable && (
+                  <form action={removeOrgMember}>
+                    <input type="hidden" name="orgId" value={orgId} />
+                    <input type="hidden" name="userId" value={m.userId} />
+                    <Button type="submit" variant="ghost">
+                      Remove
+                    </Button>
+                  </form>
+                )}
+              </div>
+            </div>
+
+            {isAdmin && projects.length > 0 && (
+              <details className="mt-2 border-t border-zinc-100 pt-2 dark:border-zinc-800">
+                <summary className="cursor-pointer text-xs text-brand-600 hover:underline">
+                  Assign to a project
+                </summary>
+                <form action={assignMemberToProject} className="mt-2 flex flex-wrap items-center gap-2">
+                  <input type="hidden" name="userId" value={m.userId} />
+                  <select name="projectId" required defaultValue="" className={inputClass}>
+                    <option value="" disabled>
+                      Project…
+                    </option>
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                  <select name="projectRole" defaultValue="contractor" className={inputClass}>
+                    {PROJECT_ROLES.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
+                  </select>
+                  <Button type="submit" variant="secondary">
+                    Assign
+                  </Button>
+                </form>
+              </details>
+            )}
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
