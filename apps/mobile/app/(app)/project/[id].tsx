@@ -91,6 +91,19 @@ export default function ProjectScreen() {
                 )}
                 <Ionicons name="chevron-forward" size={16} color={theme.color.subtle} style={{ marginLeft: 'auto' }} />
               </Pressable>
+              <Pressable
+                style={styles.teamChat}
+                onPress={() =>
+                  router.push({
+                    pathname: '/(app)/variations/[projectId]',
+                    params: { projectId: String(id), name: name ?? '' },
+                  })
+                }
+              >
+                <Ionicons name="git-compare-outline" size={18} color={theme.color.accent} />
+                <Text style={styles.teamChatText}>Change orders</Text>
+                <Ionicons name="chevron-forward" size={16} color={theme.color.subtle} style={{ marginLeft: 'auto' }} />
+              </Pressable>
               {tasks.length > 0 && <Text style={styles.count}>{tasks.length} tasks</Text>}
             </View>
           }
