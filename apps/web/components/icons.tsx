@@ -209,6 +209,13 @@ export const DollarSign: IconComponent = (p) => (
   </Icon>
 );
 
+export const MapPin: IconComponent = (p) => (
+  <Icon {...p}>
+    <path d="M20 10c0 4.4-8 12-8 12s-8-7.6-8-12a8 8 0 0 1 16 0Z" />
+    <circle cx="12" cy="10" r="3" />
+  </Icon>
+);
+
 export const Building: IconComponent = (p) => (
   <Icon {...p}>
     <rect width="16" height="20" x="4" y="2" rx="2" />

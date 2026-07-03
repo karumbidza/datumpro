@@ -27,6 +27,8 @@ export interface TaskMediaRow {
   storagePath: string;
   url: string | null;
   uploaderName: string | null;
+  gpsLat: number | null;
+  gpsLng: number | null;
 }
 
 /** Batch-resolve display names for a set of user ids in one query. */
@@ -105,7 +107,7 @@ export async function listTaskMedia(taskId: string, purpose?: string): Promise<T
   const supabase = await createClient();
   let query = supabase
     .from('task_media')
-    .select('id, kind, purpose, caption, storage_path, uploaded_by')
+    .select('id, kind, purpose, caption, storage_path, uploaded_by, gps_lat, gps_lng')
     .eq('task_id', taskId)
     .order('created_at', { ascending: true });
   if (purpose) query = query.eq('purpose', purpose);
@@ -117,6 +119,8 @@ export async function listTaskMedia(taskId: string, purpose?: string): Promise<T
     caption: string | null;
     storage_path: string;
     uploaded_by: string | null;
+    gps_lat: number | null;
+    gps_lng: number | null;
   }[];
 
   const names = await nameMap(rows.map((r) => r.uploaded_by));
@@ -130,6 +134,8 @@ export async function listTaskMedia(taskId: string, purpose?: string): Promise<T
     storagePath: r.storage_path,
     url: urls.get(r.storage_path) ?? null,
     uploaderName: r.uploaded_by ? names.get(r.uploaded_by) ?? null : null,
+    gpsLat: r.gps_lat,
+    gpsLng: r.gps_lng,
   }));
 }
 
