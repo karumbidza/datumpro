@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { getTask, getTaskPermissions, type TaskDetail, type TaskPermissions } from '../../../lib/data/tasks';
 import { getTaskConversationId, getUnreadCount } from '../../../lib/data/chat';
 import { TaskPhotos } from '../../../components/task-photos';
+import { TaskExtensions } from '../../../components/task-extensions';
 import { TaskActions } from '../../../components/task-actions';
 import { Card, Pill, ProgressBar } from '../../../components/ui';
 import { formatDate, slaLabel, statusLabel } from '../../../lib/ui';
@@ -102,6 +103,18 @@ export default function TaskDetailScreen() {
       <Card>
         <TaskPhotos orgId={task.orgId} projectId={task.projectId} taskId={task.id} />
       </Card>
+
+      {perms && (
+        <Card>
+          <TaskExtensions
+            taskId={task.id}
+            orgId={task.orgId}
+            projectId={task.projectId}
+            isAssignee={perms.isAssignee}
+            canManage={perms.canManage}
+          />
+        </Card>
+      )}
     </ScrollView>
   );
 }
