@@ -22,18 +22,29 @@ export interface HomeData {
   myAtRisk: number;
 }
 
-export interface PendingSignoff {
-  id: string;
+export type ApprovalKind = 'signoff' | 'extension' | 'variation';
+
+export interface PendingApproval {
+  key: string;
+  kind: ApprovalKind;
   title: string;
+  detail: string;
   projectName: string;
-  assigneeName: string;
+  taskId: string | null;
+  projectId: string;
 }
 
-/** Tasks awaiting the current user's sign-off — submitted tasks on projects
- *  where they're the project PM, plus every submitted task in orgs where they're
- *  owner/admin. Mirrors can_manage_project; each row deep-links to the task,
- *  where Approve/Reject already live. Empty for pure field users. */
-export async function listPendingSignoffs(): Promise<PendingSignoff[]> {
+function impactLabel(cents: number, days: number): string {
+  const parts: string[] = [];
+  if (cents !== 0) parts.push(`${cents > 0 ? '+' : '−'}$${(Math.abs(cents) / 100).toLocaleString()}`);
+  if (days !== 0) parts.push(`${days > 0 ? '+' : '−'}${Math.abs(days)}d`);
+  return parts.length ? parts.join(' · ') : 'no cost/time change';
+}
+
+/** Every decision waiting on the current user — task sign-offs, extension
+ *  requests and submitted variations — on the projects they manage (project PM,
+ *  or every project in orgs where they're owner/admin). Empty for field users. */
+export async function listPendingApprovals(): Promise<PendingApproval[]> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -42,12 +53,7 @@ export async function listPendingSignoffs(): Promise<PendingSignoff[]> {
 
   const [{ data: pmRows }, { data: adminRows }] = await Promise.all([
     supabase.from('project_members').select('project_id').eq('user_id', me).eq('role', 'pm'),
-    supabase
-      .from('org_members')
-      .select('org_id')
-      .eq('user_id', me)
-      .eq('status', 'active')
-      .in('role', ['owner', 'admin']),
+    supabase.from('org_members').select('org_id').eq('user_id', me).eq('status', 'active').in('role', ['owner', 'admin']),
   ]);
   const pmProjects = ((pmRows ?? []) as { project_id: string }[]).map((r) => r.project_id);
   const adminOrgs = ((adminRows ?? []) as { org_id: string }[]).map((r) => r.org_id);
@@ -56,40 +62,71 @@ export async function listPendingSignoffs(): Promise<PendingSignoff[]> {
   const ors: string[] = [];
   if (pmProjects.length) ors.push(`project_id.in.(${pmProjects.join(',')})`);
   if (adminOrgs.length) ors.push(`org_id.in.(${adminOrgs.join(',')})`);
+  const or = ors.join(',');
 
-  const { data } = await supabase
-    .from('tasks')
-    .select('id, title, project_id, assignee_id')
-    .eq('status', 'submitted')
-    .or(ors.join(','))
-    .order('submitted_at', { ascending: true });
-  const rows = (data ?? []) as {
-    id: string;
-    title: string;
-    project_id: string;
-    assignee_id: string | null;
-  }[];
-  if (rows.length === 0) return [];
-
-  const projectIds = [...new Set(rows.map((r) => r.project_id))];
-  const userIds = [...new Set(rows.map((r) => r.assignee_id).filter(Boolean))] as string[];
-  const [{ data: projs }, profsRes] = await Promise.all([
-    supabase.from('projects').select('id, name').in('id', projectIds),
-    userIds.length
-      ? supabase.from('profiles').select('id, display_name').in('id', userIds)
-      : Promise.resolve({ data: [] as { id: string; display_name: string | null }[] }),
+  const [tasksRes, extRes, varRes] = await Promise.all([
+    supabase.from('tasks').select('id, title, project_id, assignee_id, submitted_at').eq('status', 'submitted').or(or),
+    supabase
+      .from('task_extension_requests')
+      .select('id, task_id, project_id, proposed_due_date, requested_by, created_at')
+      .eq('status', 'pending')
+      .or(or),
+    supabase
+      .from('variation_orders')
+      .select('id, project_id, description, cost_impact_cents, time_impact_days, created_by, created_at')
+      .eq('status', 'submitted')
+      .or(or),
   ]);
-  const pName = new Map(((projs ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name]));
-  const uName = new Map(
-    ((profsRes.data ?? []) as { id: string; display_name: string | null }[]).map((u) => [u.id, u.display_name]),
-  );
+  const tasks = (tasksRes.data ?? []) as { id: string; title: string; project_id: string; assignee_id: string | null; submitted_at: string | null }[];
+  const exts = (extRes.data ?? []) as { id: string; task_id: string; project_id: string; proposed_due_date: string; requested_by: string | null; created_at: string }[];
+  const vars = (varRes.data ?? []) as { id: string; project_id: string; description: string; cost_impact_cents: number; time_impact_days: number; created_by: string | null; created_at: string }[];
+  if (tasks.length === 0 && exts.length === 0 && vars.length === 0) return [];
 
-  return rows.map((r) => ({
-    id: r.id,
-    title: r.title,
-    projectName: pName.get(r.project_id) ?? 'Project',
-    assigneeName: r.assignee_id ? uName.get(r.assignee_id) ?? 'Someone' : 'Unassigned',
-  }));
+  const projectIds = [...new Set([...tasks, ...exts, ...vars].map((r) => r.project_id))];
+  const extTaskIds = [...new Set(exts.map((e) => e.task_id))];
+  const userIds = [
+    ...new Set([...tasks.map((t) => t.assignee_id), ...exts.map((e) => e.requested_by), ...vars.map((v) => v.created_by)].filter(Boolean)),
+  ] as string[];
+
+  const [projsRes, extTasksRes, profsRes] = await Promise.all([
+    supabase.from('projects').select('id, name').in('id', projectIds),
+    extTaskIds.length ? supabase.from('tasks').select('id, title').in('id', extTaskIds) : Promise.resolve({ data: [] as { id: string; title: string }[] }),
+    userIds.length ? supabase.from('profiles').select('id, display_name').in('id', userIds) : Promise.resolve({ data: [] as { id: string; display_name: string | null }[] }),
+  ]);
+  const pName = new Map(((projsRes.data ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name]));
+  const tTitle = new Map(((extTasksRes.data ?? []) as { id: string; title: string }[]).map((t) => [t.id, t.title]));
+  const uName = new Map(((profsRes.data ?? []) as { id: string; display_name: string | null }[]).map((u) => [u.id, u.display_name ?? 'Someone']));
+
+  const items: PendingApproval[] = [
+    ...tasks.map((t) => ({
+      key: `s:${t.id}`,
+      kind: 'signoff' as const,
+      title: t.title,
+      detail: `${t.assignee_id ? uName.get(t.assignee_id) ?? 'Someone' : 'Unassigned'} · submitted for sign-off`,
+      projectName: pName.get(t.project_id) ?? 'Project',
+      taskId: t.id,
+      projectId: t.project_id,
+    })),
+    ...exts.map((e) => ({
+      key: `e:${e.id}`,
+      kind: 'extension' as const,
+      title: tTitle.get(e.task_id) ?? 'Task',
+      detail: `New due ${e.proposed_due_date}${e.requested_by ? ` · ${uName.get(e.requested_by) ?? 'Someone'}` : ''}`,
+      projectName: pName.get(e.project_id) ?? 'Project',
+      taskId: e.task_id,
+      projectId: e.project_id,
+    })),
+    ...vars.map((v) => ({
+      key: `v:${v.id}`,
+      kind: 'variation' as const,
+      title: v.description,
+      detail: `${impactLabel(v.cost_impact_cents, v.time_impact_days)}${v.created_by ? ` · ${uName.get(v.created_by) ?? 'Someone'}` : ''}`,
+      projectName: pName.get(v.project_id) ?? 'Project',
+      taskId: null,
+      projectId: v.project_id,
+    })),
+  ];
+  return items;
 }
 
 /** One round-trip of everything the Home dashboard needs. RLS scopes the rows to

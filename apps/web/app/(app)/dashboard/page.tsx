@@ -7,7 +7,7 @@ import { getDashboardData } from '@/lib/data/dashboard';
 import { getPortfolioData } from '@/lib/data/portfolio';
 import {
   homePersona,
-  listPendingSignoffs,
+  listPendingApprovals,
   listMyOpenTasks,
   listManagedProjects,
 } from '@/lib/data/home';
@@ -50,9 +50,9 @@ export default async function DashboardPage() {
   const { active } = ctx;
   const canCreate = can(active.role, 'project:create');
   const persona = homePersona(active.role);
-  const [displayName, signoffs] = await Promise.all([
+  const [displayName, approvals] = await Promise.all([
     resolveDisplayName(ctx.userId, ctx.email),
-    listPendingSignoffs(active.orgId, ctx.userId, active.role),
+    listPendingApprovals(active.orgId, ctx.userId, active.role),
   ]);
 
   const newProject = canCreate ? (
@@ -74,7 +74,7 @@ export default async function DashboardPage() {
           subtitle={`Here's what's happening across ${active.name} today · ${formatLongDate(new Date())}`}
           action={newProject}
         />
-        {signoffs.length > 0 && <ApprovalsInbox items={signoffs} />}
+        {approvals.length > 0 && <ApprovalsInbox items={approvals} />}
         <InsightBanner counts={counts} />
         <KpiRow kpis={portfolio.kpis} />
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -103,7 +103,7 @@ export default async function DashboardPage() {
           subtitle={`Your delivery overview · ${formatLongDate(new Date())}`}
           action={newProject}
         />
-        {signoffs.length > 0 && <ApprovalsInbox items={signoffs} />}
+        {approvals.length > 0 && <ApprovalsInbox items={approvals} />}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <ManagedProjectsCard projects={managed} />
           <MyTasksCard tasks={myTasks} />
@@ -121,7 +121,7 @@ export default async function DashboardPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-6 py-8">
       <Greeting name={displayName} subtitle={`Here's your work today · ${formatLongDate(new Date())}`} />
-      {signoffs.length > 0 && <ApprovalsInbox items={signoffs} />}
+      {approvals.length > 0 && <ApprovalsInbox items={approvals} />}
       <MyTasksCard tasks={myTasks} />
       {hasPay && (
         <Card>

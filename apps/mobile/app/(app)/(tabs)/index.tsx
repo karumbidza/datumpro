@@ -5,21 +5,32 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import {
   getHomeData,
-  listPendingSignoffs,
+  listPendingApprovals,
   type HomeData,
-  type PendingSignoff,
+  type PendingApproval,
 } from '../../../lib/data/home';
 import { Card, ProgressBar, StatTile, Avatar } from '../../../components/ui';
 import { theme, contentWidth } from '../../../lib/theme';
 
+const KIND_LABEL: Record<PendingApproval['kind'], string> = {
+  signoff: 'Sign-off',
+  extension: 'Extension',
+  variation: 'Variation',
+};
+const KIND_COLOR: Record<PendingApproval['kind'], string> = {
+  signoff: '#3b82f6',
+  extension: theme.color.warning,
+  variation: '#8b5cf6',
+};
+
 export default function Home() {
   const router = useRouter();
   const [data, setData] = useState<HomeData | null>(null);
-  const [signoffs, setSignoffs] = useState<PendingSignoff[]>([]);
+  const [signoffs, setSignoffs] = useState<PendingApproval[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    const [home, pending] = await Promise.all([getHomeData(), listPendingSignoffs()]);
+    const [home, pending] = await Promise.all([getHomeData(), listPendingApprovals()]);
     setData(home);
     setSignoffs(pending);
     setRefreshing(false);
@@ -87,27 +98,39 @@ export default function Home() {
           <StatTile label="Overdue" value={data?.myOverdue ?? 0} accent={theme.color.danger} />
         </View>
 
-        {/* Awaiting your sign-off (managers only; empty for field users) */}
+        {/* Awaiting your approval (managers only; empty for field users) */}
         {signoffs.length > 0 && (
           <>
             <View style={styles.sectionHead}>
-              <Text style={styles.sectionTitle}>Awaiting your sign-off</Text>
+              <Text style={styles.sectionTitle}>Awaiting your approval</Text>
               <View style={styles.approvalCount}>
                 <Text style={styles.approvalCountText}>{signoffs.length}</Text>
               </View>
             </View>
             <View style={{ gap: 10 }}>
-              {signoffs.map((s) => (
-                <Pressable key={s.id} onPress={() => router.push(`/(app)/task/${s.id}`)}>
+              {signoffs.map((a) => (
+                <Pressable
+                  key={a.key}
+                  onPress={() =>
+                    a.taskId
+                      ? router.push(`/(app)/task/${a.taskId}`)
+                      : router.push({ pathname: '/(app)/variations/[projectId]', params: { projectId: a.projectId, name: a.projectName } })
+                  }
+                >
                   <Card>
                     <View style={styles.approvalRow}>
-                      <View style={styles.approvalDot} />
+                      <View style={[styles.approvalDot, { backgroundColor: KIND_COLOR[a.kind] }]} />
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.projName} numberOfLines={1}>
-                          {s.title}
-                        </Text>
-                        <Text style={styles.projMeta}>
-                          {s.projectName} · {s.assigneeName}
+                        <View style={styles.approvalTitleRow}>
+                          <View style={[styles.kindChip, { backgroundColor: KIND_COLOR[a.kind] + '22' }]}>
+                            <Text style={[styles.kindChipText, { color: KIND_COLOR[a.kind] }]}>{KIND_LABEL[a.kind]}</Text>
+                          </View>
+                          <Text style={styles.projName} numberOfLines={1}>
+                            {a.title}
+                          </Text>
+                        </View>
+                        <Text style={styles.projMeta} numberOfLines={1}>
+                          {a.projectName} · {a.detail}
                         </Text>
                       </View>
                       <Ionicons name="chevron-forward" size={16} color={theme.color.subtle} />
@@ -222,6 +245,9 @@ const styles = StyleSheet.create({
   approvalCountText: { fontSize: 12, fontWeight: '700', color: theme.color.warning },
   approvalRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   approvalDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.color.warning },
+  approvalTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  kindChip: { borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1 },
+  kindChipText: { fontSize: 10, fontWeight: '700' },
   viewTasks: {
     flexDirection: 'row',
     alignItems: 'center',
