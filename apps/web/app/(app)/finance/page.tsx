@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getActiveContext } from '@/lib/data/org';
 import { can } from '@datumpro/shared/access';
-import { orgFinanceOverview } from '@/lib/data/finance-portfolio';
+import { orgFinanceOverview, orgReceivablesAging } from '@/lib/data/finance-portfolio';
+import { ReceivablesAging } from '@/components/finance/receivables-aging';
 import { Card, CardTitle, CardValue } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatUsd } from '@datumpro/shared/domain';
@@ -28,7 +29,10 @@ export default async function OrgFinancePage() {
   const canView = can(ctx.active.role, 'finance:view') && ctx.active.role !== 'viewer';
   if (!canView) redirect('/dashboard');
 
-  const { totals, collectionRate, projects } = await orgFinanceOverview(ctx.active.orgId);
+  const [{ totals, collectionRate, projects }, aging] = await Promise.all([
+    orgFinanceOverview(ctx.active.orgId),
+    orgReceivablesAging(ctx.active.orgId, new Date()),
+  ]);
   const withMoney = projects.filter(
     (p) => p.budgetCents || p.invoicedCents || p.paidCents || p.costToDateCents,
   );
@@ -66,6 +70,12 @@ export default async function OrgFinancePage() {
           <CardValue>{formatUsd(totals.outstandingCents)}</CardValue>
         </Card>
       </section>
+
+      {aging.totalOutstandingCents > 0 && (
+        <section className="mt-6">
+          <ReceivablesAging aging={aging} />
+        </section>
+      )}
 
       <section className="mt-8">
         <h2 className="mb-3 text-sm font-semibold">By project</h2>

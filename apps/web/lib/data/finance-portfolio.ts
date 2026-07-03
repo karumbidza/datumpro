@@ -26,6 +26,81 @@ export interface OrgFinanceOverview {
   projects: ProjectFinanceRow[];
 }
 
+export interface AgingBucket {
+  key: string;
+  label: string;
+  cents: number;
+  count: number;
+  overdue: boolean;
+}
+
+export interface ReceivablesAging {
+  totalOutstandingCents: number;
+  overdueCents: number;
+  buckets: AgingBucket[];
+}
+
+/** Aged receivables across the org: unpaid client-invoice balances bucketed by
+ *  how far past their due date they are. Outstanding = invoice total − confirmed
+ *  payments; void invoices are excluded. `asOf` is passed in (server "today") so
+ *  the function stays deterministic. */
+export async function orgReceivablesAging(orgId: string, asOf: Date): Promise<ReceivablesAging> {
+  const supabase = await createClient();
+  const [invoicesRes, paymentsRes] = await Promise.all([
+    supabase.from('invoices').select('id, status, total_cents, due_date').eq('org_id', orgId),
+    supabase.from('payments').select('invoice_id, amount_cents, status').eq('org_id', orgId),
+  ]);
+
+  const invoices = (invoicesRes.data ?? []) as {
+    id: string;
+    status: string;
+    total_cents: number;
+    due_date: string | null;
+  }[];
+  const paidByInvoice = new Map<string, number>();
+  for (const p of (paymentsRes.data ?? []) as { invoice_id: string; amount_cents: number; status: string }[]) {
+    if (p.status !== 'confirmed') continue;
+    paidByInvoice.set(p.invoice_id, (paidByInvoice.get(p.invoice_id) ?? 0) + (p.amount_cents ?? 0));
+  }
+
+  const defs: { key: string; label: string; overdue: boolean; test: (days: number, due: boolean) => boolean }[] = [
+    { key: 'current', label: 'Not yet due', overdue: false, test: (d, due) => !due || d <= 0 },
+    { key: '1_30', label: '1–30 days', overdue: true, test: (d, due) => due && d >= 1 && d <= 30 },
+    { key: '31_60', label: '31–60 days', overdue: true, test: (d, due) => due && d >= 31 && d <= 60 },
+    { key: '61_90', label: '61–90 days', overdue: true, test: (d, due) => due && d >= 61 && d <= 90 },
+    { key: '90_plus', label: '90+ days', overdue: true, test: (d, due) => due && d > 90 },
+  ];
+  const buckets: AgingBucket[] = defs.map((d) => ({ key: d.key, label: d.label, cents: 0, count: 0, overdue: d.overdue }));
+  const asOfMs = Date.UTC(asOf.getUTCFullYear(), asOf.getUTCMonth(), asOf.getUTCDate());
+  let totalOutstandingCents = 0;
+  let overdueCents = 0;
+
+  for (const inv of invoices) {
+    if (inv.status === 'void') continue;
+    const outstanding = inv.total_cents - (paidByInvoice.get(inv.id) ?? 0);
+    if (outstanding <= 0) continue;
+    totalOutstandingCents += outstanding;
+
+    const hasDue = !!inv.due_date;
+    let days = 0;
+    if (hasDue) {
+      const due = new Date(inv.due_date as string);
+      const dueMs = Date.UTC(due.getUTCFullYear(), due.getUTCMonth(), due.getUTCDate());
+      days = Math.round((asOfMs - dueMs) / 86_400_000);
+    }
+    const def = defs.find((d) => d.test(days, hasDue));
+    if (!def) continue; // unreachable — the buckets are exhaustive
+    const bucket = buckets.find((b) => b.key === def.key);
+    if (bucket) {
+      bucket.cents += outstanding;
+      bucket.count += 1;
+    }
+    if (def.overdue) overdueCents += outstanding;
+  }
+
+  return { totalOutstandingCents, overdueCents, buckets };
+}
+
 /** Portfolio-wide money view for a single org. Four org-scoped queries — no
  *  per-project fan-out. RLS still applies, so a caller only ever aggregates
  *  rows they're allowed to read; the hub is gated to owner/admin/finance who
