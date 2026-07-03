@@ -455,7 +455,7 @@ create type public.payment_method   as enum ('paynow', 'bank_transfer', 'cash', 
 create type public.payment_status   as enum ('pending', 'confirmed', 'failed', 'refunded');
 create type public.pop_status       as enum ('submitted', 'verified', 'rejected');
 create type public.paynow_status    as enum ('created', 'sent', 'paid', 'cancelled', 'failed');
-create type public.variation_status as enum ('draft', 'approved', 'rejected');
+create type public.variation_status as enum ('draft', 'submitted', 'approved', 'rejected');
 create type public.schedule_status  as enum ('pending', 'invoiced', 'paid');
 
 -- ── Budget / Bill of Quantities ──────────────────────────────────────────────
@@ -489,6 +489,7 @@ create table public.variation_orders (
   created_by        uuid references auth.users(id) on delete set null,
   approved_by       uuid references auth.users(id) on delete set null,
   approved_at       timestamptz,
+  decided_at        timestamptz,
   created_at        timestamptz not null default now(),
   foreign key (project_id, org_id) references public.projects (id, org_id) on delete cascade
 );
@@ -1301,10 +1302,23 @@ create policy budget_lines_write on public.budget_lines for all
 drop policy if exists variation_orders_select on public.variation_orders;
 create policy variation_orders_select on public.variation_orders for select
   using ((select public.can_view_project(project_id, org_id)));
+-- A project member raises their own variation (non-managers forced to
+-- 'submitted'); only a manager decides / edits / removes.
 drop policy if exists variation_orders_write on public.variation_orders;
-create policy variation_orders_write on public.variation_orders for all
+drop policy if exists variation_orders_insert on public.variation_orders;
+create policy variation_orders_insert on public.variation_orders for insert
+  with check (
+    (select public.can_view_project(project_id, org_id))
+    and created_by = (select auth.uid())
+    and ((select public.can_manage_project(project_id, org_id)) or status = 'submitted')
+  );
+drop policy if exists variation_orders_update on public.variation_orders;
+create policy variation_orders_update on public.variation_orders for update
   using ((select public.can_manage_project(project_id, org_id)))
   with check ((select public.can_manage_project(project_id, org_id)));
+drop policy if exists variation_orders_delete on public.variation_orders;
+create policy variation_orders_delete on public.variation_orders for delete
+  using ((select public.can_manage_project(project_id, org_id)));
 
 -- ── invoices (SELECT project-aware; write stays finance-scoped) ──
 drop policy if exists invoices_select on public.invoices;
