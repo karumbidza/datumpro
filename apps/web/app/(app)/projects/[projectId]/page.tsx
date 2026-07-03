@@ -5,7 +5,10 @@ import { getProject, listMilestones, listRecentReports } from '@/lib/data/projec
 import { getDashboardData } from '@/lib/data/dashboard';
 import { getProjectSchedule } from '@/lib/data/scheduling';
 import { myOrgRole } from '@/lib/data/tasks';
+import { myProjectRole } from '@/lib/data/members';
+import { listVariations } from '@/lib/data/variations';
 import { MilestonesPanel } from '@/components/project/milestones-panel';
+import { VariationsPanel } from '@/components/project/variations-panel';
 import { StatCards } from '@/components/dashboard/stat-cards';
 import { TimelineOverview } from '@/components/dashboard/timeline-overview';
 import { ScheduleSummary } from '@/components/project/schedule-summary';
@@ -30,15 +33,20 @@ export default async function ProjectOverviewPage({
   const project = await getProject(projectId);
   if (!project) notFound();
 
-  const [{ counts, tasks }, milestones, reports, schedule, orgRole] = await Promise.all([
-    getDashboardData(project.org_id, projectId),
-    listMilestones(projectId),
-    listRecentReports(projectId),
-    getProjectSchedule(projectId),
-    myOrgRole(project.org_id),
-  ]);
+  const [{ counts, tasks }, milestones, reports, schedule, orgRole, projectRole, variations] =
+    await Promise.all([
+      getDashboardData(project.org_id, projectId),
+      listMilestones(projectId),
+      listRecentReports(projectId),
+      getProjectSchedule(projectId),
+      myOrgRole(project.org_id),
+      myProjectRole(projectId),
+      listVariations(projectId),
+    ]);
 
   const canManageMilestones = orgRole === 'owner' || orgRole === 'admin' || orgRole === 'pm';
+  // Deciding a variation mirrors can_manage_project: org admin or the project PM.
+  const canDecideVariations = orgRole === 'owner' || orgRole === 'admin' || projectRole === 'pm';
   const latestProgress = reports[0]?.progress_pct ?? 0;
 
   return (
@@ -73,6 +81,8 @@ export default async function ProjectOverviewPage({
           <span className="text-sm font-medium tabular-nums">{latestProgress}%</span>
         </div>
       </Card>
+
+      <VariationsPanel projectId={projectId} data={variations} canDecide={canDecideVariations} />
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <MilestonesPanel projectId={projectId} milestones={milestones} canManage={canManageMilestones} />
