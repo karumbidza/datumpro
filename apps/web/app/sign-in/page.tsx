@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { use, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { env } from '@/lib/env';
 import { Button } from '@/components/ui/button';
@@ -19,9 +19,18 @@ function safeNext(): string {
   return n && n.startsWith('/') && !n.startsWith('//') ? n : '/dashboard';
 }
 
-export default function SignInPage() {
+export default function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ email?: string }>;
+}) {
+  // Email carried over from an invite link (?email=), read from searchParams so
+  // it's identical on server and client (no hydration mismatch) — the invitee
+  // signs in or creates their account with the exact invited address.
+  const invited = (use(searchParams).email ?? '').trim();
   const [method, setMethod] = useState<Method>('password');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(invited);
+  const fromInvite = invited !== '';
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: 'error' | 'info'; text: string } | null>(null);
@@ -83,7 +92,17 @@ export default function SignInPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
       <Card>
-        <h1 className="text-lg font-semibold tracking-tight">Sign in to DatumPro</h1>
+        <h1 className="text-lg font-semibold tracking-tight">
+          {fromInvite ? 'Accept your invitation' : 'Sign in to DatumPro'}
+        </h1>
+
+        {fromInvite && (
+          <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+            Sign in with <span className="font-medium">{email}</span> — or, if you’re new, tap{' '}
+            <span className="font-medium">Create account</span> to set a password. Then you’ll return
+            to accept the invite.
+          </p>
+        )}
 
         <div className="mt-4 flex gap-1 rounded-md bg-zinc-100 p-1 text-sm dark:bg-zinc-800">
           <button

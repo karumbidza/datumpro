@@ -69,13 +69,15 @@ export default async function InvitePage({
             ) : (
               <div className="mt-4">
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                  Sign in with <span className="font-medium">{preview.email}</span> to accept.
+                  Continue with <span className="font-medium">{preview.email}</span> to accept. New
+                  to DatumPro? Create your account on the next screen — sign-in and sign-up both use
+                  this address.
                 </p>
                 <Link
-                  href={`/sign-in?next=${encodeURIComponent(`/invite/${token}`)}`}
+                  href={`/sign-in?next=${encodeURIComponent(`/invite/${token}`)}&email=${encodeURIComponent(preview.email)}`}
                   className="mt-3 inline-block"
                 >
-                  <Button type="button">Sign in to accept</Button>
+                  <Button type="button">Sign in or create account</Button>
                 </Link>
               </div>
             )}
