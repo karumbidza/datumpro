@@ -13,9 +13,12 @@ export function KpiRow({ kpis }: { kpis: PortfolioKpis }) {
   ];
   return (
     <Card className="p-0">
-      <div className="grid grid-cols-2 divide-zinc-100 dark:divide-zinc-800 sm:grid-cols-3 lg:grid-cols-5 lg:divide-x">
+      <div className="grid grid-cols-5">
         {cells.map((c) => (
-          <div key={c.label} className="px-5 py-4">
+          <div
+            key={c.label}
+            className="px-5 py-4 [&:not(:last-child)]:border-r [&:not(:last-child)]:border-zinc-100 dark:[&:not(:last-child)]:border-zinc-800"
+          >
             <p className="text-xs text-zinc-500 dark:text-zinc-400">{c.label}</p>
             <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{c.value}</p>
           </div>

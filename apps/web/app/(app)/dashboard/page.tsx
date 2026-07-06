@@ -14,9 +14,7 @@ import {
 import { listMyPayments } from '@/lib/data/payments';
 import { TimelineOverview } from '@/components/dashboard/timeline-overview';
 import { KpiRow } from '@/components/dashboard/kpi-row';
-import { InsightBanner } from '@/components/dashboard/insight-banner';
-import { StatusChart, ProgressTrend } from '@/components/dashboard/portfolio-charts';
-import { RecentProjectsTable, UpcomingTasksTable } from '@/components/dashboard/portfolio-tables';
+import { UpcomingTasksTable } from '@/components/dashboard/portfolio-tables';
 import { ApprovalsInbox } from '@/components/dashboard/approvals-inbox';
 import { MyTasksCard } from '@/components/dashboard/my-tasks-card';
 import { ManagedProjectsCard } from '@/components/dashboard/managed-projects-card';
@@ -63,29 +61,21 @@ export default async function DashboardPage() {
 
   // ── Portfolio home — owner / admin / finance ──────────────────────────────
   if (persona === 'portfolio') {
-    const [{ counts, tasks }, portfolio] = await Promise.all([
+    const [{ tasks }, portfolio] = await Promise.all([
       getDashboardData(active.orgId),
       getPortfolioData(active.orgId),
     ]);
     return (
-      <div className="mx-auto max-w-6xl space-y-8 px-6 py-8 xl:px-10">
+      <div className="mx-auto flex max-w-[1152px] flex-col gap-8 px-10 py-8">
         <Greeting
           name={displayName}
           subtitle={`Here's what's happening across ${active.name} today · ${formatLongDate(new Date())}`}
           action={newProject}
         />
-        {approvals.length > 0 && <ApprovalsInbox items={approvals} />}
-        <InsightBanner counts={counts} />
         <KpiRow kpis={portfolio.kpis} />
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <StatusChart data={portfolio.statusDistribution} />
-          <ProgressTrend series={portfolio.progressSeries} />
-        </div>
         <TimelineOverview tasks={tasks} />
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <UpcomingTasksTable tasks={portfolio.upcomingTasks} />
-          <RecentProjectsTable projects={portfolio.recentProjects} />
-        </div>
+        {approvals.length > 0 && <ApprovalsInbox items={approvals} />}
+        <UpcomingTasksTable tasks={portfolio.upcomingTasks} />
       </div>
     );
   }

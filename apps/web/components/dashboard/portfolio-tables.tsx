@@ -13,13 +13,6 @@ const STATUS_TONE: Record<ProjectStatus, 'neutral' | 'blue' | 'green' | 'amber'>
   archived: 'neutral',
 };
 
-const PRIORITY_TONE: Record<TaskPriority, 'neutral' | 'amber'> = {
-  urgent: 'amber',
-  high: 'amber',
-  medium: 'neutral',
-  low: 'neutral',
-};
-
 export function RecentProjectsTable({ projects }: { projects: RecentProject[] }) {
   return (
     <Card>
@@ -59,6 +52,13 @@ export function RecentProjectsTable({ projects }: { projects: RecentProject[] })
   );
 }
 
+const PRIORITY_PILL: Record<TaskPriority, string> = {
+  urgent: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
+  high: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
+  medium: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300',
+  low: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300',
+};
+
 export function UpcomingTasksTable({ tasks }: { tasks: UpcomingTask[] }) {
   return (
     <Card>
@@ -66,21 +66,25 @@ export function UpcomingTasksTable({ tasks }: { tasks: UpcomingTask[] }) {
       {tasks.length === 0 ? (
         <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">No scheduled tasks due.</p>
       ) : (
-        <ul className="mt-2 divide-y divide-zinc-100 dark:divide-zinc-800">
+        <ul className="mt-2">
           {tasks.map((t) => (
             <li key={t.id}>
               <Link
                 href={`/projects/${t.projectId}/tasks/${t.id}`}
-                className="flex items-center gap-3 py-2.5 hover:opacity-80"
+                className="flex items-center gap-3 border-b border-zinc-100 py-2.5 last:border-b-0 hover:opacity-80 dark:border-zinc-800"
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{t.title}</p>
-                  <p className="truncate text-xs text-zinc-500">
+                  <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
                     {t.projectName}
                     {t.assigneeName ? ` · ${t.assigneeName}` : ''}
                   </p>
                 </div>
-                <Badge tone={PRIORITY_TONE[t.priority]}>{t.priority}</Badge>
+                <span
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${PRIORITY_PILL[t.priority]}`}
+                >
+                  {t.priority}
+                </span>
                 <span className="w-24 text-right text-xs tabular-nums text-zinc-400">{t.dueDate}</span>
               </Link>
             </li>
