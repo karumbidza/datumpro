@@ -26,3 +26,6 @@ coverage/
 packages/shared/package-lock.json
 apps/web/next-env.d.ts
 .vercel
+
+# design handoff reference material (not app code)
+design_handoff_datumpro_ui/
