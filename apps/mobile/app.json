@@ -18,7 +18,22 @@
       ],
       "expo-notifications"
     ],
-    "ios": { "supportsTablet": true },
-    "android": { "package": "app.datumpro.field" }
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.datumpro.field"
+    },
+    "android": {
+      "package": "app.datumpro.field",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "9d368953-219f-4c93-a18b-a4cc1400ad26"
+      }
+    },
+    "owner": "a.karu"
   }
 }
