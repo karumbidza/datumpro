@@ -25,3 +25,4 @@ coverage/
 .expo/
 packages/shared/package-lock.json
 apps/web/next-env.d.ts
+.vercel
