@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { getActiveContext } from '@/lib/data/org';
 import { listProjects } from '@/lib/data/projects';
 import { listOrgMembers, listPendingInvitations } from '@/lib/data/org-members';
-import { inviteMember, revokeInvitation } from './actions';
+import { inviteMember, revokeInvitation, resendInvitation } from './actions';
 import { MembersRoster } from '@/components/org/members-roster';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -83,12 +83,20 @@ export default async function OrgMembersPage() {
                       invited as {inv.role} · {new Date(inv.createdAt).toLocaleDateString('en-GB')}
                     </p>
                   </div>
-                  <form action={revokeInvitation}>
-                    <input type="hidden" name="invitationId" value={inv.id} />
-                    <Button type="submit" variant="ghost">
-                      Revoke
-                    </Button>
-                  </form>
+                  <div className="flex items-center gap-1">
+                    <form action={resendInvitation}>
+                      <input type="hidden" name="invitationId" value={inv.id} />
+                      <Button type="submit" variant="secondary">
+                        Resend
+                      </Button>
+                    </form>
+                    <form action={revokeInvitation}>
+                      <input type="hidden" name="invitationId" value={inv.id} />
+                      <Button type="submit" variant="ghost">
+                        Revoke
+                      </Button>
+                    </form>
+                  </div>
                 </div>
               </Card>
             ))}
