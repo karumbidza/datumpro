@@ -176,3 +176,46 @@ export async function revokeInvitation(formData: FormData) {
   if (error) throw new Error(error.message);
   revalidatePath('/org/members');
 }
+
+/** Re-send the invite email for an existing pending invitation, reusing its
+ *  token (no new token, no status change). Admin-only (RLS on org_invitations).
+ *  Email is best-effort — sends only if Resend is configured. */
+export async function resendInvitation(formData: FormData) {
+  const invitationId = String(formData.get('invitationId') ?? '');
+  if (!invitationId) throw new Error('Missing invitation');
+  const supabase = await createClient();
+
+  const { data, error: readErr } = await supabase
+    .from('org_invitations')
+    .select('org_id, email, role, token, status')
+    .eq('id', invitationId)
+    .maybeSingle();
+  if (readErr) throw new Error(readErr.message);
+  const inv = data as
+    | { org_id: string; email: string; role: string; token: string; status: string }
+    | null;
+  if (!inv || inv.status !== 'pending') throw new Error('No pending invitation to resend.');
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const [{ data: org }, { data: inviter }] = await Promise.all([
+    supabase.from('organizations').select('name').eq('id', inv.org_id).single(),
+    user
+      ? supabase.from('profiles').select('display_name, email').eq('id', user.id).single()
+      : Promise.resolve({ data: null }),
+  ]);
+  const inviterName =
+    (inviter as { display_name?: string; email?: string } | null)?.display_name ||
+    (inviter as { email?: string } | null)?.email ||
+    'A teammate';
+  const { subject, html } = inviteEmail({
+    orgName: (org as { name?: string } | null)?.name ?? 'DatumPro',
+    inviterName,
+    role: inv.role as OrgRole,
+    acceptUrl: `${appUrl()}/invite/${inv.token}`,
+  });
+  await sendEmail({ to: inv.email, subject, html });
+
+  revalidatePath('/org/members');
+}
