@@ -4,7 +4,13 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ORG_ROLES, PROJECT_ROLES } from '@datumpro/shared/access';
-import { updateOrgMemberRole, removeOrgMember, assignMemberToProject } from '@/app/(app)/org/members/actions';
+import {
+  updateOrgMemberRole,
+  removeOrgMember,
+  assignMemberToProject,
+  deactivateOrgMember,
+  reactivateOrgMember,
+} from '@/app/(app)/org/members/actions';
 
 const inputClass =
   'rounded-md border border-zinc-200 bg-transparent px-2 py-1 text-xs outline-none focus:border-brand-500 dark:border-zinc-800';
@@ -17,6 +23,7 @@ interface Member {
   name: string;
   email: string | null;
   role: string;
+  status: 'active' | 'disabled';
 }
 
 export function MembersRoster({
@@ -37,8 +44,9 @@ export function MembersRoster({
       {members.map((m) => {
         const isSelf = m.userId === meId;
         const editable = isAdmin && !isSelf && m.role !== 'owner';
+        const disabled = m.status === 'disabled';
         return (
-          <Card key={m.userId}>
+          <Card key={m.userId} className={disabled ? 'opacity-60' : undefined}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">
@@ -49,7 +57,7 @@ export function MembersRoster({
               </div>
 
               <div className="flex items-center gap-2">
-                {editable ? (
+                {editable && !disabled ? (
                   <form action={updateOrgMemberRole}>
                     <input type="hidden" name="orgId" value={orgId} />
                     <input type="hidden" name="userId" value={m.userId} />
@@ -71,19 +79,51 @@ export function MembersRoster({
                     {m.role}
                   </Badge>
                 )}
-                {editable && (
-                  <form action={removeOrgMember}>
+
+                {disabled && <Badge tone="neutral">disabled</Badge>}
+
+                {editable && !disabled && (
+                  <>
+                    <form action={deactivateOrgMember}>
+                      <input type="hidden" name="orgId" value={orgId} />
+                      <input type="hidden" name="userId" value={m.userId} />
+                      <Button type="submit" variant="ghost">
+                        Deactivate
+                      </Button>
+                    </form>
+                    <form
+                      action={removeOrgMember}
+                      onSubmit={(e) => {
+                        if (
+                          !window.confirm(
+                            'Remove this member permanently? This deletes their membership and history. Consider Deactivate instead.',
+                          )
+                        )
+                          e.preventDefault();
+                      }}
+                    >
+                      <input type="hidden" name="orgId" value={orgId} />
+                      <input type="hidden" name="userId" value={m.userId} />
+                      <Button type="submit" variant="ghost">
+                        Remove
+                      </Button>
+                    </form>
+                  </>
+                )}
+
+                {editable && disabled && (
+                  <form action={reactivateOrgMember}>
                     <input type="hidden" name="orgId" value={orgId} />
                     <input type="hidden" name="userId" value={m.userId} />
-                    <Button type="submit" variant="ghost">
-                      Remove
+                    <Button type="submit" variant="secondary">
+                      Reactivate
                     </Button>
                   </form>
                 )}
               </div>
             </div>
 
-            {isAdmin && projects.length > 0 && (
+            {isAdmin && !disabled && projects.length > 0 && (
               <details className="mt-2 border-t border-zinc-100 pt-2 dark:border-zinc-800">
                 <summary className="cursor-pointer text-xs text-brand-600 hover:underline">
                   Assign to a project

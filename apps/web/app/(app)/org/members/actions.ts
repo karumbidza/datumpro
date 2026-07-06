@@ -97,6 +97,50 @@ export async function removeOrgMember(formData: FormData) {
   revalidatePath('/org/members');
 }
 
+/** Soft off-boarding: set a member's status to 'disabled'. The is_org_member /
+ *  org_role RLS helpers filter on status='active', so a disabled member loses
+ *  all org access immediately while their row (and history) is preserved.
+ *  Owner/admin only (RLS); can't disable yourself or the owner. */
+export async function deactivateOrgMember(formData: FormData) {
+  const orgId = String(formData.get('orgId') ?? '');
+  const userId = String(formData.get('userId') ?? '');
+  const { supabase, user } = await requireUser();
+  if (userId === user.id) throw new Error('You cannot deactivate yourself.');
+
+  const { data: target } = await supabase
+    .from('org_members')
+    .select('role')
+    .eq('org_id', orgId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if ((target as { role?: string } | null)?.role === 'owner') {
+    throw new Error('The owner cannot be deactivated.');
+  }
+
+  const { error } = await supabase
+    .from('org_members')
+    .update({ status: 'disabled' })
+    .eq('org_id', orgId)
+    .eq('user_id', userId);
+  if (error) throw new Error(error.message);
+  revalidatePath('/org/members');
+}
+
+/** Restore a disabled member to 'active' at their existing role. Owner/admin
+ *  only (RLS). */
+export async function reactivateOrgMember(formData: FormData) {
+  const orgId = String(formData.get('orgId') ?? '');
+  const userId = String(formData.get('userId') ?? '');
+  const { supabase } = await requireUser();
+  const { error } = await supabase
+    .from('org_members')
+    .update({ status: 'active' })
+    .eq('org_id', orgId)
+    .eq('user_id', userId);
+  if (error) throw new Error(error.message);
+  revalidatePath('/org/members');
+}
+
 /** Assign an existing org member to a project with a project role. RLS
  *  (can_manage_project) rejects anyone who isn't an org admin or the project PM. */
 export async function assignMemberToProject(formData: FormData) {
@@ -130,5 +174,48 @@ export async function revokeInvitation(formData: FormData) {
     .update({ status: 'revoked' })
     .eq('id', invitationId);
   if (error) throw new Error(error.message);
+  revalidatePath('/org/members');
+}
+
+/** Re-send the invite email for an existing pending invitation, reusing its
+ *  token (no new token, no status change). Admin-only (RLS on org_invitations).
+ *  Email is best-effort — sends only if Resend is configured. */
+export async function resendInvitation(formData: FormData) {
+  const invitationId = String(formData.get('invitationId') ?? '');
+  if (!invitationId) throw new Error('Missing invitation');
+  const supabase = await createClient();
+
+  const { data, error: readErr } = await supabase
+    .from('org_invitations')
+    .select('org_id, email, role, token, status')
+    .eq('id', invitationId)
+    .maybeSingle();
+  if (readErr) throw new Error(readErr.message);
+  const inv = data as
+    | { org_id: string; email: string; role: string; token: string; status: string }
+    | null;
+  if (!inv || inv.status !== 'pending') throw new Error('No pending invitation to resend.');
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const [{ data: org }, { data: inviter }] = await Promise.all([
+    supabase.from('organizations').select('name').eq('id', inv.org_id).single(),
+    user
+      ? supabase.from('profiles').select('display_name, email').eq('id', user.id).single()
+      : Promise.resolve({ data: null }),
+  ]);
+  const inviterName =
+    (inviter as { display_name?: string; email?: string } | null)?.display_name ||
+    (inviter as { email?: string } | null)?.email ||
+    'A teammate';
+  const { subject, html } = inviteEmail({
+    orgName: (org as { name?: string } | null)?.name ?? 'DatumPro',
+    inviterName,
+    role: inv.role as OrgRole,
+    acceptUrl: `${appUrl()}/invite/${inv.token}`,
+  });
+  await sendEmail({ to: inv.email, subject, html });
+
   revalidatePath('/org/members');
 }

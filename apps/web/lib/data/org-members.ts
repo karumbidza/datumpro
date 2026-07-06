@@ -6,6 +6,7 @@ export interface OrgMemberRow {
   name: string;
   email: string | null;
   role: OrgRole;
+  status: 'active' | 'disabled';
 }
 
 export interface OrgInvitationRow {
@@ -22,18 +23,23 @@ export interface InvitationPreview {
   status: 'pending' | 'accepted' | 'revoked';
 }
 
-/** Active members of an org, with display name/email. RLS scopes to the org. */
+/** Active + disabled members of an org, with display name/email. RLS scopes to
+ *  the org. Active first, then disabled (so they can be reactivated). */
 export async function listOrgMembers(orgId: string): Promise<OrgMemberRow[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from('org_members')
-    .select('user_id, role, profiles(display_name, email)')
+    .select('user_id, role, status, profiles(display_name, email)')
     .eq('org_id', orgId)
-    .eq('status', 'active');
-  return ((data ?? []) as {
+    .in('status', ['active', 'disabled']);
+  const rows = ((data ?? []) as {
     user_id: string;
     role: string;
-    profiles: { display_name: string | null; email: string | null } | { display_name: string | null; email: string | null }[] | null;
+    status: string;
+    profiles:
+      | { display_name: string | null; email: string | null }
+      | { display_name: string | null; email: string | null }[]
+      | null;
   }[]).map((m) => {
     const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
     return {
@@ -41,8 +47,11 @@ export async function listOrgMembers(orgId: string): Promise<OrgMemberRow[]> {
       name: p?.display_name || p?.email || 'Member',
       email: p?.email ?? null,
       role: (m.role ?? 'member') as OrgRole,
+      status: (m.status === 'disabled' ? 'disabled' : 'active') as 'active' | 'disabled',
     };
   });
+  // Active first, then disabled.
+  return rows.sort((a, b) => (a.status === b.status ? 0 : a.status === 'active' ? -1 : 1));
 }
 
 /** Pending invitations for an org (admins only — RLS enforces). */
