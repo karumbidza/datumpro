@@ -24,7 +24,10 @@ export default async function OrgMembersPage() {
   const [members, invitations, projectRows] = await Promise.all([
     listOrgMembers(orgId),
     isAdmin ? listPendingInvitations(orgId) : Promise.resolve([]),
-    isAdmin ? listProjects() : Promise.resolve([]),
+    // Projects only feed the optional "assign to a project" dropdown — a
+    // transient projects/RLS error must never take down the whole Members page
+    // (e.g. on the re-render triggered after a successful invite).
+    isAdmin ? listProjects().catch(() => []) : Promise.resolve([]),
   ]);
   const projects = projectRows.map((p) => ({ id: p.id, name: p.name }));
 
