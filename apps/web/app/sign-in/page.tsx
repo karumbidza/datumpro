@@ -43,11 +43,13 @@ export default function SignInPage({
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     setBusy(false);
     if (error) {
-      const unconfirmed = /invalid login credentials|email not confirmed/i.test(error.message);
+      const needsSignup = /invalid login credentials|email not confirmed/i.test(error.message);
       return setMessage({
         kind: 'error',
-        text: unconfirmed
-          ? "Can't sign in — your email may not be confirmed. Confirm via the email link, or (for dev) disable “Confirm email” in Supabase → Auth → Email, then create the account again."
+        text: needsSignup
+          ? fromInvite
+            ? 'We couldn’t sign you in. New here? Tap “Create account” below to set your password. If you just created it, check your email for a confirmation link first.'
+            : 'We couldn’t sign you in. Check your password, or if you’re new, tap “Create account”. If you just signed up, confirm via the link in your email first.'
           : error.message,
       });
     }
@@ -71,7 +73,7 @@ export default function SignInPage({
     if (data.session) return window.location.assign(safeNext()); // confirmation disabled → straight in
     setMessage({
       kind: 'info',
-      text: 'Account created, but email confirmation is ON. Click the link in your email to finish — or (for dev) turn off “Confirm email” in Supabase → Auth → Email, delete this user, and create again.',
+      text: 'Account created! Check your email for a confirmation link to finish — then you’ll be signed in and returned here to accept.',
     });
   }
 
@@ -123,10 +125,22 @@ export default function SignInPage({
           <form onSubmit={passwordSignIn} className="mt-5 space-y-3">
             <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" className={inputClass} />
             <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" className={inputClass} />
-            <div className="flex gap-2">
-              <Button type="submit" className="flex-1" disabled={busy}>{busy ? '…' : 'Sign in'}</Button>
-              <Button type="button" variant="secondary" onClick={signUp} disabled={busy}>Create account</Button>
-            </div>
+            {fromInvite ? (
+              // Invited people are usually new — lead with Create account.
+              <div className="space-y-2">
+                <Button type="button" className="w-full" onClick={signUp} disabled={busy}>
+                  {busy ? 'Creating…' : 'Create account'}
+                </Button>
+                <Button type="submit" variant="secondary" className="w-full" disabled={busy}>
+                  {busy ? '…' : 'I already have an account'}
+                </Button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Button type="submit" className="flex-1" disabled={busy}>{busy ? '…' : 'Sign in'}</Button>
+                <Button type="button" variant="secondary" onClick={signUp} disabled={busy}>Create account</Button>
+              </div>
+            )}
           </form>
         ) : (
           <form onSubmit={magicLink} className="mt-5 space-y-3">
