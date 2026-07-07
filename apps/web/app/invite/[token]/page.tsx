@@ -4,6 +4,7 @@ import { getInvitationPreview } from '@/lib/data/org-members';
 import { acceptInvitation } from './actions';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { SubmitButton } from '@/components/ui/submit-button';
 
 export default async function InvitePage({
   params,
@@ -58,7 +59,7 @@ export default async function InvitePage({
             {user ? (
               <form action={acceptInvitation} className="mt-4">
                 <input type="hidden" name="token" value={token} />
-                <Button type="submit">Accept invitation</Button>
+                <SubmitButton pendingText="Joining…">Accept invitation</SubmitButton>
                 {user.email && user.email.toLowerCase() !== preview.email.toLowerCase() && (
                   <p className="mt-2 text-xs text-amber-600">
                     You’re signed in as {user.email}. This invite was sent to {preview.email} — sign in

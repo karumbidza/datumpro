@@ -6,7 +6,7 @@ import { listOrgMembers, listPendingInvitations } from '@/lib/data/org-members';
 import { inviteMember, revokeInvitation, resendInvitation } from './actions';
 import { MembersRoster } from '@/components/org/members-roster';
 import { Card, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { SubmitButton } from '@/components/ui/submit-button';
 import { ORG_ROLES } from '@datumpro/shared/access';
 
 const inputClass =
@@ -14,10 +14,25 @@ const inputClass =
 
 const INVITE_ROLES = ORG_ROLES.filter((r) => r !== 'owner');
 
-export default async function OrgMembersPage() {
+export default async function OrgMembersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; invited?: string; resent?: string; assigned?: string }>;
+}) {
   const ctx = await getActiveContext();
   if (!ctx) redirect('/sign-in');
   if (!ctx.active) redirect('/orgs/new');
+
+  const sp = await searchParams;
+  const notice = sp.error
+    ? { kind: 'error' as const, text: sp.error }
+    : sp.invited
+      ? { kind: 'ok' as const, text: 'Invitation sent.' }
+      : sp.resent
+        ? { kind: 'ok' as const, text: 'Invitation re-sent.' }
+        : sp.assigned
+          ? { kind: 'ok' as const, text: 'Member assigned to the project.' }
+          : null;
 
   const orgId = ctx.active.orgId;
   const isAdmin = ctx.active.role === 'owner' || ctx.active.role === 'admin';
@@ -41,6 +56,18 @@ export default async function OrgMembersPage() {
         Add everyone — staff and contractors — to your organisation once, here. Then assign them to the
         projects they work on (with a project role like Contractor or PM).
       </p>
+
+      {notice && (
+        <p
+          className={`mt-4 rounded-md px-3 py-2 text-sm ${
+            notice.kind === 'error'
+              ? 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400'
+              : 'bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400'
+          }`}
+        >
+          {notice.text}
+        </p>
+      )}
 
       {isAdmin && (
         <section className="mt-6">
@@ -67,7 +94,7 @@ export default async function OrgMembersPage() {
                   ))}
                 </select>
               </div>
-              <Button type="submit">Send invite</Button>
+              <SubmitButton pendingText="Sending…">Send invite</SubmitButton>
             </form>
           </Card>
         </section>
@@ -89,15 +116,15 @@ export default async function OrgMembersPage() {
                   <div className="flex items-center gap-1">
                     <form action={resendInvitation}>
                       <input type="hidden" name="invitationId" value={inv.id} />
-                      <Button type="submit" variant="secondary">
+                      <SubmitButton variant="secondary" pendingText="Sending…">
                         Resend
-                      </Button>
+                      </SubmitButton>
                     </form>
                     <form action={revokeInvitation}>
                       <input type="hidden" name="invitationId" value={inv.id} />
-                      <Button type="submit" variant="ghost">
+                      <SubmitButton variant="ghost" pendingText="…">
                         Revoke
-                      </Button>
+                      </SubmitButton>
                     </form>
                   </div>
                 </div>

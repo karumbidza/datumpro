@@ -1,7 +1,7 @@
 'use client';
 
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { SubmitButton } from '@/components/ui/submit-button';
 import { Badge } from '@/components/ui/badge';
 import { ORG_ROLES, PROJECT_ROLES } from '@datumpro/shared/access';
 import {
@@ -87,9 +87,9 @@ export function MembersRoster({
                     <form action={deactivateOrgMember}>
                       <input type="hidden" name="orgId" value={orgId} />
                       <input type="hidden" name="userId" value={m.userId} />
-                      <Button type="submit" variant="ghost">
+                      <SubmitButton variant="ghost" pendingText="…">
                         Deactivate
-                      </Button>
+                      </SubmitButton>
                     </form>
                     <form
                       action={removeOrgMember}
@@ -104,9 +104,9 @@ export function MembersRoster({
                     >
                       <input type="hidden" name="orgId" value={orgId} />
                       <input type="hidden" name="userId" value={m.userId} />
-                      <Button type="submit" variant="ghost">
+                      <SubmitButton variant="ghost" pendingText="…">
                         Remove
-                      </Button>
+                      </SubmitButton>
                     </form>
                   </>
                 )}
@@ -115,9 +115,9 @@ export function MembersRoster({
                   <form action={reactivateOrgMember}>
                     <input type="hidden" name="orgId" value={orgId} />
                     <input type="hidden" name="userId" value={m.userId} />
-                    <Button type="submit" variant="secondary">
+                    <SubmitButton variant="secondary" pendingText="…">
                       Reactivate
-                    </Button>
+                    </SubmitButton>
                   </form>
                 )}
               </div>
@@ -147,9 +147,9 @@ export function MembersRoster({
                       </option>
                     ))}
                   </select>
-                  <Button type="submit" variant="secondary">
+                  <SubmitButton variant="secondary" pendingText="Assigning…">
                     Assign
-                  </Button>
+                  </SubmitButton>
                 </form>
               </details>
             )}
