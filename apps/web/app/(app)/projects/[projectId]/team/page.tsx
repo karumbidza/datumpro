@@ -4,11 +4,12 @@ import { createClient } from '@/lib/supabase/server';
 import { getProject } from '@/lib/data/projects';
 import { myOrgRole } from '@/lib/data/tasks';
 import { listProjectMembers, listAddableOrgMembers, myProjectRole } from '@/lib/data/members';
-import { addProjectMember, updateProjectMemberRole, removeProjectMember } from './actions';
+import { updateProjectMemberRole, removeProjectMember } from './actions';
+import { AddTeammateForm } from './add-teammate-form';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { PROJECT_ROLES } from '@datumpro/shared/access';
+import { SubmitButton } from '@/components/ui/submit-button';
+import { PROJECT_ROLES, projectRolesForType } from '@datumpro/shared/access';
 
 const inputClass =
   'w-full rounded-md border border-zinc-200 bg-transparent px-2.5 py-1.5 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
@@ -31,10 +32,18 @@ const ROLE_BLURB: Record<string, string> = {
 
 export default async function ProjectTeamPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ projectId: string }>;
+  searchParams: Promise<{ error?: string; added?: string }>;
 }) {
   const { projectId } = await params;
+  const sp = await searchParams;
+  const notice = sp.error
+    ? { kind: 'error' as const, text: sp.error }
+    : sp.added
+      ? { kind: 'ok' as const, text: 'Added to the project.' }
+      : null;
   const supabase = await createClient();
   const {
     data: { user },
@@ -65,6 +74,18 @@ export default async function ProjectTeamPage({
         project automatically.
       </p>
 
+      {notice && (
+        <p
+          className={`mt-4 rounded-md px-3 py-2 text-sm ${
+            notice.kind === 'error'
+              ? 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400'
+              : 'bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400'
+          }`}
+        >
+          {notice.text}
+        </p>
+      )}
+
       <section className="mt-6 space-y-2">
         {members.length === 0 ? (
           <p className="text-sm text-zinc-500 dark:text-zinc-400">No members yet.</p>
@@ -83,22 +104,22 @@ export default async function ProjectTeamPage({
                         <input type="hidden" name="projectId" value={projectId} />
                         <input type="hidden" name="userId" value={m.userId} />
                         <select name="role" defaultValue={m.role} className={inputClass}>
-                          {PROJECT_ROLES.map((r) => (
+                          {projectRolesForType(m.memberType).map((r) => (
                             <option key={r} value={r}>
                               {r}
                             </option>
                           ))}
                         </select>
-                        <Button type="submit" variant="secondary">
+                        <SubmitButton variant="secondary" pendingText="…">
                           Update
-                        </Button>
+                        </SubmitButton>
                       </form>
                       <form action={removeProjectMember}>
                         <input type="hidden" name="projectId" value={projectId} />
                         <input type="hidden" name="userId" value={m.userId} />
-                        <Button type="submit" variant="ghost">
+                        <SubmitButton variant="ghost" pendingText="…">
                           Remove
-                        </Button>
+                        </SubmitButton>
                       </form>
                     </>
                   ) : (
@@ -124,34 +145,7 @@ export default async function ProjectTeamPage({
                 first, then add them here.
               </p>
             ) : (
-              <form action={addProjectMember} className="mt-3 flex flex-wrap items-end gap-3">
-                <input type="hidden" name="projectId" value={projectId} />
-                <div className="min-w-48 flex-1">
-                  <label className="mb-1 block text-xs font-medium">Company member</label>
-                  <select name="userId" required className={inputClass} defaultValue="">
-                    <option value="" disabled>
-                      Select a person…
-                    </option>
-                    {addable.map((a) => (
-                      <option key={a.userId} value={a.userId}>
-                        {a.name}
-                        {a.email ? ` · ${a.email}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium">Role</label>
-                  <select name="role" defaultValue="contributor" className={inputClass}>
-                    {PROJECT_ROLES.map((r) => (
-                      <option key={r} value={r}>
-                        {r}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <Button type="submit">Add</Button>
-              </form>
+              <AddTeammateForm projectId={projectId} addable={addable} />
             )}
 
             <ul className="mt-4 space-y-1 border-t border-zinc-100 pt-3 text-xs text-zinc-500 dark:border-zinc-800">
