@@ -3,7 +3,10 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { ORG_ROLES, PROJECT_ROLES, type OrgRole, type ProjectRole } from '@datumpro/shared/access';
+import {
+  PROJECT_ROLES, type ProjectRole,
+  INVITABLE_MEMBER_TYPES, MEMBER_TYPE_META, memberTypeToOrgRole, projectRolesForType, type MemberType,
+} from '@datumpro/shared/access';
 import { sendEmail } from '@/lib/email/resend';
 import { inviteEmail, appUrl } from '@/lib/email/templates';
 
@@ -36,10 +39,11 @@ async function requireUser() {
 export async function inviteMember(formData: FormData) {
   const orgId = String(formData.get('orgId') ?? '');
   const email = String(formData.get('email') ?? '').trim().toLowerCase();
-  const roleRaw = String(formData.get('role') ?? '');
-  if (!(ORG_ROLES as readonly string[]).includes(roleRaw)) fail('Invalid organisation role.');
+  const typeRaw = String(formData.get('memberType') ?? '');
+  if (!(INVITABLE_MEMBER_TYPES as readonly string[]).includes(typeRaw)) fail('Pick a member type.');
   if (!orgId || !email) fail('Enter an email address.');
-  const role = roleRaw as OrgRole;
+  const memberType = typeRaw as MemberType;
+  const role = memberTypeToOrgRole(memberType);
 
   const supabase = await createClient();
   const {
@@ -50,7 +54,7 @@ export async function inviteMember(formData: FormData) {
     const token = `${crypto.randomUUID()}${crypto.randomUUID()}`.replace(/-/g, '');
     const { error } = await supabase
       .from('org_invitations')
-      .insert({ org_id: orgId, email, role, token, invited_by: user?.id ?? null });
+      .insert({ org_id: orgId, email, role, member_type: memberType, token, invited_by: user?.id ?? null });
     if (error) {
       if (error.code === '23505') fail('There is already a pending invitation for that email.');
       fail(error.message);
@@ -71,7 +75,7 @@ export async function inviteMember(formData: FormData) {
       const { subject, html } = inviteEmail({
         orgName: (org as { name?: string } | null)?.name ?? 'DatumPro',
         inviterName,
-        role,
+        role: MEMBER_TYPE_META[memberType].label,
         acceptUrl: `${appUrl()}/invite/${token}`,
       });
       await sendEmail({ to: email, subject, html });
@@ -87,21 +91,21 @@ export async function inviteMember(formData: FormData) {
   done('invited');
 }
 
-/** Change a member's organisation role. RLS restricts to owner/admin; we also
- *  block changing your own role and handing out 'owner' (transfer is separate). */
+/** Change a member's TYPE (which sets their org role). RLS restricts to
+ *  owner/admin; we also block changing your own type and handing out 'owner'. */
 export async function updateOrgMemberRole(formData: FormData) {
   const orgId = String(formData.get('orgId') ?? '');
   const userId = String(formData.get('userId') ?? '');
-  const roleRaw = String(formData.get('role') ?? '');
+  const typeRaw = String(formData.get('memberType') ?? '');
   const { supabase, user } = await requireUser();
 
-  if (!(ORG_ROLES as readonly string[]).includes(roleRaw)) fail('Invalid organisation role.');
-  if (roleRaw === 'owner') fail('Ownership is transferred separately, not assigned.');
+  if (!(INVITABLE_MEMBER_TYPES as readonly string[]).includes(typeRaw)) fail('Pick a member type.');
   if (userId === user.id) fail('You cannot change your own role.');
+  const memberType = typeRaw as MemberType;
 
   const { error } = await supabase
     .from('org_members')
-    .update({ role: roleRaw as OrgRole })
+    .update({ member_type: memberType, role: memberTypeToOrgRole(memberType) })
     .eq('org_id', orgId)
     .eq('user_id', userId);
   if (error) fail(error.message);
@@ -177,8 +181,23 @@ export async function assignMemberToProject(formData: FormData) {
   const { supabase } = await requireUser();
   const { data: project } = await supabase.from('projects').select('org_id').eq('id', projectId).maybeSingle();
   if (!project) fail('Project not found.');
+  const orgId = (project as { org_id: string }).org_id;
+
+  // A member's type constrains which project roles they can hold (the DB trigger
+  // is the backstop; this gives a clean message).
+  const { data: mem } = await supabase
+    .from('org_members')
+    .select('member_type')
+    .eq('org_id', orgId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  const mtype = (mem as { member_type?: MemberType } | null)?.member_type;
+  if (mtype && !projectRolesForType(mtype).includes(role)) {
+    fail(`A ${MEMBER_TYPE_META[mtype].label} can’t be assigned as project ${role}.`);
+  }
+
   const { error } = await supabase.from('project_members').upsert(
-    { org_id: (project as { org_id: string }).org_id, project_id: projectId, user_id: userId, role },
+    { org_id: orgId, project_id: projectId, user_id: userId, role },
     { onConflict: 'project_id,user_id' },
   );
   if (error) fail(error.message);
@@ -233,7 +252,7 @@ export async function resendInvitation(formData: FormData) {
     const { subject, html } = inviteEmail({
       orgName: (org as { name?: string } | null)?.name ?? 'DatumPro',
       inviterName,
-      role: inv.role as OrgRole,
+      role: inv.role,
       acceptUrl: `${appUrl()}/invite/${inv.token}`,
     });
     await sendEmail({ to: inv.email, subject, html });

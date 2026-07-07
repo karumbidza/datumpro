@@ -1,11 +1,12 @@
 import { createClient } from '@/lib/supabase/server';
-import type { OrgRole } from '@datumpro/shared/access';
+import type { OrgRole, MemberType } from '@datumpro/shared/access';
 
 export interface OrgMemberRow {
   userId: string;
   name: string;
   email: string | null;
   role: OrgRole;
+  memberType: MemberType;
   status: 'active' | 'disabled';
 }
 
@@ -13,6 +14,7 @@ export interface OrgInvitationRow {
   id: string;
   email: string;
   role: OrgRole;
+  memberType: MemberType;
   createdAt: string;
 }
 
@@ -29,12 +31,13 @@ export async function listOrgMembers(orgId: string): Promise<OrgMemberRow[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from('org_members')
-    .select('user_id, role, status, profiles(display_name, email)')
+    .select('user_id, role, member_type, status, profiles(display_name, email)')
     .eq('org_id', orgId)
     .in('status', ['active', 'disabled']);
   const rows = ((data ?? []) as {
     user_id: string;
     role: string;
+    member_type: string | null;
     status: string;
     profiles:
       | { display_name: string | null; email: string | null }
@@ -47,6 +50,7 @@ export async function listOrgMembers(orgId: string): Promise<OrgMemberRow[]> {
       name: p?.display_name || p?.email || 'Member',
       email: p?.email ?? null,
       role: (m.role ?? 'member') as OrgRole,
+      memberType: (m.member_type ?? 'staff') as MemberType,
       status: (m.status === 'disabled' ? 'disabled' : 'active') as 'active' | 'disabled',
     };
   });
@@ -59,14 +63,15 @@ export async function listPendingInvitations(orgId: string): Promise<OrgInvitati
   const supabase = await createClient();
   const { data } = await supabase
     .from('org_invitations')
-    .select('id, email, role, created_at')
+    .select('id, email, role, member_type, created_at')
     .eq('org_id', orgId)
     .eq('status', 'pending')
     .order('created_at', { ascending: false });
-  return ((data ?? []) as { id: string; email: string; role: string; created_at: string }[]).map((i) => ({
+  return ((data ?? []) as { id: string; email: string; role: string; member_type: string | null; created_at: string }[]).map((i) => ({
     id: i.id,
     email: i.email,
     role: i.role as OrgRole,
+    memberType: (i.member_type ?? 'staff') as MemberType,
     createdAt: i.created_at,
   }));
 }

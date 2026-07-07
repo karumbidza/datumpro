@@ -7,12 +7,10 @@ import { inviteMember, revokeInvitation, resendInvitation } from './actions';
 import { MembersRoster } from '@/components/org/members-roster';
 import { Card, CardTitle } from '@/components/ui/card';
 import { SubmitButton } from '@/components/ui/submit-button';
-import { ORG_ROLES } from '@datumpro/shared/access';
+import { INVITABLE_MEMBER_TYPES, MEMBER_TYPE_META } from '@datumpro/shared/access';
 
 const inputClass =
   'w-full rounded-md border border-zinc-200 bg-transparent px-2.5 py-1.5 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
-
-const INVITE_ROLES = ORG_ROLES.filter((r) => r !== 'owner');
 
 export default async function OrgMembersPage({
   searchParams,
@@ -36,6 +34,9 @@ export default async function OrgMembersPage({
 
   const orgId = ctx.active.orgId;
   const isAdmin = ctx.active.role === 'owner' || ctx.active.role === 'admin';
+  // Members management is admin-only — match /org. Non-admins can't view the
+  // roster here (RLS already blocks the mutations; this closes the disclosure).
+  if (!isAdmin) redirect('/dashboard');
   const [members, invitations, projectRows] = await Promise.all([
     listOrgMembers(orgId),
     isAdmin ? listPendingInvitations(orgId) : Promise.resolve([]),
@@ -85,11 +86,11 @@ export default async function OrgMembersPage({
                 <input type="email" name="email" required placeholder="name@company.com" className={inputClass} />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium">Org role</label>
-                <select name="role" defaultValue="member" className={inputClass}>
-                  {INVITE_ROLES.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
+                <label className="mb-1 block text-xs font-medium">Member type</label>
+                <select name="memberType" defaultValue="staff" className={inputClass}>
+                  {INVITABLE_MEMBER_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {MEMBER_TYPE_META[t].label}
                     </option>
                   ))}
                 </select>
@@ -110,7 +111,7 @@ export default async function OrgMembersPage({
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">{inv.email}</p>
                     <p className="text-xs text-zinc-500">
-                      invited as {inv.role} · {new Date(inv.createdAt).toLocaleDateString('en-GB')}
+                      invited as {MEMBER_TYPE_META[inv.memberType].label} · {new Date(inv.createdAt).toLocaleDateString('en-GB')}
                     </p>
                   </div>
                   <div className="flex items-center gap-1">

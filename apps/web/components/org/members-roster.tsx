@@ -3,7 +3,7 @@
 import { Card } from '@/components/ui/card';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { Badge } from '@/components/ui/badge';
-import { ORG_ROLES, PROJECT_ROLES } from '@datumpro/shared/access';
+import { INVITABLE_MEMBER_TYPES, MEMBER_TYPE_META, projectRolesForType, type MemberType } from '@datumpro/shared/access';
 import {
   updateOrgMemberRole,
   removeOrgMember,
@@ -15,14 +15,15 @@ import {
 const inputClass =
   'rounded-md border border-zinc-200 bg-transparent px-2 py-1 text-xs outline-none focus:border-brand-500 dark:border-zinc-800';
 
-// Owner is transferred, not assigned — keep it out of the editable options.
-const ASSIGNABLE_ORG_ROLES = ORG_ROLES.filter((r) => r !== 'owner');
+const typeTone = (t: MemberType): 'amber' | 'blue' | 'neutral' =>
+  t === 'owner' ? 'amber' : t === 'admin' || t === 'pm' ? 'blue' : 'neutral';
 
 interface Member {
   userId: string;
   name: string;
   email: string | null;
   role: string;
+  memberType: MemberType;
   status: 'active' | 'disabled';
 }
 
@@ -62,22 +63,20 @@ export function MembersRoster({
                     <input type="hidden" name="orgId" value={orgId} />
                     <input type="hidden" name="userId" value={m.userId} />
                     <select
-                      name="role"
-                      defaultValue={m.role}
+                      name="memberType"
+                      defaultValue={m.memberType}
                       onChange={(e) => e.currentTarget.form?.requestSubmit()}
                       className={inputClass}
                     >
-                      {ASSIGNABLE_ORG_ROLES.map((r) => (
-                        <option key={r} value={r}>
-                          {r}
+                      {INVITABLE_MEMBER_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {MEMBER_TYPE_META[t].label}
                         </option>
                       ))}
                     </select>
                   </form>
                 ) : (
-                  <Badge tone={m.role === 'owner' ? 'amber' : m.role === 'admin' ? 'blue' : 'neutral'}>
-                    {m.role}
-                  </Badge>
+                  <Badge tone={typeTone(m.memberType)}>{MEMBER_TYPE_META[m.memberType].label}</Badge>
                 )}
 
                 {disabled && <Badge tone="neutral">disabled</Badge>}
@@ -140,8 +139,12 @@ export function MembersRoster({
                       </option>
                     ))}
                   </select>
-                  <select name="projectRole" defaultValue="contractor" className={inputClass}>
-                    {PROJECT_ROLES.map((r) => (
+                  <select
+                    name="projectRole"
+                    defaultValue={projectRolesForType(m.memberType)[0]}
+                    className={inputClass}
+                  >
+                    {projectRolesForType(m.memberType).map((r) => (
                       <option key={r} value={r}>
                         {r}
                       </option>
