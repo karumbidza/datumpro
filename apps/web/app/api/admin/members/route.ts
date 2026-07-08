@@ -67,6 +67,7 @@ export async function GET(req: Request) {
         role: m.role,
         memberType: m.member_type,
         status: m.status,
+        canManage: m.role !== 'owner',
       };
     }),
   }));

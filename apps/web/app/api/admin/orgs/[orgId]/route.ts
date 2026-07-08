@@ -56,6 +56,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ orgId: s
       memberType: m.member_type,
       status: m.status,
       joinedAt: m.created_at,
+      // The owner is not manageable from the control plane (can't be disabled or
+      // role-changed) — everyone else is.
+      canManage: m.role !== 'owner',
     })),
     invitations: (invites ?? []).map((i) => ({
       id: i.id,
@@ -65,5 +68,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ orgId: s
       expiresAt: null,
       acceptedAt: i.accepted_at,
     })),
+    // Org roles Pulse may assign in DatumPro (mirrors the PATCH whitelist).
+    roles: ['admin', 'finance', 'pm', 'member', 'viewer'],
   });
 }
