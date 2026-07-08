@@ -23,7 +23,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const role = ctx.active.role;
   const canManageMembers = can(role, 'member:manage');
   const canCreateProject = can(role, 'project:create');
-  const canViewFinance = can(role, 'finance:view') && role !== 'viewer';
+  const canViewFinance = can(role, 'finance:view');
 
   return (
     <div className="flex h-screen overflow-hidden bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">

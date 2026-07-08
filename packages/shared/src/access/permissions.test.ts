@@ -20,7 +20,7 @@ describe('permissions — segregation of duties', () => {
   it('owner can do everything; viewer is read-only', () => {
     expect(can('owner', 'org:manage')).toBe(true);
     expect(can('owner', 'variation:approve')).toBe(true);
-    expect(can('viewer', 'finance:view')).toBe(true);
+    expect(can('viewer', 'finance:view')).toBe(false);
     expect(can('viewer', 'invoice:create')).toBe(false);
     expect(can('viewer', 'report:create')).toBe(false);
   });

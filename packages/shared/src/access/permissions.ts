@@ -75,7 +75,9 @@ const ROLE_PERMISSIONS: Record<OrgRole, readonly Permission[]> = {
     'report:create', 'report:view',
     'request:create', 'pop:submit',
   ],
-  viewer: ['report:view', 'finance:view'],
+  // A viewer is read-only and NOT a finance role — it does not see the finance
+  // hub (project-level finance visibility is governed separately by RLS).
+  viewer: ['report:view'],
 };
 
 /** Does this org role grant the given permission? */

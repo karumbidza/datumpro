@@ -19,7 +19,7 @@ export default async function OrgPage() {
   if (!can(ctx.active.role, 'member:manage')) redirect('/dashboard');
 
   const orgId = ctx.active.orgId;
-  const canViewFinance = can(ctx.active.role, 'finance:view') && ctx.active.role !== 'viewer';
+  const canViewFinance = can(ctx.active.role, 'finance:view');
   const [members, invitations] = await Promise.all([
     listOrgMembers(orgId),
     listPendingInvitations(orgId),

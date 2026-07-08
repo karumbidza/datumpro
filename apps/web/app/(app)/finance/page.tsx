@@ -26,7 +26,7 @@ export default async function OrgFinancePage() {
 
   // Owners, admins, finance and delivery PMs see the portfolio roll-up; RLS
   // still scopes the underlying rows to what each caller may read.
-  const canView = can(ctx.active.role, 'finance:view') && ctx.active.role !== 'viewer';
+  const canView = can(ctx.active.role, 'finance:view');
   if (!canView) redirect('/dashboard');
 
   const [{ totals, collectionRate, projects }, aging] = await Promise.all([

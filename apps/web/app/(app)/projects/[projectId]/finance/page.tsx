@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getProject } from '@/lib/data/projects';
+import { myOrgRole } from '@/lib/data/tasks';
 import { listBudgetBilling, listInvoices, financeSummary } from '@/lib/data/finance';
 import { listProjectPayments } from '@/lib/data/payments';
 import { addBudgetLine } from './actions';
@@ -9,6 +10,7 @@ import { BudgetVsCost } from '@/components/finance/budget-vs-cost';
 import { Card, CardTitle, CardValue } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { can, type OrgRole } from '@datumpro/shared/access';
 import { formatUsd } from '@datumpro/shared/domain';
 
 const PAY_STATUS = {
@@ -32,12 +34,18 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
 
   const project = await getProject(projectId);
   if (!project) notFound();
-  const [summary, budget, invoices, payments] = await Promise.all([
+  const [summary, budget, invoices, payments, orgRole] = await Promise.all([
     financeSummary(projectId),
     listBudgetBilling(projectId),
     listInvoices(projectId),
     listProjectPayments(projectId),
+    myOrgRole(project.org_id),
   ]);
+  // Only show write controls to people who can actually use them (RLS is the
+  // hard gate; this stops non-authorised members seeing buttons that would fail).
+  const role = (orgRole ?? 'viewer') as OrgRole;
+  const canManageBudget = can(role, 'budget:manage');
+  const canInvoice = can(role, 'invoice:create');
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
@@ -99,22 +107,26 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
                 })}
               </ul>
             )}
-            <form action={addBudgetLine} className="mt-4 flex flex-wrap items-end gap-2 border-t border-zinc-100 pt-4 dark:border-zinc-800">
-              <input type="hidden" name="projectId" value={projectId} />
-              <input name="description" required placeholder="Line item" className={`${inputClass} flex-1 min-w-32`} />
-              <input name="quantity" type="number" step="0.01" defaultValue={1} className={`${inputClass} w-20`} title="Qty" />
-              <input name="rate" type="number" step="0.01" placeholder="Rate $" className={`${inputClass} w-24`} />
-              <Button type="submit" variant="secondary">Add</Button>
-            </form>
+            {canManageBudget && (
+              <form action={addBudgetLine} className="mt-4 flex flex-wrap items-end gap-2 border-t border-zinc-100 pt-4 dark:border-zinc-800">
+                <input type="hidden" name="projectId" value={projectId} />
+                <input name="description" required placeholder="Line item" className={`${inputClass} flex-1 min-w-32`} />
+                <input name="quantity" type="number" step="0.01" defaultValue={1} className={`${inputClass} w-20`} title="Qty" />
+                <input name="rate" type="number" step="0.01" placeholder="Rate $" className={`${inputClass} w-24`} />
+                <Button type="submit" variant="secondary">Add</Button>
+              </form>
+            )}
           </Card>
         </div>
 
         <div>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold">Invoices</h2>
-            <Link href={`/projects/${projectId}/finance/invoices/new`}>
-              <Button>New invoice</Button>
-            </Link>
+            {canInvoice && (
+              <Link href={`/projects/${projectId}/finance/invoices/new`}>
+                <Button>New invoice</Button>
+              </Link>
+            )}
           </div>
           {invoices.length === 0 ? (
             <p className="text-sm text-zinc-500 dark:text-zinc-400">No invoices yet.</p>
