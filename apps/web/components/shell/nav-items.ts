@@ -8,6 +8,7 @@ import {
   Wallet,
   FileText,
   MessageSquare,
+  MessageCircle,
   type IconComponent,
 } from '@/components/icons';
 import type { SidebarProject } from '@/lib/data/org';
@@ -48,7 +49,12 @@ export function computeNav(
     { name: 'All projects', href: '/projects', icon: FolderOpen },
     { name: 'My payments', href: '/payments', icon: Wallet },
     ...(canViewFinance ? [{ name: 'Finance', href: '/finance', icon: DollarSign }] : []),
-    ...(canManageMembers ? [{ name: 'Organization', href: '/org', icon: Building }] : []),
+    ...(canManageMembers
+      ? [
+          { name: 'Organization', href: '/org', icon: Building },
+          { name: 'Support', href: '/support', icon: MessageCircle },
+        ]
+      : []),
   ];
 }
 
