@@ -9,19 +9,34 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { formatUsd } from '@datumpro/shared/domain';
+import { formatUsd, PAYMENT_REQUEST_STATUS_LABEL, type PaymentRequestStatus } from '@datumpro/shared/domain';
 import {
   listMyPayments,
   submitPaymentClaim,
   type MyDraw,
   type MyPaymentsSummary,
 } from '../../../lib/data/payments';
+import {
+  listMyPaymentRequests,
+  listMyRequestProjects,
+  type MyPaymentRequest,
+  type RequestProject,
+} from '../../../lib/data/payment-requests';
+import { RequestPaymentModal } from '../../../components/request-payment-modal';
 import { Card, Pill, StatTile } from '../../../components/ui';
 import { theme, contentWidth, type Tone } from '../../../lib/theme';
 
 const EMPTY: MyPaymentsSummary = { earnedCents: 0, claimedCents: 0, paidCents: 0, outstandingCents: 0 };
+
+const REQ_TONE: Record<PaymentRequestStatus, Tone> = {
+  requested: { bg: theme.color.accentSoft, fg: theme.color.accent, bar: theme.color.accent },
+  approved: { bg: '#e0edff', fg: '#1d4ed8', bar: '#1d4ed8' },
+  paid: { bg: theme.color.successSoft, fg: theme.color.success, bar: theme.color.success },
+  rejected: { bg: '#e5e7eb', fg: '#374151', bar: '#6b7280' },
+};
 
 const STATUS: Record<MyDraw['status'], { label: string; tone: Tone }> = {
   pending: { label: 'Not claimed', tone: { bg: '#e5e7eb', fg: '#374151', bar: '#6b7280' } },
@@ -42,11 +57,20 @@ export default function Payments() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [claiming, setClaiming] = useState<string | null>(null);
+  const [requests, setRequests] = useState<MyPaymentRequest[]>([]);
+  const [projects, setProjects] = useState<RequestProject[]>([]);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const load = useCallback(async () => {
-    const res = await listMyPayments();
+    const [res, reqs, projs] = await Promise.all([
+      listMyPayments(),
+      listMyPaymentRequests(),
+      listMyRequestProjects(),
+    ]);
     setLines(res.lines);
     setSummary(res.summary);
+    setRequests(reqs);
+    setProjects(projs);
     setLoading(false);
     setRefreshing(false);
   }, []);
@@ -107,24 +131,74 @@ export default function Payments() {
             />
           }
           ListHeaderComponent={
-            <Card style={styles.summary}>
-              <View style={styles.statsRow}>
-                <StatTile label="Earned" value={formatUsd(summary.earnedCents)} />
-                <StatTile
-                  label="Awaiting"
-                  value={formatUsd(summary.claimedCents)}
-                  accent={theme.color.accent}
-                />
+            <View style={{ gap: 12 }}>
+              <Card style={styles.summary}>
+                <View style={styles.statsRow}>
+                  <StatTile label="Earned" value={formatUsd(summary.earnedCents)} />
+                  <StatTile
+                    label="Awaiting"
+                    value={formatUsd(summary.claimedCents)}
+                    accent={theme.color.accent}
+                  />
+                </View>
+                <View style={styles.statsRow}>
+                  <StatTile
+                    label="Paid"
+                    value={formatUsd(summary.paidCents)}
+                    accent={theme.color.success}
+                  />
+                  <StatTile label="Outstanding" value={formatUsd(summary.outstandingCents)} />
+                </View>
+              </Card>
+
+              <View style={styles.sectionHead}>
+                <Text style={styles.sectionTitle}>Payment requests</Text>
+                {projects.length > 0 && (
+                  <Pressable onPress={() => setModalOpen(true)} style={styles.reqBtn}>
+                    <Text style={styles.reqBtnText}>Request payment</Text>
+                  </Pressable>
+                )}
               </View>
-              <View style={styles.statsRow}>
-                <StatTile
-                  label="Paid"
-                  value={formatUsd(summary.paidCents)}
-                  accent={theme.color.success}
-                />
-                <StatTile label="Outstanding" value={formatUsd(summary.outstandingCents)} />
-              </View>
-            </Card>
+
+              {requests.length === 0 ? (
+                <Text style={styles.hint}>
+                  No requests yet. Raise one to invoice for a draw or ad-hoc work.
+                </Text>
+              ) : (
+                requests.map((r) => {
+                  const t = REQ_TONE[r.status];
+                  return (
+                    <Card key={r.id} style={styles.reqCard}>
+                      <View style={styles.drawTop}>
+                        <Text style={styles.project}>{r.projectName}</Text>
+                        <Pill label={PAYMENT_REQUEST_STATUS_LABEL[r.status]} tone={t} />
+                      </View>
+                      <View style={styles.drawBottom}>
+                        <Text style={styles.task}>{r.title}</Text>
+                        <Text style={styles.amount}>{formatUsd(r.amountCents)}</Text>
+                      </View>
+                      {r.status === 'rejected' && r.reviewNote ? (
+                        <Text style={styles.note}>“{r.reviewNote}”</Text>
+                      ) : null}
+                      <View style={styles.linkRow}>
+                        {r.invoiceUrl ? (
+                          <Pressable onPress={() => Linking.openURL(r.invoiceUrl!)}>
+                            <Text style={styles.link}>View invoice</Text>
+                          </Pressable>
+                        ) : null}
+                        {r.status === 'paid' && r.popUrl ? (
+                          <Pressable onPress={() => Linking.openURL(r.popUrl!)}>
+                            <Text style={styles.link}>Proof of payment</Text>
+                          </Pressable>
+                        ) : null}
+                      </View>
+                    </Card>
+                  );
+                })
+              )}
+
+              {lines.length > 0 && <Text style={styles.sectionTitle}>Scheduled draws</Text>}
+            </View>
           }
           ListEmptyComponent={
             <Text style={styles.empty}>
@@ -170,6 +244,16 @@ export default function Payments() {
           }}
         />
       )}
+
+      <RequestPaymentModal
+        visible={modalOpen}
+        projects={projects}
+        onClose={() => setModalOpen(false)}
+        onDone={() => {
+          setModalOpen(false);
+          void load();
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -183,6 +267,14 @@ const styles = StyleSheet.create({
   empty: { color: theme.color.subtle, fontSize: 14, textAlign: 'center' },
   summary: { gap: 12, marginBottom: 4 },
   statsRow: { flexDirection: 'row', gap: 12 },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sectionTitle: { fontSize: 14, fontWeight: '800', color: theme.color.text },
+  reqBtn: { backgroundColor: theme.color.dark, borderRadius: theme.radius.pill, paddingHorizontal: 14, paddingVertical: 8 },
+  reqBtnText: { color: theme.color.onDark, fontWeight: '700', fontSize: 13 },
+  reqCard: { gap: 6 },
+  hint: { fontSize: 13, color: theme.color.subtle },
+  linkRow: { flexDirection: 'row', gap: 16, marginTop: 2 },
+  link: { fontSize: 13, fontWeight: '600', color: theme.color.accent },
   draw: { gap: 6 },
   drawTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   project: { fontSize: 12, fontWeight: '600', color: theme.color.subtle },
