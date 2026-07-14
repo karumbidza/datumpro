@@ -6,7 +6,16 @@ import { submitPaymentClaim } from '@/app/(app)/projects/[projectId]/tasks/actio
 import { Card, CardTitle, CardValue } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { formatUsd } from '@datumpro/shared/domain';
+import { formatUsd, PAYMENT_REQUEST_STATUS_LABEL, type PaymentRequestStatus } from '@datumpro/shared/domain';
+import { listMyPaymentRequests, listMyRequestProjects } from '@/lib/data/payment-requests';
+import { RequestPaymentForm } from '@/components/payments/request-payment-form';
+
+const REQ_TONE: Record<PaymentRequestStatus, 'neutral' | 'blue' | 'green' | 'amber'> = {
+  requested: 'amber',
+  approved: 'blue',
+  paid: 'green',
+  rejected: 'neutral',
+};
 
 const inputClass =
   'w-full rounded-md border border-zinc-200 bg-transparent px-2.5 py-1.5 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
@@ -30,6 +39,14 @@ export default async function MyPaymentsPage() {
   if (!user) redirect('/sign-in');
 
   const { lines, summary } = await listMyPayments(user.id);
+  const [{ rows: requests }, requestProjects] = await Promise.all([
+    listMyPaymentRequests(user.id),
+    listMyRequestProjects(user.id),
+  ]);
+  // Pending draws can be requested against (pre-fills the form).
+  const draws = lines
+    .filter((l) => l.status === 'pending')
+    .map((l) => ({ id: l.id, projectId: l.projectId, name: l.name, amountCents: l.amountCents }));
 
   // Group draws under their project for a readable statement.
   const byProject = new Map<string, { name: string; lines: MyPaymentLine[] }>();
@@ -69,6 +86,65 @@ export default async function MyPaymentsPage() {
         </Card>
       </section>
 
+      <section className="mt-8">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold">Payment requests</h2>
+          <RequestPaymentForm projects={requestProjects} draws={draws} />
+        </div>
+        {requests.length === 0 ? (
+          <Card>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              No requests yet. Raise one to invoice for a scheduled draw or ad-hoc work — attach your
+              invoice, and track it through approval to payment here.
+            </p>
+          </Card>
+        ) : (
+          <div className="divide-y divide-zinc-100 rounded-lg border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-950">
+            {requests.map((r) => (
+              <div key={r.id} className="p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{r.title}</p>
+                    <p className="text-xs text-zinc-400">
+                      {r.projectName}
+                      {r.invoiceUrl && (
+                        <>
+                          {' · '}
+                          <a href={r.invoiceUrl} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline dark:text-brand-400">
+                            {r.invoiceName ?? 'invoice'}
+                          </a>
+                        </>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className="text-sm font-semibold tabular-nums">{formatUsd(r.amountCents)}</span>
+                    <Badge tone={REQ_TONE[r.status]}>{PAYMENT_REQUEST_STATUS_LABEL[r.status]}</Badge>
+                  </div>
+                </div>
+                {r.status === 'rejected' && r.reviewNote && (
+                  <p className="mt-1 text-xs text-zinc-500">Rejected — “{r.reviewNote}”</p>
+                )}
+                {r.status === 'paid' && (
+                  <p className="mt-1 text-xs text-green-600 dark:text-green-400">
+                    Paid{r.paidReference ? ` · ref ${r.paidReference}` : ''}
+                    {r.popUrl && (
+                      <>
+                        {' · '}
+                        <a href={r.popUrl} target="_blank" rel="noreferrer" className="underline">
+                          proof of payment
+                        </a>
+                      </>
+                    )}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <h2 className="mb-3 mt-10 text-sm font-semibold">Scheduled draws</h2>
       {lines.length === 0 ? (
         <Card className="mt-8">
           <p className="text-sm text-zinc-500 dark:text-zinc-400">

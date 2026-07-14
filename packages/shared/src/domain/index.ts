@@ -5,3 +5,4 @@ export * from './monitoring';
 export * from './tasks';
 export * from './scheduling';
 export * from './commitments';
+export * from './payments';

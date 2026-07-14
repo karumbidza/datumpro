@@ -3,15 +3,25 @@ import { redirect, notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getProject } from '@/lib/data/projects';
 import { myOrgRole } from '@/lib/data/tasks';
+import { myProjectRole } from '@/lib/data/members';
 import { listBudgetBilling, listInvoices, financeSummary } from '@/lib/data/finance';
 import { listProjectPayments } from '@/lib/data/payments';
+import { listProjectPaymentRequests } from '@/lib/data/payment-requests';
 import { addBudgetLine } from './actions';
 import { BudgetVsCost } from '@/components/finance/budget-vs-cost';
+import { ManageRequest } from '@/components/payments/manage-request';
 import { Card, CardTitle, CardValue } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { can, type OrgRole } from '@datumpro/shared/access';
-import { formatUsd } from '@datumpro/shared/domain';
+import { formatUsd, PAYMENT_REQUEST_STATUS_LABEL, type PaymentRequestStatus } from '@datumpro/shared/domain';
+
+const REQ_TONE: Record<PaymentRequestStatus, 'neutral' | 'blue' | 'green' | 'amber'> = {
+  requested: 'amber',
+  approved: 'blue',
+  paid: 'green',
+  rejected: 'neutral',
+};
 
 const PAY_STATUS = {
   pending: { tone: 'neutral', label: 'not claimed' },
@@ -34,18 +44,22 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
 
   const project = await getProject(projectId);
   if (!project) notFound();
-  const [summary, budget, invoices, payments, orgRole] = await Promise.all([
+  const [summary, budget, invoices, payments, orgRole, projectRole, paymentRequests] = await Promise.all([
     financeSummary(projectId),
     listBudgetBilling(projectId),
     listInvoices(projectId),
     listProjectPayments(projectId),
     myOrgRole(project.org_id),
+    myProjectRole(projectId),
+    listProjectPaymentRequests(projectId),
   ]);
   // Only show write controls to people who can actually use them (RLS is the
   // hard gate; this stops non-authorised members seeing buttons that would fail).
   const role = (orgRole ?? 'viewer') as OrgRole;
   const canManageBudget = can(role, 'budget:manage');
   const canInvoice = can(role, 'invoice:create');
+  // Reviewing contractor payment requests: org finance/admin/owner, or the PM.
+  const canManagePayments = can(role, 'payment:record') || projectRole === 'pm';
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
@@ -152,6 +166,58 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
           )}
         </div>
       </section>
+
+      {/* Contractor payment requests (buy-side; approve → pay → POP) */}
+      {paymentRequests.length > 0 && (
+        <section className="mt-8">
+          <h2 className="mb-3 text-sm font-semibold">Payment requests</h2>
+          <Card className="p-0">
+            <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+              {paymentRequests.map((r) => (
+                <li key={r.id} className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{r.title}</p>
+                      <p className="text-xs text-zinc-400">
+                        {r.contractorName ?? 'Contractor'}
+                        {r.invoiceUrl && (
+                          <>
+                            {' · '}
+                            <a href={r.invoiceUrl} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline dark:text-brand-400">
+                              {r.invoiceName ?? 'invoice'}
+                            </a>
+                          </>
+                        )}
+                      </p>
+                      {r.note && <p className="mt-1 text-xs text-zinc-500">“{r.note}”</p>}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <span className="text-sm font-semibold tabular-nums">{formatUsd(r.amountCents)}</span>
+                      <Badge tone={REQ_TONE[r.status]}>{PAYMENT_REQUEST_STATUS_LABEL[r.status]}</Badge>
+                    </div>
+                  </div>
+                  {r.status === 'paid' && (
+                    <p className="mt-1 text-xs text-green-600 dark:text-green-400">
+                      Paid{r.paidReference ? ` · ref ${r.paidReference}` : ''}
+                      {r.popUrl && (
+                        <>
+                          {' · '}
+                          <a href={r.popUrl} target="_blank" rel="noreferrer" className="underline">
+                            POP
+                          </a>
+                        </>
+                      )}
+                    </p>
+                  )}
+                  {canManagePayments && (
+                    <ManageRequest id={r.id} orgId={r.orgId} projectId={projectId} status={r.status} />
+                  )}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </section>
+      )}
 
       {/* Contractor payments (buy-side; RLS shows only what the viewer may see) */}
       <section className="mt-8">

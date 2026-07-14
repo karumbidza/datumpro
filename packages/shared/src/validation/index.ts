@@ -20,6 +20,19 @@ export const inviteMemberSchema = z.object({
 });
 export type InviteMemberInput = z.infer<typeof inviteMemberSchema>;
 
+/** A contractor's payment request (buy-side). Optionally links to a scheduled
+ *  draw; carries an optional uploaded invoice document. */
+export const paymentRequestSchema = z.object({
+  projectId: z.string().uuid(),
+  scheduleId: z.string().uuid().optional().nullable(),
+  title: z.string().trim().min(2).max(160),
+  amountCents: z.number().int().positive(),
+  note: z.string().trim().max(1000).optional().nullable(),
+  invoicePath: z.string().trim().max(500).optional().nullable(),
+  invoiceName: z.string().trim().max(255).optional().nullable(),
+});
+export type PaymentRequestInput = z.infer<typeof paymentRequestSchema>;
+
 export const createProjectSchema = z.object({
   name: z.string().trim().min(2).max(160),
   code: z.string().trim().max(40).optional(),
