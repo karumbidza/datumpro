@@ -6,3 +6,4 @@ export * from './tasks';
 export * from './scheduling';
 export * from './commitments';
 export * from './payments';
+export * from './documents';

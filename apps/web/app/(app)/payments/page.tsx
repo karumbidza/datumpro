@@ -9,11 +9,24 @@ import { Button } from '@/components/ui/button';
 import { formatUsd, PAYMENT_REQUEST_STATUS_LABEL, type PaymentRequestStatus } from '@datumpro/shared/domain';
 import { listMyPaymentRequests, listMyRequestProjects } from '@/lib/data/payment-requests';
 import { RequestPaymentForm } from '@/components/payments/request-payment-form';
+import {
+  CONTRACTOR_DOC_TYPE_LABEL,
+  CONTRACTOR_DOC_STATUS_LABEL,
+  type ContractorDocStatus,
+} from '@datumpro/shared/domain';
+import { listMyDocuments, listMyOrgs } from '@/lib/data/contractor-documents';
+import { UploadDocumentForm } from '@/components/documents/upload-document-form';
 
 const REQ_TONE: Record<PaymentRequestStatus, 'neutral' | 'blue' | 'green' | 'amber'> = {
   requested: 'amber',
   approved: 'blue',
   paid: 'green',
+  rejected: 'neutral',
+};
+
+const DOC_TONE: Record<ContractorDocStatus, 'neutral' | 'blue' | 'green' | 'amber'> = {
+  submitted: 'amber',
+  verified: 'green',
   rejected: 'neutral',
 };
 
@@ -39,9 +52,11 @@ export default async function MyPaymentsPage() {
   if (!user) redirect('/sign-in');
 
   const { lines, summary } = await listMyPayments(user.id);
-  const [{ rows: requests }, requestProjects] = await Promise.all([
+  const [{ rows: requests }, requestProjects, documents, myOrgs] = await Promise.all([
     listMyPaymentRequests(user.id),
     listMyRequestProjects(user.id),
+    listMyDocuments(user.id),
+    listMyOrgs(user.id),
   ]);
   // Pending draws can be requested against (pre-fills the form).
   const draws = lines
@@ -138,6 +153,51 @@ export default async function MyPaymentsPage() {
                     )}
                   </p>
                 )}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="mt-8">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold">Compliance documents</h2>
+            <p className="text-xs text-zinc-400">
+              Tax clearances, company registration, insurance — visible only to you and the admins.
+            </p>
+          </div>
+          <UploadDocumentForm orgs={myOrgs} />
+        </div>
+        {documents.length === 0 ? (
+          <Card>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">No documents on file yet.</p>
+          </Card>
+        ) : (
+          <div className="divide-y divide-zinc-100 rounded-lg border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-950">
+            {documents.map((d) => (
+              <div key={d.id} className="flex items-center justify-between gap-3 p-4">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">
+                    {d.title || CONTRACTOR_DOC_TYPE_LABEL[d.docType]}
+                  </p>
+                  <p className="text-xs text-zinc-400">
+                    {CONTRACTOR_DOC_TYPE_LABEL[d.docType]}
+                    {d.expiryDate ? ` · expires ${d.expiryDate}` : ''}
+                    {d.fileUrl && (
+                      <>
+                        {' · '}
+                        <a href={d.fileUrl} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline dark:text-brand-400">
+                          view
+                        </a>
+                      </>
+                    )}
+                  </p>
+                  {d.status === 'rejected' && d.reviewNote && (
+                    <p className="mt-0.5 text-xs text-red-500">Rejected — “{d.reviewNote}”</p>
+                  )}
+                </div>
+                <Badge tone={DOC_TONE[d.status]}>{CONTRACTOR_DOC_STATUS_LABEL[d.status]}</Badge>
               </div>
             ))}
           </div>

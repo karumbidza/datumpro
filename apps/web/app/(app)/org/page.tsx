@@ -6,7 +6,7 @@ import { listOrgMembers, listPendingInvitations } from '@/lib/data/org-members';
 import { renameOrganization } from './actions';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, DollarSign, ChevronRight } from '@/components/icons';
+import { Users, DollarSign, FileText, ChevronRight } from '@/components/icons';
 
 const inputClass =
   'w-full rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
@@ -20,6 +20,8 @@ export default async function OrgPage() {
 
   const orgId = ctx.active.orgId;
   const canViewFinance = can(ctx.active.role, 'finance:view');
+  // Reviewing contractor compliance docs is a staff (owner/admin/finance) concern.
+  const canReviewDocs = can(ctx.active.role, 'payment:record');
   const [members, invitations] = await Promise.all([
     listOrgMembers(orgId),
     listPendingInvitations(orgId),
@@ -80,6 +82,26 @@ export default async function OrgPage() {
                   <p className="text-sm font-medium">Finance</p>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
                     Budgets, invoices and payments across every project
+                  </p>
+                </div>
+                <ChevronRight size={18} className="shrink-0 text-zinc-400" />
+              </div>
+            </Card>
+          </Link>
+        )}
+
+        {/* Contractor compliance documents */}
+        {canReviewDocs && (
+          <Link href="/org/documents" className="block">
+            <Card className="transition-colors hover:border-zinc-300 dark:hover:border-zinc-700">
+              <div className="flex items-center gap-4">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+                  <FileText size={20} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">Contractor documents</p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    Tax clearances &amp; company documents to review
                   </p>
                 </div>
                 <ChevronRight size={18} className="shrink-0 text-zinc-400" />
