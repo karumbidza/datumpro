@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { useSession } from '../../../lib/auth';
 import { Card, Avatar } from '../../../components/ui';
@@ -16,6 +16,7 @@ interface Profile {
 
 export default function More() {
   const { session } = useSession();
+  const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
 
   const load = useCallback(async () => {
@@ -78,6 +79,12 @@ export default function More() {
               </Card>
             )}
 
+            <Pressable style={styles.linkRow} onPress={() => router.push('/(app)/documents')}>
+              <Ionicons name="document-text-outline" size={18} color={theme.color.text} />
+              <Text style={styles.linkText}>Compliance documents</Text>
+              <Ionicons name="chevron-forward" size={18} color={theme.color.subtle} style={{ marginLeft: 'auto' }} />
+            </Pressable>
+
             <Pressable style={styles.signOut} onPress={() => supabase.auth.signOut()}>
               <Ionicons name="log-out-outline" size={18} color={theme.color.danger} />
               <Text style={styles.signOutText}>Sign out</Text>
@@ -113,5 +120,18 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   signOutText: { color: theme.color.danger, fontWeight: '700' },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: theme.color.card,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginTop: 12,
+  },
+  linkText: { fontSize: 15, fontWeight: '600', color: theme.color.text },
   foot: { fontSize: 11, color: theme.color.subtle, textAlign: 'center', marginTop: 16 },
 });
