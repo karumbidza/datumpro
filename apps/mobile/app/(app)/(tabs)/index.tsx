@@ -11,6 +11,7 @@ import {
 } from '../../../lib/data/home';
 import { Card, ProgressBar, StatTile, Avatar } from '../../../components/ui';
 import { theme, contentWidth } from '../../../lib/theme';
+import { useResponsive } from '../../../lib/responsive';
 
 const KIND_LABEL: Record<PendingApproval['kind'], string> = {
   signoff: 'Sign-off',
@@ -25,6 +26,7 @@ const KIND_COLOR: Record<PendingApproval['kind'], string> = {
 
 export default function Home() {
   const router = useRouter();
+  const { contentMaxWidth } = useResponsive();
   const [data, setData] = useState<HomeData | null>(null);
   const [signoffs, setSignoffs] = useState<PendingApproval[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -45,9 +47,9 @@ export default function Home() {
   const onTrack = data ? data.myOverdue === 0 : true;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { maxWidth: contentMaxWidth }]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

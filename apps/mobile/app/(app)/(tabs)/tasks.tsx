@@ -5,6 +5,7 @@ import { useFocusEffect } from 'expo-router';
 import { listMyTasks, type MyTask } from '../../../lib/data/tasks';
 import { TaskCard } from '../../../components/task-card';
 import { theme, contentWidth } from '../../../lib/theme';
+import { useResponsive } from '../../../lib/responsive';
 
 type Filter = 'all' | 'in_progress' | 'completed' | 'overdue';
 const FILTERS: { key: Filter; label: string }[] = [
@@ -44,6 +45,8 @@ export default function Tasks() {
     };
   }, [tasks]);
 
+  const { columns, contentMaxWidth } = useResponsive();
+
   const visible = useMemo(() => {
     const t = today();
     switch (filter) {
@@ -59,7 +62,7 @@ export default function Tasks() {
   }, [tasks, filter]);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <Text style={styles.title}>Tasks</Text>
 
       <View style={styles.chips}>
@@ -86,8 +89,13 @@ export default function Tasks() {
       ) : (
         <FlatList
           data={visible}
+          key={`cols-${columns}`}
+          numColumns={columns}
+          columnWrapperStyle={columns > 1 ? styles.row : undefined}
           keyExtractor={(t) => t.id}
-          contentContainerStyle={visible.length === 0 ? styles.emptyWrap : styles.listContent}
+          contentContainerStyle={
+            visible.length === 0 ? styles.emptyWrap : [styles.listContent, { maxWidth: contentMaxWidth }]
+          }
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -98,7 +106,11 @@ export default function Tasks() {
             />
           }
           ListEmptyComponent={<Text style={styles.empty}>Nothing here.</Text>}
-          renderItem={({ item }) => <TaskCard task={item} />}
+          renderItem={({ item }) => (
+            <View style={columns > 1 ? styles.col : undefined}>
+              <TaskCard task={item} />
+            </View>
+          )}
         />
       )}
     </SafeAreaView>
@@ -122,6 +134,8 @@ const styles = StyleSheet.create({
   chipTextActive: { color: '#fff' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { padding: 16, gap: 10, ...contentWidth },
+  row: { gap: 10 },
+  col: { flex: 1 },
   emptyWrap: { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
   empty: { color: theme.color.subtle, fontSize: 14 },
 });

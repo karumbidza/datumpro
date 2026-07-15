@@ -28,6 +28,7 @@ import {
 import { RequestPaymentModal } from '../../../components/request-payment-modal';
 import { Card, Pill, StatTile } from '../../../components/ui';
 import { theme, contentWidth, type Tone } from '../../../lib/theme';
+import { useResponsive } from '../../../lib/responsive';
 
 const EMPTY: MyPaymentsSummary = { earnedCents: 0, claimedCents: 0, paidCents: 0, outstandingCents: 0 };
 
@@ -52,6 +53,7 @@ const STATUS: Record<MyDraw['status'], { label: string; tone: Tone }> = {
 
 export default function Payments() {
   const router = useRouter();
+  const { contentMaxWidth } = useResponsive();
   const [lines, setLines] = useState<MyDraw[]>([]);
   const [summary, setSummary] = useState<MyPaymentsSummary>(EMPTY);
   const [loading, setLoading] = useState(true);
@@ -109,7 +111,7 @@ export default function Payments() {
   );
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <Text style={styles.title}>Payments</Text>
 
       {loading ? (
@@ -120,7 +122,9 @@ export default function Payments() {
         <FlatList
           data={lines}
           keyExtractor={(l) => l.id}
-          contentContainerStyle={lines.length === 0 ? styles.emptyWrap : styles.listContent}
+          contentContainerStyle={
+            lines.length === 0 ? styles.emptyWrap : [styles.listContent, { maxWidth: contentMaxWidth }]
+          }
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

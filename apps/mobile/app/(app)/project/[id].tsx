@@ -1,15 +1,18 @@
 import { useCallback, useState } from 'react';
 import { View, Text, FlatList, Pressable, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { listProjectTasks, canManageProjectById, type MyTask } from '../../../lib/data/tasks';
 import { getProjectConversationId, getUnreadCount } from '../../../lib/data/chat';
 import { TaskCard } from '../../../components/task-card';
 import { theme, contentWidth } from '../../../lib/theme';
+import { useResponsive } from '../../../lib/responsive';
 
 export default function ProjectScreen() {
   const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
   const router = useRouter();
+  const { columns, contentMaxWidth } = useResponsive();
   const [tasks, setTasks] = useState<MyTask[]>([]);
   const [canManage, setCanManage] = useState(false);
   const [teamUnread, setTeamUnread] = useState(0);
@@ -36,7 +39,7 @@ export default function ProjectScreen() {
   );
 
   return (
-    <View style={styles.screen}>
+    <SafeAreaView style={styles.screen} edges={['left', 'right', 'bottom']}>
       <Stack.Screen
         options={{
           title: name ?? 'Project',
@@ -60,8 +63,13 @@ export default function ProjectScreen() {
       ) : (
         <FlatList
           data={tasks}
+          key={`cols-${columns}`}
+          numColumns={columns}
+          columnWrapperStyle={columns > 1 ? styles.row : undefined}
           keyExtractor={(t) => t.id}
-          contentContainerStyle={tasks.length === 0 ? styles.emptyWrap : styles.listContent}
+          contentContainerStyle={
+            tasks.length === 0 ? styles.emptyWrap : [styles.listContent, { maxWidth: contentMaxWidth }]
+          }
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -108,10 +116,14 @@ export default function ProjectScreen() {
             </View>
           }
           ListEmptyComponent={<Text style={styles.empty}>No tasks in this project yet.</Text>}
-          renderItem={({ item }) => <TaskCard task={item} subtitle={`Priority: ${item.priority}`} />}
+          renderItem={({ item }) => (
+            <View style={columns > 1 ? styles.col : undefined}>
+              <TaskCard task={item} subtitle={`Priority: ${item.priority}`} />
+            </View>
+          )}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -119,6 +131,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.color.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { padding: 16, gap: 10, ...contentWidth },
+  row: { gap: 10 },
+  col: { flex: 1 },
   header: { gap: 10, marginBottom: 4 },
   teamChat: {
     flexDirection: 'row',

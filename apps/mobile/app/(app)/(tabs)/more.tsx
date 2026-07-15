@@ -7,6 +7,7 @@ import { supabase } from '../../../lib/supabase';
 import { useSession } from '../../../lib/auth';
 import { Card, Avatar } from '../../../components/ui';
 import { theme, contentWidth } from '../../../lib/theme';
+import { useResponsive } from '../../../lib/responsive';
 
 interface Profile {
   name: string;
@@ -17,6 +18,7 @@ interface Profile {
 export default function More() {
   const { session } = useSession();
   const router = useRouter();
+  const { contentMaxWidth } = useResponsive();
   const [profile, setProfile] = useState<Profile | null>(null);
 
   const load = useCallback(async () => {
@@ -49,8 +51,8 @@ export default function More() {
   );
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+      <ScrollView contentContainerStyle={[styles.content, { maxWidth: contentMaxWidth }]}>
         <Text style={styles.title}>More</Text>
 
         {!profile ? (

@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { listInbox, type InboxItem } from '../../../lib/data/chat';
 import { theme, contentWidth } from '../../../lib/theme';
+import { useResponsive } from '../../../lib/responsive';
 
 function shortTime(iso: string | null): string {
   if (!iso) return '';
@@ -18,6 +19,7 @@ function shortTime(iso: string | null): string {
 
 export default function Messages() {
   const router = useRouter();
+  const { contentMaxWidth } = useResponsive();
   const [items, setItems] = useState<InboxItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -46,7 +48,7 @@ export default function Messages() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <Text style={styles.title}>Messages</Text>
 
       {loading ? (
@@ -57,7 +59,9 @@ export default function Messages() {
         <FlatList
           data={items}
           keyExtractor={(i) => i.conversationId}
-          contentContainerStyle={items.length === 0 ? styles.emptyWrap : styles.listContent}
+          contentContainerStyle={
+            items.length === 0 ? styles.emptyWrap : [styles.listContent, { maxWidth: contentMaxWidth }]
+          }
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

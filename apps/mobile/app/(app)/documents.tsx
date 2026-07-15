@@ -29,7 +29,8 @@ import {
   type MyDocument,
 } from '../../lib/data/contractor-documents';
 import { Card, Pill } from '../../components/ui';
-import { theme, type Tone } from '../../lib/theme';
+import { theme, contentWidth, type Tone } from '../../lib/theme';
+import { useResponsive } from '../../lib/responsive';
 
 const TONE: Record<ContractorDocStatus, Tone> = {
   submitted: { bg: theme.color.accentSoft, fg: theme.color.accent, bar: theme.color.accent },
@@ -38,6 +39,7 @@ const TONE: Record<ContractorDocStatus, Tone> = {
 };
 
 export default function Documents() {
+  const { columns, contentMaxWidth } = useResponsive();
   const [docs, setDocs] = useState<MyDocument[]>([]);
   const [orgs, setOrgs] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,7 +59,7 @@ export default function Documents() {
   );
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <Stack.Screen options={{ title: 'Documents' }} />
       <View style={styles.head}>
         <Text style={styles.title}>Compliance documents</Text>
@@ -74,11 +76,14 @@ export default function Documents() {
       ) : (
         <FlatList
           data={docs}
+          key={`cols-${columns}`}
+          numColumns={columns}
+          columnWrapperStyle={columns > 1 ? styles.row : undefined}
           keyExtractor={(d) => d.id}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, { maxWidth: contentMaxWidth }]}
           ListEmptyComponent={<Text style={styles.empty}>No documents on file yet.</Text>}
           renderItem={({ item }) => (
-            <Card style={styles.doc}>
+            <Card style={[styles.doc, columns > 1 ? styles.col : null]}>
               <View style={styles.docTop}>
                 <Text style={styles.docTitle}>{item.title || CONTRACTOR_DOC_TYPE_LABEL[item.docType]}</Text>
                 <Pill label={CONTRACTOR_DOC_STATUS_LABEL[item.status]} tone={TONE[item.status]} />
@@ -216,7 +221,9 @@ const styles = StyleSheet.create({
   sub: { fontSize: 13, color: theme.color.subtle, paddingHorizontal: 20, marginTop: 2 },
   addBtn: { backgroundColor: theme.color.dark, borderRadius: theme.radius.pill, paddingHorizontal: 16, paddingVertical: 8 },
   addText: { color: theme.color.onDark, fontWeight: '700', fontSize: 13 },
-  list: { padding: 16, gap: 10 },
+  list: { padding: 16, gap: 10, ...contentWidth },
+  row: { gap: 10 },
+  col: { flex: 1 },
   empty: { color: theme.color.subtle, fontSize: 14, textAlign: 'center', marginTop: 32 },
   doc: { gap: 4 },
   docTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
