@@ -167,10 +167,20 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
         </div>
       </section>
 
-      {/* Contractor payment requests (buy-side; approve → pay → POP) */}
-      {paymentRequests.length > 0 && (
+      {/* Contractor payment requests (buy-side; approve → pay → POP). Always shown
+          to managers so the capability is visible before any request exists. */}
+      {(canManagePayments || paymentRequests.length > 0) && (
         <section className="mt-8">
           <h2 className="mb-3 text-sm font-semibold">Payment requests</h2>
+          {paymentRequests.length === 0 ? (
+            <Card>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                No payment requests yet. When a contractor requests payment (against a draw or as an
+                invoice) from their <span className="font-medium">Payments &amp; documents</span> page,
+                it appears here to approve, pay, and attach a proof of payment.
+              </p>
+            </Card>
+          ) : (
           <Card className="p-0">
             <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
               {paymentRequests.map((r) => (
@@ -216,6 +226,7 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
               ))}
             </ul>
           </Card>
+          )}
         </section>
       )}
 
