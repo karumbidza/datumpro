@@ -66,13 +66,16 @@ export interface SidebarProject {
 export interface SidebarData {
   projects: SidebarProject[];
   myTaskCount: number;
+  /** Whether the user has any contractor activity — drives the personal
+   *  "Payments & documents" nav item (hidden for pure admins/PMs). */
+  isContractor: boolean;
 }
 
-/** Lightweight data for the sidebar: the active org's projects and the count of
- *  the user's open (not-done) assigned tasks. */
+/** Lightweight data for the sidebar: the active org's projects, the count of the
+ *  user's open (not-done) assigned tasks, and whether they're a contractor. */
 export async function getSidebarData(orgId: string, userId: string): Promise<SidebarData> {
   const supabase = await createClient();
-  const [projectsRes, taskCountRes] = await Promise.all([
+  const [projectsRes, taskCountRes, assignedRes, reqRes, docRes] = await Promise.all([
     supabase
       .from('projects')
       .select('id, name')
@@ -84,10 +87,17 @@ export async function getSidebarData(orgId: string, userId: string): Promise<Sid
       .eq('org_id', orgId)
       .eq('assignee_id', userId)
       .neq('status', 'done'),
+    // Contractor signals: assigned to any task, or has raised payment requests /
+    // filed compliance documents.
+    supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('assignee_id', userId),
+    supabase.from('contractor_payment_requests').select('id', { count: 'exact', head: true }).eq('contractor_id', userId),
+    supabase.from('contractor_documents').select('id', { count: 'exact', head: true }).eq('contractor_id', userId),
   ]);
 
   return {
     projects: (projectsRes.data ?? []) as SidebarProject[],
     myTaskCount: taskCountRes.count ?? 0,
+    isContractor:
+      (assignedRes.count ?? 0) > 0 || (reqRes.count ?? 0) > 0 || (docRes.count ?? 0) > 0,
   };
 }

@@ -1,14 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import type { InvoiceStatus, PaymentStatus, PopStatus } from '@datumpro/shared/domain';
 
-export interface BudgetLineRow {
-  id: string;
-  description: string;
-  category: string | null;
-  quantity: number;
-  rate_cents: number;
-  budget_amount_cents: number;
-}
 export interface InvoiceRow {
   id: string;
   number: string;
@@ -38,17 +30,6 @@ export interface PopRow {
   status: PopStatus;
   submitted_by: string | null;
   note: string | null;
-}
-
-export async function listBudgetLines(projectId: string): Promise<BudgetLineRow[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('budget_lines')
-    .select('id, description, category, quantity, rate_cents, budget_amount_cents')
-    .eq('project_id', projectId)
-    .order('created_at', { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as BudgetLineRow[];
 }
 
 export interface BudgetBillingRow {

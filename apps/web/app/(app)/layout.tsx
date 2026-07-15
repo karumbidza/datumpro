@@ -16,7 +16,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     return <div className="min-h-screen">{children}</div>;
   }
 
-  const { projects, myTaskCount } = await getSidebarData(ctx.active.orgId, ctx.userId);
+  const { projects, myTaskCount, isContractor } = await getSidebarData(ctx.active.orgId, ctx.userId);
   // Nav gating derives from the shared permission map so it always matches the
   // capabilities the DB enforces. PM is a delivery manager: creates projects,
   // views finance — but member management stays owner/admin.
@@ -35,6 +35,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         canManageMembers={canManageMembers}
         canCreateProject={canCreateProject}
         canViewFinance={canViewFinance}
+        showMyPayments={isContractor}
         myTaskCount={myTaskCount}
       />
       <div className="flex min-w-0 flex-1 flex-col">
@@ -46,6 +47,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           canManageMembers={canManageMembers}
           canCreateProject={canCreateProject}
           canViewFinance={canViewFinance}
+          showMyPayments={isContractor}
         />
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>

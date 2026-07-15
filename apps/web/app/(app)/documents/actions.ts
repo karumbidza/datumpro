@@ -62,14 +62,3 @@ export async function rejectContractorDocument(formData: FormData): Promise<Resu
     review_note: (formData.get('reviewNote') as string) || null,
   });
 }
-
-/** Contractor removes their own (or staff removes any) document. */
-export async function deleteContractorDocument(formData: FormData): Promise<Result> {
-  const supabase = await createClient();
-  const id = String(formData.get('id') ?? '');
-  const { error } = await supabase.from('contractor_documents').delete().eq('id', id);
-  if (error) return { ok: false, error: error.message };
-  revalidatePath('/payments');
-  revalidatePath('/org/documents');
-  return { ok: true };
-}

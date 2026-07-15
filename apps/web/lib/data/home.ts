@@ -30,65 +30,6 @@ async function managedProjectIds(
   return ((data ?? []) as { project_id: string }[]).map((r) => r.project_id);
 }
 
-export interface SignoffItem {
-  id: string;
-  title: string;
-  projectId: string;
-  projectName: string;
-  assigneeName: string;
-  submittedAt: string | null;
-}
-
-/** Tasks awaiting sign-off that the caller can actually approve. */
-export async function listPendingSignoffs(
-  orgId: string,
-  userId: string,
-  role: OrgRole,
-): Promise<SignoffItem[]> {
-  const supabase = await createClient();
-  const managed = await managedProjectIds(supabase, userId, role);
-  if (managed !== 'all' && managed.length === 0) return [];
-
-  let q = supabase
-    .from('tasks')
-    .select('id, title, project_id, assignee_id, submitted_at')
-    .eq('org_id', orgId)
-    .eq('status', 'submitted')
-    .order('submitted_at', { ascending: true });
-  if (managed !== 'all') q = q.in('project_id', managed);
-  const { data } = await q;
-  const rows = (data ?? []) as {
-    id: string;
-    title: string;
-    project_id: string;
-    assignee_id: string | null;
-    submitted_at: string | null;
-  }[];
-  if (rows.length === 0) return [];
-
-  const projectIds = [...new Set(rows.map((r) => r.project_id))];
-  const userIds = [...new Set(rows.map((r) => r.assignee_id).filter(Boolean))] as string[];
-  const [{ data: projs }, profsRes] = await Promise.all([
-    supabase.from('projects').select('id, name').in('id', projectIds),
-    userIds.length
-      ? supabase.from('profiles').select('id, display_name').in('id', userIds)
-      : Promise.resolve({ data: [] as { id: string; display_name: string | null }[] }),
-  ]);
-  const pName = new Map(((projs ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name]));
-  const uName = new Map(
-    ((profsRes.data ?? []) as { id: string; display_name: string | null }[]).map((u) => [u.id, u.display_name]),
-  );
-
-  return rows.map((r) => ({
-    id: r.id,
-    title: r.title,
-    projectId: r.project_id,
-    projectName: pName.get(r.project_id) ?? 'Project',
-    assigneeName: r.assignee_id ? uName.get(r.assignee_id) ?? 'Someone' : 'Unassigned',
-    submittedAt: r.submitted_at,
-  }));
-}
-
 export type ApprovalKind = 'signoff' | 'extension' | 'variation';
 
 export interface PendingApproval {
@@ -240,11 +181,6 @@ export async function listPendingApprovals(
   ];
   items.sort((a, b) => (a.at ?? '').localeCompare(b.at ?? ''));
   return items;
-}
-
-/** Kind label for the UI. */
-export function approvalKindLabel(kind: ApprovalKind): string {
-  return KIND_LABEL[kind];
 }
 
 export interface MyTaskItem {

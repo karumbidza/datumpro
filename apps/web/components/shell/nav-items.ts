@@ -33,6 +33,7 @@ export function computeNav(
   activeProject: SidebarProject | null,
   canManageMembers: boolean,
   canViewFinance = false,
+  showMyPayments = true,
 ): NavItem[] {
   if (activeProject) {
     return [
@@ -47,7 +48,9 @@ export function computeNav(
   return [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'All projects', href: '/projects', icon: FolderOpen },
-    { name: 'My payments', href: '/payments', icon: Wallet },
+    ...(showMyPayments
+      ? [{ name: 'Payments & documents', href: '/payments', icon: Wallet }]
+      : []),
     ...(canViewFinance ? [{ name: 'Finance', href: '/finance', icon: DollarSign }] : []),
     ...(canManageMembers
       ? [

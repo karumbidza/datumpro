@@ -16,16 +16,17 @@ interface Props {
   canManageMembers: boolean;
   canCreateProject: boolean;
   canViewFinance: boolean;
+  showMyPayments?: boolean;
 }
 
 /** Mobile-only top bar + slide-over drawer. The desktop sidebar is hidden below
  *  `md`, so this is the sole navigation on phones. */
-export function MobileNav({ projects, orgs, activeOrgId, email, canManageMembers, canViewFinance }: Props) {
+export function MobileNav({ projects, orgs, activeOrgId, email, canManageMembers, canViewFinance, showMyPayments = true }: Props) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
   const activeProject = projects.find((p) => p.id === activeProjectId(pathname)) ?? null;
-  const nav = computeNav(activeProject, canManageMembers, canViewFinance);
+  const nav = computeNav(activeProject, canManageMembers, canViewFinance, showMyPayments);
   const activeOrgName = orgs.find((o) => o.orgId === activeOrgId)?.name ?? 'DatumPro';
 
   // Close the drawer whenever the route changes.

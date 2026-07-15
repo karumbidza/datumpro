@@ -76,7 +76,7 @@ export default async function MyPaymentsPage() {
       <Link href="/dashboard" className="text-xs text-zinc-500 hover:underline">
         ← Dashboard
       </Link>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight">My payments</h1>
+      <h1 className="mt-1 text-2xl font-semibold tracking-tight">Payments &amp; documents</h1>
       <p className="text-sm text-zinc-500 dark:text-zinc-400">
         Your progress draws across every project. Claim a draw when the work it covers is done — your
         project manager reviews and pays it.

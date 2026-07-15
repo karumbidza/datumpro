@@ -21,13 +21,6 @@ async function requireUser() {
   return { supabase, user };
 }
 
-/** Reload the recent window (server truth) — called by the client on any channel
- *  event. Reuses the RLS-scoped data layer, incl. names + reactions. */
-export async function loadMessages(conversationId: string): Promise<ChatMessage[]> {
-  const { user } = await requireUser();
-  return listMessages(conversationId, user.id);
-}
-
 /** Metadata for a file the client has already uploaded to the `chat-media`
  *  bucket. The bytes never pass through the server action — only the key. */
 export interface AttachmentInput {
