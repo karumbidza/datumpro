@@ -3,7 +3,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import {
-  listMessages,
   listMessagesBefore,
   listMessagesSince,
   getMessage,
@@ -11,6 +10,7 @@ import {
   type ChatMessage,
   type ChatSearchResult,
 } from '@/lib/data/chat';
+import { listMemberActivity, type ActivityItem } from '@/lib/data/chat-roster';
 
 async function requireUser() {
   const supabase = await createClient();
@@ -19,6 +19,16 @@ async function requireUser() {
   } = await supabase.auth.getUser();
   if (!user) redirect('/sign-in');
   return { supabase, user };
+}
+
+/** A roster member's recent activity — lazily loaded when the People rail detail
+ *  view opens. RLS scopes the audit log to the caller's org. */
+export async function getMemberActivity(
+  projectId: string,
+  userId: string,
+): Promise<ActivityItem[]> {
+  await requireUser();
+  return listMemberActivity(projectId, userId);
 }
 
 /** Metadata for a file the client has already uploaded to the `chat-media`

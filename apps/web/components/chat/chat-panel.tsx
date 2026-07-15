@@ -12,12 +12,15 @@ import {
   loadEarlier,
   loadSince,
   loadOne,
+  getMemberActivity,
   type AttachmentInput,
 } from '@/app/(app)/projects/[projectId]/chat/actions';
 import type { ChatAttachment, ChatMessage, ChatSearchResult } from '@/lib/data/chat';
+import type { RosterMember } from '@/lib/data/chat-roster';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, Paperclip, Mic, Square, X, Download, FileText, Search } from '@/components/icons';
+import { MessageCircle, Paperclip, Mic, Square, X, Download, FileText, Search, Users } from '@/components/icons';
 import { NotifyToggle } from '@/components/chat/notify-toggle';
+import { PeopleRail } from '@/components/chat/people-rail';
 
 const EMOJIS = ['👍', '❤️', '😂', '🎉', '✅'];
 const MAX_FILE_BYTES = 50 * 1024 * 1024; // 50 MB per file
@@ -35,6 +38,9 @@ interface Props {
   title?: string;
   subtitle?: string;
   className?: string;
+  /** Roster for the People rail. When provided, the panel renders the two-pane
+   *  layout (conversation + presence rail). Omit for a bare conversation. */
+  members?: RosterMember[];
 }
 
 type AttachmentKind = AttachmentInput['kind'];
@@ -173,6 +179,7 @@ export function ChatPanel({
   title,
   subtitle,
   className = '',
+  members,
 }: Props) {
   const supabase = useMemo(() => createClient(), []);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
@@ -183,7 +190,9 @@ export function ChatPanel({
   const [editingBody, setEditingBody] = useState('');
   const [replyTo, setReplyTo] = useState<{ id: string; name: string; snippet: string } | null>(null);
   const [typing, setTyping] = useState<Record<string, string>>({});
-  const [onlineOthers, setOnlineOthers] = useState(0);
+  const [onlineIds, setOnlineIds] = useState<Set<string>>(() => new Set());
+  const [railOpen, setRailOpen] = useState(false);
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingAttachment[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
@@ -200,6 +209,7 @@ export function ChatPanel({
   const earliestSeqRef = useRef(initialMessages[0]?.seq ?? 0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   const shouldScrollRef = useRef(true); // scroll to bottom on first paint
   const prependAnchor = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -303,10 +313,11 @@ export function ChatPanel({
         })
         .on('presence', { event: 'sync' }, () => {
           const state = channel.presenceState() as Record<string, { user_id?: string }[]>;
+          // Keep the full online set (self included) so the People rail can show
+          // "You" as active; the header's "N online" derives an others-count.
           const ids = new Set<string>();
           for (const arr of Object.values(state)) for (const m of arr) if (m.user_id) ids.add(m.user_id);
-          ids.delete(currentUserId);
-          setOnlineOthers(ids.size);
+          setOnlineIds(ids);
         })
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
@@ -566,8 +577,36 @@ export function ChatPanel({
   const lastOwn = [...messages].reverse().find((m) => m.senderId === currentUserId);
   const typingNames = Object.values(typing);
 
+  // Presence-derived counts. `onlineOthers` (excludes self) drives the legacy
+  // green indicator; `onlineCount` (roster ∩ online) drives the People rail pill.
+  const onlineOthers = onlineIds.size - (onlineIds.has(currentUserId) ? 1 : 0);
+  const roster = members ?? null;
+  const onlineCount = roster ? roster.filter((m) => onlineIds.has(m.userId)).length : onlineOthers;
+
+  const focusComposer = useCallback((member: RosterMember) => {
+    setRailOpen(false);
+    setSelectedMemberId(null);
+    // @-mention-free: just drop focus in the composer so a reply can be typed.
+    composerRef.current?.focus();
+    void member;
+  }, []);
+
+  const railProps = roster
+    ? {
+        members: roster,
+        onlineIds,
+        currentUserId,
+        selectedId: selectedMemberId,
+        onSelect: setSelectedMemberId,
+        onBack: () => setSelectedMemberId(null),
+        onMessage: focusComposer,
+        loadActivity: (userId: string) => getMemberActivity(projectId, userId),
+      }
+    : null;
+
   return (
-    <div className={`flex flex-col rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950 ${className}`}>
+    <div className={`flex min-h-0 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950 ${className}`}>
+      <div className="flex min-w-0 flex-1 flex-col">
       {title && (
         <header className="flex items-center gap-2 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
           <MessageCircle size={18} className="text-zinc-500" />
@@ -575,10 +614,30 @@ export function ChatPanel({
             {title} <span className="text-zinc-400">({messages.length})</span>
           </h2>
           <div className="ml-auto flex items-center gap-2">
-            {onlineOthers > 0 && (
-              <span className="flex items-center gap-1 text-[11px] text-green-600 dark:text-green-400">
-                ● {onlineOthers} online
+            {roster ? (
+              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                {roster.length} members · {onlineCount} online
               </span>
+            ) : (
+              onlineOthers > 0 && (
+                <span className="flex items-center gap-1 text-[11px] text-green-600 dark:text-green-400">
+                  ● {onlineOthers} online
+                </span>
+              )
+            )}
+            {railProps && (
+              <button
+                type="button"
+                onClick={() => setRailOpen(true)}
+                title="People"
+                aria-label="Show people"
+                className="flex items-center gap-1 rounded p-1 text-zinc-400 hover:bg-zinc-100 lg:hidden dark:hover:bg-zinc-800"
+              >
+                <Users size={16} />
+                {onlineCount > 0 && (
+                  <span className="text-[11px] font-medium text-green-600">{onlineCount}</span>
+                )}
+              </button>
             )}
             <NotifyToggle />
             <button
@@ -833,6 +892,7 @@ export function ChatPanel({
 
           <div className="rounded-lg border border-zinc-200 focus-within:border-brand-500 dark:border-zinc-700">
             <textarea
+              ref={composerRef}
               value={input}
               onChange={onInputChange}
               onKeyDown={(e) => {
@@ -901,6 +961,31 @@ export function ChatPanel({
           </div>
           <p className="mt-1 text-[10px] text-zinc-400">Press ⌘/Ctrl + Enter to post.</p>
         </div>
+      )}
+      </div>
+
+      {railProps && (
+        <>
+          {/* Desktop rail — always visible ≥ lg */}
+          <aside className="hidden min-h-0 w-[300px] flex-shrink-0 flex-col border-l border-zinc-200 bg-white lg:flex dark:border-zinc-800 dark:bg-zinc-950">
+            <PeopleRail {...railProps} />
+          </aside>
+
+          {/* Mobile — slide-over sheet from the right */}
+          {railOpen && (
+            <div className="fixed inset-0 z-40 flex lg:hidden">
+              <button
+                type="button"
+                aria-label="Close people"
+                onClick={() => setRailOpen(false)}
+                className="flex-1 bg-black/30"
+              />
+              <aside className="flex w-full max-w-[340px] flex-col bg-white shadow-xl dark:bg-zinc-950">
+                <PeopleRail {...railProps} onClose={() => setRailOpen(false)} />
+              </aside>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

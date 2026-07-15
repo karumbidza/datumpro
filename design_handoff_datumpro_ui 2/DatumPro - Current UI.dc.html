@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    * { box-sizing: border-box; }
+    button { font-family: inherit; }
+    input, select, textarea { font-family: inherit; }
+  </style>
+</helmet>
+
+<div style="height:100vh;background:#ffffff;color:#18181b;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;-webkit-font-smoothing:antialiased;font-size:16px">
+
+<sc-if value="{{ isSignin }}">
+  <main data-screen-label="Sign in" style="margin:0 auto;display:flex;min-height:100vh;max-width:448px;flex-direction:column;justify-content:center;padding:0 24px">
+    <div style="border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:20px">
+      <h1 style="margin:0;font-size:18px;font-weight:600;letter-spacing:-0.025em">Sign in to DatumPro</h1>
+      <div style="margin-top:16px;display:flex;gap:4px;border-radius:6px;background:#f4f4f5;padding:4px;font-size:14px">
+        <button style="flex:1;border-radius:4px;padding:6px 12px;background:#ffffff;box-shadow:0 1px 2px rgba(0,0,0,0.05);border:none;cursor:pointer;color:#18181b">Password</button>
+        <button style="flex:1;border-radius:4px;padding:6px 12px;background:transparent;border:none;cursor:pointer;color:#71717a">Magic link</button>
+      </div>
+      <div style="margin-top:20px;display:flex;flex-direction:column;gap:12px">
+        <input type="email" placeholder="you@company.com" style="width:100%;border-radius:6px;border:1px solid #e4e4e7;background:transparent;padding:8px 12px;font-size:14px;outline:none" />
+        <input type="password" placeholder="Password" style="width:100%;border-radius:6px;border:1px solid #e4e4e7;background:transparent;padding:8px 12px;font-size:14px;outline:none" />
+        <div style="display:flex;gap:8px">
+          <button onClick="{{ goDashboard }}" style="flex:1;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:500;background:#2563eb;color:#ffffff;border:none;cursor:pointer" style-hover="background:#1d4ed8">Sign in</button>
+          <button style="display:inline-flex;align-items:center;justify-content:center;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:500;background:transparent;color:#18181b;border:1px solid #e4e4e7;cursor:pointer" style-hover="background:#fafafa">Create account</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</sc-if>
+
+<sc-if value="{{ isApp }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;height:100vh;overflow:hidden">
+
+  <!-- ═══════════ Sidebar ═══════════ -->
+  <aside style="display:flex;height:100vh;width:256px;flex-shrink:0;flex-direction:column;border-right:1px solid #e4e4e7;background:#ffffff">
+    <div style="position:relative;display:flex;height:70px;align-items:center;border-bottom:1px solid #e4e4e7;padding:0 12px">
+      <button onClick="{{ toggleSwitcher }}" style="display:flex;width:100%;align-items:center;justify-content:space-between;border-radius:6px;padding:8px;text-align:left;background:transparent;border:none;cursor:pointer" style-hover="background:#f4f4f5">
+        <span style="display:flex;min-width:0;align-items:center;gap:12px">
+          <svg viewBox="0 0 64 64" width="32" height="32" style="flex-shrink:0;border-radius:6px"><rect width="64" height="64" rx="14" fill="#0a0a0a"></rect><rect x="16" y="17" width="10" height="10" rx="2.5" fill="#ffffff"></rect><rect x="32" y="19" width="17" height="5" rx="2" fill="#ffffff"></rect><rect x="16" y="32" width="10" height="10" rx="2.5" fill="#ffffff"></rect><rect x="32" y="34" width="12" height="5" rx="2" fill="#ffffff"></rect><rect x="16" y="47" width="10" height="5" rx="2" fill="rgba(255,255,255,0.28)"></rect><rect x="32" y="47" width="17" height="5" rx="2" fill="rgba(255,255,255,0.28)"></rect></svg>
+          <span style="min-width:0">
+            <span style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:600;color:#18181b">{{ switcherLabel }}</span>
+            <span style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#71717a">3 projects</span>
+          </span>
+        </span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a1a1aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="m6 9 6 6 6-6"></path></svg>
+      </button>
+
+      <sc-if value="{{ switcherOpen }}">
+        <div style="position:absolute;left:12px;top:100%;z-index:50;max-height:384px;width:240px;overflow-y:auto;border-radius:6px;border:1px solid #e4e4e7;background:#ffffff;box-shadow:0 10px 15px -3px rgba(0,0,0,0.1),0 4px 6px -4px rgba(0,0,0,0.1)">
+          <div style="padding:6px">
+            <button onClick="{{ goDashboardFromSwitcher }}" style="display:flex;width:100%;align-items:center;gap:12px;border-radius:4px;padding:8px;background:transparent;border:none;cursor:pointer;text-align:left" style-hover="background:#f4f4f5">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#71717a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H18a2 2 0 0 1 2 2v2"></path></svg>
+              <span style="flex:1;font-size:14px;font-weight:500;color:#27272a">All projects</span>
+              <sc-if value="{{ notInProject }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></sc-if>
+            </button>
+          </div>
+          <p style="margin:0;padding:4px 12px 0;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;color:#a1a1aa">Projects</p>
+          <div style="padding:6px">
+            <button onClick="{{ goProjectFromSwitcher }}" style="display:flex;width:100%;align-items:center;gap:12px;border-radius:4px;padding:8px;background:transparent;border:none;cursor:pointer;text-align:left" style-hover="background:#f4f4f5">
+              <span style="width:8px;height:8px;flex-shrink:0;border-radius:9999px;background:#2563eb"></span>
+              <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;color:#27272a">Kariba Heights Apartments</span>
+              <sc-if value="{{ inProject }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M20 6 9 17l-5-5"></path></svg></sc-if>
+            </button>
+            <button style="display:flex;width:100%;align-items:center;gap:12px;border-radius:4px;padding:8px;background:transparent;border:none;cursor:pointer;text-align:left" style-hover="background:#f4f4f5">
+              <span style="width:8px;height:8px;flex-shrink:0;border-radius:9999px;background:#2563eb"></span>
+              <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;color:#27272a">Msasa Warehouse Fit-out</span>
+            </button>
+            <button style="display:flex;width:100%;align-items:center;gap:12px;border-radius:4px;padding:8px;background:transparent;border:none;cursor:pointer;text-align:left" style-hover="background:#f4f4f5">
+              <span style="width:8px;height:8px;flex-shrink:0;border-radius:9999px;background:#2563eb"></span>
+              <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;color:#27272a">Chinhoyi Clinic Block B</span>
+            </button>
+          </div>
+          <div style="border-top:1px solid #e4e4e7;padding:6px">
+            <button style="display:flex;width:100%;align-items:center;gap:8px;border-radius:4px;padding:8px;font-size:14px;font-weight:500;color:#2563eb;background:transparent;border:none;cursor:pointer;text-align:left" style-hover="background:#f4f4f5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg> New project
+            </button>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+
+    <nav style="flex:1;overflow-y:auto;padding:8px">
+      <sc-if value="{{ notInProject }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <div onClick="{{ goDashboard }}" style="display:flex;align-items:center;gap:12px;border-radius:6px;padding:8px 12px;font-size:14px;cursor:pointer;background:{{ nav.dashboard.bg }};color:{{ nav.dashboard.fg }};font-weight:{{ nav.dashboard.fw }}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>
+            Dashboard
+          </div>
+          <div onClick="{{ goProjects }}" style="display:flex;align-items:center;gap:12px;border-radius:6px;padding:8px 12px;font-size:14px;cursor:pointer;background:{{ nav.projects.bg }};color:{{ nav.projects.fg }};font-weight:{{ nav.projects.fw }}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H18a2 2 0 0 1 2 2v2"></path></svg>
+            All projects
+          </div>
+          <div onClick="{{ goPayments }}" style="display:flex;align-items:center;gap:12px;border-radius:6px;padding:8px 12px;font-size:14px;cursor:pointer;background:{{ nav.payments.bg }};color:{{ nav.payments.fg }};font-weight:{{ nav.payments.fw }}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2"></path><path d="M3 7h16a2 2 0 0 1 2 2v0a2 2 0 0 1-2 2H3"></path><path d="M16 11h.01"></path></svg>
+            My payments
+          </div>
+          <div onClick="{{ goFinanceOrg }}" style="display:flex;align-items:center;gap:12px;border-radius:6px;padding:8px 12px;font-size:14px;cursor:pointer;background:{{ nav.financeOrg.bg }};color:{{ nav.financeOrg.fg }};font-weight:{{ nav.financeOrg.fw }}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"></path><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            Finance
+          </div>
+          <div onClick="{{ goOrg }}" style="display:flex;align-items:center;gap:12px;border-radius:6px;padding:8px 12px;font-size:14px;cursor:pointer;background:{{ nav.org.bg }};color:{{ nav.org.fg }};font-weight:{{ nav.org.fw }}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2"></rect><path d="M9 22v-4h6v4"></path><path d="M8 6h.01M16 6h.01M8 10h.01M16 10h.01M8 14h.01M16 14h.01"></path></svg>
+            Organization
+          </div>
+        </div>
+        <div onClick="{{ goDashboard }}" style="margin-top:24px;display:flex;align-items:center;justify-content:space-between;border-radius:6px;padding:8px 12px;cursor:pointer" style-hover="background:#fafafa">
+          <span style="display:flex;align-items:center;gap:8px">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#71717a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11 3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+            <span style="font-size:14px;font-weight:500;color:#3f3f46">My Tasks</span>
+          </span>
+          <span style="border-radius:4px;background:#e4e4e7;padding:2px 8px;font-size:12px;color:#3f3f46">4</span>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ inProject }}">
+        <p style="margin:0;padding:8px 12px 4px;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;color:#a1a1aa">Kariba Heights Apartments</p>
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <div onClick="{{ goProject }}" style="display:flex;align-items:center;gap:12px;border-radius:6px;padding:8px 12px;font-size:14px;cursor:pointer;background:{{ nav.project.bg }};color:{{ nav.project.fg }};font-weight:{{ nav.project.fw }}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>
+            Overview
+          </div>
+          <div onClick="{{ goTasks }}" style="display:flex;align-items:center;gap:12px;border-radius:6px;padding:8px 12px;font-size:14px;cursor:pointer;background:{{ nav.tasks.bg }};color:{{ nav.tasks.fg }};font-weight:{{ nav.tasks.fw }}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11 3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+            Tasks
+          </div>
+          <div onClick="{{ goFinance }}" style="display:flex;align-items:center;gap:12px;border-radius:6px;padding:8px 12px;font-size:14px;cursor:pointer;background:{{ nav.finance.bg }};color:{{ nav.finance.fg }};font-weight:{{ nav.finance.fw }}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"></path><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            Finance
+          </div>
+          <div onClick="{{ goRequests }}" style="display:flex;align-items:center;gap:12px;border-radius:6px;padding:8px 12px;font-size:14px;cursor:pointer;background:{{ nav.requests.bg }};color:{{ nav.requests.fg }};font-weight:{{ nav.requests.fw }}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v5h5"></path><path d="M9 13h6"></path><path d="M9 17h6"></path></svg>
+            Requests
+          </div>
+          <div onClick="{{ goChat }}" style="display:flex;align-items:center;gap:12px;border-radius:6px;padding:8px 12px;font-size:14px;cursor:pointer;background:{{ nav.chat.bg }};color:{{ nav.chat.fg }};font-weight:{{ nav.chat.fw }}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            Chat
+          </div>
+          <div onClick="{{ goTeam }}" style="display:flex;align-items:center;gap:12px;border-radius:6px;padding:8px 12px;font-size:14px;cursor:pointer;background:{{ nav.team.bg }};color:{{ nav.team.fg }};font-weight:{{ nav.team.fw }}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            Team
+          </div>
+        </div>
+      </sc-if>
+    </nav>
+
+    <div style="border-top:1px solid #e4e4e7;padding:12px">
+      <button style="display:flex;width:100%;align-items:center;justify-content:space-between;gap:8px;border-radius:4px;padding:2px 4px;text-align:left;background:transparent;border:none;cursor:pointer" style-hover="background:#f4f4f5">
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:500;color:#52525b">Grafaid Engineers</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a1a1aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="m6 9 6 6 6-6"></path></svg>
+      </button>
+      <div style="margin-top:4px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span style="min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#71717a;cursor:pointer" style-hover="color:#18181b">tendai@grafaid.co.zw</span>
+        <button onClick="{{ goSignin }}" title="Sign out" style="display:flex;align-items:center;gap:4px;border-radius:4px;padding:4px 8px;font-size:12px;color:#71717a;background:transparent;border:none;cursor:pointer" style-hover="background:#f4f4f5;color:#18181b">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="m16 17 5-5-5-5"></path><path d="M21 12H9"></path></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ═══════════ Main ═══════════ -->
+  <main style="flex:1;min-width:0;overflow-y:auto">
+
+    <!-- ── Dashboard ── -->
+    <sc-if value="{{ sDashboard }}" hint-placeholder-val="{{ true }}">
+    <div data-screen-label="Dashboard" style="margin:0 auto;max-width:1152px;display:flex;flex-direction:column;gap:32px;padding:32px 40px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+        <div>
+          <h1 style="margin:0 0 4px;font-size:24px;font-weight:600;letter-spacing:-0.025em;color:#18181b">Welcome back, Tendai</h1>
+          <p style="margin:0;font-size:14px;color:#71717a">Here's what's happening across Grafaid Engineers today · Monday, 6 July 2026</p>
+        </div>
+        <button style="display:inline-flex;align-items:center;justify-content:center;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:500;background:#2563eb;color:#ffffff;border:none;cursor:pointer;white-space:nowrap" style-hover="background:#1d4ed8">New project</button>
+      </div>
+
+      <div style="border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:0">
+        <div style="display:grid;grid-template-columns:repeat(5,1fr)">
+          <div style="padding:16px 20px;border-right:1px solid #f4f4f5"><p style="margin:0;font-size:12px;color:#71717a">Total projects</p><p style="margin:4px 0 0;font-size:24px;font-weight:600;letter-spacing:-0.025em;font-variant-numeric:tabular-nums">7</p></div>
+          <div style="padding:16px 20px;border-right:1px solid #f4f4f5"><p style="margin:0;font-size:12px;color:#71717a">In progress</p><p style="margin:4px 0 0;font-size:24px;font-weight:600;letter-spacing:-0.025em;font-variant-numeric:tabular-nums">3</p></div>
+          <div style="padding:16px 20px;border-right:1px solid #f4f4f5"><p style="margin:0;font-size:12px;color:#71717a">On hold</p><p style="margin:4px 0 0;font-size:24px;font-weight:600;letter-spacing:-0.025em;font-variant-numeric:tabular-nums">1</p></div>
+          <div style="padding:16px 20px;border-right:1px solid #f4f4f5"><p style="margin:0;font-size:12px;color:#71717a">Complete</p><p style="margin:4px 0 0;font-size:24px;font-weight:600;letter-spacing:-0.025em;font-variant-numeric:tabular-nums">2</p></div>
+          <div style="padding:16px 20px"><p style="margin:0;font-size:12px;color:#71717a">Overall progress</p><p style="margin:4px 0 0;font-size:24px;font-weight:600;letter-spacing:-0.025em;font-variant-numeric:tabular-nums">54%</p></div>
+        </div>
+      </div>
+
+      <dc-import name="TimelineOverview" tasks="{{ dashTasks }}" hint-size="100%,700px"></dc-import>
+
+      <sc-if value="{{ showApprovals }}">
+      <div style="border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <h3 style="margin:0;font-size:14px;font-weight:600;color:#18181b">Awaiting your approval</h3>
+          <span style="border-radius:9999px;background:#fffbeb;padding:2px 8px;font-size:12px;font-weight:600;color:#b45309;font-variant-numeric:tabular-nums">3</span>
+        </div>
+        <ul style="margin:12px 0 0;padding:0;list-style:none">
+          <sc-for list="{{ approvals }}" as="a" hint-placeholder-count="3">
+            <li style="border-bottom:1px solid #f4f4f5">
+              <div onClick="{{ a.onToggle }}" style="display:flex;align-items:center;gap:12px;padding:10px 0;cursor:pointer">
+                <span style="width:8px;height:8px;flex-shrink:0;border-radius:9999px;background:{{ a.dot }}"></span>
+                <div style="min-width:0;flex:1">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="flex-shrink:0;border-radius:9999px;padding:2px 6px;font-size:10px;font-weight:600;background:{{ a.chipBg }};color:{{ a.chipFg }}">{{ a.kind }}</span>
+                    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:500">{{ a.title }}</span>
+                  </div>
+                  <p style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#71717a">{{ a.sub }}</p>
+                </div>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a1a1aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;transition:transform 0.15s;transform:rotate({{ a.rot }}deg)"><path d="m9 18 6-6-6-6"></path></svg>
+              </div>
+              <sc-if value="{{ a.expanded }}">
+                <div style="padding:2px 0 14px 20px">
+                  <p style="margin:0 0 10px;font-size:13px;line-height:1.5;color:#3f3f46">{{ a.detail }}</p>
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <button style="display:inline-flex;align-items:center;justify-content:center;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:500;background:#2563eb;color:#ffffff;border:none;cursor:pointer" style-hover="background:#1d4ed8">{{ a.action1 }}</button>
+                    <button style="display:inline-flex;align-items:center;justify-content:center;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:500;background:transparent;color:#18181b;border:1px solid #e4e4e7;cursor:pointer" style-hover="background:#fafafa">{{ a.action2 }}</button>
+                    <span onClick="{{ a.onOpen }}" style="margin-left:auto;font-size:13px;font-weight:500;color:#1d4ed8;cursor:pointer" style-hover="text-decoration:underline">Open full detail →</span>
+                  </div>
+                </div>
+              </sc-if>
+            </li>
+          </sc-for>
+        </ul>
+      </div>
+      </sc-if>
+
+      <div style="border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:20px">
+          <h3 style="margin:0;font-size:14px;font-weight:600;color:#18181b">Upcoming tasks</h3>
+          <ul style="margin:8px 0 0;padding:0;list-style:none">
+            <li style="border-bottom:1px solid #f4f4f5"><div style="display:flex;align-items:center;gap:12px;padding:10px 0;cursor:pointer"><div style="min-width:0;flex:1"><p style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:500">Slab pour Block A</p><p style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#71717a">Kariba Heights Apartments · Tariro Chirwa</p></div><span style="display:inline-flex;border-radius:9999px;padding:2px 8px;font-size:12px;font-weight:500;background:#fffbeb;color:#b45309">high</span><span style="width:96px;text-align:right;font-size:12px;color:#a1a1aa;font-variant-numeric:tabular-nums">2026-07-09</span></div></li>
+            <li style="border-bottom:1px solid #f4f4f5"><div style="display:flex;align-items:center;gap:12px;padding:10px 0;cursor:pointer"><div style="min-width:0;flex:1"><p style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:500">Plumbing rough-in</p><p style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#71717a">Kariba Heights Apartments · Kudzai Mhlanga</p></div><span style="display:inline-flex;border-radius:9999px;padding:2px 8px;font-size:12px;font-weight:500;background:#f4f4f5;color:#52525b">medium</span><span style="width:96px;text-align:right;font-size:12px;color:#a1a1aa;font-variant-numeric:tabular-nums">2026-07-08</span></div></li>
+            <li style="border-bottom:1px solid #f4f4f5"><div style="display:flex;align-items:center;gap:12px;padding:10px 0;cursor:pointer"><div style="min-width:0;flex:1"><p style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:500">Racking layout sign-off</p><p style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#71717a">Msasa Warehouse Fit-out · Simba Dube</p></div><span style="display:inline-flex;border-radius:9999px;padding:2px 8px;font-size:12px;font-weight:500;background:#fffbeb;color:#b45309">urgent</span><span style="width:96px;text-align:right;font-size:12px;color:#a1a1aa;font-variant-numeric:tabular-nums">2026-07-10</span></div></li>
+            <li><div style="display:flex;align-items:center;gap:12px;padding:10px 0;cursor:pointer"><div style="min-width:0;flex:1"><p style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:500">Window frames delivery</p><p style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#71717a">Kariba Heights Apartments</p></div><span style="display:inline-flex;border-radius:9999px;padding:2px 8px;font-size:12px;font-weight:500;background:#f4f4f5;color:#52525b">low</span><span style="width:96px;text-align:right;font-size:12px;color:#a1a1aa;font-variant-numeric:tabular-nums">2026-07-16</span></div></li>
+          </ul>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ── Projects list ── -->
+    <sc-if value="{{ sProjects }}">
+    <div data-screen-label="All projects" style="margin:0 auto;max-width:1024px;padding:40px 24px">
+      <header style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+        <div>
+          <h1 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-0.025em">Projects</h1>
+          <p style="margin:2px 0 0;font-size:14px;color:#71717a">3 projects · 54% overall progress</p>
+        </div>
+        <button style="display:inline-flex;align-items:center;justify-content:center;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:500;background:#2563eb;color:#ffffff;border:none;cursor:pointer" style-hover="background:#1d4ed8">New project</button>
+      </header>
+      <div style="margin-top:24px;display:flex;flex-direction:column;gap:8px">
+        <div onClick="{{ goProject }}" style="position:relative;display:flex;align-items:center;gap:16px;border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:12px 16px;cursor:pointer" style-hover="border-color:#d4d4d8">
+          <div style="width:160px;flex-shrink:0">
+            <h2 style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:600;color:#18181b">Kariba Heights Apartments</h2>
+            <p style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#71717a">Mutasa Family Trust</p>
+          </div>
+          <div style="min-width:0;flex:1">
+            <div style="position:relative;height:8px;border-radius:9999px;background:#f4f4f5">
+              <div style="position:absolute;left:0;top:0;height:8px;border-radius:9999px;background:#2563eb;width:62%"></div>
+              <span title="Groundworks complete · done" style="position:absolute;top:50%;height:12px;width:12px;transform:translate(-50%,-50%);border-radius:9999px;border:2px solid #ffffff;background:#22c55e;left:15%"></span>
+              <span title="Structure to roof level · done" style="position:absolute;top:50%;height:12px;width:12px;transform:translate(-50%,-50%);border-radius:9999px;border:2px solid #ffffff;background:#22c55e;left:40%"></span>
+              <span title="Roof complete · in progress" style="position:absolute;top:50%;height:12px;width:12px;transform:translate(-50%,-50%);border-radius:9999px;border:2px solid #ffffff;background:#f59e0b;left:70%"></span>
+              <span title="Practical completion · pending" style="position:absolute;top:50%;height:12px;width:12px;transform:translate(-50%,-50%);border-radius:9999px;border:2px solid #ffffff;background:#d4d4d8;left:92%"></span>
+            </div>
+            <div style="margin-top:4px;display:flex;align-items:center;justify-content:space-between;font-size:10px;color:#a1a1aa">
+              <span>02 Feb 2026</span>
+              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 8px">Next: <span style="color:#71717a">Roof complete</span> · 15 Aug 2026</span>
+              <span>18 Dec 2026</span>
+            </div>
+          </div>
+          <div style="width:48px;flex-shrink:0;text-align:right;font-size:14px;font-weight:600;color:#18181b;font-variant-numeric:tabular-nums">62%</div>
+          <div style="width:96px;flex-shrink:0;text-align:right;font-size:12px;color:#a1a1aa;font-variant-numeric:tabular-nums">$1,250,000.00</div>
+          <span style="display:inline-flex;border-radius:9999px;padding:2px 8px;font-size:12px;font-weight:500;background:#f0fdf4;color:#15803d">active</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d4d4d8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="m9 18 6-6-6-6"></path></svg>
+        </div>
+
+        <div style="position:relative;display:flex;align-items:center;gap:16px;border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:12px 16px;cursor:pointer" style-hover="border-color:#d4d4d8">
+          <div style="width:160px;flex-shrink:0">
+            <h2 style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:600;color:#18181b">Msasa Warehouse Fit-out</h2>
+            <p style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#71717a">Delta Beverages</p>
+          </div>
+          <div style="min-width:0;flex:1">
+            <div style="position:relative;height:8px;border-radius:9999px;background:#f4f4f5">
+              <div style="position:absolute;left:0;top:0;height:8px;border-radius:9999px;background:#2563eb;width:38%"></div>
+              <span title="Strip-out complete · done" style="position:absolute;top:50%;height:12px;width:12px;transform:translate(-50%,-50%);border-radius:9999px;border:2px solid #ffffff;background:#22c55e;left:20%"></span>
+              <span title="Services first fix · in progress" style="position:absolute;top:50%;height:12px;width:12px;transform:translate(-50%,-50%);border-radius:9999px;border:2px solid #ffffff;background:#f59e0b;left:45%"></span>
+              <span title="Handover · pending" style="position:absolute;top:50%;height:12px;width:12px;transform:translate(-50%,-50%);border-radius:9999px;border:2px solid #ffffff;background:#d4d4d8;left:88%"></span>
+            </div>
+            <div style="margin-top:4px;display:flex;align-items:center;justify-content:space-between;font-size:10px;color:#a1a1aa">
+              <span>04 May 2026</span>
+              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 8px">Next: <span style="color:#71717a">Services first fix</span> · 24 Jul 2026</span>
+              <span>30 Oct 2026</span>
+            </div>
+          </div>
+          <div style="width:48px;flex-shrink:0;text-align:right;font-size:14px;font-weight:600;color:#18181b;font-variant-numeric:tabular-nums">38%</div>
+          <div style="width:96px;flex-shrink:0;text-align:right;font-size:12px;color:#a1a1aa;font-variant-numeric:tabular-nums">$410,000.00</div>
+          <span style="display:inline-flex;border-radius:9999px;padding:2px 8px;font-size:12px;font-weight:500;background:#f0fdf4;color:#15803d">active</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d4d4d8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="m9 18 6-6-6-6"></path></svg>
+        </div>
+
+        <div style="position:relative;display:flex;align-items:center;gap:16px;border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:12px 16px;cursor:pointer" style-hover="border-color:#d4d4d8">
+          <div style="width:160px;flex-shrink:0">
+            <h2 style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:600;color:#18181b">Chinhoyi Clinic Block B</h2>
+            <p style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#71717a">Ministry of Health</p>
+          </div>
+          <div style="min-width:0;flex:1">
+            <div style="position:relative;height:8px;border-radius:9999px;background:#f4f4f5">
+              <div style="position:absolute;left:0;top:0;height:8px;border-radius:9999px;background:#2563eb;width:12%"></div>
+              <span title="Design freeze · in progress" style="position:absolute;top:50%;height:12px;width:12px;transform:translate(-50%,-50%);border-radius:9999px;border:2px solid #ffffff;background:#f59e0b;left:18%"></span>
+              <span title="Site establishment · pending" style="position:absolute;top:50%;height:12px;width:12px;transform:translate(-50%,-50%);border-radius:9999px;border:2px solid #ffffff;background:#d4d4d8;left:35%"></span>
+            </div>
+            <div style="margin-top:4px;display:flex;align-items:center;justify-content:space-between;font-size:10px;color:#a1a1aa">
+              <span>01 Sep 2026</span>
+              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 8px">Next: <span style="color:#71717a">Design freeze</span> · 14 Aug 2026</span>
+              <span>30 Jun 2027</span>
+            </div>
+          </div>
+          <div style="width:48px;flex-shrink:0;text-align:right;font-size:14px;font-weight:600;color:#18181b;font-variant-numeric:tabular-nums">12%</div>
+          <div style="width:96px;flex-shrink:0;text-align:right;font-size:12px;color:#a1a1aa;font-variant-numeric:tabular-nums">$780,000.00</div>
+          <span style="display:inline-flex;border-radius:9999px;padding:2px 8px;font-size:12px;font-weight:500;background:#eff6ff;color:#1d4ed8">planning</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d4d4d8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="m9 18 6-6-6-6"></path></svg>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ── Project overview ── -->
+    <sc-if value="{{ sProject }}">
+    <div data-screen-label="Project overview" style="margin:0 auto;max-width:1152px;display:flex;flex-direction:column;gap:32px;padding:32px 40px">
+      <header style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+        <div>
+          <h1 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-0.025em">Kariba Heights Apartments</h1>
+          <p style="margin:0;font-size:14px;color:#71717a">Mutasa Family Trust</p>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button style="display:inline-flex;align-items:center;justify-content:center;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:500;background:transparent;color:#18181b;border:1px solid #e4e4e7;cursor:pointer" style-hover="background:#fafafa">New site report</button>
+          <button style="display:inline-flex;align-items:center;justify-content:center;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:500;background:#2563eb;color:#ffffff;border:none;cursor:pointer" style-hover="background:#1d4ed8">New task</button>
+        </div>
+      </header>
+
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+        <div style="border-radius:8px;border:1px solid #bfdbfe;background:#eff6ff;padding:16px">
+          <div style="margin-bottom:8px"><span style="display:inline-flex;border-radius:8px;padding:8px;background:#dbeafe"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg></span></div>
+          <p style="margin:0;font-size:24px;font-weight:700;color:#1d4ed8">1</p>
+          <p style="margin:0;font-size:12px;color:#2563eb">Pending Sign-offs</p>
+          <p style="margin:2px 0 0;font-size:11px;color:rgba(59,130,246,0.7)">1 task awaiting review</p>
+        </div>
+        <div style="border-radius:8px;border:1px solid #fed7aa;background:#fff7ed;padding:16px">
+          <div style="margin-bottom:8px"><span style="display:inline-flex;border-radius:8px;padding:8px;background:#ffedd5"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="M12 8v4"></path><path d="M12 16h.01"></path></svg></span></div>
+          <p style="margin:0;font-size:24px;font-weight:700;color:#c2410c">1</p>
+          <p style="margin:0;font-size:12px;color:#ea580c">Active Blockers</p>
+          <p style="margin:2px 0 0;font-size:11px;color:rgba(249,115,22,0.7)">1 task blocked and paused</p>
+        </div>
+        <div style="border-radius:8px;border:1px solid #fecaca;background:#fef2f2;padding:16px">
+          <div style="margin-bottom:8px"><span style="display:inline-flex;border-radius:8px;padding:8px;background:#fee2e2"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg></span></div>
+          <p style="margin:0;font-size:24px;font-weight:700;color:#b91c1c">1</p>
+          <p style="margin:0;font-size:12px;color:#dc2626">SLA Breaches</p>
+          <p style="margin:2px 0 0;font-size:11px;color:rgba(239,68,68,0.7)">1 task past due date</p>
+        </div>
+        <div style="border-radius:8px;border:1px solid #fde68a;background:#fffbeb;padding:16px">
+          <div style="margin-bottom:8px"><span style="display:inline-flex;border-radius:8px;padding:8px;background:#fef3c7"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"></path><path d="M16 2v4"></path><path d="M8 2v4"></path><path d="M3 10h5"></path><circle cx="18" cy="18" r="4"></circle><path d="M18 16.5V18l1 1"></path></svg></span></div>
+          <p style="margin:0;font-size:24px;font-weight:700;color:#b45309">2</p>
+          <p style="margin:0;font-size:12px;color:#d97706">Open Requests</p>
+          <p style="margin:2px 0 0;font-size:11px;color:rgba(245,158,11,0.7)">2 awaiting approval</p>
+        </div>
+      </div>
+
+      <dc-import name="TimelineOverview" tasks="{{ projTasks }}" hint-size="100%,600px"></dc-import>
+    </div>
+    </sc-if>
+
+    <!-- ── Tasks board ── -->
+    <sc-if value="{{ sTasks }}">
+    <div data-screen-label="Tasks" style="margin:0 auto;max-width:1152px;padding:40px 24px">
+      <header style="margin-bottom:32px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
+        <div>
+          <span onClick="{{ goProject }}" style="font-size:12px;color:#71717a;cursor:pointer" style-hover="text-decoration:underline">← Kariba Heights Apartments</span>
+          <h1 style="margin:4px 0 0;font-size:24px;font-weight:600;letter-spacing:-0.025em">Tasks</h1>
+        </div>
+        <button style="display:inline-flex;align-items:center;justify-content:center;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:500;background:#2563eb;color:#ffffff;border:none;cursor:pointer" style-hover="background:#1d4ed8">New task</button>
+      </header>
+      <div style="display:grid;grid-template-columns:170px minmax(150px,1fr) 44px 64px 104px 16px;align-items:center;gap:14px;padding:0 16px 8px;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;color:#a1a1aa">
+        <span>Task / assignee</span>
+        <span>Progress</span>
+        <span style="text-align:right">%</span>
+        <span style="text-align:center">Priority</span>
+        <span style="text-align:center">Status</span>
+        <span></span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <sc-for list="{{ taskRows }}" as="t" hint-placeholder-count="8">
+          <div onClick="{{ t.onClick }}" style="display:grid;grid-template-columns:170px minmax(150px,1fr) 44px 64px 104px 16px;align-items:center;gap:14px;border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:12px 16px;cursor:pointer" style-hover="border-color:#d4d4d8">
+            <div style="min-width:0">
+              <h2 style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:600;color:#18181b">{{ t.title }}</h2>
+              <p style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#71717a">{{ t.assignee }}</p>
+            </div>
+            <div style="min-width:0">
+              <div style="position:relative;height:8px;border-radius:9999px;background:#f4f4f5">
+                <div style="position:absolute;left:0;top:0;height:8px;border-radius:9999px;width:{{ t.pct }}%;background:{{ t.barColor }}"></div>
+              </div>
+              <div style="margin-top:4px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px;color:#a1a1aa">
+                <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:{{ t.metaColor }}">{{ t.meta }}</span>
+                <span style="flex-shrink:0">Due {{ t.due }}</span>
+              </div>
+            </div>
+            <div style="text-align:right;font-size:14px;font-weight:600;color:#18181b;font-variant-numeric:tabular-nums">{{ t.pctLabel }}</div>
+            <div style="display:flex;justify-content:center"><span style="display:inline-flex;border-radius:9999px;padding:2px 8px;font-size:12px;font-weight:500;background:{{ t.prioBg }};color:{{ t.prioFg }}">{{ t.priority }}</span></div>
+            <div style="display:flex;justify-content:center"><span style="display:inline-flex;border-radius:9999px;padding:2px 8px;font-size:12px;font-weight:500;white-space:nowrap;background:{{ t.statusBg }};color:{{ t.statusFg }}">{{ t.statusLabel }}</span></div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d4d4d8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ── Task detail ── -->
+    <sc-if value="{{ sTask }}">
+    <div data-screen-label="Task detail" style="margin:0 auto;max-width:768px;padding:40px 24px">
+      <span onClick="{{ goTasks }}" style="font-size:12px;color:#71717a;cursor:pointer" style-hover="text-decoration:underline">← Tasks</span>
+      <div style="margin-top:4px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
+        <h1 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-0.025em">Slab pour Block A</h1>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="display:inline-flex;border-radius:9999px;padding:2px 8px;font-size:12px;font-weight:500;background:#eff6ff;color:#1d4ed8;white-space:nowrap">in progress</span>
+          <button style="display:inline-flex;align-items:center;justify-content:center;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:500;background:transparent;color:#18181b;border:1px solid #e4e4e7;cursor:pointer" style-hover="background:#fafafa">Edit</button>
+        </div>
+      </div>
+
+      <div style="margin-top:24px;border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:20px;display:flex;flex-direction:column;gap:8px;font-size:14px">
+        <div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#71717a">Assignee</span><span style="font-weight:500">Tariro Chirwa</span></div>
+        <div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#71717a">Priority</span><span style="font-weight:500">high</span></div>
+        <div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#71717a">SLA</span><span style="font-weight:500">at risk</span></div>
+        <div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#71717a">Schedule</span><span style="font-weight:500">On critical path</span></div>
+        <div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#71717a">Start</span><span style="font-weight:500">2026-06-30</span></div>
+        <div style="display:flex;justify-content:space-between;gap:12px"><span style="color:#71717a">Due</span><span style="font-weight:500">2026-07-09</span></div>
+        <p style="margin:0;padding-top:8px;color:#52525b">Pour and finish the 180m² ground-floor slab for Block A, including mesh placement, screed and 7-day curing protection.</p>
+      </div>
+
+      <div style="margin-top:24px;display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div style="border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:20px">
+          <h3 style="margin:0;font-size:14px;font-weight:600;color:#18181b">Submit for sign-off</h3>
+          <div style="margin-top:12px;display:flex;flex-direction:column;gap:12px">
+            <textarea rows="3" placeholder="What was completed?" style="width:100%;border-radius:6px;border:1px solid #e4e4e7;background:transparent;padding:8px 12px;font-size:14px;outline:none;resize:vertical"></textarea>
+            <label style="display:flex;align-items:center;gap:8px;font-size:14px"><input type="checkbox" /> I confirm this work is complete and accurate.</label>
+            <button style="align-self:flex-start;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:500;background:#2563eb;color:#ffffff;border:none;cursor:pointer" style-hover="background:#1d4ed8">Submit</button>
+          </div>
+        </div>
+        <div style="border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:20px">
+          <h3 style="margin:0;font-size:14px;font-weight:600;color:#18181b">Raise a blocker</h3>
+          <div style="margin-top:12px;display:flex;flex-direction:column;gap:12px">
+            <textarea rows="2" placeholder="What's blocking you?" style="width:100%;border-radius:6px;border:1px solid #e4e4e7;background:transparent;padding:8px 12px;font-size:14px;outline:none;resize:vertical"></textarea>
+            <button style="align-self:flex-start;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:500;background:transparent;color:#18181b;border:1px solid #e4e4e7;cursor:pointer" style-hover="background:#fafafa">Raise blocker</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:24px">
+        <div style="display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid #e4e4e7">
+          <button onClick="{{ tabDeps }}" style="margin-bottom:-1px;display:flex;align-items:center;gap:6px;border-radius:6px 6px 0 0;border:none;border-bottom:2px solid {{ tabs.deps.line }};padding:8px 12px;font-size:14px;font-weight:500;background:transparent;cursor:pointer;color:{{ tabs.deps.fg }}">
+            Dependencies <span style="border-radius:9999px;padding:2px 6px;font-size:11px;font-variant-numeric:tabular-nums;background:{{ tabs.deps.cBg }};color:{{ tabs.deps.cFg }}">1</span>
+          </button>
+          <button onClick="{{ tabActivity }}" style="margin-bottom:-1px;display:flex;align-items:center;gap:6px;border-radius:6px 6px 0 0;border:none;border-bottom:2px solid {{ tabs.activity.line }};padding:8px 12px;font-size:14px;font-weight:500;background:transparent;cursor:pointer;color:{{ tabs.activity.fg }}">
+            Activity <span style="border-radius:9999px;padding:2px 6px;font-size:11px;font-variant-numeric:tabular-nums;background:{{ tabs.activity.cBg }};color:{{ tabs.activity.cFg }}">4</span>
+          </button>
+        </div>
+        <div style="padding-top:20px">
+          <sc-if value="{{ isTabDeps }}" hint-placeholder-val="{{ true }}">
+            <div style="border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:20px">
+              <h3 style="margin:0;font-size:14px;font-weight:600;color:#18181b">Dependencies</h3>
+              <p style="margin:4px 0 0;font-size:12px;color:#71717a">Predecessors that must finish (plus any lag) before this task can start.</p>
+              <ul style="margin:12px 0 0;padding:0;list-style:none">
+                <li style="display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:6px;border:1px solid #f4f4f5;padding:8px">
+                  <div style="display:flex;min-width:0;align-items:center;gap:8px">
+                    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:500;cursor:pointer" style-hover="text-decoration:underline">Foundation excavation</span>
+                    <span style="display:inline-flex;border-radius:9999px;padding:2px 8px;font-size:12px;font-weight:500;background:#f0fdf4;color:#15803d">done</span>
+                  </div>
+                  <button style="display:inline-flex;align-items:center;justify-content:center;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:500;background:transparent;color:#52525b;border:none;cursor:pointer" style-hover="background:#f4f4f5">Remove</button>
+                </li>
+              </ul>
+              <div style="margin-top:16px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;border-top:1px solid #f4f4f5;padding-top:16px">
+                <div style="min-width:192px;flex:1">
+                  <label style="margin-bottom:4px;display:block;font-size:12px;font-weight:500">Starts after</label>
+                  <select style="width:100%;border-radius:6px;border:1px solid #e4e4e7;background:transparent;padding:8px 12px;font-size:14px;outline:none;color:#71717a"><option>Select a task…</option><option>Brickwork Block B</option><option>Plumbing rough-in</option></select>
+                </div>
+                <div style="width:96px">
+                  <label style="margin-bottom:4px;display:block;font-size:12px;font-weight:500">Lag (days)</label>
+                  <input type="number" value="0" style="width:100%;border-radius:6px;border:1px solid #e4e4e7;background:transparent;padding:8px 12px;font-size:14px;outline:none" />
+                </div>
+                <button style="display:inline-flex;align-items:center;justify-content:center;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:500;background:#2563eb;color:#ffffff;border:none;cursor:pointer" style-hover="background:#1d4ed8">Add</button>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ isTabActivity }}">
+            <ol style="margin:0;padding:0 0 0 16px;list-style:none;border-left:1px solid #e4e4e7;display:flex;flex-direction:column;gap:12px">
+              <li style="position:relative"><span style="position:absolute;left:-21px;top:6px;width:8px;height:8px;border-radius:9999px;background:#d4d4d8"></span><p style="margin:0;font-size:14px;color:#3f3f46">Task started</p><p style="margin:0;font-size:11px;color:#a1a1aa">Tariro Chirwa · 30/06/2026, 07:12</p></li>
+              <li style="position:relative"><span style="position:absolute;left:-21px;top:6px;width:8px;height:8px;border-radius:9999px;background:#d4d4d8"></span><p style="margin:0;font-size:14px;color:#3f3f46">Dependency added: Foundation excavation</p><p style="margin:0;font-size:11px;color:#a1a1aa">Tendai Karumbidza · 28/06/2026, 14:40</p></li>
+              <li style="position:relative"><span style="position:absolute;left:-21px;top:6px;width:8px;height:8px;border-radius:9999px;background:#d4d4d8"></span><p style="margin:0;font-size:14px;color:#3f3f46">Due date set to 2026-07-09</p><p style="margin:0;font-size:11px;color:#a1a1aa">Tendai Karumbidza · 25/06/2026, 09:03</p></li>
+              <li style="position:relative"><span style="position:absolute;left:-21px;top:6px;width:8px;height:8px;border-radius:9999px;background:#d4d4d8"></span><p style="margin:0;font-size:14px;color:#3f3f46">Task created and assigned to Tariro Chirwa</p><p style="margin:0;font-size:11px;color:#a1a1aa">Tendai Karumbidza · 25/06/2026, 08:57</p></li>
+            </ol>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ── Project finance ── -->
+    <sc-if value="{{ sFinance }}">
+    <div data-screen-label="Project finance" style="margin:0 auto;max-width:1024px;padding:40px 24px">
+      <span onClick="{{ goProject }}" style="font-size:12px;color:#71717a;cursor:pointer" style-hover="text-decoration:underline">← Kariba Heights Apartments</span>
+      <h1 style="margin:4px 0 0;font-size:24px;font-weight:600;letter-spacing:-0.025em">Finance</h1>
+
+      <section style="margin-top:24px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+        <div style="border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:20px"><h3 style="margin:0;font-size:14px;font-weight:600">Budget</h3><p style="margin:8px 0 0;font-size:24px;font-weight:600;letter-spacing:-0.025em">$1,250,000.00</p></div>
+        <div style="border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:20px"><h3 style="margin:0;font-size:14px;font-weight:600">Invoiced</h3><p style="margin:8px 0 0;font-size:24px;font-weight:600;letter-spacing:-0.025em">$520,000.00</p></div>
+        <div style="border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:20px"><h3 style="margin:0;font-size:14px;font-weight:600">Paid</h3><p style="margin:8px 0 0;font-size:24px;font-weight:600;letter-spacing:-0.025em">$402,500.00</p></div>
+        <div style="border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:20px"><h3 style="margin:0;font-size:14px;font-weight:600">Outstanding</h3><p style="margin:8px 0 0;font-size:24px;font-weight:600;letter-spacing:-0.025em">$117,500.00</p></div>
+      </section>
+
+      <section style="margin-top:32px;display:grid;grid-template-columns:1fr 1fr;gap:24px">
+        <div>
+          <h2 style="margin:0 0 12px;font-size:14px;font-weight:600">Budget / BOQ</h2>
+          <div style="border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:20px">
+            <ul style="margin:0;padding:0;list-style:none">
+              <li style="padding:8px 0;font-size:14px;border-bottom:1px solid #f4f4f5">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Substructure &amp; groundworks</span><span style="flex-shrink:0;font-variant-numeric:tabular-nums;color:#71717a">$310,000.00</span></div>
+                <div style="margin-top:4px;display:flex;align-items:center;gap:8px"><div style="height:4px;flex:1;overflow:hidden;border-radius:9999px;background:#f4f4f5"><div style="height:100%;border-radius:9999px;background:#2563eb;width:92%"></div></div><span style="flex-shrink:0;font-size:11px;font-variant-numeric:tabular-nums;color:#a1a1aa">$285,200.00 billed</span></div>
+              </li>
+              <li style="padding:8px 0;font-size:14px;border-bottom:1px solid #f4f4f5">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Superstructure — Blocks A &amp; B</span><span style="flex-shrink:0;font-variant-numeric:tabular-nums;color:#71717a">$540,000.00</span></div>
+                <div style="margin-top:4px;display:flex;align-items:center;gap:8px"><div style="height:4px;flex:1;overflow:hidden;border-radius:9999px;background:#f4f4f5"><div style="height:100%;border-radius:9999px;background:#2563eb;width:41%"></div></div><span style="flex-shrink:0;font-size:11px;font-variant-numeric:tabular-nums;color:#a1a1aa">$219,800.00 billed</span></div>
+              </li>
+              <li style="padding:8px 0;font-size:14px">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">External works &amp; drainage</span><span style="flex-shrink:0;font-variant-numeric:tabular-nums;color:#71717a">$95,000.00</span></div>
+                <div style="margin-top:4px;display:flex;align-items:center;gap:8px"><div style="height:4px;flex:1;overflow:hidden;border-radius:9999px;background:#f4f4f5"><div style="height:100%;border-radius:9999px;background:#f59e0b;width:100%"></div></div><span style="flex-shrink:0;font-size:11px;font-variant-numeric:tabular-nums;color:#a1a1aa">$101,300.00 billed<span style="color:#d97706"> · over</span></span></div>
+              </li>
+            </ul>
+            <div style="margin-top:16px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px;border-top:1px solid #f4f4f5;padding-top:16px">
+              <input placeholder="Line item" style="flex:1;min-width:128px;border-radius:6px;border:1px solid #e4e4e7;background:transparent;padding:6px 10px;font-size:14px;outline:none" />
+              <input type="number" value="1" title="Qty" style="width:80px;border-radius:6px;border:1px solid #e4e4e7;background:transparent;padding:6px 10px;font-size:14px;outline:none" />
+              <input type="number" placeholder="Rate $" style="width:96px;border-radius:6px;border:1px solid #e4e4e7;background:transparent;padding:6px 10px;font-size:14px;outline:none" />
+              <button style="display:inline-flex;align-items:center;justify-content:center;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:500;background:transparent;color:#18181b;border:1px solid #e4e4e7;cursor:pointer" style-hover="background:#fafafa">Add</button>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+            <h2 style="margin:0;font-size:14px;font-weight:600">Invoices</h2>
+            <button style="display:inline-flex;align-items:center;justify-content:center;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:500;background:#2563eb;color:#ffffff;border:none;cursor:pointer" style-hover="background:#1d4ed8">New invoice</button>
+          </div>
+          <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px">
+            <li><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:12px;cursor:pointer" style-hover="border-color:#d4d4d8">
+              <div><p style="margin:0;font-size:14px;font-weight:500">INV-2026-014</p><p style="margin:0;font-size:12px;color:#a1a1aa">2026-06-30</p></div>
+              <div style="display:flex;align-items:center;gap:12px"><span style="font-size:14px;font-variant-numeric:tabular-nums">$86,400.00</span><span style="display:inline-flex;border-radius:9999px;padding:2px 8px;font-size:12px;font-weight:500;background:#eff6ff;color:#1d4ed8">sent</span></div>
+            </div></li>
+            <li><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:12px;cursor:pointer" style-hover="border-color:#d4d4d8">
+              <div><p style="margin:0;font-size:14px;font-weight:500">INV-2026-011</p><p style="margin:0;font-size:12px;color:#a1a1aa">2026-05-31</p></div>
+              <div style="display:flex;align-items:center;gap:12px"><span style="font-size:14px;font-variant-numeric:tabular-nums">$124,000.00</span><span style="display:inline-flex;border-radius:9999px;padding:2px 8px;font-size:12px;font-weight:500;background:#fffbeb;color:#b45309">overdue</span></div>
+            </div></li>
+            <li><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:12px;cursor:pointer" style-hover="border-color:#d4d4d8">
+              <div><p style="margin:0;font-size:14px;font-weight:500">INV-2026-008</p><p style="margin:0;font-size:12px;color:#a1a1aa">2026-04-30</p></div>
+              <div style="display:flex;align-items:center;gap:12px"><span style="font-size:14px;font-variant-numeric:tabular-nums">$142,600.00</span><span style="display:inline-flex;border-radius:9999px;padding:2px 8px;font-size:12px;font-weight:500;background:#f0fdf4;color:#15803d">paid</span></div>
+            </div></li>
+          </ul>
+        </div>
+      </section>
+
+      <section style="margin-top:32px">
+        <h2 style="margin:0 0 12px;font-size:14px;font-weight:600">Contractor payments</h2>
+        <div style="border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:20px">
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;border-bottom:1px solid #f4f4f5;padding-bottom:16px">
+            <div><p style="margin:0;font-size:12px;color:#71717a">Committed</p><p style="margin:0;font-size:18px;font-weight:600;font-variant-numeric:tabular-nums">$164,000.00</p></div>
+            <div><p style="margin:0;font-size:12px;color:#71717a">Paid</p><p style="margin:0;font-size:18px;font-weight:600;font-variant-numeric:tabular-nums">$96,500.00</p></div>
+            <div><p style="margin:0;font-size:12px;color:#71717a">Outstanding</p><p style="margin:0;font-size:18px;font-weight:600;font-variant-numeric:tabular-nums">$67,500.00</p></div>
+          </div>
+          <ul style="margin:0;padding:8px 0 0;list-style:none">
+            <li style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;font-size:14px;border-bottom:1px solid #f4f4f5">
+              <div style="min-width:0"><span style="font-weight:500;cursor:pointer" style-hover="text-decoration:underline">Slab pour Block A</span><span style="margin-left:8px;font-size:12px;color:#a1a1aa">Draw 2 of 3</span></div>
+              <div style="display:flex;align-items:center;gap:12px"><span style="font-variant-numeric:tabular-nums">$28,000.00</span><span style="display:inline-flex;border-radius:9999px;padding:2px 8px;font-size:12px;font-weight:500;background:#eff6ff;color:#1d4ed8">awaiting payment</span></div>
+            </li>
+            <li style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;font-size:14px;border-bottom:1px solid #f4f4f5">
+              <div style="min-width:0"><span style="font-weight:500;cursor:pointer" style-hover="text-decoration:underline">Foundation excavation</span><span style="margin-left:8px;font-size:12px;color:#a1a1aa">Final draw</span></div>
+              <div style="display:flex;align-items:center;gap:12px"><span style="font-variant-numeric:tabular-nums">$41,500.00</span><span style="display:inline-flex;border-radius:9999px;padding:2px 8px;font-size:12px;font-weight:500;background:#f0fdf4;color:#15803d">paid</span></div>
+            </li>
+            <li style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;font-size:14px">
+              <div style="min-width:0"><span style="font-weight:500;cursor:pointer" style-hover="text-decoration:underline">Electrical first fix</span><span style="margin-left:8px;font-size:12px;color:#a1a1aa">Draw 1 of 2</span></div>
+              <div style="display:flex;align-items:center;gap:12px"><span style="font-variant-numeric:tabular-nums">$18,200.00</span><span style="display:inline-flex;border-radius:9999px;padding:2px 8px;font-size:12px;font-weight:500;background:#f4f4f5;color:#52525b">not claimed</span></div>
+            </li>
+          </ul>
+        </div>
+      </section>
+    </div>
+    </sc-if>
+
+    <!-- ── Org finance ── -->
+    <sc-if value="{{ sFinanceOrg }}">
+    <div data-screen-label="Org finance" style="margin:0 auto;max-width:1152px;padding:40px 24px">
+      <span onClick="{{ goDashboard }}" style="font-size:12px;color:#71717a;cursor:pointer" style-hover="text-decoration:underline">← Dashboard</span>
+      <h1 style="margin:4px 0 0;font-size:24px;font-weight:600;letter-spacing:-0.025em">Finance</h1>
+      <p style="margin:0;font-size:14px;color:#71717a">Money across every project in Grafaid Engineers.</p>
+
+      <section style="margin-top:24px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+        <div style="border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:20px"><h3 style="margin:0;font-size:14px;font-weight:600">Budget</h3><p style="margin:8px 0 0;font-size:24px;font-weight:600;letter-spacing:-0.025em">$2,440,000.00</p></div>
+        <div style="border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:20px"><h3 style="margin:0;font-size:14px;font-weight:600">Invoiced</h3><p style="margin:8px 0 0;font-size:24px;font-weight:600;letter-spacing:-0.025em">$743,000.00</p></div>
+        <div style="border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:20px"><h3 style="margin:0;font-size:14px;font-weight:600">Collected</h3><p style="margin:8px 0 0;font-size:24px;font-weight:600;letter-spacing:-0.025em">$561,300.00</p><p style="margin:4px 0 0;font-size:12px;color:#71717a">76% of invoiced</p></div>
+        <div style="border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:20px"><h3 style="margin:0;font-size:14px;font-weight:600">Outstanding</h3><p style="margin:8px 0 0;font-size:24px;font-weight:600;letter-spacing:-0.025em">$181,700.00</p></div>
+      </section>
+
+      <section style="margin-top:32px">
+        <h2 style="margin:0 0 12px;font-size:14px;font-weight:600">By project</h2>
+        <div style="overflow-x:auto;border-radius:8px;border:1px solid #e4e4e7;background:#ffffff">
+          <table style="width:100%;min-width:820px;font-size:14px;border-collapse:collapse">
+            <thead>
+              <tr style="border-bottom:1px solid #f4f4f5;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:0.025em;color:#a1a1aa">
+                <th style="padding:10px 16px;font-weight:500">Project</th>
+                <th style="padding:10px 16px;text-align:right;font-weight:500">Budget</th>
+                <th style="padding:10px 16px;text-align:right;font-weight:500">Cost to date</th>
+                <th style="padding:10px 16px;text-align:right;font-weight:500">Invoiced</th>
+                <th style="padding:10px 16px;text-align:right;font-weight:500">Collected</th>
+                <th style="padding:10px 16px;text-align:right;font-weight:500">Outstanding</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom:1px solid #fafafa">
+                <td style="padding:12px 16px"><span onClick="{{ goFinance }}" style="font-weight:500;cursor:pointer" style-hover="text-decoration:underline">Kariba Heights Apartments</span><span style="margin-left:8px;display:inline-flex;border-radius:9999px;padding:2px 8px;font-size:12px;font-weight:500;background:#eff6ff;color:#1d4ed8;vertical-align:middle">active</span></td>
+                <td style="padding:12px 16px;text-align:right;font-variant-numeric:tabular-nums;color:#71717a">$1,250,000.00</td>
+                <td style="padding:12px 16px;text-align:right;font-variant-numeric:tabular-nums;color:#d97706">$486,300.00</td>
+                <td style="padding:12px 16px;text-align:right;font-variant-numeric:tabular-nums">$520,000.00</td>
+                <td style="padding:12px 16px;text-align:right;font-variant-numeric:tabular-nums;color:#16a34a">$402,500.00</td>
+                <td style="padding:12px 16px;text-align:right;font-variant-numeric:tabular-nums;font-weight:500">$117,500.00</td>
+              </tr>
+              <tr style="border-bottom:1px solid #fafafa">
+                <td style="padding:12px 16px"><span style="font-weight:500;cursor:pointer" style-hover="text-decoration:underline">Msasa Warehouse Fit-out</span><span style="margin-left:8px;display:inline-flex;border-radius:9999px;padding:2px 8px;font-size:12px;font-weight:500;background:#eff6ff;color:#1d4ed8;vertical-align:middle">active</span></td>
+                <td style="padding:12px 16px;text-align:right;font-variant-numeric:tabular-nums;color:#71717a">$410,000.00</td>
+                <td style="padding:12px 16px;text-align:right;font-variant-numeric:tabular-nums;color:#d97706">$132,400.00</td>
+                <td style="padding:12px 16px;text-align:right;font-variant-numeric:tabular-nums">$158,000.00</td>
+                <td style="padding:12px 16px;text-align:right;font-variant-numeric:tabular-nums;color:#16a34a">$121,800.00</td>
+                <td style="padding:12px 16px;text-align:right;font-variant-numeric:tabular-nums;font-weight:500">$36,200.00</td>
+              </tr>
+              <tr>
+                <td style="padding:12px 16px"><span style="font-weight:500;cursor:pointer" style-hover="text-decoration:underline">Chinhoyi Clinic Block B</span><span style="margin-left:8px;display:inline-flex;border-radius:9999px;padding:2px 8px;font-size:12px;font-weight:500;background:#f4f4f5;color:#52525b;vertical-align:middle">planning</span></td>
+                <td style="padding:12px 16px;text-align:right;font-variant-numeric:tabular-nums;color:#71717a">$780,000.00</td>
+                <td style="padding:12px 16px;text-align:right;font-variant-numeric:tabular-nums;color:#d97706">$21,900.00</td>
+                <td style="padding:12px 16px;text-align:right;font-variant-numeric:tabular-nums">$65,000.00</td>
+                <td style="padding:12px 16px;text-align:right;font-variant-numeric:tabular-nums;color:#16a34a">$37,000.00</td>
+                <td style="padding:12px 16px;text-align:right;font-variant-numeric:tabular-nums;font-weight:500">$28,000.00</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr style="border-top:1px solid #e4e4e7;font-weight:500">
+                <td style="padding:12px 16px">Total</td>
+                <td style="padding:12px 16px;text-align:right;font-variant-numeric:tabular-nums;color:#71717a">$2,440,000.00</td>
+                <td style="padding:12px 16px;text-align:right;font-variant-numeric:tabular-nums;color:#d97706">$640,600.00</td>
+                <td style="padding:12px 16px;text-align:right;font-variant-numeric:tabular-nums">$743,000.00</td>
+                <td style="padding:12px 16px;text-align:right;font-variant-numeric:tabular-nums;color:#16a34a">$561,300.00</td>
+                <td style="padding:12px 16px;text-align:right;font-variant-numeric:tabular-nums">$181,700.00</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </section>
+    </div>
+    </sc-if>
+
+    <!-- ── Requests ── -->
+    <sc-if value="{{ sRequests }}">
+    <div data-screen-label="Requests" style="margin:0 auto;max-width:768px;padding:40px 24px">
+      <header style="margin-bottom:32px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
+        <div>
+          <span onClick="{{ goProject }}" style="font-size:12px;color:#71717a;cursor:pointer" style-hover="text-decoration:underline">← Kariba Heights Apartments</span>
+          <h1 style="margin:4px 0 0;font-size:24px;font-weight:600;letter-spacing:-0.025em">Requests</h1>
+        </div>
+        <button style="display:inline-flex;align-items:center;justify-content:center;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:500;background:#2563eb;color:#ffffff;border:none;cursor:pointer" style-hover="background:#1d4ed8">New request</button>
+      </header>
+      <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px">
+        <li><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:12px;cursor:pointer" style-hover="border-color:#d4d4d8">
+          <div><p style="margin:0;font-size:14px;font-weight:500"><span style="margin-right:8px;border-radius:4px;background:#f4f4f5;padding:2px 6px;font-size:11px;text-transform:uppercase;color:#71717a">purchase</span>Cement — 400 bags PC 42.5</p><p style="margin:4px 0 0;font-size:12px;color:#a1a1aa">$5,120.00</p></div>
+          <span style="display:inline-flex;border-radius:9999px;padding:2px 8px;font-size:12px;font-weight:500;background:#eff6ff;color:#1d4ed8">submitted</span>
+        </div></li>
+        <li><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:12px;cursor:pointer" style-hover="border-color:#d4d4d8">
+          <div><p style="margin:0;font-size:14px;font-weight:500"><span style="margin-right:8px;border-radius:4px;background:#f4f4f5;padding:2px 6px;font-size:11px;text-transform:uppercase;color:#71717a">rfi</span>Confirm rebar spec for lift shaft walls</p></div>
+          <span style="display:inline-flex;border-radius:9999px;padding:2px 8px;font-size:12px;font-weight:500;background:#eff6ff;color:#1d4ed8">submitted</span>
+        </div></li>
+        <li><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:12px;cursor:pointer" style-hover="border-color:#d4d4d8">
+          <div><p style="margin:0;font-size:14px;font-weight:500"><span style="margin-right:8px;border-radius:4px;background:#f4f4f5;padding:2px 6px;font-size:11px;text-transform:uppercase;color:#71717a">variation</span>Additional retaining wall on east boundary</p><p style="margin:4px 0 0;font-size:12px;color:#a1a1aa">$4,800.00</p></div>
+          <span style="display:inline-flex;border-radius:9999px;padding:2px 8px;font-size:12px;font-weight:500;background:#f0fdf4;color:#15803d">approved</span>
+        </div></li>
+        <li><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:12px;cursor:pointer" style-hover="border-color:#d4d4d8">
+          <div><p style="margin:0;font-size:14px;font-weight:500"><span style="margin-right:8px;border-radius:4px;background:#f4f4f5;padding:2px 6px;font-size:11px;text-transform:uppercase;color:#71717a">access</span>Weekend site access — slab curing checks</p></div>
+          <span style="display:inline-flex;border-radius:9999px;padding:2px 8px;font-size:12px;font-weight:500;background:#fffbeb;color:#b45309">rejected</span>
+        </div></li>
+      </ul>
+    </div>
+    </sc-if>
+
+    <!-- ── Team ── -->
+    <sc-if value="{{ sTeam }}">
+    <div data-screen-label="Team" style="margin:0 auto;max-width:768px;padding:40px 24px">
+      <span onClick="{{ goProject }}" style="font-size:12px;color:#71717a;cursor:pointer" style-hover="text-decoration:underline">← Kariba Heights Apartments</span>
+      <h1 style="margin:4px 0 0;font-size:24px;font-weight:600;letter-spacing:-0.025em">Team</h1>
+      <p style="margin:0;font-size:14px;color:#71717a">Members added here see only this project. Company owners, admins and finance see every project automatically.</p>
+
+      <section style="margin-top:24px;display:flex;flex-direction:column;gap:8px">
+        <div style="border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:20px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div style="min-width:0"><p style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:500">Tariro Chirwa</p><p style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#71717a">tariro@grafaid.co.zw</p></div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <select style="border-radius:6px;border:1px solid #e4e4e7;background:transparent;padding:6px 10px;font-size:14px;outline:none"><option>pm</option><option>contractor</option><option>contributor</option><option>client</option><option>viewer</option></select>
+              <button style="display:inline-flex;align-items:center;justify-content:center;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:500;background:transparent;color:#18181b;border:1px solid #e4e4e7;cursor:pointer" style-hover="background:#fafafa">Update</button>
+              <button style="display:inline-flex;align-items:center;justify-content:center;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:500;background:transparent;color:#52525b;border:none;cursor:pointer" style-hover="background:#f4f4f5">Remove</button>
+            </div>
+          </div>
+        </div>
+        <div style="border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:20px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div style="min-width:0"><p style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:500">Blessing Moyo</p><p style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#71717a">blessing@mzilikazibuilders.co.zw</p></div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <select style="border-radius:6px;border:1px solid #e4e4e7;background:transparent;padding:6px 10px;font-size:14px;outline:none"><option>contractor</option><option>pm</option><option>contributor</option><option>client</option><option>viewer</option></select>
+              <button style="display:inline-flex;align-items:center;justify-content:center;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:500;background:transparent;color:#18181b;border:1px solid #e4e4e7;cursor:pointer" style-hover="background:#fafafa">Update</button>
+              <button style="display:inline-flex;align-items:center;justify-content:center;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:500;background:transparent;color:#52525b;border:none;cursor:pointer" style-hover="background:#f4f4f5">Remove</button>
+            </div>
+          </div>
+        </div>
+        <div style="border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:20px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div style="min-width:0"><p style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:500">Kudzai Mhlanga</p><p style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#71717a">kudzai@grafaid.co.zw</p></div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <select style="border-radius:6px;border:1px solid #e4e4e7;background:transparent;padding:6px 10px;font-size:14px;outline:none"><option>contributor</option><option>pm</option><option>contractor</option><option>client</option><option>viewer</option></select>
+              <button style="display:inline-flex;align-items:center;justify-content:center;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:500;background:transparent;color:#18181b;border:1px solid #e4e4e7;cursor:pointer" style-hover="background:#fafafa">Update</button>
+              <button style="display:inline-flex;align-items:center;justify-content:center;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:500;background:transparent;color:#52525b;border:none;cursor:pointer" style-hover="background:#f4f4f5">Remove</button>
+            </div>
+          </div>
+        </div>
+        <div style="border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:20px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div style="min-width:0"><p style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:500">Rudo Mutasa</p><p style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#71717a">rudo@mutasatrust.org</p></div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <select style="border-radius:6px;border:1px solid #e4e4e7;background:transparent;padding:6px 10px;font-size:14px;outline:none"><option>client</option><option>pm</option><option>contractor</option><option>contributor</option><option>viewer</option></select>
+              <button style="display:inline-flex;align-items:center;justify-content:center;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:500;background:transparent;color:#18181b;border:1px solid #e4e4e7;cursor:pointer" style-hover="background:#fafafa">Update</button>
+              <button style="display:inline-flex;align-items:center;justify-content:center;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:500;background:transparent;color:#52525b;border:none;cursor:pointer" style-hover="background:#f4f4f5">Remove</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section style="margin-top:32px">
+        <div style="border-radius:8px;border:1px solid #e4e4e7;background:#ffffff;padding:20px">
+          <h3 style="margin:0;font-size:14px;font-weight:600;color:#18181b">Add a teammate</h3>
+          <div style="margin-top:12px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px">
+            <div style="min-width:192px;flex:1">
+              <label style="margin-bottom:4px;display:block;font-size:12px;font-weight:500">Company member</label>
+              <select style="width:100%;border-radius:6px;border:1px solid #e4e4e7;background:transparent;padding:6px 10px;font-size:14px;outline:none;color:#71717a"><option>Select a person…</option><option>Simba Dube · simba@grafaid.co.zw</option></select>
+            </div>
+            <div>
+              <label style="margin-bottom:4px;display:block;font-size:12px;font-weight:500">Role</label>
+              <select style="border-radius:6px;border:1px solid #e4e4e7;background:transparent;padding:6px 10px;font-size:14px;outline:none"><option>contributor</option><option>pm</option><option>contractor</option><option>client</option><option>viewer</option></select>
+            </div>
+            <button style="display:inline-flex;align-items:center;justify-content:center;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:500;background:#2563eb;color:#ffffff;border:none;cursor:pointer" style-hover="background:#1d4ed8">Add</button>
+          </div>
+          <ul style="margin:16px 0 0;padding:12px 0 0;list-style:none;border-top:1px solid #f4f4f5;display:flex;flex-direction:column;gap:4px;font-size:12px;color:#71717a">
+            <li><span style="font-weight:500;text-transform:capitalize;color:#3f3f46">pm</span> — Manages the project — tasks, members, schedule.</li>
+            <li><span style="font-weight:500;text-transform:capitalize;color:#3f3f46">contractor</span> — Executes tasks under an agreed commitment (cost, timeline, terms).</li>
+            <li><span style="font-weight:500;text-transform:capitalize;color:#3f3f46">contributor</span> — Does the work — updates assigned tasks, submits reports.</li>
+            <li><span style="font-weight:500;text-transform:capitalize;color:#3f3f46">client</span> — External stakeholder — sees progress and their invoices.</li>
+            <li><span style="font-weight:500;text-transform:capitalize;color:#3f3f46">viewer</span> — Read-only access to this project.</li>
+          </ul>
+        </div>
+      </section>
+    </div>
+    </sc-if>
+
+    <!-- ── Chat ── -->
+    <sc-if value="{{ sChat }}">
+    <div data-screen-label="Chat" style="display:flex;flex-direction:column;height:100%;min-height:0">
+      <div style="flex-shrink:0;border-bottom:1px solid #e4e4e7;padding:16px 24px">
+        <span onClick="{{ goProject }}" style="font-size:12px;color:#71717a;cursor:pointer" style-hover="text-decoration:underline">← Kariba Heights Apartments</span>
+        <div style="margin-top:2px;display:flex;align-items:center;gap:8px">
+          <h1 style="margin:0;font-size:20px;font-weight:600;letter-spacing:-0.025em">Project Chat</h1>
+          <span style="border-radius:9999px;background:#f4f4f5;padding:2px 8px;font-size:11px;font-weight:500;color:#52525b">{{ memberCount }} members · {{ onlineCount }} online</span>
+        </div>
+      </div>
+
+      <div style="display:flex;flex:1;min-height:0">
+        <!-- Conversation column -->
+        <div style="display:flex;flex:1;min-width:0;flex-direction:column">
+          <div style="flex:1;overflow-y:auto;padding:24px 24px 8px;display:flex;flex-direction:column;gap:4px">
+            <div style="margin:4px 0 12px;display:flex;align-items:center;gap:12px">
+              <div style="height:1px;flex:1;background:#f4f4f5"></div>
+              <span style="font-size:11px;font-weight:500;color:#a1a1aa">Today · 6 July 2026</span>
+              <div style="height:1px;flex:1;background:#f4f4f5"></div>
+            </div>
+            <sc-for list="{{ messages }}" as="m" hint-placeholder-count="6">
+              <div style="display:flex;gap:10px;margin-bottom:10px;flex-direction:{{ m.dir }};align-items:flex-end">
+                <span style="display:flex;height:28px;width:28px;flex-shrink:0;align-items:center;justify-content:center;border-radius:9999px;font-size:11px;font-weight:600;color:#ffffff;background:{{ m.color }}">{{ m.initials }}</span>
+                <div style="max-width:78%;min-width:0;display:flex;flex-direction:column;align-items:{{ m.align }}">
+                  <div style="margin-bottom:3px;display:flex;gap:8px;font-size:11px;color:#a1a1aa">
+                    <span style="font-weight:500;color:#71717a">{{ m.name }}</span><span>{{ m.time }}</span>
+                  </div>
+                  <div style="border-radius:12px;padding:9px 13px;font-size:14px;line-height:1.45;background:{{ m.bubbleBg }};color:{{ m.bubbleFg }};border:{{ m.bubbleBorder }};border-radius:{{ m.radius }}">{{ m.text }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="flex-shrink:0;border-top:1px solid #e4e4e7;padding:12px 24px 16px">
+            <div style="display:flex;align-items:flex-end;gap:8px;border-radius:10px;border:1px solid #e4e4e7;background:#fafafa;padding:8px 8px 8px 14px">
+              <input placeholder="Message the project team…" style="flex:1;border:none;background:transparent;padding:6px 0;font-size:14px;outline:none;font-family:inherit" />
+              <button title="Attach" style="display:flex;height:34px;width:34px;align-items:center;justify-content:center;border-radius:8px;background:transparent;border:none;cursor:pointer;color:#a1a1aa" style-hover="background:#f0f0f1;color:#52525b"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg></button>
+              <button title="Send" style="display:flex;height:34px;width:34px;align-items:center;justify-content:center;border-radius:8px;background:#2563eb;border:none;cursor:pointer;color:#ffffff" style-hover="background:#1d4ed8"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"></path><path d="m21.854 2.147-10.94 10.939"></path></svg></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- People sidebar -->
+        <aside style="display:flex;width:300px;flex-shrink:0;flex-direction:column;border-left:1px solid #e4e4e7;background:#ffffff;min-height:0">
+          <sc-if value="{{ chatListMode }}" hint-placeholder-val="{{ true }}">
+            <div style="flex-shrink:0;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e4e4e7;padding:14px 16px">
+              <h3 style="margin:0;font-size:13px;font-weight:600;color:#18181b">People</h3>
+              <span style="font-size:11px;color:#a1a1aa">{{ memberCount }}</span>
+            </div>
+            <div style="flex:1;overflow-y:auto;padding:8px">
+              <p style="margin:0;padding:8px 8px 4px;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;color:#a1a1aa">Active now · {{ onlineCount }}</p>
+              <sc-for list="{{ onlineMembers }}" as="p" hint-placeholder-count="3">
+                <div onClick="{{ p.onClick }}" style="display:flex;align-items:center;gap:10px;border-radius:8px;padding:8px;cursor:pointer" style-hover="background:#f4f4f5">
+                  <span style="position:relative;flex-shrink:0"><span style="display:flex;height:32px;width:32px;align-items:center;justify-content:center;border-radius:9999px;font-size:12px;font-weight:600;color:#ffffff;background:{{ p.color }}">{{ p.initials }}</span><span style="position:absolute;right:-1px;bottom:-1px;height:10px;width:10px;border-radius:9999px;border:2px solid #ffffff;background:#22c55e"></span></span>
+                  <div style="min-width:0;flex:1">
+                    <p style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:500;color:#27272a">{{ p.name }}</p>
+                    <p style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:#a1a1aa">{{ p.roleLabel }}</p>
+                  </div>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d4d4d8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="m9 18 6-6-6-6"></path></svg>
+                </div>
+              </sc-for>
+              <p style="margin:0;padding:14px 8px 4px;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;color:#a1a1aa">Offline · {{ offlineCount }}</p>
+              <sc-for list="{{ offlineMembers }}" as="p" hint-placeholder-count="2">
+                <div onClick="{{ p.onClick }}" style="display:flex;align-items:center;gap:10px;border-radius:8px;padding:8px;cursor:pointer" style-hover="background:#f4f4f5">
+                  <span style="position:relative;flex-shrink:0"><span style="display:flex;height:32px;width:32px;align-items:center;justify-content:center;border-radius:9999px;font-size:12px;font-weight:600;color:#ffffff;opacity:0.55;background:{{ p.color }}">{{ p.initials }}</span><span style="position:absolute;right:-1px;bottom:-1px;height:10px;width:10px;border-radius:9999px;border:2px solid #ffffff;background:#d4d4d8"></span></span>
+                  <div style="min-width:0;flex:1">
+                    <p style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:500;color:#52525b">{{ p.name }}</p>
+                    <p style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:#a1a1aa">{{ p.lastSeen }}</p>
+                  </div>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d4d4d8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="m9 18 6-6-6-6"></path></svg>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ chatDetailMode }}">
+            <div style="flex-shrink:0;display:flex;align-items:center;gap:8px;border-bottom:1px solid #e4e4e7;padding:12px 12px">
+              <button onClick="{{ closeMember }}" style="display:flex;height:30px;width:30px;align-items:center;justify-content:center;border-radius:8px;background:transparent;border:none;cursor:pointer;color:#52525b" style-hover="background:#f4f4f5"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg></button>
+              <span style="font-size:13px;font-weight:600;color:#18181b">People</span>
+            </div>
+            <div style="flex:1;overflow-y:auto">
+              <div style="display:flex;flex-direction:column;align-items:center;gap:8px;border-bottom:1px solid #f4f4f5;padding:24px 20px">
+                <span style="position:relative"><span style="display:flex;height:72px;width:72px;align-items:center;justify-content:center;border-radius:9999px;font-size:26px;font-weight:600;color:#ffffff;background:{{ sel.color }}">{{ sel.initials }}</span><span style="position:absolute;right:2px;bottom:2px;height:16px;width:16px;border-radius:9999px;border:3px solid #ffffff;background:{{ sel.statusDot }}"></span></span>
+                <div style="text-align:center">
+                  <p style="margin:0;font-size:16px;font-weight:600;color:#18181b">{{ sel.name }}</p>
+                  <p style="margin:2px 0 0;font-size:12px;color:{{ sel.statusColor }}">{{ sel.statusText }}</p>
+                </div>
+                <span style="border-radius:9999px;padding:2px 10px;font-size:11px;font-weight:500;text-transform:capitalize;background:{{ sel.roleBg }};color:{{ sel.roleFg }}">{{ sel.roleLabel }}</span>
+                <div style="margin-top:4px;display:flex;gap:8px">
+                  <button style="display:flex;height:36px;width:36px;align-items:center;justify-content:center;border-radius:9999px;background:#2563eb;border:none;cursor:pointer;color:#ffffff" style-hover="background:#1d4ed8" title="Message"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></button>
+                  <button style="display:flex;height:36px;width:36px;align-items:center;justify-content:center;border-radius:9999px;background:transparent;border:1px solid #e4e4e7;cursor:pointer;color:#52525b" style-hover="background:#fafafa" title="Call"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384z"></path></svg></button>
+                  <button style="display:flex;height:36px;width:36px;align-items:center;justify-content:center;border-radius:9999px;background:transparent;border:1px solid #e4e4e7;cursor:pointer;color:#52525b" style-hover="background:#fafafa" title="Email"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg></button>
+                </div>
+              </div>
+
+              <div style="border-bottom:1px solid #f4f4f5;padding:16px 20px">
+                <p style="margin:0 0 10px;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;color:#a1a1aa">Contact</p>
+                <div style="display:flex;flex-direction:column;gap:10px;font-size:13px">
+                  <div style="display:flex;align-items:center;gap:10px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a1a1aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384z"></path></svg><span style="color:#3f3f46">{{ sel.phone }}</span></div>
+                  <div style="display:flex;align-items:center;gap:10px;min-width:0"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a1a1aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><rect width="20" height="16" x="2" y="4" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#3f3f46">{{ sel.email }}</span></div>
+                </div>
+              </div>
+
+              <div style="border-bottom:1px solid #f4f4f5;padding:16px 20px">
+                <p style="margin:0 0 10px;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;color:#a1a1aa">On this project</p>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                  <div style="border-radius:8px;background:#fafafa;padding:10px 12px"><p style="margin:0;font-size:20px;font-weight:600;color:#18181b;font-variant-numeric:tabular-nums">{{ sel.openTasks }}</p><p style="margin:0;font-size:11px;color:#71717a">Open tasks</p></div>
+                  <div style="border-radius:8px;background:#fafafa;padding:10px 12px"><p style="margin:0;font-size:20px;font-weight:600;color:#18181b;font-variant-numeric:tabular-nums">{{ sel.doneTasks }}</p><p style="margin:0;font-size:11px;color:#71717a">Completed</p></div>
+                </div>
+              </div>
+
+              <div style="padding:16px 20px">
+                <p style="margin:0 0 10px;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;color:#a1a1aa">Recent activity</p>
+                <ol style="margin:0;padding:0 0 0 14px;list-style:none;border-left:1px solid #e4e4e7;display:flex;flex-direction:column;gap:12px">
+                  <sc-for list="{{ sel.activity }}" as="ac" hint-placeholder-count="3">
+                    <li style="position:relative"><span style="position:absolute;left:-19px;top:5px;width:7px;height:7px;border-radius:9999px;background:#d4d4d8"></span><p style="margin:0;font-size:13px;color:#3f3f46">{{ ac.text }}</p><p style="margin:0;font-size:11px;color:#a1a1aa">{{ ac.time }}</p></li>
+                  </sc-for>
+                </ol>
+              </div>
+            </div>
+          </sc-if>
+        </aside>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ── Placeholder (screens not yet recreated) ── -->
+    <sc-if value="{{ sPlaceholder }}">
+    <div data-screen-label="Placeholder" style="display:flex;min-height:60vh;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:24px;text-align:center">
+      <p style="margin:0;font-size:14px;font-weight:500;color:#3f3f46">{{ phTitle }}</p>
+      <p style="margin:0;font-size:12px;color:#a1a1aa">This screen hasn't been recreated yet — ask me to add it.</p>
+    </div>
+    </sc-if>
+
+  </main>
+</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;screen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;dashboard&quot;,&quot;options&quot;:[&quot;dashboard&quot;,&quot;projects&quot;,&quot;financeOrg&quot;,&quot;project&quot;,&quot;tasks&quot;,&quot;task&quot;,&quot;finance&quot;,&quot;requests&quot;,&quot;team&quot;,&quot;signin&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Navigation&quot;},&quot;showApprovals&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Dashboard&quot;}}">
+class Component extends DCLogic {
+  state = { screen: null, switcherOpen: false, taskTab: 'deps', phTitle: '', expandedApproval: 0, chatMember: null };
+
+  renderVals() {
+    const screen = this.state.screen ?? this.props.screen ?? 'dashboard';
+    const projectScreens = ['project', 'tasks', 'task', 'finance', 'requests', 'team', 'chat'];
+    const inProject = projectScreens.includes(screen);
+
+    const go = (s, ph) => () => this.setState({ screen: s, switcherOpen: false, phTitle: ph || '' });
+
+    const item = (active) => active
+      ? { bg: '#f4f4f5', fg: '#18181b', fw: '500' }
+      : { bg: 'transparent', fg: '#3f3f46', fw: '400' };
+
+    const nav = {
+      dashboard: item(screen === 'dashboard'),
+      projects: item(screen === 'projects'),
+      payments: item(screen === 'payments'),
+      financeOrg: item(screen === 'financeOrg'),
+      org: item(screen === 'org'),
+      project: item(screen === 'project'),
+      tasks: item(screen === 'tasks' || screen === 'task'),
+      finance: item(screen === 'finance'),
+      requests: item(screen === 'requests'),
+      chat: item(screen === 'chat'),
+      team: item(screen === 'team'),
+    };
+
+    const tab = (active) => active
+      ? { line: '#2563eb', fg: '#1d4ed8', cBg: '#eff6ff', cFg: '#1d4ed8' }
+      : { line: 'transparent', fg: '#71717a', cBg: '#f4f4f5', cFg: '#71717a' };
+
+    const dashTasks = [
+      { title: 'Foundation excavation', assignee: 'Blessing Moyo', project: 'Kariba Heights Apartments', status: 'done', start: 0, duration: 8 },
+      { title: 'Slab pour Block A', assignee: 'Tariro Chirwa', project: 'Kariba Heights Apartments', status: 'active', start: 8, duration: 10 },
+      { title: 'Roof trusses install', assignee: 'Peter Ncube', project: 'Kariba Heights Apartments', status: 'overdue', start: 5, duration: 8 },
+      { title: 'Electrical first fix', assignee: 'Simba Dube', project: 'Kariba Heights Apartments', status: 'blocked', start: 10, duration: 12 },
+      { title: 'Plumbing rough-in', assignee: 'Kudzai Mhlanga', project: 'Kariba Heights Apartments', status: 'pending', start: 9, duration: 9 },
+      { title: 'Brickwork Block B', assignee: 'Blessing Moyo', project: 'Kariba Heights Apartments', status: 'active', start: 12, duration: 14 },
+      { title: 'Racking layout sign-off', assignee: 'Simba Dube', project: 'Msasa Warehouse Fit-out', status: 'active', start: 11, duration: 8 },
+      { title: 'Window frames delivery', assignee: 'Unassigned', project: 'Kariba Heights Apartments', status: 'todo', start: 20, duration: 5 },
+      { title: 'Site drainage works', assignee: 'Tariro Chirwa', project: 'Kariba Heights Apartments', status: 'todo', start: 24, duration: 10 },
+    ];
+    const projTasks = dashTasks.filter((t) => t.project === 'Kariba Heights Apartments');
+
+    const PR = { high:{bg:'#fffbeb',fg:'#b45309'}, urgent:{bg:'#fffbeb',fg:'#b45309'}, medium:{bg:'#f4f4f5',fg:'#52525b'}, low:{bg:'#f4f4f5',fg:'#52525b'} };
+    const ST = {
+      done:{label:'Done',bg:'#f0fdf4',fg:'#15803d',bar:'#16a34a'},
+      in_progress:{label:'In progress',bg:'#eff6ff',fg:'#1d4ed8',bar:'#2563eb'},
+      submitted:{label:'Review',bg:'#eff6ff',fg:'#1d4ed8',bar:'#3b82f6'},
+      blocked:{label:'Blocked',bg:'#fffbeb',fg:'#b45309',bar:'#d97706'},
+      todo:{label:'To do',bg:'#f4f4f5',fg:'#52525b',bar:'#d4d4d8'},
+    };
+    const rawTasks = [
+      {title:'Slab pour Block A',assignee:'Tariro Chirwa',status:'in_progress',priority:'high',start:'30 Jun',due:'09 Jul',pct:55,meta:'\u25cf Critical path',metaColor:'#dc2626',task:true},
+      {title:'Brickwork Block B',assignee:'Blessing Moyo',status:'in_progress',priority:'medium',start:'01 Jul',due:'17 Jul',pct:40,meta:'2d slack',metaColor:'#a1a1aa'},
+      {title:'Plumbing rough-in',assignee:'Kudzai Mhlanga',status:'submitted',priority:'medium',start:'20 Jun',due:'08 Jul',pct:90,meta:'Awaiting review',metaColor:'#a1a1aa'},
+      {title:'Electrical first fix',assignee:'Simba Dube',status:'blocked',priority:'high',start:'02 Jul',due:'14 Jul',pct:30,meta:'\ud83d\udea7 Conduit stock held at supplier',metaColor:'#d97706'},
+      {title:'Foundation excavation',assignee:'Blessing Moyo',status:'done',priority:'medium',start:'10 Jun',due:'29 Jun',pct:100,meta:'\u2713 Signed off',metaColor:'#16a34a'},
+      {title:'Roof trusses install',assignee:'Peter Ncube',status:'done',priority:'high',start:'24 Jun',due:'04 Jul',pct:100,meta:'\u2713 Signed off',metaColor:'#16a34a'},
+      {title:'Window frames delivery',assignee:'Unassigned',status:'todo',priority:'low',start:'14 Jul',due:'16 Jul',pct:0,meta:'3d slack',metaColor:'#a1a1aa'},
+      {title:'Site drainage works',assignee:'Tariro Chirwa',status:'todo',priority:'medium',start:'20 Jul',due:'25 Jul',pct:0,meta:'6d slack',metaColor:'#a1a1aa'},
+    ];
+    const taskRows = rawTasks.map((t) => {
+      const s = ST[t.status], p = PR[t.priority];
+      return { title:t.title, assignee:t.assignee, priority:t.priority, due:t.due, startLabel:t.start,
+        meta:t.meta, metaColor:t.metaColor, pct:t.pct, pctLabel:t.pct+'%', barColor:s.bar,
+        statusLabel:s.label, statusBg:s.bg, statusFg:s.fg, prioBg:p.bg, prioFg:p.fg,
+        onClick: t.task ? go('task') : go('tasks') };
+    });
+
+    const AP = [
+      { kind:'Sign-off', dot:'#60a5fa', chipBg:'#eff6ff', chipFg:'#1d4ed8', title:'Slab pour Block A', sub:'Kariba Heights Apartments · submitted by Tariro Chirwa', detail:'Tariro submitted completion with notes and 2 site photos, and confirmed the declaration. Approve to mark the task Done, or send it back for rework.', action1:'Approve (mark done)', action2:'Reject', open:'task' },
+      { kind:'Extension', dot:'#fbbf24', chipBg:'#fffbeb', chipFg:'#b45309', title:'Electrical first fix', sub:'Kariba Heights Apartments · +4 days requested', detail:'Reason given: conduit stock held at supplier pending payment confirmation. New due date requested 2026-07-18 (+4 days). The SLA clock is currently paused.', action1:'Grant extension', action2:'Decline', open:'task' },
+      { kind:'Variation', dot:'#c084fc', chipBg:'#faf5ff', chipFg:'#7e22ce', title:'VO-012 · Additional retaining wall', sub:'Msasa Warehouse Fit-out · +$4,800.00 · +6d', detail:'East boundary retaining wall required following the geotech review. Cost impact +$4,800.00, time impact +6 days. Raised by Blessing Moyo. Approving writes a variation order against the budget.', action1:'Approve variation', action2:'Reject', open:'project' },
+    ];
+    const approvals = AP.map((a, i) => ({ ...a, expanded: this.state.expandedApproval === i, rot: this.state.expandedApproval === i ? 90 : 0, onToggle: () => this.setState({ expandedApproval: this.state.expandedApproval === i ? null : i }), onOpen: go(a.open) }));
+
+    // ── Chat: members + messages ──
+    const ROLE = { pm:{label:'Project manager',bg:'#eff6ff',fg:'#1d4ed8'}, owner:{label:'Owner',bg:'#faf5ff',fg:'#7e22ce'}, contractor:{label:'Contractor',bg:'#fff7ed',fg:'#c2410c'}, contributor:{label:'Contributor',bg:'#f4f4f5',fg:'#52525b'}, client:{label:'Client',bg:'#f0fdf4',fg:'#15803d'} };
+    const MEMBERS = [
+      { id:'tendai', name:'Tendai Karumbidza', initials:'TK', color:'#7c3aed', role:'owner', online:true, phone:'+263 77 000 1200', email:'tendai@grafaid.co.zw', openTasks:0, doneTasks:0, activity:[{text:'Approved variation VO-011',time:'Today · 08:14'},{text:'Posted in Project Chat',time:'Today · 08:02'}] },
+      { id:'tariro', name:'Tariro Chirwa', initials:'TC', color:'#2563eb', role:'pm', online:true, phone:'+263 77 234 5678', email:'tariro@grafaid.co.zw', openTasks:3, doneTasks:5, activity:[{text:'Submitted "Slab pour Block A" for sign-off',time:'Today · 09:41'},{text:'Commented on Plumbing rough-in',time:'Today · 09:12'},{text:'Updated site report to 62%',time:'Yesterday · 16:30'}] },
+      { id:'blessing', name:'Blessing Moyo', initials:'BM', color:'#0d9488', role:'contractor', online:true, phone:'+263 71 887 4410', email:'blessing@mzilikazibuilders.co.zw', openTasks:2, doneTasks:4, activity:[{text:'Marked Foundation excavation done',time:'Today · 07:55'},{text:'Raised variation VO-012',time:'Yesterday · 14:20'}] },
+      { id:'kudzai', name:'Kudzai Mhlanga', initials:'KM', color:'#ea580c', role:'contributor', online:false, lastSeen:'Active 40m ago', phone:'+263 78 552 9033', email:'kudzai@grafaid.co.zw', openTasks:1, doneTasks:2, activity:[{text:'Uploaded 3 photos to Plumbing rough-in',time:'Today · 08:48'},{text:'Started Plumbing rough-in',time:'2 Jul · 07:30'}] },
+      { id:'simba', name:'Simba Dube', initials:'SD', color:'#c026d3', role:'contributor', online:false, lastSeen:'Active 2h ago', phone:'+263 77 419 6621', email:'simba@grafaid.co.zw', openTasks:1, doneTasks:3, activity:[{text:'Reported blocker on Electrical first fix',time:'Today · 06:20'},{text:'Requested +4 day extension',time:'Today · 06:18'}] },
+      { id:'rudo', name:'Rudo Mutasa', initials:'RM', color:'#64748b', role:'client', online:false, lastSeen:'Active yesterday', phone:'+263 77 300 1188', email:'rudo@mutasatrust.org', openTasks:0, doneTasks:0, activity:[{text:'Viewed latest site report',time:'Yesterday · 18:05'}] },
+    ];
+    const roleInfo = (r) => ROLE[r] || ROLE.contributor;
+    const onlineMembers = MEMBERS.filter((m) => m.online).map((m) => ({ id:m.id, name:m.name, initials:m.initials, color:m.color, roleLabel:roleInfo(m.role).label, onClick:() => this.setState({ chatMember: m.id }) }));
+    const offlineMembers = MEMBERS.filter((m) => !m.online).map((m) => ({ id:m.id, name:m.name, initials:m.initials, color:m.color, lastSeen:m.lastSeen, onClick:() => this.setState({ chatMember: m.id }) }));
+
+    const selRaw = MEMBERS.find((m) => m.id === this.state.chatMember) || null;
+    const sel = selRaw ? {
+      name:selRaw.name, initials:selRaw.initials, color:selRaw.color, phone:selRaw.phone, email:selRaw.email,
+      openTasks:selRaw.openTasks, doneTasks:selRaw.doneTasks, activity:selRaw.activity,
+      roleLabel:roleInfo(selRaw.role).label, roleBg:roleInfo(selRaw.role).bg, roleFg:roleInfo(selRaw.role).fg,
+      statusDot:selRaw.online ? '#22c55e' : '#d4d4d8', statusColor:selRaw.online ? '#16a34a' : '#a1a1aa',
+      statusText:selRaw.online ? 'Active now' : (selRaw.lastSeen || 'Offline'),
+    } : null;
+
+    const CM = Object.fromEntries(MEMBERS.map((m) => [m.id, m]));
+    const rawMsgs = [
+      { from:'tariro', time:'08:41', text:'Morning all. Block A slab is stripped and looking good — sending it for sign-off now.' },
+      { from:'blessing', time:'08:47', text:'Nice one. Bricklaying gangs are on Block B first lift, should hit the halfway mark by Thursday.' },
+      { from:'simba', time:'09:03', text:'Heads up — electrical first fix is blocked. Conduit stock is held at the supplier pending payment confirmation. I’ve raised a +4 day extension.' },
+      { from:'tendai', time:'09:10', text:'Thanks Simba, I’ll clear the supplier payment this morning and review the extension. Keep the crew on drainage works meanwhile.' },
+      { from:'kudzai', time:'09:26', text:'Plumbing rough-in photos are uploaded for review whenever the PM has a minute.' },
+      { from:'tendai', time:'09:32', text:'On it — will get to your sign-off right after the slab. Good progress everyone.' },
+    ];
+    const messages = rawMsgs.map((r) => {
+      const p = CM[r.from]; const mine = r.from === 'tendai';
+      return { name: mine ? 'You' : p.name, initials:p.initials, color:p.color, time:r.time, text:r.text,
+        dir: mine ? 'row-reverse' : 'row', align: mine ? 'flex-end' : 'flex-start',
+        bubbleBg: mine ? '#2563eb' : '#ffffff', bubbleFg: mine ? '#ffffff' : '#27272a',
+        bubbleBorder: mine ? 'none' : '1px solid #e4e4e7',
+        radius: mine ? '12px 12px 3px 12px' : '12px 12px 12px 3px' };
+    });
+
+    return {
+      isSignin: screen === 'signin',
+      isApp: screen !== 'signin',
+      sDashboard: screen === 'dashboard',
+      sProjects: screen === 'projects',
+      sProject: screen === 'project',
+      sTasks: screen === 'tasks',
+      sTask: screen === 'task',
+      sFinance: screen === 'finance',
+      sFinanceOrg: screen === 'financeOrg',
+      sRequests: screen === 'requests',
+      sTeam: screen === 'team',
+      sChat: screen === 'chat',
+      sPlaceholder: screen === 'payments' || screen === 'org',
+      phTitle: this.state.phTitle,
+      inProject,
+      notInProject: !inProject,
+      switcherOpen: this.state.switcherOpen,
+      switcherLabel: inProject ? 'Kariba Heights Apartments' : 'All projects',
+      showApprovals: this.props.showApprovals ?? true,
+      nav, dashTasks, projTasks, taskRows, approvals,
+      onlineMembers, offlineMembers, sel,
+      messages,
+      memberCount: MEMBERS.length,
+      onlineCount: onlineMembers.length,
+      offlineCount: offlineMembers.length,
+      chatListMode: !sel,
+      chatDetailMode: !!sel,
+      closeMember: () => this.setState({ chatMember: null }),
+      tabs: { deps: tab(this.state.taskTab === 'deps'), activity: tab(this.state.taskTab === 'activity') },
+      isTabDeps: this.state.taskTab === 'deps',
+      isTabActivity: this.state.taskTab === 'activity',
+      tabDeps: () => this.setState({ taskTab: 'deps' }),
+      tabActivity: () => this.setState({ taskTab: 'activity' }),
+      toggleSwitcher: () => this.setState({ switcherOpen: !this.state.switcherOpen }),
+      goDashboard: go('dashboard'),
+      goDashboardFromSwitcher: go('dashboard'),
+      goProjects: go('projects'),
+      goPayments: go('payments', 'My payments'),
+      goFinanceOrg: go('financeOrg'),
+      goOrg: go('org', 'Organization'),
+      goProject: go('project'),
+      goProjectFromSwitcher: go('project'),
+      goTasks: go('tasks'),
+      goTask: go('task'),
+      goFinance: go('finance'),
+      goRequests: go('requests'),
+      goChat: go('chat'),
+      goTeam: go('team'),
+      goSignin: go('signin'),
+    };
+  }
+}
+</script>
+</body>
+</html>

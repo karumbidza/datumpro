@@ -10,6 +10,7 @@ import {
   listExtensionRequests,
 } from '@/lib/data/tasks';
 import { listProjectMembers, myProjectRole } from '@/lib/data/members';
+import { listChatRoster } from '@/lib/data/chat-roster';
 import { getProjectSchedule } from '@/lib/data/scheduling';
 import { listTaskQuotes, listTaskMedia } from '@/lib/data/quotes';
 import { listTaskPayments } from '@/lib/data/payments';
@@ -91,6 +92,17 @@ export default async function TaskDetailPage({
     : null;
   const chatNames = Object.fromEntries(members.map((m) => [m.userId, m.name]));
   const meName = chatNames[user.id] ?? user.email?.split('@')[0] ?? 'You';
+
+  // People rail for the task discussion: its participants (the assignee + the
+  // project's PMs — the same people the DM is visible to). Project-level stats.
+  const taskParticipantIds = Array.from(
+    new Set(
+      [task.assignee_id, ...members.filter((m) => m.role === 'pm').map((m) => m.userId)].filter(
+        (id): id is string => Boolean(id),
+      ),
+    ),
+  );
+  const taskRoster = dm ? await listChatRoster(projectId, taskParticipantIds) : [];
 
   const contractorMembers = members.filter((m) => m.role === 'contractor');
   const contractors = (contractorMembers.length > 0 ? contractorMembers : members).map((m) => ({
@@ -192,6 +204,7 @@ export default async function TaskDetailPage({
           othersReadSeq={dm.othersRead}
           canPost
           canModerate={canManage}
+          members={taskRoster}
         />
       ),
     });
