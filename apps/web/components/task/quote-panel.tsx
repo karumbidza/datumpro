@@ -1,6 +1,7 @@
 import { Card, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { SubmitButton } from '@/components/ui/submit-button';
 import { inviteQuotes, submitQuote, awardQuote } from '@/app/(app)/projects/[projectId]/tasks/actions';
 import { formatUsd, paymentTermsSummary } from '@datumpro/shared/domain';
 import type { QuoteRow, QuoteStatus } from '@/lib/data/quotes';
@@ -52,7 +53,7 @@ export function QuotePanel({ taskId, canManage, currentUserId, quotes, contracto
                 ))}
               </div>
               <div className="mt-3">
-                <Button type="submit">Invite selected</Button>
+                <SubmitButton pendingText="Inviting…">Invite selected</SubmitButton>
               </div>
             </form>
           ) : (

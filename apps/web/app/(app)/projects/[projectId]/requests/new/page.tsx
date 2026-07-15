@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getProject } from '@/lib/data/projects';
 import { createRequest } from '../actions';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { SubmitButton } from '@/components/ui/submit-button';
 import { REQUEST_TYPES } from '@datumpro/shared/domain';
 
 const inputClass =
@@ -58,7 +58,7 @@ export default async function NewRequestPage({
             <textarea name="description" rows={4} className={inputClass} />
           </div>
           <div className="pt-2">
-            <Button type="submit">Create request</Button>
+            <SubmitButton pendingText="Creating…">Create request</SubmitButton>
           </div>
           <p className="text-xs text-zinc-400">
             Saved as a draft — submit it on the next screen to start the approval chain.

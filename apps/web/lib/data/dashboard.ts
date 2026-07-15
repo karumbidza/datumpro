@@ -122,3 +122,63 @@ export async function getDashboardData(orgId: string, projectId?: string): Promi
 
   return { counts, tasks };
 }
+
+/** Portfolio timeline — ONE bar per project (not per task) for the all-projects
+ *  dashboard. Span comes from the project's own start/end dates; status + SLA are
+ *  rolled up from its tasks. Shaped as DashboardTask so it feeds TimelineOverview
+ *  directly (title = project name; the sub-line shows the task count). */
+export async function getPortfolioTimeline(orgId: string): Promise<DashboardTask[]> {
+  const supabase = await createClient();
+  const [projectsRes, tasksRes] = await Promise.all([
+    supabase
+      .from('projects')
+      .select('id, name, start_date, end_date')
+      .eq('org_id', orgId)
+      .order('created_at', { ascending: true }),
+    supabase.from('tasks').select('project_id, status, sla_status').eq('org_id', orgId),
+  ]);
+
+  const projects = (projectsRes.data ?? []) as {
+    id: string;
+    name: string;
+    start_date: string | null;
+    end_date: string | null;
+  }[];
+  const rawTasks = (tasksRes.data ?? []) as { project_id: string; status: TaskStatus; sla_status: TaskSlaStatus }[];
+
+  const byProject = new Map<string, { status: TaskStatus; sla_status: TaskSlaStatus }[]>();
+  for (const t of rawTasks) {
+    const list = byProject.get(t.project_id) ?? [];
+    list.push(t);
+    byProject.set(t.project_id, list);
+  }
+
+  return projects.map((p) => {
+    const ts = byProject.get(p.id) ?? [];
+    const n = ts.length;
+    const status: TaskStatus = ts.some((t) => t.status === 'blocked')
+      ? 'blocked'
+      : n > 0 && ts.every((t) => t.status === 'done')
+        ? 'done'
+        : ts.some((t) => t.status === 'in_progress' || t.status === 'submitted')
+          ? 'in_progress'
+          : 'todo';
+    const sla_status: TaskSlaStatus = ts.some((t) => t.sla_status === 'breached')
+      ? 'breached'
+      : ts.some((t) => t.sla_status === 'at_risk')
+        ? 'at_risk'
+        : 'on_track';
+    return {
+      id: p.id,
+      title: p.name,
+      status,
+      sla_status,
+      project_id: p.id,
+      projectName: '',
+      assigneeName: n ? `${n} task${n === 1 ? '' : 's'}` : 'No tasks',
+      planned_start_date: p.start_date,
+      planned_end_date: p.end_date,
+      due_date: p.end_date,
+    };
+  });
+}

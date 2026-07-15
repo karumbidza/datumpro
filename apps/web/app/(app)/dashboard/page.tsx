@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveContext } from '@/lib/data/org';
-import { getDashboardData } from '@/lib/data/dashboard';
+import { getPortfolioTimeline } from '@/lib/data/dashboard';
 import { getPortfolioData } from '@/lib/data/portfolio';
 import {
   homePersona,
@@ -61,8 +61,8 @@ export default async function DashboardPage() {
 
   // ── Portfolio home — owner / admin / finance ──────────────────────────────
   if (persona === 'portfolio') {
-    const [{ tasks }, portfolio] = await Promise.all([
-      getDashboardData(active.orgId),
+    const [projectTimeline, portfolio] = await Promise.all([
+      getPortfolioTimeline(active.orgId),
       getPortfolioData(active.orgId),
     ]);
     return (
@@ -73,7 +73,7 @@ export default async function DashboardPage() {
           action={newProject}
         />
         <KpiRow kpis={portfolio.kpis} />
-        <TimelineOverview tasks={tasks} />
+        <TimelineOverview tasks={projectTimeline} unit="project" />
         {approvals.length > 0 && <ApprovalsInbox items={approvals} />}
         <UpcomingTasksTable tasks={portfolio.upcomingTasks} />
       </div>

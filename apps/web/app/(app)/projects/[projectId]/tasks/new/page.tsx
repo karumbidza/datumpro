@@ -5,7 +5,7 @@ import { getProject } from '@/lib/data/projects';
 import { listProjectMembers } from '@/lib/data/members';
 import { createTask } from '../actions';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { SubmitButton } from '@/components/ui/submit-button';
 import { TASK_PRIORITIES } from '@datumpro/shared/domain';
 
 const inputClass =
@@ -68,6 +68,11 @@ export default async function NewTaskPage({
               </select>
             </div>
           </div>
+          <p className="-mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            Prefer to compare bids? Leave this <span className="font-medium">Unassigned</span>, create the
+            task, then open its <span className="font-medium">Quotes</span> panel to invite two or more
+            contractors and award the winner.
+          </p>
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="mb-1 block text-sm font-medium">Start</label>
@@ -83,7 +88,7 @@ export default async function NewTaskPage({
             </div>
           </div>
           <div className="pt-2">
-            <Button type="submit">Create task</Button>
+            <SubmitButton pendingText="Creating…">Create task</SubmitButton>
           </div>
         </form>
       </Card>

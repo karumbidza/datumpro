@@ -109,7 +109,16 @@ function StatusBadge({ state }: { state: BarState }) {
 }
 
 /* ── Component ──────────────────────────────────────────────────────── */
-export function TimelineOverview({ tasks: input }: { tasks: DashboardTask[] }) {
+export function TimelineOverview({
+  tasks: input,
+  unit = 'task',
+}: {
+  tasks: DashboardTask[];
+  /** What each row represents — 'task' on a project, 'project' on the portfolio
+   *  dashboard. Drives the user-facing wording only. */
+  unit?: 'task' | 'project';
+}) {
+  const unitPlural = `${unit}s`;
   const [scale, setScale] = useState<Scale>('day');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -214,8 +223,8 @@ export function TimelineOverview({ tasks: input }: { tasks: DashboardTask[] }) {
         </div>
         <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
           <Calendar size={28} className="text-zinc-300 dark:text-zinc-600" />
-          <p className="text-sm text-zinc-500">No scheduled tasks yet.</p>
-          <p className="text-xs text-zinc-400">Add planned dates to tasks to see them on the timeline.</p>
+          <p className="text-sm text-zinc-500">No scheduled {unitPlural} yet.</p>
+          <p className="text-xs text-zinc-400">Add planned dates to {unitPlural} to see them on the timeline.</p>
         </div>
       </div>
     );
@@ -235,7 +244,7 @@ export function TimelineOverview({ tasks: input }: { tasks: DashboardTask[] }) {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search tasks…"
+            placeholder={`Search ${unitPlural}…`}
             className="w-44 rounded-md border border-zinc-200 bg-zinc-50 py-1.5 pl-7 pr-2 text-xs outline-none focus:border-brand-500 dark:border-zinc-700 dark:bg-zinc-800"
           />
         </div>
@@ -259,14 +268,14 @@ export function TimelineOverview({ tasks: input }: { tasks: DashboardTask[] }) {
       </div>
 
       <div className="px-3 pb-2 text-[11px] text-zinc-400">
-        Showing {summary.showing} of {summary.total} tasks
+        Showing {summary.showing} of {summary.total} {unitPlural}
         {summary.overdue > 0 && <> · {summary.overdue} overdue</>}
         {summary.blocked > 0 && <> · {summary.blocked} blocked</>}
       </div>
 
       {filtered.length === 0 ? (
         <div className="py-8 text-center text-xs text-zinc-400">
-          No tasks match the current filters.
+          No {unitPlural} match the current filters.
           <button
             onClick={() => {
               setSearch('');

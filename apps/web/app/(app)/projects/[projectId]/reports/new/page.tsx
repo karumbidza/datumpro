@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createReport } from '../actions';
 import { WEATHER_OPTIONS } from '@datumpro/shared/domain';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { SubmitButton } from '@/components/ui/submit-button';
 
 const inputClass =
   'w-full rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
@@ -70,12 +70,12 @@ export default async function NewReportPage({
           </div>
 
           <div className="flex gap-2 pt-2">
-            <Button type="submit" name="intent" value="submitted">
+            <SubmitButton name="intent" value="submitted" pendingText="Submitting…">
               Submit report
-            </Button>
-            <Button type="submit" name="intent" value="draft" variant="secondary">
+            </SubmitButton>
+            <SubmitButton name="intent" value="draft" variant="secondary" pendingText="Saving…">
               Save draft
-            </Button>
+            </SubmitButton>
           </div>
         </form>
       </Card>

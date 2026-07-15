@@ -31,6 +31,8 @@ export function ManageRequest({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [payOpen, setPayOpen] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [reason, setReason] = useState('');
   const [reference, setReference] = useState('');
   const [pop, setPop] = useState<File | null>(null);
 
@@ -83,9 +85,50 @@ export function ManageRequest({
 
   if (status === 'paid' || status === 'rejected') return null;
 
+  async function confirmReject() {
+    const fd = base();
+    if (reason.trim()) fd.set('reviewNote', reason.trim());
+    await run(rejectPaymentRequest, fd);
+    setRejectOpen(false);
+    setReason('');
+  }
+
   return (
     <div className="mt-2">
-      {!payOpen ? (
+      {rejectOpen ? (
+        <div className="space-y-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+          <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-300">
+            Reason for rejecting <span className="text-zinc-400">(shared with the contractor)</span>
+          </label>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={2}
+            autoFocus
+            placeholder="e.g. Amount exceeds the agreed quote — please revise and resubmit."
+            className={inputClass}
+          />
+          <div className="flex gap-2">
+            <button
+              disabled={busy || !reason.trim()}
+              onClick={confirmReject}
+              className="rounded-md bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-500 disabled:opacity-50"
+            >
+              {busy ? 'Rejecting…' : 'Confirm reject'}
+            </button>
+            <button
+              disabled={busy}
+              onClick={() => {
+                setRejectOpen(false);
+                setReason('');
+              }}
+              className="rounded-md px-3 py-1 text-xs text-zinc-500 hover:underline"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : !payOpen ? (
         <div className="flex flex-wrap items-center gap-2">
           {status === 'requested' && (
             <button
@@ -105,7 +148,7 @@ export function ManageRequest({
           </button>
           <button
             disabled={busy}
-            onClick={() => run(rejectPaymentRequest, base())}
+            onClick={() => setRejectOpen(true)}
             className="rounded-md border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
           >
             Reject
