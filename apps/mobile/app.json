@@ -4,7 +4,7 @@
     "slug": "datumpro-field",
     "scheme": "datumpro",
     "version": "0.1.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "updates": {
