@@ -5,6 +5,7 @@ export interface OrgMemberRow {
   userId: string;
   name: string;
   email: string | null;
+  company: string | null;
   role: OrgRole;
   memberType: MemberType;
   status: 'active' | 'disabled';
@@ -48,16 +49,18 @@ export async function listOrgMembers(orgId: string): Promise<OrgMemberRow[]> {
 
   const { data: profileData } = await supabase
     .from('profiles')
-    .select('id, display_name, email')
+    .select('id, display_name, email, company')
     .in(
       'id',
       members.map((m) => m.user_id),
     );
   const profiles = new Map(
-    ((profileData ?? []) as { id: string; display_name: string | null; email: string | null }[]).map((p) => [
-      p.id,
-      p,
-    ]),
+    ((profileData ?? []) as {
+      id: string;
+      display_name: string | null;
+      email: string | null;
+      company: string | null;
+    }[]).map((p) => [p.id, p]),
   );
 
   const rows = members.map((m) => {
@@ -66,6 +69,7 @@ export async function listOrgMembers(orgId: string): Promise<OrgMemberRow[]> {
       userId: m.user_id,
       name: p?.display_name || p?.email || 'Member',
       email: p?.email ?? null,
+      company: p?.company ?? null,
       role: (m.role ?? 'member') as OrgRole,
       memberType: (m.member_type ?? 'staff') as MemberType,
       status: (m.status === 'disabled' ? 'disabled' : 'active') as 'active' | 'disabled',

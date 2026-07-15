@@ -18,10 +18,15 @@ export default async function AccountPage() {
   if (!user) redirect('/sign-in');
 
   const [{ data: profile }, ctx] = await Promise.all([
-    supabase.from('profiles').select('display_name, email').eq('id', user.id).single(),
+    supabase.from('profiles').select('display_name, email, company, phone').eq('id', user.id).single(),
     getActiveContext(),
   ]);
-  const p = profile as { display_name: string | null; email: string | null } | null;
+  const p = profile as {
+    display_name: string | null;
+    email: string | null;
+    company: string | null;
+    phone: string | null;
+  } | null;
 
   return (
     <main className="mx-auto max-w-lg px-6 py-10">
@@ -37,11 +42,30 @@ export default async function AccountPage() {
         <CardTitle>Profile</CardTitle>
         <form action={updateDisplayName} className="mt-3 space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-medium">Display name</label>
+            <label className="mb-1 block text-xs font-medium">Full name</label>
             <input
               name="displayName"
               defaultValue={p?.display_name ?? ''}
               placeholder="e.g. Alex Karumbidza"
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium">Company</label>
+            <input
+              name="company"
+              defaultValue={p?.company ?? ''}
+              placeholder="e.g. Karumbidza Builders"
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium">Phone</label>
+            <input
+              name="phone"
+              type="tel"
+              defaultValue={p?.phone ?? ''}
+              placeholder="e.g. +263 77 123 4567"
               className={inputClass}
             />
           </div>
