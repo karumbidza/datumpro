@@ -26,25 +26,42 @@ export interface InvitationPreview {
 }
 
 /** Active + disabled members of an org, with display name/email. RLS scopes to
- *  the org. Active first, then disabled (so they can be reactivated). */
+ *  the org. Active first, then disabled (so they can be reactivated).
+ *
+ *  Profiles are fetched in a SEPARATE query, not a PostgREST embed: org_members
+ *  has no foreign key to profiles (only to auth.users), so `profiles(...)` can't
+ *  resolve and would silently return an empty list. */
 export async function listOrgMembers(orgId: string): Promise<OrgMemberRow[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from('org_members')
-    .select('user_id, role, member_type, status, profiles(display_name, email)')
+    .select('user_id, role, member_type, status')
     .eq('org_id', orgId)
     .in('status', ['active', 'disabled']);
-  const rows = ((data ?? []) as {
+  const members = (data ?? []) as {
     user_id: string;
     role: string;
     member_type: string | null;
     status: string;
-    profiles:
-      | { display_name: string | null; email: string | null }
-      | { display_name: string | null; email: string | null }[]
-      | null;
-  }[]).map((m) => {
-    const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+  }[];
+  if (members.length === 0) return [];
+
+  const { data: profileData } = await supabase
+    .from('profiles')
+    .select('id, display_name, email')
+    .in(
+      'id',
+      members.map((m) => m.user_id),
+    );
+  const profiles = new Map(
+    ((profileData ?? []) as { id: string; display_name: string | null; email: string | null }[]).map((p) => [
+      p.id,
+      p,
+    ]),
+  );
+
+  const rows = members.map((m) => {
+    const p = profiles.get(m.user_id);
     return {
       userId: m.user_id,
       name: p?.display_name || p?.email || 'Member',
