@@ -321,13 +321,14 @@ export const BellOff: IconComponent = (p) => (
   </Icon>
 );
 
-/** Brand mark — the DatumPro logo, rendered as a rounded tile for the workspace
- *  switcher and mobile nav. Source of truth is /public/logo.svg. */
+/** Brand mark — the DatumPro icon glyph, rendered as a rounded tile for the
+ *  workspace switcher and mobile nav (small squares where the full wordmark
+ *  would be illegible). Source of truth is /public/logo-mark.svg. */
 export function BrandMark({ size = 32 }: { size?: number }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src="/logo.svg"
+      src="/logo-mark.svg"
       alt="DatumPro"
       width={size}
       height={size}
