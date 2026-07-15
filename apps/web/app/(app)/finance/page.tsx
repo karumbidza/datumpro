@@ -2,8 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getActiveContext } from '@/lib/data/org';
 import { can } from '@datumpro/shared/access';
-import { orgFinanceOverview, orgReceivablesAging } from '@/lib/data/finance-portfolio';
-import { ReceivablesAging } from '@/components/finance/receivables-aging';
+import { orgContractorFinance } from '@/lib/data/finance-portfolio';
 import { Card, CardTitle, CardValue } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatUsd } from '@datumpro/shared/domain';
@@ -16,25 +15,20 @@ const STATUS_TONE: Record<string, 'neutral' | 'blue' | 'green' | 'amber'> = {
   archived: 'neutral',
 };
 
-/** Org-wide finance hub — the portfolio money view for owners, admins, finance
- *  and delivery PMs. Gated here and by RLS. Per-project detail lives at
- *  /projects/[id]/finance; this is the roll-up above it. */
+/** Org-wide finance hub — the portfolio contractor-payments view for owners,
+ *  admins, finance and delivery PMs. Gated here and by RLS. Per-project detail
+ *  (approve / pay / POP) lives at /projects/[id]/finance; this is the roll-up. */
 export default async function OrgFinancePage() {
   const ctx = await getActiveContext();
   if (!ctx) redirect('/sign-in');
   if (!ctx.active) redirect('/orgs/new');
 
-  // Owners, admins, finance and delivery PMs see the portfolio roll-up; RLS
-  // still scopes the underlying rows to what each caller may read.
   const canView = can(ctx.active.role, 'finance:view');
   if (!canView) redirect('/dashboard');
 
-  const [{ totals, collectionRate, projects }, aging] = await Promise.all([
-    orgFinanceOverview(ctx.active.orgId),
-    orgReceivablesAging(ctx.active.orgId, new Date()),
-  ]);
+  const { totals, projects } = await orgContractorFinance(ctx.active.orgId);
   const withMoney = projects.filter(
-    (p) => p.budgetCents || p.invoicedCents || p.paidCents || p.costToDateCents,
+    (p) => p.budgetCents || p.committedCents || p.paidCents || p.pendingRequestsCount,
   );
 
   return (
@@ -44,7 +38,7 @@ export default async function OrgFinancePage() {
       </Link>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Finance</h1>
       <p className="text-sm text-zinc-500 dark:text-zinc-400">
-        Money across every project in {ctx.active.name}.
+        Contractor payments across every project in {ctx.active.name}.
       </p>
 
       <section className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -53,17 +47,12 @@ export default async function OrgFinancePage() {
           <CardValue>{formatUsd(totals.budgetCents)}</CardValue>
         </Card>
         <Card>
-          <CardTitle>Invoiced</CardTitle>
-          <CardValue>{formatUsd(totals.invoicedCents)}</CardValue>
+          <CardTitle>Committed</CardTitle>
+          <CardValue>{formatUsd(totals.committedCents)}</CardValue>
         </Card>
         <Card>
-          <CardTitle>Collected</CardTitle>
+          <CardTitle>Paid</CardTitle>
           <CardValue>{formatUsd(totals.paidCents)}</CardValue>
-          {collectionRate !== null && (
-            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-              {Math.round(collectionRate * 100)}% of invoiced
-            </p>
-          )}
         </Card>
         <Card>
           <CardTitle>Outstanding</CardTitle>
@@ -71,9 +60,22 @@ export default async function OrgFinancePage() {
         </Card>
       </section>
 
-      {aging.totalOutstandingCents > 0 && (
+      {totals.pendingRequestsCount > 0 && (
         <section className="mt-6">
-          <ReceivablesAging aging={aging} />
+          <Card className="flex items-center justify-between gap-3 border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950">
+            <div>
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                {totals.pendingRequestsCount} payment request
+                {totals.pendingRequestsCount === 1 ? '' : 's'} awaiting action
+              </p>
+              <p className="text-xs text-amber-700/80 dark:text-amber-400/80">
+                Open a project below to approve, pay, and attach a proof of payment.
+              </p>
+            </div>
+            <span className="shrink-0 text-lg font-semibold tabular-nums text-amber-800 dark:text-amber-300">
+              {formatUsd(totals.pendingRequestsCents)}
+            </span>
+          </Card>
         </section>
       )}
 
@@ -82,21 +84,21 @@ export default async function OrgFinancePage() {
         {withMoney.length === 0 ? (
           <Card>
             <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              No budgets, invoices or payments recorded yet. Open a project&apos;s Finance tab to
-              add a budget or raise an invoice.
+              No contractor commitments yet. When a quote is awarded, its draws appear here; open a
+              project&apos;s Finance tab to track and pay them.
             </p>
           </Card>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-            <table className="w-full min-w-[820px] text-sm">
+            <table className="w-full min-w-[760px] text-sm">
               <thead>
                 <tr className="border-b border-zinc-100 text-left text-xs uppercase tracking-wide text-zinc-400 dark:border-zinc-800">
                   <th className="px-4 py-2.5 font-medium">Project</th>
                   <th className="px-4 py-2.5 text-right font-medium">Budget</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Cost to date</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Invoiced</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Collected</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Committed</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Paid</th>
                   <th className="px-4 py-2.5 text-right font-medium">Outstanding</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Pending</th>
                 </tr>
               </thead>
               <tbody>
@@ -121,15 +123,21 @@ export default async function OrgFinancePage() {
                     <td className="px-4 py-3 text-right tabular-nums text-zinc-500">
                       {formatUsd(p.budgetCents)}
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-amber-600 dark:text-amber-400">
-                      {formatUsd(p.costToDateCents)}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums">{formatUsd(p.invoicedCents)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{formatUsd(p.committedCents)}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-green-600 dark:text-green-400">
                       {formatUsd(p.paidCents)}
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums font-medium">
                       {formatUsd(p.outstandingCents)}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {p.pendingRequestsCount > 0 ? (
+                        <span className="text-amber-600 dark:text-amber-400">
+                          {p.pendingRequestsCount} · {formatUsd(p.pendingRequestsCents)}
+                        </span>
+                      ) : (
+                        <span className="text-zinc-400">—</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -140,14 +148,14 @@ export default async function OrgFinancePage() {
                   <td className="px-4 py-3 text-right tabular-nums text-zinc-500">
                     {formatUsd(totals.budgetCents)}
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-amber-600 dark:text-amber-400">
-                    {formatUsd(totals.costToDateCents)}
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums">{formatUsd(totals.invoicedCents)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{formatUsd(totals.committedCents)}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-green-600 dark:text-green-400">
                     {formatUsd(totals.paidCents)}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">{formatUsd(totals.outstandingCents)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    {totals.pendingRequestsCount > 0 ? formatUsd(totals.pendingRequestsCents) : '—'}
+                  </td>
                 </tr>
               </tfoot>
             </table>
