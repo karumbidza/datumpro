@@ -321,17 +321,17 @@ export const BellOff: IconComponent = (p) => (
   </Icon>
 );
 
-/** Brand mark — the dark rounded-square logo used in the workspace switcher. */
+/** Brand mark — the DatumPro logo, rendered as a rounded tile for the workspace
+ *  switcher and mobile nav. Source of truth is /public/logo.svg. */
 export function BrandMark({ size = 32 }: { size?: number }) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width={size} height={size} style={{ flexShrink: 0, borderRadius: size / 5 }}>
-      <rect width="64" height="64" rx="14" fill="#0a0a0a" />
-      <rect x="16" y="17" width="10" height="10" rx="2.5" fill="#ffffff" />
-      <rect x="32" y="19" width="17" height="5" rx="2" fill="#ffffff" />
-      <rect x="16" y="32" width="10" height="10" rx="2.5" fill="#ffffff" />
-      <rect x="32" y="34" width="12" height="5" rx="2" fill="#ffffff" />
-      <rect x="16" y="47" width="10" height="5" rx="2" fill="rgba(255,255,255,0.28)" />
-      <rect x="32" y="47" width="17" height="5" rx="2" fill="rgba(255,255,255,0.28)" />
-    </svg>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/logo.svg"
+      alt="DatumPro"
+      width={size}
+      height={size}
+      style={{ flexShrink: 0, borderRadius: size / 5, objectFit: 'cover' }}
+    />
   );
 }

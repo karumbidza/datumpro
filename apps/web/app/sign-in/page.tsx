@@ -114,6 +114,12 @@ export default function SignInPage({
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/logo.svg"
+        alt="DatumPro"
+        className="mx-auto mb-6 h-20 w-20 rounded-2xl shadow-sm"
+      />
       <Card>
         <h1 className="text-lg font-semibold tracking-tight">
           {fromInvite ? 'Accept your invitation' : 'Sign in to DatumPro'}

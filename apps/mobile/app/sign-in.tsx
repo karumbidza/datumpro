@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import { supabase } from '../lib/supabase';
 
 type Method = 'password' | 'code';
@@ -64,6 +64,7 @@ export default function SignIn() {
 
   return (
     <View style={styles.screen}>
+      <Image source={require('../assets/logo.png')} style={styles.logo} resizeMode="cover" />
       <Text style={styles.brand}>DatumPro Field</Text>
       <Text style={styles.subtitle}>Sign in to your site account</Text>
 
@@ -151,6 +152,7 @@ export default function SignIn() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, justifyContent: 'center', paddingHorizontal: 24, gap: 12, backgroundColor: '#fff' },
+  logo: { width: 88, height: 88, borderRadius: 20, alignSelf: 'center', marginBottom: 4 },
   brand: { fontSize: 24, fontWeight: '700', color: '#18181b' },
   subtitle: { fontSize: 14, color: '#71717a', marginBottom: 8 },
   toggle: {

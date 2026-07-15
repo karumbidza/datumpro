@@ -7,6 +7,12 @@
     "orientation": "default",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#3686b9"
+    },
     "updates": {
       "url": "https://u.expo.dev/9d368953-219f-4c93-a18b-a4cc1400ad26"
     },
@@ -30,6 +36,10 @@
     },
     "android": {
       "package": "app.datumpro.field",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#3686b9"
+      },
       "permissions": [
         "android.permission.RECORD_AUDIO"
       ]
