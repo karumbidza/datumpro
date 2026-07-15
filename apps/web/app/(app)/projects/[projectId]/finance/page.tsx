@@ -4,15 +4,13 @@ import { createClient } from '@/lib/supabase/server';
 import { getProject } from '@/lib/data/projects';
 import { myOrgRole } from '@/lib/data/tasks';
 import { myProjectRole } from '@/lib/data/members';
-import { listBudgetBilling, listInvoices, financeSummary } from '@/lib/data/finance';
+import { financeSummary } from '@/lib/data/finance';
 import { listProjectPayments } from '@/lib/data/payments';
 import { listProjectPaymentRequests } from '@/lib/data/payment-requests';
-import { addBudgetLine } from './actions';
 import { BudgetVsCost } from '@/components/finance/budget-vs-cost';
 import { ManageRequest } from '@/components/payments/manage-request';
 import { Card, CardTitle, CardValue } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { can, type OrgRole } from '@datumpro/shared/access';
 import { formatUsd, PAYMENT_REQUEST_STATUS_LABEL, type PaymentRequestStatus } from '@datumpro/shared/domain';
 
@@ -29,11 +27,6 @@ const PAY_STATUS = {
   paid: { tone: 'green', label: 'paid' },
 } as const;
 
-const inputClass =
-  'w-full rounded-md border border-zinc-200 bg-transparent px-2.5 py-1.5 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
-
-const INVOICE_TONE = { paid: 'green', part_paid: 'blue', sent: 'blue', overdue: 'amber', draft: 'neutral', void: 'neutral' } as const;
-
 export default async function FinancePage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
   const supabase = await createClient();
@@ -44,20 +37,17 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
 
   const project = await getProject(projectId);
   if (!project) notFound();
-  const [summary, budget, invoices, payments, orgRole, projectRole, paymentRequests] = await Promise.all([
+  const [summary, payments, orgRole, projectRole, paymentRequests] = await Promise.all([
     financeSummary(projectId),
-    listBudgetBilling(projectId),
-    listInvoices(projectId),
     listProjectPayments(projectId),
     myOrgRole(project.org_id),
     myProjectRole(projectId),
     listProjectPaymentRequests(projectId),
   ]);
-  // Only show write controls to people who can actually use them (RLS is the
-  // hard gate; this stops non-authorised members seeing buttons that would fail).
+  // The budget is the project's contract value; committed cost + payments track
+  // against it (buy-side, request-and-pay — no client invoicing here).
+  const budgetCents = project.contract_value_cents;
   const role = (orgRole ?? 'viewer') as OrgRole;
-  const canManageBudget = can(role, 'budget:manage');
-  const canInvoice = can(role, 'invoice:create');
   // Reviewing contractor payment requests: org finance/admin/owner, or the PM.
   const canManagePayments = can(role, 'payment:record') || projectRole === 'pm';
 
@@ -69,103 +59,21 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Finance</h1>
 
       <section className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Card><CardTitle>Budget</CardTitle><CardValue>{formatUsd(summary.budgetCents)}</CardValue></Card>
-        <Card><CardTitle>Invoiced</CardTitle><CardValue>{formatUsd(summary.invoicedCents)}</CardValue></Card>
-        <Card><CardTitle>Paid</CardTitle><CardValue>{formatUsd(summary.paidCents)}</CardValue></Card>
-        <Card><CardTitle>Outstanding</CardTitle><CardValue>{formatUsd(summary.outstandingCents)}</CardValue></Card>
+        <Card><CardTitle>Budget</CardTitle><CardValue>{formatUsd(budgetCents)}</CardValue></Card>
+        <Card><CardTitle>Committed</CardTitle><CardValue>{formatUsd(summary.committedCostCents)}</CardValue></Card>
+        <Card><CardTitle>Paid</CardTitle><CardValue>{formatUsd(summary.costToDateCents)}</CardValue></Card>
+        <Card><CardTitle>Outstanding</CardTitle><CardValue>{formatUsd(summary.committedCostCents - summary.costToDateCents)}</CardValue></Card>
       </section>
 
-      {(summary.budgetCents > 0 || summary.committedCostCents > 0) && (
+      {(budgetCents > 0 || summary.committedCostCents > 0) && (
         <section className="mt-6">
           <BudgetVsCost
-            budgetCents={summary.budgetCents}
+            budgetCents={budgetCents}
             committedCostCents={summary.committedCostCents}
             costToDateCents={summary.costToDateCents}
           />
         </section>
       )}
-
-      <section className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div>
-          <h2 className="mb-3 text-sm font-semibold">Budget / BOQ</h2>
-          <Card>
-            {budget.length === 0 ? (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">No budget lines yet.</p>
-            ) : (
-              <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                {budget.map((b) => {
-                  const pct = b.budgetCents > 0 ? Math.min(100, (b.billedCents / b.budgetCents) * 100) : 0;
-                  const over = b.remainingCents < 0;
-                  return (
-                    <li key={b.id} className="py-2 text-sm">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="min-w-0 truncate">{b.description}</span>
-                        <span className="shrink-0 tabular-nums text-zinc-500">
-                          {formatUsd(b.budgetCents)}
-                        </span>
-                      </div>
-                      <div className="mt-1 flex items-center gap-2">
-                        <div className="h-1 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
-                          <div
-                            className={`h-full rounded-full ${over ? 'bg-amber-500' : 'bg-brand-500'}`}
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                        <span className="shrink-0 text-[11px] tabular-nums text-zinc-400">
-                          {formatUsd(b.billedCents)} billed
-                          {over && <span className="text-amber-600 dark:text-amber-400"> · over</span>}
-                        </span>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-            {canManageBudget && (
-              <form action={addBudgetLine} className="mt-4 flex flex-wrap items-end gap-2 border-t border-zinc-100 pt-4 dark:border-zinc-800">
-                <input type="hidden" name="projectId" value={projectId} />
-                <input name="description" required placeholder="Line item" className={`${inputClass} flex-1 min-w-32`} />
-                <input name="quantity" type="number" step="0.01" defaultValue={1} className={`${inputClass} w-20`} title="Qty" />
-                <input name="rate" type="number" step="0.01" placeholder="Rate $" className={`${inputClass} w-24`} />
-                <Button type="submit" variant="secondary">Add</Button>
-              </form>
-            )}
-          </Card>
-        </div>
-
-        <div>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Invoices</h2>
-            {canInvoice && (
-              <Link href={`/projects/${projectId}/finance/invoices/new`}>
-                <Button>New invoice</Button>
-              </Link>
-            )}
-          </div>
-          {invoices.length === 0 ? (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">No invoices yet.</p>
-          ) : (
-            <ul className="space-y-2">
-              {invoices.map((inv) => (
-                <li key={inv.id}>
-                  <Link href={`/projects/${projectId}/finance/invoices/${inv.id}`}>
-                    <Card className="flex items-center justify-between gap-3 p-3 transition-colors hover:border-zinc-300 dark:hover:border-zinc-700">
-                      <div>
-                        <p className="text-sm font-medium">{inv.number}</p>
-                        <p className="text-xs text-zinc-400">{inv.issue_date}</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm tabular-nums">{formatUsd(inv.total_cents)}</span>
-                        <Badge tone={INVOICE_TONE[inv.status]}>{inv.status.replace('_', ' ')}</Badge>
-                      </div>
-                    </Card>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </section>
 
       {/* Contractor payment requests (buy-side; approve → pay → POP). Always shown
           to managers so the capability is visible before any request exists. */}
