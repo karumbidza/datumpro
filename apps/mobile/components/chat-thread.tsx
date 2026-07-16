@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/auth';
+import { theme } from '../lib/theme';
 import {
   listMessages,
   sendMessage,
@@ -23,6 +24,8 @@ import {
   markConversationRead,
   type ChatMessage,
 } from '../lib/data/chat';
+import { getConversationRoster, type RosterMember } from '../lib/data/chat-roster';
+import { ChatMembersSheet } from './chat-members-sheet';
 
 /** The chat surface — message list, realtime sync, text + photo composer. Shared
  *  by the task discussion and the project team channel; the parent resolves the
@@ -42,13 +45,41 @@ export function ChatThread({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [members, setMembers] = useState<RosterMember[]>([]);
+  const [onlineIds, setOnlineIds] = useState<Set<string>>(() => new Set());
+  const [sheetOpen, setSheetOpen] = useState(false);
   const listRef = useRef<FlatList<ChatMessage>>(null);
+  const onlineCount = members.filter((m) => onlineIds.has(m.userId)).length;
 
   const reload = useCallback(async (id: string) => {
     setMessages(await listMessages(id));
     // Opening / viewing the thread clears its unread state.
     void markConversationRead(id);
   }, []);
+
+  // Load the conversation's member roster (for the People sheet + presence).
+  useEffect(() => {
+    if (!conversationId) {
+      setMembers([]);
+      return;
+    }
+    let active = true;
+    getConversationRoster(conversationId)
+      .then((r) => active && setMembers(r))
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [conversationId]);
+
+  // Keep our own last_active_at fresh so others see an accurate "Active …" label.
+  useEffect(() => {
+    if (!meId) return;
+    const iv = setInterval(() => {
+      void supabase.from('profiles').update({ last_active_at: new Date().toISOString() }).eq('id', meId);
+    }, 30_000);
+    return () => clearInterval(iv);
+  }, [meId]);
 
   useEffect(() => {
     if (!conversationId) return;
@@ -60,18 +91,28 @@ export function ChatThread({
       const { data } = await supabase.auth.getSession();
       if (data.session?.access_token) supabase.realtime.setAuth(data.session.access_token);
       channel = supabase.channel(`chat:${conversationId}`, {
-        config: { private: true, broadcast: { self: false } },
+        config: { private: true, broadcast: { self: false }, presence: { key: meId ?? '' } },
       });
       channel
         .on('broadcast', { event: 'message' }, () => active && void reload(conversationId))
-        .subscribe();
+        .on('presence', { event: 'sync' }, () => {
+          const state = channel!.presenceState() as Record<string, { user_id?: string }[]>;
+          const ids = new Set<string>();
+          for (const arr of Object.values(state)) for (const m of arr) if (m.user_id) ids.add(m.user_id);
+          if (active) setOnlineIds(ids);
+        })
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED' && meId) {
+            void channel!.track({ user_id: meId, name: session?.user.email ?? '' });
+          }
+        });
     })();
 
     return () => {
       active = false;
       if (channel) supabase.removeChannel(channel);
     };
-  }, [conversationId, reload]);
+  }, [conversationId, reload, meId, session?.user.email]);
 
   async function submit() {
     if (!conversationId || sending) return;
@@ -152,6 +193,25 @@ export function ChatThread({
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
+      {members.length > 0 && (
+        <Pressable style={styles.peopleBar} onPress={() => setSheetOpen(true)}>
+          <Ionicons name="people-outline" size={16} color={theme.color.accent} />
+          <Text style={styles.peopleText}>
+            {members.length} member{members.length === 1 ? '' : 's'}
+            {onlineCount > 0 && <Text style={styles.onlineText}> · {onlineCount} online</Text>}
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color={theme.color.subtle} />
+        </Pressable>
+      )}
+
+      <ChatMembersSheet
+        visible={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        members={members}
+        onlineIds={onlineIds}
+        meId={meId ?? ''}
+      />
+
       <FlatList
         ref={listRef}
         data={messages}
@@ -203,6 +263,18 @@ export function ChatThread({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#fafafa' },
+  peopleBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e4e4e7',
+  },
+  peopleText: { flex: 1, fontSize: 13, fontWeight: '600', color: theme.color.text },
+  onlineText: { color: theme.color.success, fontWeight: '600' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fafafa' },
   muted: { color: '#71717a' },
   listContent: { padding: 12, gap: 8 },
