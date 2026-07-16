@@ -1,6 +1,5 @@
 import { BrandLoader } from '@/components/ui/brand-loader';
 
-/** Instant branded fallback while an app route's server component streams in. */
 export default function Loading() {
   return (
     <div className="flex h-full items-center justify-center py-24">

@@ -32,3 +32,9 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
+
+/* Branded loader — the logo's chart nodes lighting up in sequence. */
+@keyframes brand-pulse {
+  0%, 100% { opacity: 0.25; }
+  40% { opacity: 1; }
+}
