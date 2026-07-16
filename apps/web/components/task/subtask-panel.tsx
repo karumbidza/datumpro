@@ -23,6 +23,8 @@ export function SubtaskPanel({
   isAssignee,
   canManage,
   assigneeName,
+  taskStart,
+  taskEnd,
 }: {
   taskId: string;
   projectId: string;
@@ -31,6 +33,9 @@ export function SubtaskPanel({
   isAssignee: boolean;
   canManage: boolean;
   assigneeName: string;
+  /** The parent task's window — subtask dates are clamped to it. */
+  taskStart: string | null;
+  taskEnd: string | null;
 }) {
   const [declineOpen, setDeclineOpen] = useState(false);
   const doneCount = subtasks.filter((s) => s.isDone).length;
@@ -168,11 +173,23 @@ export function SubtaskPanel({
           </div>
           <div>
             <label className="mb-1 block text-[11px] font-medium text-zinc-500">Start</label>
-            <input type="date" name="plannedStartDate" className={inputClass} />
+            <input
+              type="date"
+              name="plannedStartDate"
+              min={taskStart ?? undefined}
+              max={taskEnd ?? undefined}
+              className={inputClass}
+            />
           </div>
           <div>
             <label className="mb-1 block text-[11px] font-medium text-zinc-500">End</label>
-            <input type="date" name="plannedEndDate" className={inputClass} />
+            <input
+              type="date"
+              name="plannedEndDate"
+              min={taskStart ?? undefined}
+              max={taskEnd ?? undefined}
+              className={inputClass}
+            />
           </div>
           <SubmitButton variant="secondary" pendingText="Adding…">
             Add step
