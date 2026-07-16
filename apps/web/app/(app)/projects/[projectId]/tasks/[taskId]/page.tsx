@@ -16,6 +16,8 @@ import { listTaskQuotes, listTaskMedia } from '@/lib/data/quotes';
 import { listTaskPayments } from '@/lib/data/payments';
 import { getTaskConversationId, listMessages, othersMaxReadSeq } from '@/lib/data/chat';
 import { QuotePanel } from '@/components/task/quote-panel';
+import { SubtaskPanel } from '@/components/task/subtask-panel';
+import { listSubtasks } from '@/lib/data/subtasks';
 import { PaymentsPanel } from '@/components/task/payments-panel';
 import { ChatPanel } from '@/components/chat/chat-panel';
 import { CompletionEvidence } from '@/components/task/completion-evidence';
@@ -111,6 +113,9 @@ export default async function TaskDetailPage({
   }));
 
   const assigneeName = members.find((m) => m.userId === task.assignee_id)?.name ?? 'Unassigned';
+  const subtasks = await listSubtasks(taskId);
+  const acceptancePending = task.acceptance_status === 'pending';
+  const planComplete = subtasks.length === 0 || subtasks.every((s) => s.isDone);
   const isAssignee = task.assignee_id === user.id;
   // Sign-off authority mirrors the DB guard: org admin OR the project's PM.
   const canManage = orgRole === 'owner' || orgRole === 'admin' || projectRole === 'pm';
@@ -125,7 +130,7 @@ export default async function TaskDetailPage({
   // the primary CTA is never buried behind a tab. The DB enforces the real
   // rules (e.g. only a lead can approve to DONE) regardless of what's shown.
   const workflowActions =
-    task.status !== 'done' && canAct ? (
+    task.status !== 'done' && canAct && !acceptancePending ? (
       <div className="mt-6 space-y-4">
         {task.status === 'todo' && (
           <form action={startTask}>
@@ -138,14 +143,20 @@ export default async function TaskDetailPage({
           <div className="grid gap-4 sm:grid-cols-2">
             <Card>
               <CardTitle>Submit for sign-off</CardTitle>
-              <form action={submitTask} className="mt-3 space-y-3">
-                <input type="hidden" name="taskId" value={taskId} />
-                <textarea name="notes" rows={3} required placeholder="What was completed?" className={inputClass} />
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" name="declaration" /> I confirm this work is complete and accurate.
-                </label>
-                <Button type="submit">Submit</Button>
-              </form>
+              {planComplete ? (
+                <form action={submitTask} className="mt-3 space-y-3">
+                  <input type="hidden" name="taskId" value={taskId} />
+                  <textarea name="notes" rows={3} required placeholder="What was completed?" className={inputClass} />
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="declaration" /> I confirm this work is complete and accurate.
+                  </label>
+                  <Button type="submit">Submit</Button>
+                </form>
+              ) : (
+                <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+                  Complete every step in your task plan below before submitting for sign-off.
+                </p>
+              )}
             </Card>
             <Card>
               <CardTitle>Raise a blocker</CardTitle>
@@ -408,6 +419,20 @@ export default async function TaskDetailPage({
           <p className="text-zinc-600 dark:text-zinc-300">📝 {task.completion_notes}</p>
         )}
       </Card>
+
+      {(task.assignee_id || subtasks.length > 0) && (
+        <div className="mt-6">
+          <SubtaskPanel
+            taskId={taskId}
+            projectId={projectId}
+            subtasks={subtasks}
+            acceptanceStatus={task.acceptance_status}
+            isAssignee={isAssignee}
+            canManage={canManage}
+            assigneeName={assigneeName}
+          />
+        </div>
+      )}
 
       {workflowActions}
 

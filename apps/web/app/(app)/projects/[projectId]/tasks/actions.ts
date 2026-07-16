@@ -211,6 +211,12 @@ export async function submitTask(formData: FormData) {
     throw new Error('Attach at least one completion photo or video before submitting.');
   }
 
+  // Plan gate: if a subtask plan exists, every item must be ticked off first.
+  const { data: subs } = await supabase.from('task_subtasks').select('is_done').eq('task_id', taskId);
+  if (subs && subs.length > 0 && (subs as { is_done: boolean }[]).some((s) => !s.is_done)) {
+    throw new Error('Complete every item in your task plan before submitting for approval.');
+  }
+
   const { error } = await supabase
     .from('tasks')
     .update({
@@ -226,6 +232,94 @@ export async function submitTask(formData: FormData) {
   if (error) throw new Error(error.message);
   await logActivity(supabase, task, user.id, 'status', 'Submitted for sign-off');
   revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
+}
+
+// ── Task acceptance (assigned contractor) ────────────────────────────────────
+export async function acceptTask(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const taskId = String(formData.get('taskId') ?? '');
+  const task = await loadTask(supabase, taskId);
+  if (!task) throw new Error('Task not found');
+  const { error } = await supabase
+    .from('tasks')
+    .update({ acceptance_status: 'accepted', accepted_at: new Date().toISOString() })
+    .eq('id', taskId);
+  if (error) throw new Error(error.message);
+  await logActivity(supabase, task, user.id, 'status', 'Accepted the task');
+  revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
+}
+
+/** Contractor declines an assigned task — it returns to the PM (unassigned). */
+export async function declineTask(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const taskId = String(formData.get('taskId') ?? '');
+  const reason = String(formData.get('reason') ?? '').trim();
+  const task = await loadTask(supabase, taskId);
+  if (!task) throw new Error('Task not found');
+  const { error } = await supabase
+    .from('tasks')
+    .update({ acceptance_status: 'rejected', rejected_reason: reason || null, assignee_id: null })
+    .eq('id', taskId);
+  if (error) throw new Error(error.message);
+  await logActivity(supabase, task, user.id, 'status', reason ? `Declined the task — ${reason}` : 'Declined the task');
+  revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
+}
+
+// ── Subtask plan (the contractor's to-do list) ───────────────────────────────
+async function taskOrgProject(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  taskId: string,
+): Promise<{ org_id: string; project_id: string } | null> {
+  const { data } = await supabase.from('tasks').select('org_id, project_id').eq('id', taskId).maybeSingle();
+  return data as { org_id: string; project_id: string } | null;
+}
+
+export async function addSubtask(formData: FormData) {
+  const { supabase } = await requireUser();
+  const taskId = String(formData.get('taskId') ?? '');
+  const title = String(formData.get('title') ?? '').trim();
+  if (!title) return;
+  const info = await taskOrgProject(supabase, taskId);
+  if (!info) throw new Error('Task not found');
+  const { data: last } = await supabase
+    .from('task_subtasks')
+    .select('position')
+    .eq('task_id', taskId)
+    .order('position', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const position = ((last as { position: number } | null)?.position ?? -1) + 1;
+  const { error } = await supabase.from('task_subtasks').insert({
+    org_id: info.org_id,
+    task_id: taskId,
+    title,
+    planned_start_date: (formData.get('plannedStartDate') as string) || null,
+    planned_end_date: (formData.get('plannedEndDate') as string) || null,
+    position,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath(`/projects/${info.project_id}/tasks/${taskId}`);
+}
+
+export async function toggleSubtask(formData: FormData) {
+  const { supabase } = await requireUser();
+  const id = String(formData.get('id') ?? '');
+  const done = formData.get('done') === 'true';
+  const taskId = String(formData.get('taskId') ?? '');
+  const projectId = String(formData.get('projectId') ?? '');
+  const { error } = await supabase.from('task_subtasks').update({ is_done: done }).eq('id', id);
+  if (error) throw new Error(error.message);
+  revalidatePath(`/projects/${projectId}/tasks/${taskId}`);
+}
+
+export async function removeSubtask(formData: FormData) {
+  const { supabase } = await requireUser();
+  const id = String(formData.get('id') ?? '');
+  const taskId = String(formData.get('taskId') ?? '');
+  const projectId = String(formData.get('projectId') ?? '');
+  const { error } = await supabase.from('task_subtasks').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+  revalidatePath(`/projects/${projectId}/tasks/${taskId}`);
 }
 
 export async function approveTask(formData: FormData) {
