@@ -25,9 +25,22 @@ export default function TaskDetailScreen() {
   const load = useCallback(async () => {
     const t = await getTask(String(id));
     setTask(t);
-    setPerms(t ? await getTaskPermissions(t.orgId, t.projectId, t.assigneeId) : null);
-    setSubtasks(await listSubtasks(String(id)));
-    const conv = await getTaskConversationId(String(id));
+    if (!t) {
+      setPerms(null);
+      setSubtasks([]);
+      setUnread(0);
+      setLoading(false);
+      return;
+    }
+    // Everything below depends only on the task — fetch it all in parallel
+    // instead of one round-trip at a time.
+    const [perms, subs, conv] = await Promise.all([
+      getTaskPermissions(t.orgId, t.projectId, t.assigneeId),
+      listSubtasks(String(id)),
+      getTaskConversationId(String(id)),
+    ]);
+    setPerms(perms);
+    setSubtasks(subs);
     setUnread(conv ? await getUnreadCount(conv) : 0);
     setLoading(false);
   }, [id]);

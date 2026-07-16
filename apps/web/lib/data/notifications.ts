@@ -1,3 +1,4 @@
+import { after } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { emailUser } from '@/lib/email/notify';
 import { sendExpoPushToUsers } from '@/lib/notify/push';
@@ -66,7 +67,8 @@ export async function notifyUser(
   supabase: SupabaseClient,
   args: { orgId: string; userId: string; type: string; title: string; body?: string; link?: string; entityId?: string },
 ): Promise<void> {
-  // In-app (guarded SQL helper).
+  // In-app (guarded SQL helper) — cheap, keep on the request path so the bell is
+  // up to date immediately.
   try {
     await supabase.rpc('notify', {
       p_org: args.orgId,
@@ -81,9 +83,12 @@ export async function notifyUser(
   } catch {
     /* swallow */
   }
-  // Email + mobile push (each best-effort internally).
-  await emailUser(args.userId, { subject: args.title, html: notifHtml(args.title, args.body, args.link) });
-  await sendExpoPushToUsers([args.userId], { title: args.title, body: args.body ?? '', url: args.link });
+  // Email + mobile push are external HTTP — run them AFTER the response is sent
+  // so they never add latency to the click. (Vercel keeps the function alive.)
+  after(async () => {
+    await emailUser(args.userId, { subject: args.title, html: notifHtml(args.title, args.body, args.link) });
+    await sendExpoPushToUsers([args.userId], { title: args.title, body: args.body ?? '', url: args.link });
+  });
 }
 
 /** Notify every project manager of a project (used on accept/decline). */

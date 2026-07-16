@@ -68,6 +68,9 @@ export default async function TaskDetailPage({
     quotes,
     completionMedia,
     extensions,
+    payments,
+    subtasks,
+    dmConversationId,
   ] = await Promise.all([
     listProjectMembers(projectId),
     myOrgRole(task.org_id),
@@ -79,19 +82,21 @@ export default async function TaskDetailPage({
     listTaskQuotes(taskId),
     listTaskMedia(taskId, 'completion'),
     listExtensionRequests(taskId),
+    listTaskPayments(taskId),
+    listSubtasks(taskId),
+    getTaskConversationId(taskId),
   ]);
-  const payments = await listTaskPayments(taskId);
   const sched = schedule?.meta[taskId];
 
   // Task DM (created on assignment; visible only to staff / PM / the assigned contractor).
-  const dmConversationId = await getTaskConversationId(taskId);
-  const dm = dmConversationId
-    ? {
-        id: dmConversationId,
-        messages: await listMessages(dmConversationId, user.id),
-        othersRead: await othersMaxReadSeq(dmConversationId, user.id),
-      }
-    : null;
+  let dm: { id: string; messages: Awaited<ReturnType<typeof listMessages>>; othersRead: number } | null = null;
+  if (dmConversationId) {
+    const [messages, othersRead] = await Promise.all([
+      listMessages(dmConversationId, user.id),
+      othersMaxReadSeq(dmConversationId, user.id),
+    ]);
+    dm = { id: dmConversationId, messages, othersRead };
+  }
   const chatNames = Object.fromEntries(members.map((m) => [m.userId, m.name]));
   const meName = chatNames[user.id] ?? user.email?.split('@')[0] ?? 'You';
 
@@ -113,7 +118,6 @@ export default async function TaskDetailPage({
   }));
 
   const assigneeName = members.find((m) => m.userId === task.assignee_id)?.name ?? 'Unassigned';
-  const subtasks = await listSubtasks(taskId);
   const acceptancePending = task.acceptance_status === 'pending';
   const planComplete = subtasks.length === 0 || subtasks.every((s) => s.isDone);
   const isAssignee = task.assignee_id === user.id;
