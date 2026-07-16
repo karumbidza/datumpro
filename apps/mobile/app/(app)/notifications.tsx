@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { BrandLoader } from '../../components/brand-loader';
 import { View, Text, FlatList, Pressable, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
@@ -50,7 +51,7 @@ export default function Notifications() {
       <Stack.Screen options={{ title: 'Notifications' }} />
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator />
+          <BrandLoader />
         </View>
       ) : (
         <FlatList

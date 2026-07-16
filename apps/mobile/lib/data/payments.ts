@@ -1,4 +1,4 @@
-import { supabase } from '../supabase';
+import { supabase, currentUser} from '../supabase';
 
 export type DrawStatus = 'pending' | 'invoiced' | 'paid';
 
@@ -43,9 +43,7 @@ interface RawDraw {
  *  Scoped to tasks assigned to them (staff/PM would otherwise see all draws
  *  under RLS). Mirrors the web listMyPayments. */
 export async function listMyPayments(): Promise<{ lines: MyDraw[]; summary: MyPaymentsSummary }> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
   const me = user?.id;
   if (!me) return { lines: [], summary: EMPTY };
 

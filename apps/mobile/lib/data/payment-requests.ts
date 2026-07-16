@@ -1,5 +1,5 @@
 import { decode } from 'base64-arraybuffer';
-import { supabase } from '../supabase';
+import { supabase, currentUser} from '../supabase';
 import type { PaymentRequestStatus } from '@datumpro/shared/domain';
 
 const BUCKET = 'project-media';
@@ -69,9 +69,7 @@ export async function listMyPaymentRequests(): Promise<MyPaymentRequest[]> {
 
 /** Projects the contractor can raise a request against (their memberships). */
 export async function listMyRequestProjects(): Promise<RequestProject[]> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
   if (!user) return [];
   const { data } = await supabase
     .from('project_members')
@@ -112,9 +110,7 @@ export async function requestPayment(input: {
   invoicePath?: string | null;
   invoiceName?: string | null;
 }): Promise<void> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
   if (!user) throw new Error('Not signed in');
   const { data: project } = await supabase
     .from('projects')

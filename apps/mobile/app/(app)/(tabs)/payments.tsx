@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { BrandLoader } from '../../../components/brand-loader';
 import {
   View,
   Text,
@@ -116,7 +117,7 @@ export default function Payments() {
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator />
+          <BrandLoader />
         </View>
       ) : (
         <FlatList

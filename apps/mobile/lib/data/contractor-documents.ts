@@ -1,5 +1,5 @@
 import { decode } from 'base64-arraybuffer';
-import { supabase } from '../supabase';
+import { supabase, currentUser} from '../supabase';
 import type { ContractorDocType, ContractorDocStatus } from '@datumpro/shared/domain';
 
 const BUCKET = 'project-media';
@@ -49,9 +49,7 @@ export async function listMyDocuments(): Promise<MyDocument[]> {
 }
 
 export async function listMyOrgs(): Promise<{ id: string; name: string }[]> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
   if (!user) return [];
   const { data } = await supabase
     .from('org_members')
@@ -76,9 +74,7 @@ export async function uploadDocument(params: {
   ext: string;
   mime: string;
 }): Promise<void> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
   if (!user) throw new Error('Not signed in');
   const unique = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const path = `${params.orgId}/compliance/${unique}.${params.ext}`;

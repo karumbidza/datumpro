@@ -13,3 +13,13 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     detectSessionInUrl: false,
   },
 });
+
+/** The signed-in user from the LOCAL session — no network round-trip, unlike
+ *  auth.getUser() which validates the JWT against the auth server on every call.
+ *  RLS still enforces auth server-side on every query, so reads stay secure. */
+export async function currentUser() {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  return session?.user ?? null;
+}

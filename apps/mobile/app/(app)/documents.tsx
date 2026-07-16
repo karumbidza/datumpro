@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { BrandLoader } from '../../components/brand-loader';
 import {
   View,
   Text,
@@ -72,7 +73,7 @@ export default function Documents() {
       <Text style={styles.sub}>Visible only to you and the admins.</Text>
 
       {loading ? (
-        <ActivityIndicator style={{ marginTop: 24 }} />
+        <View style={{ marginTop: 24, alignSelf: 'center' }}><BrandLoader /></View>
       ) : (
         <FlatList
           data={docs}

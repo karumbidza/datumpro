@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
+import { BrandLoader } from '../../../components/brand-loader';
 import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { supabase } from '../../../lib/supabase';
+import { supabase, currentUser} from '../../../lib/supabase';
 import { useSession } from '../../../lib/auth';
 import { Card, Avatar } from '../../../components/ui';
 import { theme, contentWidth } from '../../../lib/theme';
@@ -22,9 +23,7 @@ export default function More() {
   const [profile, setProfile] = useState<Profile | null>(null);
 
   const load = useCallback(async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await currentUser();
     if (!user) return;
     const [{ data: p }, { data: members }] = await Promise.all([
       supabase.from('profiles').select('display_name, email').eq('id', user.id).maybeSingle(),
@@ -56,7 +55,7 @@ export default function More() {
         <Text style={styles.title}>More</Text>
 
         {!profile ? (
-          <ActivityIndicator style={{ marginTop: 24 }} />
+          <View style={{ marginTop: 24, alignSelf: 'center' }}><BrandLoader /></View>
         ) : (
           <>
             <Card style={{ marginTop: 12 }}>

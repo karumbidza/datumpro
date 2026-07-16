@@ -1,4 +1,4 @@
-import { supabase } from '../supabase';
+import { supabase, currentUser} from '../supabase';
 import { createTaskSchema } from '@datumpro/shared/validation';
 
 /**
@@ -8,9 +8,7 @@ import { createTaskSchema } from '@datumpro/shared/validation';
  */
 
 async function meId(): Promise<string | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
   return user?.id ?? null;
 }
 

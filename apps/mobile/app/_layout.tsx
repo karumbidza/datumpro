@@ -1,4 +1,5 @@
 import 'react-native-url-polyfill/auto';
+import { BrandLoader } from '../components/brand-loader';
 import { useEffect } from 'react';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar, setStatusBarHidden } from 'expo-status-bar';
@@ -53,7 +54,7 @@ function AuthGate() {
   if (loading) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator />
+        <BrandLoader />
       </View>
     );
   }

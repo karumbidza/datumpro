@@ -1,5 +1,5 @@
 import { decode } from 'base64-arraybuffer';
-import { supabase } from '../supabase';
+import { supabase, currentUser} from '../supabase';
 
 const CHAT_BUCKET = 'chat-media';
 
@@ -73,9 +73,7 @@ export async function listMessages(conversationId: string, limit = 50): Promise<
 export async function sendMessage(conversationId: string, body: string): Promise<void> {
   const trimmed = body.trim();
   if (!trimmed) return;
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
   if (!user) return;
   const { error } = await supabase
     .from('messages')
@@ -95,9 +93,7 @@ export async function sendPhotoMessage(params: {
   height?: number | null;
   sizeBytes?: number | null;
 }): Promise<void> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
   if (!user) return;
 
   const { data: conv } = await supabase
@@ -177,9 +173,7 @@ export interface InboxItem {
  *  message preview and unread count — the Messages inbox. One bounded messages
  *  fetch drives previews + unread in memory (no per-conversation round trips). */
 export async function listInbox(): Promise<InboxItem[]> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
   const me = user?.id;
   if (!me) return [];
 
@@ -262,9 +256,7 @@ export async function listInbox(): Promise<InboxItem[]> {
 /** Unread messages in a conversation for the current user: those with a higher
  *  seq than my read cursor, sent by someone else. */
 export async function getUnreadCount(conversationId: string): Promise<number> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
   const me = user?.id;
   if (!me) return 0;
 

@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { BrandLoader } from '../../../components/brand-loader';
 import { View, Text, FlatList, Pressable, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
@@ -84,7 +85,7 @@ export default function Tasks() {
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator />
+          <BrandLoader />
         </View>
       ) : (
         <FlatList

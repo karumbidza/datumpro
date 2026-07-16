@@ -1,4 +1,4 @@
-import { supabase } from '../supabase';
+import { supabase, currentUser} from '../supabase';
 
 export type VariationStatus = 'draft' | 'submitted' | 'approved' | 'rejected';
 
@@ -61,9 +61,7 @@ export async function raiseVariation(params: {
   timeDays: number;
   reference?: string | null;
 }): Promise<void> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
   if (!user) throw new Error('Not signed in');
   const { data: project } = await supabase
     .from('projects')
@@ -87,9 +85,7 @@ export async function raiseVariation(params: {
 
 /** Approve or reject a submitted variation (managers only; RLS enforces). */
 export async function decideVariation(variationId: string, approve: boolean): Promise<void> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
   const { error } = await supabase
     .from('variation_orders')
     .update({

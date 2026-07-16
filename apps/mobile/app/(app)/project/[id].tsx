@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { BrandLoader } from '../../../components/brand-loader';
 import { View, Text, FlatList, Pressable, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -58,7 +59,7 @@ export default function ProjectScreen() {
       />
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator />
+          <BrandLoader />
         </View>
       ) : (
         <FlatList

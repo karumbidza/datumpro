@@ -1,5 +1,5 @@
 import { decode } from 'base64-arraybuffer';
-import { supabase } from '../supabase';
+import { supabase, currentUser} from '../supabase';
 
 const BUCKET = 'project-media';
 
@@ -67,9 +67,7 @@ export async function uploadTaskPhoto(params: {
     .upload(path, decode(base64), { contentType: mime, upsert: false });
   if (upErr) throw new Error(upErr.message);
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
   const { error } = await supabase.from('task_media').insert({
     org_id: orgId,
     project_id: projectId,

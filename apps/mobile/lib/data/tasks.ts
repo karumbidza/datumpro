@@ -1,4 +1,4 @@
-import { supabase } from '../supabase';
+import { supabase, currentUser} from '../supabase';
 
 export interface MyTask {
   id: string;
@@ -30,9 +30,7 @@ export interface TaskPermissions {
 
 /** Can the current user manage (create/assign/approve) in this project? */
 export async function canManageProject(orgId: string, projectId: string): Promise<boolean> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
   const me = user?.id ?? '';
   const [{ data: orgRow }, { data: projRow }] = await Promise.all([
     supabase.from('org_members').select('role').eq('org_id', orgId).eq('user_id', me).maybeSingle(),
@@ -56,9 +54,7 @@ export async function getTaskPermissions(
   projectId: string,
   assigneeId: string | null,
 ): Promise<TaskPermissions> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
   const me = user?.id ?? null;
   const [{ data: orgRow }, { data: projRow }] = await Promise.all([
     supabase.from('org_members').select('role').eq('org_id', orgId).eq('user_id', me ?? '').maybeSingle(),
@@ -81,9 +77,7 @@ function projectName(p: ProjectJoin): string {
 /** Tasks assigned to the signed-in user (all states, soonest due first). RLS
  *  scopes it; the Tasks screen filters by state client-side. */
 export async function listMyTasks(): Promise<MyTask[]> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
   if (!user) return [];
 
   const { data } = await supabase

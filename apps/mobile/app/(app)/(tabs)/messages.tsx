@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { BrandLoader } from '../../../components/brand-loader';
 import { View, Text, SectionList, Pressable, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -62,7 +63,7 @@ export default function Messages() {
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator />
+          <BrandLoader />
         </View>
       ) : (
         <SectionList

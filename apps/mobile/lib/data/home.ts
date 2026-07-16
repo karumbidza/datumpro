@@ -1,4 +1,4 @@
-import { supabase } from '../supabase';
+import { supabase, currentUser} from '../supabase';
 
 export interface ProjectProgress {
   id: string;
@@ -45,9 +45,7 @@ function impactLabel(cents: number, days: number): string {
  *  requests and submitted variations — on the projects they manage (project PM,
  *  or every project in orgs where they're owner/admin). Empty for field users. */
 export async function listPendingApprovals(): Promise<PendingApproval[]> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
   const me = user?.id;
   if (!me) return [];
 
@@ -133,9 +131,7 @@ export async function listPendingApprovals(): Promise<PendingApproval[]> {
  *  what this user may see, so the same query naturally adapts to their role:
  *  a manager sees every project's tasks, a foreman only their own. */
 export async function getHomeData(): Promise<HomeData> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
   const me = user?.id ?? '';
   const today = new Date().toISOString().slice(0, 10);
 

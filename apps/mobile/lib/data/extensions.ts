@@ -1,4 +1,4 @@
-import { supabase } from '../supabase';
+import { supabase, currentUser} from '../supabase';
 
 export type ExtensionStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
 
@@ -54,9 +54,7 @@ export async function requestExtension(params: {
   proposedDueDate: string;
   reason?: string | null;
 }): Promise<void> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
   if (!user) throw new Error('Not signed in');
   const { error } = await supabase.from('task_extension_requests').insert({
     org_id: params.orgId,
@@ -76,9 +74,7 @@ export async function decideExtension(params: {
   taskId: string;
   approve: boolean;
 }): Promise<void> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
 
   const { data: req } = await supabase
     .from('task_extension_requests')
