@@ -75,8 +75,13 @@ export default function TaskDetailScreen() {
   const tone = slaTone(task.slaStatus);
   const acceptancePending = task.acceptanceStatus === 'pending';
   const planComplete = subtasks.length === 0 || subtasks.every((s) => s.isDone);
-  const pct =
-    task.status === 'done' ? 100 : subtasks.length > 0 ? subtaskPct(subtasks) : statusProgress(task.status);
+  const pct = acceptancePending
+    ? 0
+    : task.status === 'done'
+      ? 100
+      : subtasks.length > 0
+        ? subtaskPct(subtasks)
+        : statusProgress(task.status);
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>

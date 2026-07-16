@@ -26,10 +26,17 @@ function statusIcon(status: string): keyof typeof Ionicons.glyphMap {
 export function TaskCard({ task, subtitle }: { task: MyTask; subtitle?: string }) {
   const router = useRouter();
   const tone = slaTone(task.slaStatus);
-  const pct = statusProgress(task.status);
+  const pending = task.acceptanceStatus === 'pending';
+  const pct = pending ? 0 : statusProgress(task.status);
 
   return (
     <Pressable style={styles.card} onPress={() => router.push(`/(app)/task/${task.id}`)}>
+      {pending && (
+        <View style={styles.acceptBanner}>
+          <Ionicons name="alert-circle" size={14} color={theme.color.warning} />
+          <Text style={styles.acceptText}>Awaiting your acceptance — tap to accept or decline</Text>
+        </View>
+      )}
       <View style={styles.top}>
         <View style={[styles.iconWrap, { backgroundColor: tone.bg }]}>
           <Ionicons name={statusIcon(task.status)} size={18} color={tone.fg} />
@@ -69,6 +76,16 @@ const styles = StyleSheet.create({
     padding: 14,
     gap: 10,
   },
+  acceptBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: theme.color.warningSoft,
+    borderRadius: theme.radius.sm,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+  },
+  acceptText: { flex: 1, fontSize: 12, fontWeight: '700', color: theme.color.warning },
   top: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   iconWrap: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   body: { flex: 1, minWidth: 0 },

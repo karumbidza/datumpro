@@ -40,7 +40,9 @@ export function SubtaskPanel({
   const [declineOpen, setDeclineOpen] = useState(false);
   const doneCount = subtasks.filter((s) => s.isDone).length;
   const pct = subtasks.length ? Math.round((100 * doneCount) / subtasks.length) : 0;
-  const canEdit = isAssignee || canManage;
+  // The plan (add / remove / tick) belongs to the assigned contractor. Managers
+  // see it but don't build or tick it — they approve the finished task.
+  const canEdit = isAssignee;
 
   // Acceptance decision — shown to the assigned contractor while pending.
   if (acceptanceStatus === 'pending' && isAssignee) {

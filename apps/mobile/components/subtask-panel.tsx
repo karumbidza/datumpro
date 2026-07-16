@@ -34,7 +34,8 @@ export function SubtaskPanel({
   const [declineOpen, setDeclineOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [newTitle, setNewTitle] = useState('');
-  const canEdit = isAssignee || canManage;
+  // Only the assigned contractor builds and ticks the plan; managers view it.
+  const canEdit = isAssignee;
   const pct = subtaskPct(subtasks);
   const done = subtasks.filter((s) => s.isDone).length;
 

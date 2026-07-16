@@ -9,6 +9,7 @@ export interface MyTask {
   priority: string;
   projectId: string;
   projectName: string;
+  acceptanceStatus: 'pending' | 'accepted' | 'rejected' | null;
 }
 
 export interface TaskDetail extends MyTask {
@@ -82,7 +83,7 @@ export async function listMyTasks(): Promise<MyTask[]> {
 
   const { data } = await supabase
     .from('tasks')
-    .select('id, title, status, sla_status, due_date, priority, project_id, projects(name)')
+    .select('id, title, status, sla_status, due_date, priority, project_id, acceptance_status, projects(name)')
     .eq('assignee_id', user.id)
     .order('due_date', { ascending: true, nullsFirst: false });
 
@@ -94,6 +95,7 @@ export async function listMyTasks(): Promise<MyTask[]> {
     due_date: string | null;
     priority: string;
     project_id: string;
+    acceptance_status: 'pending' | 'accepted' | 'rejected' | null;
     projects: ProjectJoin;
   }[]).map((t) => ({
     id: t.id,
@@ -104,6 +106,7 @@ export async function listMyTasks(): Promise<MyTask[]> {
     priority: t.priority,
     projectId: t.project_id,
     projectName: projectName(t.projects),
+    acceptanceStatus: t.acceptance_status,
   }));
 }
 
@@ -112,7 +115,7 @@ export async function listMyTasks(): Promise<MyTask[]> {
 export async function listProjectTasks(projectId: string): Promise<MyTask[]> {
   const { data } = await supabase
     .from('tasks')
-    .select('id, title, status, sla_status, due_date, priority, project_id, projects(name)')
+    .select('id, title, status, sla_status, due_date, priority, project_id, acceptance_status, projects(name)')
     .eq('project_id', projectId)
     .order('due_date', { ascending: true, nullsFirst: false });
 
@@ -124,6 +127,7 @@ export async function listProjectTasks(projectId: string): Promise<MyTask[]> {
     due_date: string | null;
     priority: string;
     project_id: string;
+    acceptance_status: 'pending' | 'accepted' | 'rejected' | null;
     projects: ProjectJoin;
   }[]).map((t) => ({
     id: t.id,
@@ -134,6 +138,7 @@ export async function listProjectTasks(projectId: string): Promise<MyTask[]> {
     priority: t.priority,
     projectId: t.project_id,
     projectName: projectName(t.projects),
+    acceptanceStatus: t.acceptance_status,
   }));
 }
 

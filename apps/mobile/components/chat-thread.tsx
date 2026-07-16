@@ -7,7 +7,7 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
-  KeyboardAvoidingView,
+  Keyboard,
   Platform,
   ActivityIndicator,
   Alert,
@@ -48,6 +48,21 @@ export function ChatThread({
   const [members, setMembers] = useState<RosterMember[]>([]);
   const [onlineIds, setOnlineIds] = useState<Set<string>>(() => new Set());
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [kbHeight, setKbHeight] = useState(0);
+
+  // Read the keyboard height directly from the IME event and lift the composer
+  // by exactly that much. Works in Android edge-to-edge/immersive where the
+  // window doesn't resize and KeyboardAvoidingView fails.
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const s = Keyboard.addListener(showEvt, (e) => setKbHeight(e.endCoordinates?.height ?? 0));
+    const h = Keyboard.addListener(hideEvt, () => setKbHeight(0));
+    return () => {
+      s.remove();
+      h.remove();
+    };
+  }, []);
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const onlineCount = members.filter((m) => onlineIds.has(m.userId)).length;
 
@@ -186,13 +201,7 @@ export function ChatThread({
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.screen}
-      // Android edge-to-edge (SDK 54) doesn't auto-inset for the IME, so rely on
-      // 'height' which tracks keyboard events directly instead of window resize.
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-    >
+    <View style={styles.screen}>
       {members.length > 0 && (
         <Pressable style={styles.peopleBar} onPress={() => setSheetOpen(true)}>
           <Ionicons name="people-outline" size={16} color={theme.color.accent} />
@@ -215,6 +224,7 @@ export function ChatThread({
       <FlatList
         ref={listRef}
         data={messages}
+        style={styles.list}
         keyExtractor={(m) => m.id}
         contentContainerStyle={styles.listContent}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
@@ -257,11 +267,14 @@ export function ChatThread({
           <Text style={styles.sendText}>Send</Text>
         </Pressable>
       </View>
-    </KeyboardAvoidingView>
+      {/* Spacer that lifts the composer above the keyboard by its exact height. */}
+      <View style={{ height: kbHeight }} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  list: { flex: 1 },
   screen: { flex: 1, backgroundColor: '#fafafa' },
   peopleBar: {
     flexDirection: 'row',
