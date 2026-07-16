@@ -4,18 +4,22 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../../lib/theme';
 import { listInbox } from '../../../lib/data/chat';
+import { unreadNotificationCount } from '../../../lib/data/notifications';
 
 export default function TabsLayout() {
   const [unread, setUnread] = useState(0);
+  const [notif, setNotif] = useState(0);
 
-  // Keep the Messages tab badge fresh — poll the inbox total and refresh on
-  // every return to the foreground. (Cleared on next poll after reading a chat.)
+  // Keep the Messages + More tab badges fresh — poll on an interval and on
+  // every return to the foreground.
   useEffect(() => {
     let active = true;
     const load = async () => {
       try {
-        const items = await listInbox();
-        if (active) setUnread(items.reduce((n, i) => n + i.unread, 0));
+        const [items, n] = await Promise.all([listInbox(), unreadNotificationCount()]);
+        if (!active) return;
+        setUnread(items.reduce((sum, i) => sum + i.unread, 0));
+        setNotif(n);
       } catch {
         /* ignore transient errors */
       }
@@ -80,6 +84,8 @@ export default function TabsLayout() {
         name="more"
         options={{
           title: 'More',
+          tabBarBadge: notif > 0 ? (notif > 99 ? '99+' : notif) : undefined,
+          tabBarBadgeStyle: { backgroundColor: theme.color.accent, fontSize: 11 },
           tabBarIcon: ({ color, size }) => <Ionicons name="ellipsis-horizontal" size={size} color={color} />,
         }}
       />

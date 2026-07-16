@@ -1,4 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
+import { emailUser } from '@/lib/email/notify';
+import { sendExpoPushToUsers } from '@/lib/notify/push';
+import { appUrl } from '@/lib/email/templates';
 
 export interface AppNotification {
   id: string;
@@ -47,12 +50,23 @@ export async function unreadNotificationCount(): Promise<number> {
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
-/** Emit an in-app notification to one user (guarded by the notify() SQL helper).
- *  Best-effort — never let a notification failure break the main action. */
+function notifHtml(title: string, body: string | undefined, link: string | undefined): string {
+  const url = link ? `${appUrl()}${link}` : appUrl();
+  return `<div style="font-family:system-ui,sans-serif">
+    <h2 style="margin:0 0 8px">${title}</h2>
+    ${body ? `<p style="color:#3f3f46;margin:0 0 16px">${body}</p>` : ''}
+    <a href="${url}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 16px;border-radius:6px">Open in DatumPro</a>
+  </div>`;
+}
+
+/** Emit a notification to one user across all channels: in-app (bell), email,
+ *  and mobile push. Best-effort — never lets a delivery failure break the
+ *  workflow that triggered it. */
 export async function notifyUser(
   supabase: SupabaseClient,
   args: { orgId: string; userId: string; type: string; title: string; body?: string; link?: string; entityId?: string },
 ): Promise<void> {
+  // In-app (guarded SQL helper).
   try {
     await supabase.rpc('notify', {
       p_org: args.orgId,
@@ -65,8 +79,11 @@ export async function notifyUser(
       p_entity_id: args.entityId ?? null,
     });
   } catch {
-    /* swallow — notifications must not block the workflow */
+    /* swallow */
   }
+  // Email + mobile push (each best-effort internally).
+  await emailUser(args.userId, { subject: args.title, html: notifHtml(args.title, args.body, args.link) });
+  await sendExpoPushToUsers([args.userId], { title: args.title, body: args.body ?? '', url: args.link });
 }
 
 /** Notify every project manager of a project (used on accept/decline). */

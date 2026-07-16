@@ -3,6 +3,7 @@
   "ignoreCommand": "npx turbo-ignore @datumpro/web",
   "crons": [
     { "path": "/api/cron/sla", "schedule": "0 * * * *" },
-    { "path": "/api/cron/digest", "schedule": "0 7 * * *" }
+    { "path": "/api/cron/digest", "schedule": "0 7 * * *" },
+    { "path": "/api/cron/reminders", "schedule": "0 6 * * *" }
   ]
 }

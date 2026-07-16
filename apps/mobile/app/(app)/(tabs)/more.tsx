@@ -81,6 +81,12 @@ export default function More() {
               </Card>
             )}
 
+            <Pressable style={styles.linkRow} onPress={() => router.push('/(app)/notifications')}>
+              <Ionicons name="notifications-outline" size={18} color={theme.color.text} />
+              <Text style={styles.linkText}>Notifications</Text>
+              <Ionicons name="chevron-forward" size={18} color={theme.color.subtle} style={{ marginLeft: 'auto' }} />
+            </Pressable>
+
             <Pressable style={styles.linkRow} onPress={() => router.push('/(app)/documents')}>
               <Ionicons name="document-text-outline" size={18} color={theme.color.text} />
               <Text style={styles.linkText}>Compliance documents</Text>
