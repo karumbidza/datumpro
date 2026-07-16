@@ -7,6 +7,7 @@ import { createTaskSchema } from '@datumpro/shared/validation';
 import { parsePaymentTerms } from '@datumpro/shared/domain';
 import { completionMediaCount } from '@/lib/data/quotes';
 import { notifyUser, notifyProjectManagers } from '@/lib/data/notifications';
+import type { FormState } from '@/components/ui/form-error';
 import { emailUser } from '@/lib/email/notify';
 import { extensionDecisionEmail, quoteAwardedEmail, appUrl } from '@/lib/email/templates';
 
@@ -57,7 +58,7 @@ async function loadTask(supabase: Awaited<ReturnType<typeof createClient>>, task
     | null;
 }
 
-export async function createTask(formData: FormData) {
+export async function createTask(_prev: FormState, formData: FormData): Promise<FormState> {
   const { supabase, user } = await requireUser();
   const projectId = String(formData.get('projectId') ?? '');
 
@@ -71,14 +72,14 @@ export async function createTask(formData: FormData) {
     plannedStartDate: (formData.get('plannedStartDate') as string) || undefined,
     plannedEndDate: (formData.get('plannedEndDate') as string) || undefined,
   });
-  if (!parsed.success) throw new Error(parsed.error.issues.map((i) => i.message).join(', '));
+  if (!parsed.success) return { error: parsed.error.issues.map((i) => i.message).join(', ') };
 
   const { data: project } = await supabase
     .from('projects')
     .select('org_id')
     .eq('id', projectId)
     .maybeSingle();
-  if (!project) throw new Error('Project not found or access denied');
+  if (!project) return { error: 'Project not found or access denied.' };
   const orgId = (project as { org_id: string }).org_id;
 
   const { data: created, error } = await supabase
@@ -99,7 +100,7 @@ export async function createTask(formData: FormData) {
     })
     .select('id')
     .single();
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
 
   const newId = (created as { id: string }).id;
   await logActivity(supabase, { id: newId, org_id: orgId }, user.id, 'created', 'Task created');
@@ -218,26 +219,26 @@ export async function startTask(formData: FormData) {
   revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
 }
 
-export async function submitTask(formData: FormData) {
+export async function submitTask(_prev: FormState, formData: FormData): Promise<FormState> {
   const { supabase, user } = await requireUser();
   const taskId = String(formData.get('taskId') ?? '');
   const notes = String(formData.get('notes') ?? '').trim();
   const declaration = formData.get('declaration') === 'on';
-  if (notes.length < 10) throw new Error('Describe what was completed (min 10 chars)');
-  if (!declaration) throw new Error('You must confirm the declaration');
+  if (notes.length < 10) return { error: 'Describe what was completed (at least 10 characters).' };
+  if (!declaration) return { error: 'Please confirm the completion declaration.' };
 
   const task = await loadTask(supabase, taskId);
-  if (!task) throw new Error('Task not found');
+  if (!task) return { error: 'Task not found.' };
 
   // Evidence gate: photo/video proof is mandatory unless the task opts out.
   if (task.requires_photo_on_complete && (await completionMediaCount(taskId)) === 0) {
-    throw new Error('Attach at least one completion photo or video before submitting.');
+    return { error: 'Attach at least one completion photo or video before submitting.' };
   }
 
   // Plan gate: if a subtask plan exists, every item must be ticked off first.
   const { data: subs } = await supabase.from('task_subtasks').select('is_done').eq('task_id', taskId);
   if (subs && subs.length > 0 && (subs as { is_done: boolean }[]).some((s) => !s.is_done)) {
-    throw new Error('Complete every item in your task plan before submitting for approval.');
+    return { error: 'Complete every item in your task plan before submitting for approval.' };
   }
 
   const { error } = await supabase
@@ -252,9 +253,10 @@ export async function submitTask(formData: FormData) {
       declaration_confirmed: true,
     })
     .eq('id', taskId);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   await logActivity(supabase, task, user.id, 'status', 'Submitted for sign-off');
   revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
+  return {};
 }
 
 // ── Task acceptance (assigned contractor) ────────────────────────────────────

@@ -28,7 +28,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   startTask,
-  submitTask,
   approveTask,
   rejectTask,
   raiseBlocker,
@@ -36,6 +35,7 @@ import {
   addDependency,
   removeDependency,
 } from '../actions';
+import { SubmitTaskForm } from '@/components/task/submit-task-form';
 
 const inputClass =
   'w-full rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
@@ -153,14 +153,7 @@ export default async function TaskDetailPage({
             <Card>
               <CardTitle>Submit for sign-off</CardTitle>
               {planComplete ? (
-                <form action={submitTask} className="mt-3 space-y-3">
-                  <input type="hidden" name="taskId" value={taskId} />
-                  <textarea name="notes" rows={3} required placeholder="What was completed?" className={inputClass} />
-                  <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" name="declaration" /> I confirm this work is complete and accurate.
-                  </label>
-                  <Button type="submit">Submit</Button>
-                </form>
+                <SubmitTaskForm taskId={taskId} />
               ) : (
                 <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
                   Complete every step in your task plan below before submitting for sign-off.
