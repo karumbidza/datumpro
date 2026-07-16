@@ -21,6 +21,11 @@ async function logActivity(orgId: string, taskId: string, type: string, message:
 
 /** todo → in_progress (assignee). */
 export async function startTask(taskId: string, orgId: string) {
+  const { count } = await supabase
+    .from('task_subtasks')
+    .select('id', { count: 'exact', head: true })
+    .eq('task_id', taskId);
+  if ((count ?? 0) === 0) throw new Error('Add at least one step to your task plan before starting.');
   const now = new Date().toISOString();
   const { error } = await supabase
     .from('tasks')

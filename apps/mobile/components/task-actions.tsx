@@ -13,6 +13,7 @@ export function TaskActions({
   onChanged,
   planComplete = true,
   acceptancePending = false,
+  hasPlan = true,
 }: {
   task: TaskDetail;
   perms: TaskPermissions;
@@ -21,6 +22,8 @@ export function TaskActions({
   planComplete?: boolean;
   /** Task awaiting the contractor's accept/decline — hide start/submit. */
   acceptancePending?: boolean;
+  /** At least one planned step exists — required before "Start". */
+  hasPlan?: boolean;
 }) {
   const [mode, setMode] = useState<Mode>('none');
   const [notes, setNotes] = useState('');
@@ -45,11 +48,12 @@ export function TaskActions({
     }
   };
 
-  const canStart = perms.isAssignee && task.status === 'todo' && !acceptancePending;
+  const startBlockedNoPlan = perms.isAssignee && task.status === 'todo' && !acceptancePending && !hasPlan;
+  const canStart = perms.isAssignee && task.status === 'todo' && !acceptancePending && hasPlan;
   const canSubmit = perms.isAssignee && task.status === 'in_progress' && !acceptancePending;
   const canDecide = perms.canManage && task.status === 'submitted';
 
-  if (!canStart && !canSubmit && !canDecide) return null;
+  if (!canStart && !canSubmit && !canDecide && !startBlockedNoPlan) return null;
 
   return (
     <View style={styles.card}>
@@ -59,6 +63,9 @@ export function TaskActions({
         <Pressable style={[styles.btn, styles.primary]} disabled={busy} onPress={() => run(() => startTask(task.id, task.orgId))}>
           {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Start task</Text>}
         </Pressable>
+      )}
+      {startBlockedNoPlan && (
+        <Text style={styles.hint}>Add at least one step to your task plan before starting.</Text>
       )}
 
       {canSubmit && mode !== 'submit' && planComplete && (

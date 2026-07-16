@@ -119,6 +119,21 @@ export function SubtaskPanel({
         />
       </div>
 
+      {/* Schedule: completion vs time elapsed since the task started */}
+      {(() => {
+        if (!taskStart || !taskEnd) return null;
+        const s = new Date(taskStart).getTime();
+        const e = new Date(taskEnd).getTime();
+        if (!(e > s)) return null;
+        const elapsed = Math.round(Math.min(100, Math.max(0, ((Date.now() - s) / (e - s)) * 100)));
+        const behind = elapsed > pct + 5;
+        return (
+          <p className={`mt-1.5 text-[11px] ${behind ? 'text-red-600 dark:text-red-400' : 'text-zinc-400'}`}>
+            {elapsed}% of the timeline elapsed{behind ? ` · behind schedule (${pct}% done)` : ''}
+          </p>
+        );
+      })()}
+
       {/* Subtask checklist */}
       <ul className="mt-3 space-y-1.5">
         {subtasks.map((s) => (

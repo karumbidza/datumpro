@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createTaskSchema } from '@datumpro/shared/validation';
 import { parsePaymentTerms } from '@datumpro/shared/domain';
 import { completionMediaCount } from '@/lib/data/quotes';
+import { notifyUser, notifyProjectManagers } from '@/lib/data/notifications';
 import { emailUser } from '@/lib/email/notify';
 import { extensionDecisionEmail, quoteAwardedEmail, appUrl } from '@/lib/email/templates';
 
@@ -100,9 +101,21 @@ export async function createTask(formData: FormData) {
     .single();
   if (error) throw new Error(error.message);
 
-  await logActivity(supabase, { id: (created as { id: string }).id, org_id: orgId }, user.id, 'created', 'Task created');
+  const newId = (created as { id: string }).id;
+  await logActivity(supabase, { id: newId, org_id: orgId }, user.id, 'created', 'Task created');
+  if (parsed.data.assigneeId) {
+    await notifyUser(supabase, {
+      orgId,
+      userId: parsed.data.assigneeId,
+      type: 'task_assigned',
+      title: 'New task assigned',
+      body: `“${parsed.data.title}” — review and accept.`,
+      link: `/projects/${projectId}/tasks/${newId}`,
+      entityId: newId,
+    });
+  }
   revalidatePath(`/projects/${projectId}/tasks`);
-  redirect(`/projects/${projectId}/tasks/${(created as { id: string }).id}`);
+  redirect(`/projects/${projectId}/tasks/${newId}`);
 }
 
 export async function updateTask(formData: FormData) {
@@ -185,6 +198,16 @@ export async function startTask(formData: FormData) {
   const task = await loadTask(supabase, taskId);
   if (!task) throw new Error('Task not found');
 
+  // Plan gate: a task must have at least one planned step before work starts,
+  // so its % completion is real from day one.
+  const { count } = await supabase
+    .from('task_subtasks')
+    .select('id', { count: 'exact', head: true })
+    .eq('task_id', taskId);
+  if ((count ?? 0) === 0) {
+    throw new Error('Add at least one step to your task plan before starting.');
+  }
+
   const now = new Date().toISOString();
   const { error } = await supabase
     .from('tasks')
@@ -246,6 +269,15 @@ export async function acceptTask(formData: FormData) {
     .eq('id', taskId);
   if (error) throw new Error(error.message);
   await logActivity(supabase, task, user.id, 'status', 'Accepted the task');
+  await notifyProjectManagers(supabase, {
+    orgId: task.org_id,
+    projectId: task.project_id,
+    type: 'task_accepted',
+    title: 'Task accepted',
+    body: `“${task.title}” was accepted.`,
+    link: `/projects/${task.project_id}/tasks/${taskId}`,
+    entityId: taskId,
+  });
   revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
 }
 
@@ -262,6 +294,15 @@ export async function declineTask(formData: FormData) {
     .eq('id', taskId);
   if (error) throw new Error(error.message);
   await logActivity(supabase, task, user.id, 'status', reason ? `Declined the task — ${reason}` : 'Declined the task');
+  await notifyProjectManagers(supabase, {
+    orgId: task.org_id,
+    projectId: task.project_id,
+    type: 'task_declined',
+    title: 'Task declined',
+    body: reason ? `“${task.title}” was declined — ${reason}` : `“${task.title}” was declined.`,
+    link: `/projects/${task.project_id}/tasks/${taskId}`,
+    entityId: taskId,
+  });
   revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
 }
 
@@ -526,6 +567,16 @@ export async function awardQuote(formData: FormData) {
   if (error) throw new Error(error.message);
 
   await supabase.from('tasks').update({ assignee_id: winner.contractor_id }).eq('id', taskId);
+
+  await notifyUser(supabase, {
+    orgId: task.org_id,
+    userId: winner.contractor_id,
+    type: 'quote_awarded',
+    title: 'Quote awarded to you',
+    body: `You won “${task.title}” — review and accept the task.`,
+    link: `/projects/${task.project_id}/tasks/${taskId}`,
+    entityId: taskId,
+  });
 
   // Generate the contractor payment schedule from the awarded terms (once).
   const cost = winner.cost_cents ?? 0;

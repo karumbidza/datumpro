@@ -81,6 +81,19 @@ export default function TaskDetailScreen() {
         <ProgressBar value={pct} color={tone.bar} />
         <Text style={styles.pct}>{pct}%</Text>
       </View>
+      {(() => {
+        if (!task.plannedStartDate || !task.plannedEndDate) return null;
+        const s = new Date(task.plannedStartDate).getTime();
+        const e = new Date(task.plannedEndDate).getTime();
+        if (!(e > s)) return null;
+        const elapsed = Math.round(Math.min(100, Math.max(0, ((Date.now() - s) / (e - s)) * 100)));
+        const behind = elapsed > pct + 5;
+        return (
+          <Text style={[styles.elapsed, behind && styles.behind]}>
+            {elapsed}% of the timeline elapsed{behind ? ' · behind schedule' : ''}
+          </Text>
+        );
+      })()}
 
       <Pressable style={styles.discussion} onPress={() => router.push(`/(app)/chat/${task.id}`)}>
         <Ionicons name="chatbubble-ellipses-outline" size={16} color={theme.color.accent} />
@@ -111,6 +124,7 @@ export default function TaskDetailScreen() {
           onChanged={load}
           planComplete={planComplete}
           acceptancePending={acceptancePending}
+          hasPlan={subtasks.length > 0}
         />
       )}
 
@@ -164,6 +178,8 @@ const styles = StyleSheet.create({
   badges: { flexDirection: 'row', gap: 8 },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   pct: { fontSize: 13, fontWeight: '700', color: theme.color.text, width: 42, textAlign: 'right' },
+  elapsed: { fontSize: 11, color: theme.color.subtle, marginTop: -4 },
+  behind: { color: theme.color.danger, fontWeight: '600' },
   discussion: {
     flexDirection: 'row',
     alignItems: 'center',

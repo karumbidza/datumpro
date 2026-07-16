@@ -132,12 +132,17 @@ export default async function TaskDetailPage({
   const workflowActions =
     task.status !== 'done' && canAct && !acceptancePending ? (
       <div className="mt-6 space-y-4">
-        {task.status === 'todo' && (
-          <form action={startTask}>
-            <input type="hidden" name="taskId" value={taskId} />
-            <Button type="submit">Start task</Button>
-          </form>
-        )}
+        {task.status === 'todo' &&
+          (subtasks.length > 0 ? (
+            <form action={startTask}>
+              <input type="hidden" name="taskId" value={taskId} />
+              <Button type="submit">Start task</Button>
+            </form>
+          ) : (
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              Add at least one step to your task plan below, then you can start the task.
+            </p>
+          ))}
 
         {task.status === 'in_progress' && (
           <div className="grid gap-4 sm:grid-cols-2">
