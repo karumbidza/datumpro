@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getProject } from '@/lib/data/projects';
 import { listTasksByProject, listOrgMembers, type TaskRow } from '@/lib/data/tasks';
 import { getProjectSchedule, type ProjectSchedule } from '@/lib/data/scheduling';
+import { progressForTasks, taskPct, getProjectProgress } from '@/lib/data/subtasks';
 import { Button } from '@/components/ui/button';
 import { ChevronRight } from '@/components/icons';
 import { parseDate, formatDayMonth } from '@/lib/date';
@@ -112,6 +113,10 @@ export default async function TaskBoardPage({
     listOrgMembers(project.org_id),
   ]);
   const nameById = new Map(members.map((m) => [m.userId, m.name]));
+  const [progress, projectPct] = await Promise.all([
+    progressForTasks(tasks.map((t) => t.id)),
+    getProjectProgress(projectId),
+  ]);
 
   return (
     <main className="mx-auto flex max-w-[1152px] flex-col gap-8 px-10 py-8">
@@ -121,6 +126,14 @@ export default async function TaskBoardPage({
             ← {project.name}
           </Link>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Tasks</h1>
+          {tasks.length > 0 && (
+            <div className="mt-2 flex items-center gap-2">
+              <div className="h-2 w-40 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                <div className="h-2 rounded-full bg-brand-600 transition-all" style={{ width: `${projectPct}%` }} />
+              </div>
+              <span className="text-xs font-medium tabular-nums text-zinc-500">{projectPct}% complete</span>
+            </div>
+          )}
         </div>
         <Link href={`/projects/${projectId}/tasks/new`}>
           <Button>New task</Button>
@@ -149,7 +162,7 @@ export default async function TaskBoardPage({
           <div className="flex flex-col gap-2">
             {tasks.map((t) => {
               const status = STATUS_META[t.status];
-              const pct = taskPercent(t);
+              const pct = taskPct(t.status, progress.get(t.id), taskPercent(t));
               const note = statusNote(t, schedule);
               const assignee = t.assignee_id ? nameById.get(t.assignee_id) ?? 'Member' : 'Unassigned';
               const due = parseDate(t.due_date);

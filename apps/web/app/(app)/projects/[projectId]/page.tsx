@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getProject } from '@/lib/data/projects';
 import { getDashboardData } from '@/lib/data/dashboard';
+import { getProjectProgress } from '@/lib/data/subtasks';
 import { StatCards } from '@/components/dashboard/stat-cards';
 import { TimelineOverview } from '@/components/dashboard/timeline-overview';
 import { Button } from '@/components/ui/button';
@@ -23,7 +24,10 @@ export default async function ProjectOverviewPage({
   const project = await getProject(projectId);
   if (!project) notFound();
 
-  const { counts, tasks } = await getDashboardData(project.org_id, projectId);
+  const [{ counts, tasks }, projectPct] = await Promise.all([
+    getDashboardData(project.org_id, projectId),
+    getProjectProgress(projectId),
+  ]);
 
   return (
     <div className="mx-auto flex max-w-[1152px] flex-col gap-8 px-10 py-8">
@@ -32,6 +36,14 @@ export default async function ProjectOverviewPage({
           <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
           {project.client_name && (
             <p className="text-sm text-zinc-500 dark:text-zinc-400">{project.client_name}</p>
+          )}
+          {tasks.length > 0 && (
+            <div className="mt-2 flex items-center gap-2">
+              <div className="h-2 w-48 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                <div className="h-2 rounded-full bg-brand-600 transition-all" style={{ width: `${projectPct}%` }} />
+              </div>
+              <span className="text-xs font-medium tabular-nums text-zinc-500">{projectPct}% complete</span>
+            </div>
           )}
         </div>
         <div className="flex gap-2">
