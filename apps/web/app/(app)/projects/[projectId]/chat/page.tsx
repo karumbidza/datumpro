@@ -36,8 +36,8 @@ export default async function ProjectChatPage({
         <div className="mt-3">
           <Card>
             <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              The project group chat is for the delivery team. Contractors use their per-task
-              discussion; a project manager can add you here if needed.
+              This project doesn’t have a group chat yet. Every project member can use it once it’s
+              created — it stays open for the life of the project.
             </p>
           </Card>
         </div>

@@ -7,8 +7,8 @@ export const theme = {
     muted: '#6b7280',
     subtle: '#9ca3af',
     border: '#eceef1',
-    accent: '#f2662d', // brand accent — single swap point
-    accentSoft: '#fdeee6',
+    accent: '#3686b9', // brand accent (DatumPro logo blue) — single swap point
+    accentSoft: '#e6f0f7',
     dark: '#0e0e10', // black pills / active tab, as in the reference
     onDark: '#ffffff',
     success: '#16a34a',
