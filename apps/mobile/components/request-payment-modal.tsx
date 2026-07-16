@@ -11,6 +11,8 @@ import {
   Alert,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import {
   requestPayment,
   uploadPaymentDoc,
@@ -35,17 +37,51 @@ export function RequestPaymentModal({
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
-  const [doc, setDoc] = useState<{ base64: string; ext: string; mime: string } | null>(null);
+  const [doc, setDoc] = useState<{ base64: string; ext: string; mime: string; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
   const project = projects.find((p) => p.id === projectId) ?? projects[0];
 
-  async function attach() {
-    const res = await ImagePicker.launchImageLibraryAsync({ base64: true, quality: 0.6, mediaTypes: ['images'] });
-    if (res.canceled || !res.assets[0]?.base64) return;
-    const a = res.assets[0];
-    const ext = a.uri.split('.').pop()?.toLowerCase() || 'jpg';
-    setDoc({ base64: a.base64!, ext, mime: a.mimeType ?? 'image/jpeg' });
+  async function fromImage(fromCamera: boolean) {
+    const perm = fromCamera
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Permission needed', 'Enable camera / photo access in Settings.');
+      return;
+    }
+    const res = fromCamera
+      ? await ImagePicker.launchCameraAsync({ base64: true, quality: 0.6 })
+      : await ImagePicker.launchImageLibraryAsync({ base64: true, quality: 0.6, mediaTypes: ['images'] });
+    const a = res.canceled ? null : res.assets[0];
+    if (!a?.base64) return;
+    const ext = (a.mimeType?.split('/')[1] || a.uri.split('.').pop() || 'jpg').toLowerCase();
+    setDoc({ base64: a.base64, ext, mime: a.mimeType ?? 'image/jpeg', name: a.fileName ?? `invoice.${ext}` });
+  }
+
+  async function fromDocument() {
+    const res = await DocumentPicker.getDocumentAsync({
+      type: ['application/pdf', 'image/*'],
+      copyToCacheDirectory: true,
+    });
+    const a = res.canceled ? null : res.assets[0];
+    if (!a) return;
+    try {
+      const base64 = await FileSystem.readAsStringAsync(a.uri, { encoding: FileSystem.EncodingType.Base64 });
+      const ext = (a.name.split('.').pop() || a.mimeType?.split('/')[1] || 'pdf').toLowerCase();
+      setDoc({ base64, ext, mime: a.mimeType ?? 'application/octet-stream', name: a.name });
+    } catch (e) {
+      Alert.alert('Could not read file', e instanceof Error ? e.message : 'Please try another file.');
+    }
+  }
+
+  function attach() {
+    Alert.alert('Attach invoice', undefined, [
+      { text: 'Take photo', onPress: () => void fromImage(true) },
+      { text: 'Photo library', onPress: () => void fromImage(false) },
+      { text: 'Document (PDF)', onPress: () => void fromDocument() },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   }
 
   async function submit() {
@@ -121,7 +157,9 @@ export function RequestPaymentModal({
           <TextInput value={note} onChangeText={setNote} placeholder="Anything the reviewer should know" placeholderTextColor={theme.color.subtle} style={styles.input} />
 
           <Pressable onPress={attach} style={styles.attach}>
-            <Text style={styles.attachText}>{doc ? '✓ Invoice attached — replace' : 'Attach invoice photo (optional)'}</Text>
+            <Text style={styles.attachText} numberOfLines={1}>
+              {doc ? `✓ ${doc.name} — replace` : 'Attach invoice — photo or PDF (optional)'}
+            </Text>
           </Pressable>
 
           <Pressable onPress={submit} disabled={busy} style={[styles.submit, busy && styles.busy]}>

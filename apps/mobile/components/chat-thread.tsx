@@ -147,8 +147,10 @@ export function ChatThread({
   return (
     <KeyboardAvoidingView
       style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={90}
+      // Android edge-to-edge (SDK 54) doesn't auto-inset for the IME, so rely on
+      // 'height' which tracks keyboard events directly instead of window resize.
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <FlatList
         ref={listRef}
