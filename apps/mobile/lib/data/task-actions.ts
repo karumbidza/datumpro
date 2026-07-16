@@ -47,6 +47,11 @@ export async function submitTask(params: {
       .eq('purpose', 'completion');
     if ((count ?? 0) === 0) throw new Error('Attach at least one completion photo before submitting.');
   }
+  // Plan gate: if a subtask plan exists, every item must be ticked first.
+  const { data: subs } = await supabase.from('task_subtasks').select('is_done').eq('task_id', params.taskId);
+  if (subs && subs.length > 0 && (subs as { is_done: boolean }[]).some((s) => !s.is_done)) {
+    throw new Error('Complete every item in your task plan before submitting for approval.');
+  }
   const { error } = await supabase
     .from('tasks')
     .update({

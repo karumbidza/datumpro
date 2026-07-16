@@ -11,10 +11,16 @@ export function TaskActions({
   task,
   perms,
   onChanged,
+  planComplete = true,
+  acceptancePending = false,
 }: {
   task: TaskDetail;
   perms: TaskPermissions;
   onChanged: () => void;
+  /** Every subtask ticked — required before "Submit for review". */
+  planComplete?: boolean;
+  /** Task awaiting the contractor's accept/decline — hide start/submit. */
+  acceptancePending?: boolean;
 }) {
   const [mode, setMode] = useState<Mode>('none');
   const [notes, setNotes] = useState('');
@@ -39,8 +45,8 @@ export function TaskActions({
     }
   };
 
-  const canStart = perms.isAssignee && task.status === 'todo';
-  const canSubmit = perms.isAssignee && task.status === 'in_progress';
+  const canStart = perms.isAssignee && task.status === 'todo' && !acceptancePending;
+  const canSubmit = perms.isAssignee && task.status === 'in_progress' && !acceptancePending;
   const canDecide = perms.canManage && task.status === 'submitted';
 
   if (!canStart && !canSubmit && !canDecide) return null;
@@ -55,10 +61,13 @@ export function TaskActions({
         </Pressable>
       )}
 
-      {canSubmit && mode !== 'submit' && (
+      {canSubmit && mode !== 'submit' && planComplete && (
         <Pressable style={[styles.btn, styles.primary]} onPress={() => setMode('submit')}>
           <Text style={styles.primaryText}>Submit for review</Text>
         </Pressable>
+      )}
+      {canSubmit && mode !== 'submit' && !planComplete && (
+        <Text style={styles.hint}>Complete every step in your task plan to submit for review.</Text>
       )}
       {canSubmit && mode === 'submit' && (
         <View style={styles.form}>

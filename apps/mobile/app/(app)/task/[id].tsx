@@ -7,6 +7,8 @@ import { getTaskConversationId, getUnreadCount } from '../../../lib/data/chat';
 import { TaskPhotos } from '../../../components/task-photos';
 import { TaskExtensions } from '../../../components/task-extensions';
 import { TaskActions } from '../../../components/task-actions';
+import { SubtaskPanel } from '../../../components/subtask-panel';
+import { listSubtasks, subtaskPct, type Subtask } from '../../../lib/data/subtasks';
 import { Card, Pill, ProgressBar } from '../../../components/ui';
 import { formatDate, slaLabel, statusLabel } from '../../../lib/ui';
 import { theme, slaTone, statusProgress, contentWidth } from '../../../lib/theme';
@@ -16,6 +18,7 @@ export default function TaskDetailScreen() {
   const router = useRouter();
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [perms, setPerms] = useState<TaskPermissions | null>(null);
+  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -23,6 +26,7 @@ export default function TaskDetailScreen() {
     const t = await getTask(String(id));
     setTask(t);
     setPerms(t ? await getTaskPermissions(t.orgId, t.projectId, t.assigneeId) : null);
+    setSubtasks(await listSubtasks(String(id)));
     const conv = await getTaskConversationId(String(id));
     setUnread(conv ? await getUnreadCount(conv) : 0);
     setLoading(false);
@@ -55,7 +59,10 @@ export default function TaskDetailScreen() {
   }
 
   const tone = slaTone(task.slaStatus);
-  const pct = statusProgress(task.status);
+  const acceptancePending = task.acceptanceStatus === 'pending';
+  const planComplete = subtasks.length === 0 || subtasks.every((s) => s.isDone);
+  const pct =
+    task.status === 'done' ? 100 : subtasks.length > 0 ? subtaskPct(subtasks) : statusProgress(task.status);
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -85,7 +92,27 @@ export default function TaskDetailScreen() {
         )}
       </Pressable>
 
-      {perms && <TaskActions task={task} perms={perms} onChanged={load} />}
+      {perms && (task.assigneeId || subtasks.length > 0) && (
+        <SubtaskPanel
+          taskId={task.id}
+          orgId={task.orgId}
+          subtasks={subtasks}
+          acceptanceStatus={task.acceptanceStatus}
+          isAssignee={perms.isAssignee}
+          canManage={perms.canManage}
+          onChanged={load}
+        />
+      )}
+
+      {perms && (
+        <TaskActions
+          task={task}
+          perms={perms}
+          onChanged={load}
+          planComplete={planComplete}
+          acceptancePending={acceptancePending}
+        />
+      )}
 
       <Card>
         <Field label="Priority" value={task.priority} />

@@ -18,6 +18,7 @@ export interface TaskDetail extends MyTask {
   description: string | null;
   plannedStartDate: string | null;
   plannedEndDate: string | null;
+  acceptanceStatus: 'pending' | 'accepted' | 'rejected' | null;
 }
 
 /** The current user's role relative to a task's project — drives which actions
@@ -147,7 +148,7 @@ export async function getTask(id: string): Promise<TaskDetail | null> {
   const { data } = await supabase
     .from('tasks')
     .select(
-      'id, org_id, title, description, status, sla_status, due_date, priority, project_id, assignee_id, requires_photo_on_complete, planned_start_date, planned_end_date, projects(name)',
+      'id, org_id, title, description, status, sla_status, due_date, priority, project_id, assignee_id, requires_photo_on_complete, planned_start_date, planned_end_date, acceptance_status, projects(name)',
     )
     .eq('id', id)
     .maybeSingle();
@@ -166,6 +167,7 @@ export async function getTask(id: string): Promise<TaskDetail | null> {
     requires_photo_on_complete: boolean | null;
     planned_start_date: string | null;
     planned_end_date: string | null;
+    acceptance_status: 'pending' | 'accepted' | 'rejected' | null;
     projects: ProjectJoin;
   };
   return {
@@ -183,5 +185,6 @@ export async function getTask(id: string): Promise<TaskDetail | null> {
     projectName: projectName(t.projects),
     plannedStartDate: t.planned_start_date,
     plannedEndDate: t.planned_end_date,
+    acceptanceStatus: t.acceptance_status,
   };
 }
