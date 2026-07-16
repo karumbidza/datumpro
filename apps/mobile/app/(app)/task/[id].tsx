@@ -132,6 +132,7 @@ export default function TaskDetailScreen() {
           acceptanceStatus={task.acceptanceStatus}
           isAssignee={perms.isAssignee}
           canManage={perms.canManage}
+          taskStatus={task.status}
           onChanged={load}
         />
       )}

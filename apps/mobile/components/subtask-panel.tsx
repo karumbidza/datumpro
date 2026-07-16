@@ -6,6 +6,7 @@ import { theme } from '../lib/theme';
 import {
   acceptTask,
   declineTask,
+  returnTask,
   addSubtask,
   toggleSubtask,
   removeSubtask,
@@ -20,6 +21,7 @@ export function SubtaskPanel({
   acceptanceStatus,
   isAssignee,
   canManage,
+  taskStatus,
   onChanged,
 }: {
   taskId: string;
@@ -28,14 +30,18 @@ export function SubtaskPanel({
   acceptanceStatus: 'pending' | 'accepted' | 'rejected' | null;
   isAssignee: boolean;
   canManage: boolean;
+  taskStatus: string;
   onChanged: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [declineOpen, setDeclineOpen] = useState(false);
+  const [handBackOpen, setHandBackOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [newTitle, setNewTitle] = useState('');
   // Only the assigned contractor builds and ticks the plan; managers view it.
   const canEdit = isAssignee;
+  const canHandBack =
+    isAssignee && acceptanceStatus === 'accepted' && taskStatus !== 'submitted' && taskStatus !== 'done';
   const pct = subtaskPct(subtasks);
   const done = subtasks.filter((s) => s.isDone).length;
 
@@ -172,6 +178,45 @@ export function SubtaskPanel({
       {canEdit && subtasks.length > 0 && done < subtasks.length && (
         <Text style={styles.gateHint}>Tick every step to unlock Submit for sign-off.</Text>
       )}
+
+      {canHandBack && (
+        <View style={styles.handBack}>
+          {!handBackOpen ? (
+            <Pressable onPress={() => setHandBackOpen(true)}>
+              <Text style={styles.handBackLink}>Can’t complete this? Hand the task back</Text>
+            </Pressable>
+          ) : (
+            <View style={{ gap: 8 }}>
+              <TextInput
+                value={reason}
+                onChangeText={setReason}
+                placeholder="Why are you handing it back? (shared with the PM)"
+                placeholderTextColor={theme.color.subtle}
+                style={styles.input}
+                multiline
+              />
+              <View style={styles.row}>
+                <Pressable
+                  style={[styles.btn, styles.btnDanger]}
+                  disabled={busy || !reason.trim()}
+                  onPress={() =>
+                    run(async () => {
+                      await returnTask(taskId, reason.trim());
+                      setHandBackOpen(false);
+                      setReason('');
+                    })
+                  }
+                >
+                  <Text style={styles.btnPrimaryText}>Hand back task</Text>
+                </Pressable>
+                <Pressable style={[styles.btn, styles.btnOutline]} disabled={busy} onPress={() => setHandBackOpen(false)}>
+                  <Text style={styles.btnOutlineText}>Cancel</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+        </View>
+      )}
     </Card>
   );
 }
@@ -210,4 +255,6 @@ const styles = StyleSheet.create({
   addBtn: { backgroundColor: theme.color.dark, borderRadius: theme.radius.md, paddingHorizontal: 18, paddingVertical: 11 },
   addBtnText: { color: theme.color.onDark, fontWeight: '700' },
   gateHint: { fontSize: 11, color: theme.color.subtle, marginTop: 8 },
+  handBack: { marginTop: 14, borderTopWidth: 1, borderTopColor: theme.color.border, paddingTop: 12 },
+  handBackLink: { fontSize: 12, fontWeight: '600', color: theme.color.subtle },
 });

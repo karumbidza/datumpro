@@ -53,6 +53,26 @@ export async function declineTask(taskId: string, reason: string): Promise<void>
   if (error) throw new Error(error.message);
 }
 
+/** Hand an already-accepted task back to the PM (any time before submit). */
+export async function returnTask(taskId: string, reason: string): Promise<void> {
+  const { error } = await supabase
+    .from('tasks')
+    .update({
+      assignee_id: null,
+      acceptance_status: 'rejected',
+      rejected_reason: reason || null,
+      status: 'todo',
+      sla_status: 'on_track',
+      actual_start_date: null,
+      sla_clock_started_at: null,
+      sla_clock_paused_at: null,
+      blocker_description: null,
+      blocker_resolved_at: null,
+    })
+    .eq('id', taskId);
+  if (error) throw new Error(error.message);
+}
+
 export async function addSubtask(params: {
   taskId: string;
   orgId: string;

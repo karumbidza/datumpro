@@ -434,6 +434,7 @@ export default async function TaskDetailPage({
             assigneeName={assigneeName}
             taskStart={task.planned_start_date}
             taskEnd={task.planned_end_date ?? task.due_date}
+            taskStatus={task.status}
           />
         </div>
       )}

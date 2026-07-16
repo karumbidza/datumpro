@@ -6,6 +6,7 @@ import { SubmitButton } from '@/components/ui/submit-button';
 import {
   acceptTask,
   declineTask,
+  returnTask,
   addSubtask,
   toggleSubtask,
   removeSubtask,
@@ -25,6 +26,7 @@ export function SubtaskPanel({
   assigneeName,
   taskStart,
   taskEnd,
+  taskStatus,
 }: {
   taskId: string;
   projectId: string;
@@ -36,8 +38,12 @@ export function SubtaskPanel({
   /** The parent task's window — subtask dates are clamped to it. */
   taskStart: string | null;
   taskEnd: string | null;
+  taskStatus: string;
 }) {
   const [declineOpen, setDeclineOpen] = useState(false);
+  const [handBackOpen, setHandBackOpen] = useState(false);
+  const canHandBack =
+    isAssignee && acceptanceStatus === 'accepted' && taskStatus !== 'submitted' && taskStatus !== 'done';
   const doneCount = subtasks.filter((s) => s.isDone).length;
   const pct = subtasks.length ? Math.round((100 * doneCount) / subtasks.length) : 0;
   // The plan (add / remove / tick) belongs to the assigned contractor. Managers
@@ -218,6 +224,46 @@ export function SubtaskPanel({
         <p className="mt-2 text-[11px] text-zinc-400">
           Tick off every step to unlock “Submit for sign-off”.
         </p>
+      )}
+
+      {canHandBack && (
+        <div className="mt-4 border-t border-zinc-100 pt-3 dark:border-zinc-800">
+          {!handBackOpen ? (
+            <button
+              type="button"
+              onClick={() => setHandBackOpen(true)}
+              className="text-[11px] font-medium text-zinc-400 hover:text-red-500"
+            >
+              Can’t complete this? Hand the task back
+            </button>
+          ) : (
+            <form action={returnTask} className="space-y-2">
+              <input type="hidden" name="taskId" value={taskId} />
+              <label className="block text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
+                Hand back to the project manager — why? <span className="text-zinc-400">(shared with them)</span>
+              </label>
+              <textarea
+                name="reason"
+                rows={2}
+                required
+                placeholder="e.g. Materials aren’t available — this needs to be rescheduled."
+                className={`${inputClass} w-full text-sm`}
+              />
+              <div className="flex gap-2">
+                <SubmitButton variant="secondary" pendingText="Handing back…">
+                  Hand back task
+                </SubmitButton>
+                <button
+                  type="button"
+                  onClick={() => setHandBackOpen(false)}
+                  className="text-sm text-zinc-500 hover:underline"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
       )}
     </Card>
   );

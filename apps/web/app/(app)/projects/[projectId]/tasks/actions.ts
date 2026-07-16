@@ -308,6 +308,46 @@ export async function declineTask(formData: FormData) {
   revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
 }
 
+/** Contractor hands an ALREADY-ACCEPTED task back to the PM (any time before
+ *  submit), with a reason. The task returns to the pool: unassigned + reset. */
+export async function returnTask(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const taskId = String(formData.get('taskId') ?? '');
+  const reason = String(formData.get('reason') ?? '').trim();
+  const task = await loadTask(supabase, taskId);
+  if (!task) throw new Error('Task not found');
+  if (task.status === 'submitted' || task.status === 'done') {
+    throw new Error('This task has already been submitted and can no longer be handed back.');
+  }
+  const { error } = await supabase
+    .from('tasks')
+    .update({
+      assignee_id: null,
+      acceptance_status: 'rejected',
+      rejected_reason: reason || null,
+      status: 'todo',
+      sla_status: 'on_track',
+      actual_start_date: null,
+      sla_clock_started_at: null,
+      sla_clock_paused_at: null,
+      blocker_description: null,
+      blocker_resolved_at: null,
+    })
+    .eq('id', taskId);
+  if (error) throw new Error(error.message);
+  await logActivity(supabase, task, user.id, 'status', reason ? `Handed the task back — ${reason}` : 'Handed the task back');
+  await notifyProjectManagers(supabase, {
+    orgId: task.org_id,
+    projectId: task.project_id,
+    type: 'task_returned',
+    title: 'Task handed back',
+    body: reason ? `“${task.title}” was handed back — ${reason}` : `“${task.title}” was handed back.`,
+    link: `/projects/${task.project_id}/tasks/${taskId}`,
+    entityId: taskId,
+  });
+  revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
+}
+
 // ── Subtask plan (the contractor's to-do list) ───────────────────────────────
 async function taskOrgProject(
   supabase: Awaited<ReturnType<typeof createClient>>,
