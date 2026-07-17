@@ -295,7 +295,9 @@ export function TimelineOverview({
                 className="sticky left-0 z-30 flex items-end border-b border-r border-zinc-200 bg-zinc-50 px-3 dark:border-zinc-800 dark:bg-zinc-800/40"
                 style={{ width: TASK_COL_WIDTH, minWidth: TASK_COL_WIDTH }}
               >
-                <span className="pb-1 text-[10px] tracking-wider text-zinc-400">TASK / ASSIGNEE</span>
+                <span className="pb-1 text-[10px] tracking-wider text-zinc-400">
+                  {unit === 'project' ? 'PROJECT' : 'TASK / ASSIGNEE'}
+                </span>
               </div>
               <div
                 className="flex border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/40"
