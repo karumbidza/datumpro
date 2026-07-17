@@ -11,6 +11,7 @@ export interface ChatMessage {
   createdAt: string;
   deletedAt: string | null;
   imageUrl: string | null; // first image attachment, signed
+  audioUrl: string | null; // first audio (voice note) attachment, signed
 }
 
 /** The active task-DM conversation id for a task — null if none or no access. */
@@ -54,9 +55,9 @@ export async function listMessages(conversationId: string, limit = 50): Promise<
     deleted_at: string | null;
   }[]).reverse();
 
-  const [names, images] = await Promise.all([
+  const [names, media] = await Promise.all([
     resolveNames(rows.map((r) => r.sender_id)),
-    resolveImages(rows.map((r) => r.id)),
+    resolveAttachments(rows.map((r) => r.id)),
   ]);
   return rows.map((r) => ({
     id: r.id,
@@ -65,7 +66,8 @@ export async function listMessages(conversationId: string, limit = 50): Promise<
     senderName: names.get(r.sender_id) ?? 'Member',
     createdAt: r.created_at,
     deletedAt: r.deleted_at,
-    imageUrl: r.deleted_at ? null : images.get(r.id) ?? null,
+    imageUrl: r.deleted_at ? null : media.images.get(r.id) ?? null,
+    audioUrl: r.deleted_at ? null : media.audios.get(r.id) ?? null,
   }));
 }
 
@@ -130,18 +132,69 @@ export async function sendPhotoMessage(params: {
   if (attErr) throw new Error(attErr.message);
 }
 
-/** message_id → first image attachment's signed URL (chat-media is private). */
-async function resolveImages(messageIds: string[]): Promise<Map<string, string>> {
+/** Post a voice note. Same path/RLS as photos, but the attachment is kind 'audio'
+ *  so web and mobile both render it as a playable clip. */
+export async function sendVoiceMessage(params: {
+  conversationId: string;
+  base64: string;
+  ext: string;
+  mime: string;
+  durationMs?: number | null;
+  sizeBytes?: number | null;
+}): Promise<void> {
+  const user = await currentUser();
+  if (!user) return;
+
+  const { data: conv } = await supabase
+    .from('conversations')
+    .select('org_id, project_id')
+    .eq('id', params.conversationId)
+    .maybeSingle();
+  const c = conv as { org_id: string; project_id: string } | null;
+  if (!c) throw new Error('Conversation not found');
+
+  const name = `${Date.now()}-${Math.random().toString(36).slice(2)}.${params.ext}`;
+  const path = `${c.org_id}/${c.project_id}/chat/${params.conversationId}/${name}`;
+  const { error: upErr } = await supabase.storage
+    .from(CHAT_BUCKET)
+    .upload(path, decode(params.base64), { contentType: params.mime, upsert: false });
+  if (upErr) throw new Error(upErr.message);
+
+  const { data: msg, error: msgErr } = await supabase
+    .from('messages')
+    .insert({ conversation_id: params.conversationId, sender_id: user.id, body: null })
+    .select('id')
+    .single();
+  if (msgErr) throw new Error(msgErr.message);
+
+  const { error: attErr } = await supabase.from('message_attachments').insert({
+    message_id: (msg as { id: string }).id,
+    kind: 'audio',
+    storage_path: path,
+    mime: params.mime,
+    size_bytes: params.sizeBytes ?? null,
+    duration_seconds: params.durationMs != null ? Math.round(params.durationMs / 100) / 10 : null,
+  });
+  if (attErr) throw new Error(attErr.message);
+}
+
+/** message_id → first image / audio attachment signed URL (chat-media is private).
+ *  One query + one batch of signed URLs covers both kinds. Audio here surfaces
+ *  voice notes sent from either web or mobile, so they play cross-platform. */
+async function resolveAttachments(
+  messageIds: string[],
+): Promise<{ images: Map<string, string>; audios: Map<string, string> }> {
   const ids = [...new Set(messageIds)];
-  const out = new Map<string, string>();
-  if (ids.length === 0) return out;
+  const images = new Map<string, string>();
+  const audios = new Map<string, string>();
+  if (ids.length === 0) return { images, audios };
   const { data } = await supabase
     .from('message_attachments')
-    .select('message_id, storage_path')
+    .select('message_id, storage_path, kind')
     .in('message_id', ids)
-    .eq('kind', 'image');
-  const atts = (data ?? []) as { message_id: string; storage_path: string }[];
-  if (atts.length === 0) return out;
+    .in('kind', ['image', 'audio']);
+  const atts = (data ?? []) as { message_id: string; storage_path: string; kind: string }[];
+  if (atts.length === 0) return { images, audios };
 
   const { data: signed } = await supabase.storage
     .from(CHAT_BUCKET)
@@ -152,9 +205,11 @@ async function resolveImages(messageIds: string[]): Promise<Map<string, string>>
   }
   for (const a of atts) {
     const u = urlByPath.get(a.storage_path);
-    if (u && !out.has(a.message_id)) out.set(a.message_id, u);
+    if (!u) continue;
+    const target = a.kind === 'audio' ? audios : images;
+    if (!target.has(a.message_id)) target.set(a.message_id, u);
   }
-  return out;
+  return { images, audios };
 }
 
 export interface InboxItem {

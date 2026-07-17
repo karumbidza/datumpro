@@ -14,6 +14,15 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import {
+  useAudioRecorder,
+  useAudioRecorderState,
+  RecordingPresets,
+  setAudioModeAsync,
+  requestRecordingPermissionsAsync,
+} from 'expo-audio';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/auth';
 import { theme } from '../lib/theme';
@@ -21,11 +30,13 @@ import {
   listMessages,
   sendMessage,
   sendPhotoMessage,
+  sendVoiceMessage,
   markConversationRead,
   type ChatMessage,
 } from '../lib/data/chat';
 import { getConversationRoster, type RosterMember } from '../lib/data/chat-roster';
 import { ChatMembersSheet } from './chat-members-sheet';
+import { VoiceNote } from './voice-note';
 
 /** The chat surface — message list, realtime sync, text + photo composer. Shared
  *  by the task discussion and the project team channel; the parent resolves the
@@ -49,6 +60,15 @@ export function ChatThread({
   const [onlineIds, setOnlineIds] = useState<Set<string>>(() => new Set());
   const [sheetOpen, setSheetOpen] = useState(false);
   const [kbHeight, setKbHeight] = useState(0);
+  const insets = useSafeAreaInsets();
+  // Single source of truth for how far the composer sits off the bottom: above
+  // the keyboard when it's open, above the gesture nav bar when it's closed. This
+  // is why the composer both stops overlapping the keyboard AND stops hiding
+  // behind the Android gesture bar.
+  const bottomSpace = kbHeight > 0 ? kbHeight : insets.bottom;
+
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(recorder);
 
   // Read the keyboard height directly from the IME event and lift the composer
   // by exactly that much. Works in Android edge-to-edge/immersive where the
@@ -185,6 +205,55 @@ export function ChatThread({
     ]);
   }
 
+  async function startRecording() {
+    if (!conversationId || sending || recorderState.isRecording) return;
+    const perm = await requestRecordingPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Microphone needed', 'Enable microphone access in Settings to record voice notes.');
+      return;
+    }
+    try {
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+    } catch (e) {
+      Alert.alert('Could not start recording', e instanceof Error ? e.message : 'Please try again.');
+    }
+  }
+
+  async function cancelRecording() {
+    try {
+      await recorder.stop();
+    } catch {
+      // already stopped
+    }
+  }
+
+  async function stopAndSendRecording() {
+    if (!conversationId) return;
+    const durationMs = recorderState.durationMillis;
+    try {
+      await recorder.stop();
+    } catch {
+      return;
+    }
+    const uri = recorder.uri;
+    // Ignore accidental taps that captured almost nothing.
+    if (!uri || durationMs < 700) return;
+    setSending(true);
+    try {
+      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+      const ext = (uri.split('.').pop() || 'm4a').toLowerCase();
+      const mime = ext === 'm4a' || ext === 'mp4' ? 'audio/mp4' : `audio/${ext}`;
+      await sendVoiceMessage({ conversationId, base64, ext, mime, durationMs });
+      await reload(conversationId);
+    } catch (e) {
+      Alert.alert('Could not send voice note', e instanceof Error ? e.message : 'Please try again.');
+    } finally {
+      setSending(false);
+    }
+  }
+
   if (resolving) {
     return (
       <View style={styles.center}>
@@ -237,6 +306,7 @@ export function ChatThread({
                 {item.imageUrl && !item.deletedAt && (
                   <Image source={{ uri: item.imageUrl }} style={styles.image} resizeMode="cover" />
                 )}
+                {item.audioUrl && !item.deletedAt && <VoiceNote url={item.audioUrl} mine={mine} />}
                 {(item.body || item.deletedAt) && (
                   <Text style={[styles.body, mine && styles.bodyMine, item.imageUrl && styles.bodyWithImage]}>
                     {item.deletedAt ? 'message deleted' : item.body}
@@ -247,28 +317,50 @@ export function ChatThread({
           );
         }}
       />
-      <View style={styles.composer}>
-        <Pressable style={styles.attach} onPress={pickPhoto} disabled={sending}>
-          <Ionicons name="camera-outline" size={22} color="#4f46e5" />
-        </Pressable>
-        <TextInput
-          style={styles.input}
-          placeholder="Write a message…"
-          placeholderTextColor="#a1a1aa"
-          value={input}
-          onChangeText={setInput}
-          multiline
-        />
-        <Pressable
-          style={[styles.send, (!input.trim() || sending) && styles.sendDisabled]}
-          onPress={submit}
-          disabled={!input.trim() || sending}
-        >
-          <Text style={styles.sendText}>Send</Text>
-        </Pressable>
-      </View>
-      {/* Spacer that lifts the composer above the keyboard by its exact height. */}
-      <View style={{ height: kbHeight }} />
+      {recorderState.isRecording ? (
+        <View style={styles.composer}>
+          <Pressable style={styles.attach} onPress={() => void cancelRecording()}>
+            <Ionicons name="trash-outline" size={22} color={theme.color.danger} />
+          </Pressable>
+          <View style={styles.recording}>
+            <View style={styles.recDot} />
+            <Text style={styles.recTime}>{fmtDuration(recorderState.durationMillis)}</Text>
+            <Text style={styles.recHint}>Recording…</Text>
+          </View>
+          <Pressable style={styles.send} onPress={() => void stopAndSendRecording()} disabled={sending}>
+            <Ionicons name="send" size={18} color="#ffffff" />
+          </Pressable>
+        </View>
+      ) : (
+        <View style={styles.composer}>
+          <Pressable style={styles.attach} onPress={pickPhoto} disabled={sending}>
+            <Ionicons name="camera-outline" size={22} color="#4f46e5" />
+          </Pressable>
+          <TextInput
+            style={styles.input}
+            placeholder="Write a message…"
+            placeholderTextColor="#a1a1aa"
+            value={input}
+            onChangeText={setInput}
+            multiline
+          />
+          {input.trim() ? (
+            <Pressable
+              style={[styles.send, sending && styles.sendDisabled]}
+              onPress={submit}
+              disabled={sending}
+            >
+              <Text style={styles.sendText}>Send</Text>
+            </Pressable>
+          ) : (
+            <Pressable style={styles.mic} onPress={() => void startRecording()} disabled={sending}>
+              <Ionicons name="mic" size={22} color="#4f46e5" />
+            </Pressable>
+          )}
+        </View>
+      )}
+      {/* Lifts the composer above the keyboard (open) or the gesture bar (closed). */}
+      <View style={{ height: bottomSpace }} />
     </View>
   );
 }
@@ -323,7 +415,30 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#18181b',
   },
-  send: { backgroundColor: '#4f46e5', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10 },
+  send: {
+    backgroundColor: '#4f46e5',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    alignSelf: 'center',
+    justifyContent: 'center',
+  },
   sendDisabled: { opacity: 0.5 },
   sendText: { color: '#fff', fontWeight: '600' },
+  mic: { alignSelf: 'center', paddingHorizontal: 8, paddingVertical: 8 },
+  recording: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+  },
+  recDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#dc2626' },
+  recTime: { fontSize: 15, fontWeight: '700', color: '#18181b', fontVariant: ['tabular-nums'] },
+  recHint: { fontSize: 13, color: '#9ca3af' },
 });
+
+function fmtDuration(ms: number): string {
+  const s = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
