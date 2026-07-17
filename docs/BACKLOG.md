@@ -21,9 +21,13 @@ soon; **P2** = scale / polish.
   (dispute-grade accountability in construction).
 - **[P1] Un-accept / hand-back.** Once accepted there's no way to return a task;
   once declined the contractor loses access. Add a "return task" action.
-- **[P2] Effort-weighted %.** Completion is equal-weight (done ÷ total). Real
-  projects want weighting by effort / value / duration — add a `weight` column
-  and switch the rollup when ready.
+- ~~**[P2] Effort-weighted %.**~~ ✅ Done. The `project_progress` roll-up now
+  weights each task by its awarded contract value (Earned-Value), falling back to
+  the project's average awarded cost for unpriced tasks and to a plain average
+  when nothing is priced (backward compatible). No schema/UI change — reweighted
+  inside the SECURITY DEFINER function so no per-task cost is exposed. *Note:
+  subtask-level completion within a task is still equal-weight; a future refinement
+  could weight steps too, but per-step value data doesn't exist yet.*
 - **[P2] Per-subtask photo evidence.** `task_media` + `requires_photo_on_complete`
   exist at the task level; add optional photo attached to a *step*, and make the
   final step's photo required.

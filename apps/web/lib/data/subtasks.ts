@@ -43,8 +43,10 @@ export function subtaskProgress(subs: Subtask[]): number {
   return Math.round((100 * subs.filter((s) => s.isDone).length) / subs.length);
 }
 
-/** The project's overall % — average of its tasks' progress (subtask-driven;
- *  a done task counts 100). Single source of truth for the project bar. */
+/** The project's overall % — an effort-weighted roll-up of its tasks' progress
+ *  (subtask-driven; a done task counts 100), where each task is weighted by its
+ *  awarded contract value so big packages move the bar more than small ones. See
+ *  the project_progress SQL function. Single source of truth for the project bar. */
 export async function getProjectProgress(projectId: string): Promise<number> {
   const supabase = await createClient();
   const { data } = await supabase.rpc('project_progress', { p_project_id: projectId });

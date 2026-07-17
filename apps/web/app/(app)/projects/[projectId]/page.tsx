@@ -44,7 +44,12 @@ export default async function ProjectOverviewPage({
               <div className="h-2 w-48 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
                 <div className="h-2 rounded-full bg-brand-600 transition-all" style={{ width: `${projectPct}%` }} />
               </div>
-              <span className="text-xs font-medium tabular-nums text-zinc-500">{projectPct}% complete</span>
+              <span
+                className="text-xs font-medium tabular-nums text-zinc-500"
+                title="Effort-weighted by each task's awarded contract value"
+              >
+                {projectPct}% complete
+              </span>
             </div>
           )}
           <ProgressTrend points={history} className="mt-3 max-w-[240px]" />
