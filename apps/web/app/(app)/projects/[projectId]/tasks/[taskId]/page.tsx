@@ -30,12 +30,12 @@ import {
   startTask,
   approveTask,
   rejectTask,
-  raiseBlocker,
   resolveBlocker,
   addDependency,
   removeDependency,
 } from '../actions';
 import { SubmitTaskForm } from '@/components/task/submit-task-form';
+import { BlockerForm } from '@/components/task/blocker-form';
 
 const inputClass =
   'w-full rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
@@ -164,11 +164,7 @@ export default async function TaskDetailPage({
             </Card>
             <Card>
               <CardTitle>Raise a blocker</CardTitle>
-              <form action={raiseBlocker} className="mt-3 space-y-3">
-                <input type="hidden" name="taskId" value={taskId} />
-                <textarea name="description" rows={2} required placeholder="What's blocking you?" className={inputClass} />
-                <Button type="submit" variant="secondary">Raise blocker</Button>
-              </form>
+              <BlockerForm taskId={taskId} />
             </Card>
           </div>
         )}

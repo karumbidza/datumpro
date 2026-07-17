@@ -445,13 +445,13 @@ export async function rejectTask(formData: FormData) {
   revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
 }
 
-export async function raiseBlocker(formData: FormData) {
+export async function raiseBlocker(_prev: FormState, formData: FormData): Promise<FormState> {
   const { supabase, user } = await requireUser();
   const taskId = String(formData.get('taskId') ?? '');
   const description = String(formData.get('description') ?? '').trim();
-  if (!description) throw new Error('Describe the blocker');
+  if (!description) return { error: 'Describe the blocker.' };
   const task = await loadTask(supabase, taskId);
-  if (!task) throw new Error('Task not found');
+  if (!task) return { error: 'Task not found.' };
   const { error } = await supabase
     .from('tasks')
     .update({
@@ -464,9 +464,10 @@ export async function raiseBlocker(formData: FormData) {
       sla_clock_paused_at: new Date().toISOString(),
     })
     .eq('id', taskId);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   await logActivity(supabase, task, user.id, 'blocker', `Blocker raised: ${description}`);
   revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
+  return {};
 }
 
 export async function resolveBlocker(formData: FormData) {
@@ -537,19 +538,19 @@ export async function inviteQuotes(formData: FormData) {
 }
 
 /** Contractor submits (or declines) their own quote. RLS restricts this to their row. */
-export async function submitQuote(formData: FormData) {
+export async function submitQuote(_prev: FormState, formData: FormData): Promise<FormState> {
   const { supabase, user } = await requireUser();
   const taskId = String(formData.get('taskId') ?? '');
   const decision = String(formData.get('decision') ?? ''); // submit | decline
   const task = await loadTask(supabase, taskId);
-  if (!task) throw new Error('Task not found');
+  if (!task) return { error: 'Task not found.' };
 
   const update: Record<string, unknown> = { decided_at: new Date().toISOString() };
   if (decision === 'decline') {
     update.status = 'declined';
   } else {
     const cost = Number(formData.get('costDollars') ?? 0);
-    if (!Number.isFinite(cost) || cost <= 0) throw new Error('Enter your cost for this task');
+    if (!Number.isFinite(cost) || cost <= 0) return { error: 'Enter your cost for this task.' };
     update.status = 'submitted';
     update.submitted_at = new Date().toISOString();
     update.cost_cents = Math.round(cost * 100);
@@ -569,9 +570,10 @@ export async function submitQuote(formData: FormData) {
     .update(update)
     .eq('task_id', taskId)
     .eq('contractor_id', user.id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   await logActivity(supabase, task, user.id, 'quote', decision === 'decline' ? 'Declined to quote' : 'Submitted a quote');
   revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
+  return {};
 }
 
 /** PM awards a submitted quote: winner → awarded, rivals → not_selected (kept for
@@ -768,14 +770,14 @@ export async function removeTaskMedia(formData: FormData) {
 /* ── Extension requests ──────────────────────────────────────────────────── */
 
 /** Executor (assignee/contractor) asks for a new due date. */
-export async function requestExtension(formData: FormData) {
+export async function requestExtension(_prev: FormState, formData: FormData): Promise<FormState> {
   const { supabase, user } = await requireUser();
   const taskId = String(formData.get('taskId') ?? '');
   const proposedDueDate = String(formData.get('proposedDueDate') ?? '');
   const reason = (formData.get('reason') as string)?.trim() || null;
-  if (!proposedDueDate) throw new Error('Choose a proposed new due date');
+  if (!proposedDueDate) return { error: 'Choose a proposed new due date.' };
   const task = await loadTask(supabase, taskId);
-  if (!task) throw new Error('Task not found');
+  if (!task) return { error: 'Task not found.' };
 
   const { error } = await supabase.from('task_extension_requests').insert({
     org_id: task.org_id,
@@ -785,9 +787,10 @@ export async function requestExtension(formData: FormData) {
     proposed_due_date: proposedDueDate,
     reason,
   });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   await logActivity(supabase, task, user.id, 'extension', `Requested extension to ${proposedDueDate}`);
   revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
+  return {};
 }
 
 /** PM approves (shifts the deadline → CPM recomputes) or rejects. */

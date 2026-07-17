@@ -1,11 +1,9 @@
 import { Card, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { requestExtension, decideExtension } from '@/app/(app)/projects/[projectId]/tasks/actions';
+import { decideExtension } from '@/app/(app)/projects/[projectId]/tasks/actions';
+import { ExtensionRequestForm } from './extension-request-form';
 import type { ExtensionRequestRow } from '@/lib/data/tasks';
-
-const inputClass =
-  'w-full rounded-md border border-zinc-200 bg-transparent px-2.5 py-1.5 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
 
 const STATUS_TONE = { pending: 'neutral', approved: 'green', rejected: 'amber', cancelled: 'neutral' } as const;
 
@@ -62,23 +60,7 @@ export function ExtensionPanel({
         </ul>
       )}
 
-      {canRequest && !hasPending && (
-        <form
-          action={requestExtension}
-          className="mt-4 flex flex-wrap items-end gap-3 border-t border-zinc-100 pt-4 dark:border-zinc-800"
-        >
-          <input type="hidden" name="taskId" value={taskId} />
-          <div>
-            <label className="mb-1 block text-xs font-medium">Proposed new due date</label>
-            <input name="proposedDueDate" type="date" required className={inputClass} />
-          </div>
-          <div className="min-w-40 flex-1">
-            <label className="mb-1 block text-xs font-medium">Reason</label>
-            <input name="reason" placeholder="e.g. rain delays, material lead-time" className={inputClass} />
-          </div>
-          <Button type="submit">Request extension</Button>
-        </form>
-      )}
+      {canRequest && !hasPending && <ExtensionRequestForm taskId={taskId} />}
     </Card>
   );
 }
