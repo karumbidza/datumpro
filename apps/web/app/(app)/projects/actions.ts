@@ -5,12 +5,13 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveContext } from '@/lib/data/org';
 import { createProjectSchema } from '@datumpro/shared/validation';
+import type { FormState } from '@/components/ui/form-error';
 
 /** Creates a project under the user's ACTIVE company (the org switcher's choice).
  *  RLS requires the caller to be owner/admin of that company; the creator is
  *  auto-added as the project's PM by a DB trigger. Contract value arrives as USD
  *  dollars and is stored as integer cents. */
-export async function createProject(formData: FormData) {
+export async function createProject(_prev: FormState, formData: FormData): Promise<FormState> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -28,9 +29,7 @@ export async function createProject(formData: FormData) {
     type: 'construction',
     contractValueCents: Number.isFinite(dollars) ? Math.round(dollars * 100) : 0,
   });
-  if (!parsed.success) {
-    throw new Error(parsed.error.issues.map((i) => i.message).join(', '));
-  }
+  if (!parsed.success) return { error: parsed.error.issues.map((i) => i.message).join(', ') };
 
   const { data: project, error } = await supabase
     .from('projects')
@@ -44,7 +43,7 @@ export async function createProject(formData: FormData) {
     })
     .select('id')
     .single();
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
 
   revalidatePath('/projects');
   redirect(`/projects/${(project as { id: string }).id}`);

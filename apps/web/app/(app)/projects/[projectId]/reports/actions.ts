@@ -5,11 +5,12 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { createSiteReportSchema } from '@datumpro/shared/validation';
 import { clampProgress } from '@datumpro/shared/domain';
+import type { FormState } from '@/components/ui/form-error';
 
 /** Creates a site report from the web form. RLS enforces tenant + author rules on
  *  the insert; we still resolve org_id server-side from the project so the client
  *  can't spoof it. Media capture is primarily the mobile slice. */
-export async function createReport(formData: FormData) {
+export async function createReport(_prev: FormState, formData: FormData): Promise<FormState> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -28,7 +29,7 @@ export async function createReport(formData: FormData) {
     status: intent === 'submitted' ? 'submitted' : 'draft',
   });
   if (!parsed.success) {
-    throw new Error(`Invalid report: ${parsed.error.issues.map((i) => i.message).join(', ')}`);
+    return { error: `Invalid report: ${parsed.error.issues.map((i) => i.message).join(', ')}` };
   }
 
   const { data: project, error: projectError } = await supabase
@@ -36,8 +37,8 @@ export async function createReport(formData: FormData) {
     .select('org_id')
     .eq('id', projectId)
     .maybeSingle();
-  if (projectError) throw new Error(projectError.message);
-  if (!project) throw new Error('Project not found or access denied');
+  if (projectError) return { error: projectError.message };
+  if (!project) return { error: 'Project not found or access denied.' };
 
   const { error } = await supabase.from('site_reports').insert({
     org_id: (project as { org_id: string }).org_id,
@@ -49,7 +50,7 @@ export async function createReport(formData: FormData) {
     weather: parsed.data.weather ?? null,
     status: parsed.data.status,
   });
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
 
   revalidatePath(`/projects/${projectId}`);
   redirect(`/projects/${projectId}`);

@@ -12,6 +12,17 @@ async function deliver(
   admin: Admin,
   args: { orgId: string; userId: string; type: string; title: string; body: string; link: string; entityId: string },
 ): Promise<void> {
+  // Don't re-nudge the same person about the same thing more than once a day.
+  const cutoff = new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString();
+  const { count } = await admin
+    .from('notifications')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', args.userId)
+    .eq('type', args.type)
+    .eq('entity_id', args.entityId)
+    .gte('created_at', cutoff);
+  if ((count ?? 0) > 0) return;
+
   await admin
     .from('notifications')
     .insert({

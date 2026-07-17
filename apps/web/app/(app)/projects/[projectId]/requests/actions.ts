@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createRequestSchema } from '@datumpro/shared/validation';
 import { emailUser } from '@/lib/email/notify';
 import { approvalDecisionEmail, appUrl } from '@/lib/email/templates';
+import type { FormState } from '@/components/ui/form-error';
 
 async function ctx() {
   const supabase = await createClient();
@@ -16,7 +17,7 @@ async function ctx() {
   return { supabase, user };
 }
 
-export async function createRequest(formData: FormData) {
+export async function createRequest(_prev: FormState, formData: FormData): Promise<FormState> {
   const { supabase, user } = await ctx();
   const projectId = String(formData.get('projectId') ?? '');
   const amountRaw = formData.get('amount');
@@ -29,10 +30,10 @@ export async function createRequest(formData: FormData) {
     description: (formData.get('description') as string) || undefined,
     amountCents,
   });
-  if (!parsed.success) throw new Error(parsed.error.issues.map((i) => i.message).join(', '));
+  if (!parsed.success) return { error: parsed.error.issues.map((i) => i.message).join(', ') };
 
   const { data: project } = await supabase.from('projects').select('org_id').eq('id', projectId).maybeSingle();
-  if (!project) throw new Error('Project not found or access denied');
+  if (!project) return { error: 'Project not found or access denied.' };
 
   const { data: created, error } = await supabase
     .from('requests')
@@ -47,7 +48,7 @@ export async function createRequest(formData: FormData) {
     })
     .select('id')
     .single();
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
 
   revalidatePath(`/projects/${projectId}/requests`);
   redirect(`/projects/${projectId}/requests/${(created as { id: string }).id}`);
