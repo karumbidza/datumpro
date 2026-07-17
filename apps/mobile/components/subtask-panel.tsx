@@ -15,6 +15,7 @@ import {
   type Subtask,
 } from '../lib/data/subtasks';
 import { uploadTaskPhoto, type TaskPhoto } from '../lib/data/media';
+import { DateField } from './date-field';
 
 export function SubtaskPanel({
   taskId,
@@ -25,6 +26,8 @@ export function SubtaskPanel({
   acceptanceStatus,
   isAssignee,
   taskStatus,
+  taskStart,
+  taskEnd,
   onChanged,
 }: {
   taskId: string;
@@ -36,6 +39,9 @@ export function SubtaskPanel({
   isAssignee: boolean;
   canManage: boolean;
   taskStatus: string;
+  /** The parent task's window — step dates are clamped to it. */
+  taskStart: string | null;
+  taskEnd: string | null;
   onChanged: () => void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -43,6 +49,8 @@ export function SubtaskPanel({
   const [handBackOpen, setHandBackOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [newTitle, setNewTitle] = useState('');
+  const [newStart, setNewStart] = useState<string | null>(null);
+  const [newEnd, setNewEnd] = useState<string | null>(null);
   // Only the assigned contractor builds and ticks the plan; managers view it.
   const canEdit = isAssignee;
   const canHandBack =
@@ -209,26 +217,43 @@ export function SubtaskPanel({
       </View>
 
       {canEdit && acceptanceStatus !== 'pending' && (
-        <View style={styles.addRow}>
-          <TextInput
-            value={newTitle}
-            onChangeText={setNewTitle}
-            placeholder="Add a step…"
-            placeholderTextColor={theme.color.subtle}
-            style={[styles.input, { flex: 1 }]}
-          />
-          <Pressable
-            style={[styles.addBtn, (!newTitle.trim() || busy) && { opacity: 0.5 }]}
-            disabled={!newTitle.trim() || busy}
-            onPress={() =>
-              run(async () => {
-                await addSubtask({ taskId, orgId, title: newTitle.trim() });
-                setNewTitle('');
-              })
-            }
-          >
-            {busy ? <ActivityIndicator color={theme.color.onDark} /> : <Text style={styles.addBtnText}>Add</Text>}
-          </Pressable>
+        <View style={styles.addBlock}>
+          <View style={styles.addRow}>
+            <TextInput
+              value={newTitle}
+              onChangeText={setNewTitle}
+              placeholder="Add a step…"
+              placeholderTextColor={theme.color.subtle}
+              style={[styles.input, { flex: 1 }]}
+            />
+            <Pressable
+              style={[styles.addBtn, (!newTitle.trim() || busy) && { opacity: 0.5 }]}
+              disabled={!newTitle.trim() || busy}
+              onPress={() =>
+                run(async () => {
+                  if (newStart && newEnd && newStart > newEnd) {
+                    throw new Error('The step’s start date is after its end date.');
+                  }
+                  await addSubtask({
+                    taskId,
+                    orgId,
+                    title: newTitle.trim(),
+                    plannedStartDate: newStart,
+                    plannedEndDate: newEnd,
+                  });
+                  setNewTitle('');
+                  setNewStart(null);
+                  setNewEnd(null);
+                })
+              }
+            >
+              {busy ? <ActivityIndicator color={theme.color.onDark} /> : <Text style={styles.addBtnText}>Add</Text>}
+            </Pressable>
+          </View>
+          <View style={styles.dateRow}>
+            <DateField label="Start" value={newStart} onChange={setNewStart} min={taskStart} max={newEnd ?? taskEnd} />
+            <DateField label="End" value={newEnd} onChange={setNewEnd} min={newStart ?? taskStart} max={taskEnd} />
+          </View>
         </View>
       )}
 
@@ -321,7 +346,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.color.text,
   },
-  addRow: { flexDirection: 'row', gap: 8, marginTop: 12, alignItems: 'center' },
+  addBlock: { marginTop: 12, gap: 8 },
+  addRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  dateRow: { flexDirection: 'row', gap: 8 },
   addBtn: { backgroundColor: theme.color.dark, borderRadius: theme.radius.md, paddingHorizontal: 18, paddingVertical: 11 },
   addBtnText: { color: theme.color.onDark, fontWeight: '700' },
   gateHint: { fontSize: 11, color: theme.color.subtle, marginTop: 8 },

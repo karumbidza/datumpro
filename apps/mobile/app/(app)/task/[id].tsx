@@ -135,6 +135,8 @@ export default function TaskDetailScreen() {
           isAssignee={perms.isAssignee}
           canManage={perms.canManage}
           taskStatus={task.status}
+          taskStart={task.plannedStartDate}
+          taskEnd={task.plannedEndDate}
           onChanged={load}
         />
       )}

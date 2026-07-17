@@ -34,8 +34,13 @@ soon; **P2** = scale / polish.
 - ~~**[P2] Project %-over-time (burn-up).**~~ ✅ Done. Nightly `/api/cron/progress`
   snapshots each in-flight project's % into `project_progress_snapshots`; the
   overview shows a 30-day trend sparkline (`ProgressTrend`) with net change.
-- **[P2] Mobile subtask date pickers.** Mobile "add step" is title-only; adding
-  dates needs `@react-native-community/datetimepicker` (native dep → rebuild).
+- ~~**[P2] Mobile subtask date pickers.**~~ ✅ Code done. Added a `DateField`
+  (Android native dialog + iOS modal, tz-safe ISO strings) and start/end pickers
+  to the mobile add-step row, clamped to the parent task's window like web.
+  **Ships only via a new native build** — `@react-native-community/datetimepicker`
+  changed the EAS fingerprint (`3a04ad21` → `9e68b546`), so this and any pending
+  mobile JS reach devices only after `eas build --profile preview` + install (not
+  OTA). Once on that build, future `eas update --channel preview` applies again.
   The DB timeline constraint already enforces bounds for any dates set.
 - **[P2] Project chat close-on-close.** Chat should go read-only when the project
   is closed (needs a project "closed" status + a trigger to flip the
