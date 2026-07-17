@@ -3,7 +3,7 @@ import { BrandLoader } from '../components/brand-loader';
 import { useEffect } from 'react';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar, setStatusBarHidden } from 'expo-status-bar';
-import { ActivityIndicator, AppState, Platform, View } from 'react-native';
+import { AppState, Platform, View } from 'react-native';
 import * as NavigationBar from 'expo-navigation-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SessionProvider, useSession } from '../lib/auth';

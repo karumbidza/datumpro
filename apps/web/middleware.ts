@@ -8,7 +8,7 @@ type CookieToSet = { name: string; value: string; options?: CookieOptions };
  *  authenticated app area. Unauthed users hitting /dashboard|/projects|/finance
  *  are redirected to /sign-in. */
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  const response = NextResponse.next({ request });
 
   const supabase = createServerClient(
     env.NEXT_PUBLIC_SUPABASE_URL,

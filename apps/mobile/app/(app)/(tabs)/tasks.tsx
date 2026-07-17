@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { BrandLoader } from '../../../components/brand-loader';
-import { View, Text, FlatList, Pressable, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, Pressable, StyleSheet, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { listMyTasks, type MyTask } from '../../../lib/data/tasks';

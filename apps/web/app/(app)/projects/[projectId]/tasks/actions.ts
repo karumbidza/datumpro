@@ -11,8 +11,6 @@ import type { FormState } from '@/components/ui/form-error';
 import { emailUser } from '@/lib/email/notify';
 import { extensionDecisionEmail, quoteAwardedEmail, appUrl } from '@/lib/email/templates';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
 async function requireUser() {
   const supabase = await createClient();
   const {

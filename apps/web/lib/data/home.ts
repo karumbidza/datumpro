@@ -43,12 +43,6 @@ export interface PendingApproval {
   at: string | null;
 }
 
-const KIND_LABEL: Record<ApprovalKind, string> = {
-  signoff: 'Sign-off',
-  extension: 'Extension',
-  variation: 'Variation',
-};
-
 function impactLabel(cents: number, days: number): string {
   const parts: string[] = [];
   if (cents !== 0) parts.push(`${cents > 0 ? '+' : '−'}${formatUsd(Math.abs(cents))}`);

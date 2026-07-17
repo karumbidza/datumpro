@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getRequestDetail } from '@/lib/data/requests';
 import { myOrgRole } from '@/lib/data/tasks';
 import { submitRequest, decideApproval } from '../actions';
-import { Card, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatUsd } from '@datumpro/shared/domain';

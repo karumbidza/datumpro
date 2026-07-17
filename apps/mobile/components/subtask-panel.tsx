@@ -24,7 +24,6 @@ export function SubtaskPanel({
   mediaBySubtask,
   acceptanceStatus,
   isAssignee,
-  canManage,
   taskStatus,
   onChanged,
 }: {

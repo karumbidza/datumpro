@@ -13,6 +13,7 @@
     "./auth": "./src/auth/index.ts"
   },
   "scripts": {
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

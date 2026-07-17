@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { BrandLoader } from '../../../components/brand-loader';
-import { View, Text, SectionList, Pressable, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, SectionList, Pressable, StyleSheet, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';

@@ -557,7 +557,7 @@ export function ChatPanel({
   }
 
   function stopRecording() {
-    recorderRef.current?.state !== 'inactive' && recorderRef.current?.stop();
+    if (recorderRef.current?.state !== 'inactive') recorderRef.current?.stop();
   }
 
   async function onReact(id: string, emoji: string) {

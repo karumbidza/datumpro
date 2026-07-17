@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { BrandLoader } from '../../../components/brand-loader';
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getTask, getTaskPermissions, type TaskDetail, type TaskPermissions } from '../../../lib/data/tasks';
@@ -52,12 +52,8 @@ export default function TaskDetailScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      let active = true;
       setLoading(true);
       void load();
-      return () => {
-        active = false;
-      };
     }, [load]),
   );
 

@@ -79,5 +79,7 @@ soon; **P2** = scale / polish.
 
 ## Quality / tooling
 
-- **ESLint not configured** for the web app (`next lint` drops into an
-  interactive setup). Wire up a config so lint runs in CI.
+- ~~**ESLint not configured**~~ ✅ Done. Flat-config ESLint 9 (typescript-eslint +
+  react-hooks + `@next/next`) across web, mobile, and shared; `next lint` retired
+  for `eslint .`. `pnpm lint` runs clean via turbo. First pass caught two real
+  bugs (a no-op `&&` statement, a broken unmount guard) and ~18 dead imports/vars.

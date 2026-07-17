@@ -7,7 +7,6 @@ import {
   Pressable,
   StyleSheet,
   RefreshControl,
-  ActivityIndicator,
   Alert,
 } from 'react-native';
 import { Linking } from 'react-native';

@@ -8,7 +8,6 @@ import {
   Pressable,
   StyleSheet,
   RefreshControl,
-  ActivityIndicator,
   Alert,
 } from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
