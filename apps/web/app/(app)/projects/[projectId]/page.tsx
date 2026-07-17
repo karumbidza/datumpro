@@ -3,9 +3,10 @@ import { notFound, redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getProject } from '@/lib/data/projects';
 import { getDashboardData } from '@/lib/data/dashboard';
-import { getProjectProgress } from '@/lib/data/subtasks';
+import { getProjectProgress, getProgressHistory } from '@/lib/data/subtasks';
 import { StatCards } from '@/components/dashboard/stat-cards';
 import { TimelineOverview } from '@/components/dashboard/timeline-overview';
+import { ProgressTrend } from '@/components/dashboard/progress-trend';
 import { Button } from '@/components/ui/button';
 
 export default async function ProjectOverviewPage({
@@ -24,9 +25,10 @@ export default async function ProjectOverviewPage({
   const project = await getProject(projectId);
   if (!project) notFound();
 
-  const [{ counts, tasks }, projectPct] = await Promise.all([
+  const [{ counts, tasks }, projectPct, history] = await Promise.all([
     getDashboardData(project.org_id, projectId),
     getProjectProgress(projectId),
+    getProgressHistory(projectId),
   ]);
 
   return (
@@ -45,6 +47,7 @@ export default async function ProjectOverviewPage({
               <span className="text-xs font-medium tabular-nums text-zinc-500">{projectPct}% complete</span>
             </div>
           )}
+          <ProgressTrend points={history} className="mt-3 max-w-[240px]" />
         </div>
         <div className="flex gap-2">
           <Link href={`/projects/${projectId}/reports/new`}>

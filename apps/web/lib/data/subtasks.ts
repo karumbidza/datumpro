@@ -51,6 +51,22 @@ export async function getProjectProgress(projectId: string): Promise<number> {
   return typeof data === 'number' ? data : 0;
 }
 
+export type ProgressPoint = { day: string; pct: number };
+
+/** The project's recent burn-up: one point per captured day (oldest → newest),
+ *  from the nightly snapshot cron. Empty until the first snapshot lands. */
+export async function getProgressHistory(projectId: string, days = 30): Promise<ProgressPoint[]> {
+  const supabase = await createClient();
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const { data } = await supabase
+    .from('project_progress_snapshots')
+    .select('day, pct')
+    .eq('project_id', projectId)
+    .gte('day', since)
+    .order('day', { ascending: true });
+  return (data ?? []) as ProgressPoint[];
+}
+
 /** done/total subtask counts for a set of tasks, keyed by task id. */
 export async function progressForTasks(
   taskIds: string[],

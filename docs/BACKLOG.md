@@ -27,8 +27,9 @@ soon; **P2** = scale / polish.
 - **[P2] Per-subtask photo evidence.** `task_media` + `requires_photo_on_complete`
   exist at the task level; add optional photo attached to a *step*, and make the
   final step's photo required.
-- **[P2] Project %-over-time (burn-up).** Rollup is live; snapshot project % to a
-  history table via a daily cron for a trend chart.
+- ~~**[P2] Project %-over-time (burn-up).**~~ ✅ Done. Nightly `/api/cron/progress`
+  snapshots each in-flight project's % into `project_progress_snapshots`; the
+  overview shows a 30-day trend sparkline (`ProgressTrend`) with net change.
 - **[P2] Mobile subtask date pickers.** Mobile "add step" is title-only; adding
   dates needs `@react-native-community/datetimepicker` (native dep → rebuild).
   The DB timeline constraint already enforces bounds for any dates set.
