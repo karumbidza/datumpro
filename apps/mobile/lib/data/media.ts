@@ -57,8 +57,10 @@ export async function uploadTaskPhoto(params: {
   mime: string;
   gpsLat?: number | null;
   gpsLng?: number | null;
+  subtaskId?: string | null;
+  purpose?: string;
 }): Promise<void> {
-  const { orgId, projectId, taskId, base64, ext, mime, gpsLat, gpsLng } = params;
+  const { orgId, projectId, taskId, base64, ext, mime, gpsLat, gpsLng, subtaskId, purpose } = params;
   const name = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
   const path = `${orgId}/${projectId}/tasks/${taskId}/${name}`;
 
@@ -72,8 +74,9 @@ export async function uploadTaskPhoto(params: {
     org_id: orgId,
     project_id: projectId,
     task_id: taskId,
+    subtask_id: subtaskId ?? null,
     kind: 'photo',
-    purpose: 'completion',
+    purpose: purpose ?? 'completion',
     storage_path: path,
     gps_lat: gpsLat ?? null,
     gps_lng: gpsLng ?? null,
@@ -81,4 +84,41 @@ export async function uploadTaskPhoto(params: {
     uploaded_by: user?.id ?? null,
   });
   if (error) throw new Error(error.message);
+}
+
+/** Per-step evidence for a task, keyed by subtask id (signed URLs). */
+export async function listSubtaskPhotos(taskId: string): Promise<Record<string, TaskPhoto[]>> {
+  const { data } = await supabase
+    .from('task_media')
+    .select('id, subtask_id, storage_path, caption, gps_lat, gps_lng')
+    .eq('task_id', taskId)
+    .not('subtask_id', 'is', null)
+    .order('created_at', { ascending: true });
+  const rows = (data ?? []) as {
+    id: string;
+    subtask_id: string;
+    storage_path: string;
+    caption: string | null;
+    gps_lat: number | null;
+    gps_lng: number | null;
+  }[];
+  if (rows.length === 0) return {};
+  const { data: signed } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrls(rows.map((r) => r.storage_path), 60 * 60);
+  const urlByPath = new Map<string, string>();
+  for (const s of (signed ?? []) as { path: string | null; signedUrl: string | null }[]) {
+    if (s.path && s.signedUrl) urlByPath.set(s.path, s.signedUrl);
+  }
+  const out: Record<string, TaskPhoto[]> = {};
+  for (const r of rows) {
+    (out[r.subtask_id] ??= []).push({
+      id: r.id,
+      url: urlByPath.get(r.storage_path) ?? null,
+      caption: r.caption,
+      gpsLat: r.gps_lat,
+      gpsLng: r.gps_lng,
+    });
+  }
+  return out;
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TextInput, Pressable, Image, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { Card, ProgressBar } from './ui';
 import { theme } from '../lib/theme';
 import {
@@ -13,11 +14,14 @@ import {
   subtaskPct,
   type Subtask,
 } from '../lib/data/subtasks';
+import { uploadTaskPhoto, type TaskPhoto } from '../lib/data/media';
 
 export function SubtaskPanel({
   taskId,
   orgId,
+  projectId,
   subtasks,
+  mediaBySubtask,
   acceptanceStatus,
   isAssignee,
   canManage,
@@ -26,7 +30,9 @@ export function SubtaskPanel({
 }: {
   taskId: string;
   orgId: string;
+  projectId: string;
   subtasks: Subtask[];
+  mediaBySubtask: Record<string, TaskPhoto[]>;
   acceptanceStatus: 'pending' | 'accepted' | 'rejected' | null;
   isAssignee: boolean;
   canManage: boolean;
@@ -55,6 +61,43 @@ export function SubtaskPanel({
     } finally {
       setBusy(false);
     }
+  }
+
+  function attachPhoto(subtaskId: string) {
+    const pick = async (fromCamera: boolean) => {
+      const perm = fromCamera
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Permission needed', 'Enable camera / photo access in Settings.');
+        return;
+      }
+      const res = fromCamera
+        ? await ImagePicker.launchCameraAsync({ base64: true, quality: 0.6, exif: true })
+        : await ImagePicker.launchImageLibraryAsync({ base64: true, quality: 0.6, mediaTypes: ['images'] });
+      const a = res.canceled ? null : res.assets[0];
+      if (!a?.base64) return;
+      const ext = (a.mimeType?.split('/')[1] || a.uri.split('.').pop() || 'jpg').toLowerCase();
+      await run(() =>
+        uploadTaskPhoto({
+          orgId,
+          projectId,
+          taskId,
+          base64: a.base64!,
+          ext,
+          mime: a.mimeType ?? 'image/jpeg',
+          subtaskId,
+          purpose: 'subtask',
+          gpsLat: a.exif?.GPSLatitude ?? null,
+          gpsLng: a.exif?.GPSLongitude ?? null,
+        }),
+      );
+    };
+    Alert.alert('Add step photo', undefined, [
+      { text: 'Take photo', onPress: () => void pick(true) },
+      { text: 'Choose from library', onPress: () => void pick(false) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   }
 
   // Acceptance decision for the assigned contractor.
@@ -119,30 +162,45 @@ export function SubtaskPanel({
 
       <View style={styles.list}>
         {subtasks.map((s) => (
-          <View key={s.id} style={styles.item}>
-            <Pressable
-              disabled={!canEdit || busy}
-              onPress={() => run(() => toggleSubtask(s.id, !s.isDone))}
-              hitSlop={8}
-            >
-              <Ionicons
-                name={s.isDone ? 'checkmark-circle' : 'ellipse-outline'}
-                size={22}
-                color={s.isDone ? theme.color.success : theme.color.subtle}
-              />
-            </Pressable>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.itemText, s.isDone && styles.itemDone]}>{s.title}</Text>
-              {(s.plannedStartDate || s.plannedEndDate) && (
-                <Text style={styles.itemDates}>
-                  {s.plannedStartDate ?? '—'} → {s.plannedEndDate ?? '—'}
-                </Text>
+          <View key={s.id} style={styles.itemWrap}>
+            <View style={styles.item}>
+              <Pressable
+                disabled={!canEdit || busy}
+                onPress={() => run(() => toggleSubtask(s.id, !s.isDone))}
+                hitSlop={8}
+              >
+                <Ionicons
+                  name={s.isDone ? 'checkmark-circle' : 'ellipse-outline'}
+                  size={22}
+                  color={s.isDone ? theme.color.success : theme.color.subtle}
+                />
+              </Pressable>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.itemText, s.isDone && styles.itemDone]}>{s.title}</Text>
+                {(s.plannedStartDate || s.plannedEndDate) && (
+                  <Text style={styles.itemDates}>
+                    {s.plannedStartDate ?? '—'} → {s.plannedEndDate ?? '—'}
+                  </Text>
+                )}
+              </View>
+              {canEdit && (
+                <Pressable disabled={busy} onPress={() => run(() => removeSubtask(s.id))} hitSlop={8}>
+                  <Ionicons name="close" size={18} color={theme.color.subtle} />
+                </Pressable>
               )}
             </View>
-            {canEdit && (
-              <Pressable disabled={busy} onPress={() => run(() => removeSubtask(s.id))} hitSlop={8}>
-                <Ionicons name="close" size={18} color={theme.color.subtle} />
-              </Pressable>
+
+            {(canEdit || (mediaBySubtask[s.id]?.length ?? 0) > 0) && (
+              <View style={styles.photoRow}>
+                {(mediaBySubtask[s.id] ?? []).map((p) =>
+                  p.url ? <Image key={p.id} source={{ uri: p.url }} style={styles.thumb} /> : null,
+                )}
+                {canEdit && (
+                  <Pressable style={styles.addPhoto} disabled={busy} onPress={() => attachPhoto(s.id)}>
+                    <Ionicons name="camera-outline" size={16} color={theme.color.accent} />
+                  </Pressable>
+                )}
+              </View>
             )}
           </View>
         ))}
@@ -228,8 +286,21 @@ const styles = StyleSheet.create({
   count: { fontSize: 12, fontWeight: '700', color: theme.color.muted },
   pending: { fontSize: 13, color: theme.color.warning, marginTop: 4 },
   progressRow: { marginTop: 10 },
-  list: { marginTop: 10, gap: 8 },
+  list: { marginTop: 10, gap: 12 },
+  itemWrap: { gap: 6 },
   item: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  photoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginLeft: 32 },
+  thumb: { width: 44, height: 44, borderRadius: 8, backgroundColor: theme.color.border },
+  addPhoto: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   itemText: { fontSize: 14, color: theme.color.text },
   itemDone: { color: theme.color.subtle, textDecorationLine: 'line-through' },
   itemDates: { fontSize: 11, color: theme.color.subtle, marginTop: 1 },

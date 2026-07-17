@@ -12,7 +12,7 @@ import {
 import { listProjectMembers, myProjectRole } from '@/lib/data/members';
 import { listChatRoster } from '@/lib/data/chat-roster';
 import { getProjectSchedule } from '@/lib/data/scheduling';
-import { listTaskQuotes, listTaskMedia } from '@/lib/data/quotes';
+import { listTaskQuotes, listTaskMedia, listSubtaskMedia } from '@/lib/data/quotes';
 import { listTaskPayments } from '@/lib/data/payments';
 import { getTaskConversationId, listMessages, othersMaxReadSeq } from '@/lib/data/chat';
 import { QuotePanel } from '@/components/task/quote-panel';
@@ -70,6 +70,7 @@ export default async function TaskDetailPage({
     extensions,
     payments,
     subtasks,
+    subtaskMedia,
     dmConversationId,
   ] = await Promise.all([
     listProjectMembers(projectId),
@@ -84,6 +85,7 @@ export default async function TaskDetailPage({
     listExtensionRequests(taskId),
     listTaskPayments(taskId),
     listSubtasks(taskId),
+    listSubtaskMedia(taskId),
     getTaskConversationId(taskId),
   ]);
   const sched = schedule?.meta[taskId];
@@ -427,7 +429,9 @@ export default async function TaskDetailPage({
           <SubtaskPanel
             taskId={taskId}
             projectId={projectId}
+            orgId={task.org_id}
             subtasks={subtasks}
+            mediaBySubtask={subtaskMedia}
             acceptanceStatus={task.acceptance_status}
             isAssignee={isAssignee}
             canManage={canManage}

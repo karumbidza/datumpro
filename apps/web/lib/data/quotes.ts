@@ -139,6 +139,27 @@ export async function listTaskMedia(taskId: string, purpose?: string): Promise<T
   }));
 }
 
+/** Per-step evidence for a task, keyed by subtask id (batched signed URLs). */
+export async function listSubtaskMedia(
+  taskId: string,
+): Promise<Record<string, { id: string; url: string | null; kind: string }[]>> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('task_media')
+    .select('id, subtask_id, kind, storage_path')
+    .eq('task_id', taskId)
+    .not('subtask_id', 'is', null)
+    .order('created_at', { ascending: true });
+  const rows = (data ?? []) as { id: string; subtask_id: string; kind: string; storage_path: string }[];
+  if (rows.length === 0) return {};
+  const urls = await signedUrlMap(rows.map((r) => r.storage_path));
+  const out: Record<string, { id: string; url: string | null; kind: string }[]> = {};
+  for (const r of rows) {
+    (out[r.subtask_id] ??= []).push({ id: r.id, url: urls.get(r.storage_path) ?? null, kind: r.kind });
+  }
+  return out;
+}
+
 /** Count of completion-purpose media — the gate for submitting a task. */
 export async function completionMediaCount(taskId: string): Promise<number> {
   const supabase = await createClient();

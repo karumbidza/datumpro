@@ -16,15 +16,19 @@ export function MediaUploader({
   projectId,
   orgId,
   purpose,
+  subtaskId,
   label = 'Upload photo / video',
   accept = 'image/*,video/*',
+  compact = false,
 }: {
   taskId: string;
   projectId: string;
   orgId: string;
-  purpose: 'completion' | 'quote' | 'progress';
+  purpose: 'completion' | 'quote' | 'progress' | 'subtask';
+  subtaskId?: string;
   label?: string;
   accept?: string;
+  compact?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -52,6 +56,7 @@ export function MediaUploader({
       fd.set('storagePath', path);
       fd.set('kind', kind);
       fd.set('purpose', purpose);
+      if (subtaskId) fd.set('subtaskId', subtaskId);
       await recordTaskMedia(fd);
       router.refresh();
     } catch (err) {
@@ -60,6 +65,20 @@ export function MediaUploader({
       setBusy(false);
       e.target.value = '';
     }
+  }
+
+  if (compact) {
+    return (
+      <label
+        title={label}
+        className={`flex h-11 w-11 cursor-pointer items-center justify-center rounded-md border border-dashed border-zinc-300 text-zinc-400 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800 ${
+          busy ? 'pointer-events-none opacity-60' : ''
+        }`}
+      >
+        <input type="file" accept={accept} className="hidden" onChange={onChange} disabled={busy} />
+        {busy ? '…' : '＋'}
+      </label>
+    );
   }
 
   return (

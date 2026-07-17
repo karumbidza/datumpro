@@ -10,6 +10,7 @@ import { TaskExtensions } from '../../../components/task-extensions';
 import { TaskActions } from '../../../components/task-actions';
 import { SubtaskPanel } from '../../../components/subtask-panel';
 import { listSubtasks, subtaskPct, type Subtask } from '../../../lib/data/subtasks';
+import { listSubtaskPhotos, type TaskPhoto } from '../../../lib/data/media';
 import { Card, Pill, ProgressBar } from '../../../components/ui';
 import { formatDate, slaLabel, statusLabel } from '../../../lib/ui';
 import { theme, slaTone, statusProgress, contentWidth } from '../../../lib/theme';
@@ -20,6 +21,7 @@ export default function TaskDetailScreen() {
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [perms, setPerms] = useState<TaskPermissions | null>(null);
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+  const [subtaskMedia, setSubtaskMedia] = useState<Record<string, TaskPhoto[]>>({});
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -35,13 +37,15 @@ export default function TaskDetailScreen() {
     }
     // Everything below depends only on the task — fetch it all in parallel
     // instead of one round-trip at a time.
-    const [perms, subs, conv] = await Promise.all([
+    const [perms, subs, media, conv] = await Promise.all([
       getTaskPermissions(t.orgId, t.projectId, t.assigneeId),
       listSubtasks(String(id)),
+      listSubtaskPhotos(String(id)),
       getTaskConversationId(String(id)),
     ]);
     setPerms(perms);
     setSubtasks(subs);
+    setSubtaskMedia(media);
     setUnread(conv ? await getUnreadCount(conv) : 0);
     setLoading(false);
   }, [id]);
@@ -128,7 +132,9 @@ export default function TaskDetailScreen() {
         <SubtaskPanel
           taskId={task.id}
           orgId={task.orgId}
+          projectId={task.projectId}
           subtasks={subtasks}
+          mediaBySubtask={subtaskMedia}
           acceptanceStatus={task.acceptanceStatus}
           isAssignee={perms.isAssignee}
           canManage={perms.canManage}

@@ -743,6 +743,7 @@ export async function recordTaskMedia(formData: FormData) {
     org_id: task.org_id,
     project_id: task.project_id,
     task_id: taskId,
+    subtask_id: (formData.get('subtaskId') as string) || null,
     kind,
     purpose,
     storage_path: storagePath,

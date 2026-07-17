@@ -12,6 +12,7 @@ import {
   removeSubtask,
 } from '@/app/(app)/projects/[projectId]/tasks/actions';
 import type { Subtask } from '@/lib/data/subtasks';
+import { MediaUploader } from '@/components/task/media-uploader';
 
 const inputClass =
   'rounded-md border border-zinc-200 bg-transparent px-2 py-1 text-xs outline-none focus:border-brand-500 dark:border-zinc-800';
@@ -19,7 +20,9 @@ const inputClass =
 export function SubtaskPanel({
   taskId,
   projectId,
+  orgId,
   subtasks,
+  mediaBySubtask,
   acceptanceStatus,
   isAssignee,
   canManage,
@@ -30,7 +33,9 @@ export function SubtaskPanel({
 }: {
   taskId: string;
   projectId: string;
+  orgId: string;
   subtasks: Subtask[];
+  mediaBySubtask: Record<string, { id: string; url: string | null; kind: string }[]>;
   acceptanceStatus: 'pending' | 'accepted' | 'rejected' | null;
   isAssignee: boolean;
   canManage: boolean;
@@ -145,37 +150,68 @@ export function SubtaskPanel({
       {/* Subtask checklist */}
       <ul className="mt-3 space-y-1.5">
         {subtasks.map((s) => (
-          <li key={s.id} className="flex items-center gap-2 rounded-md px-1 py-1 hover:bg-zinc-50 dark:hover:bg-zinc-900">
-            <form action={toggleSubtask} className="flex items-center">
-              <input type="hidden" name="id" value={s.id} />
-              <input type="hidden" name="taskId" value={taskId} />
-              <input type="hidden" name="projectId" value={projectId} />
-              <input type="hidden" name="done" value={s.isDone ? 'false' : 'true'} />
-              <input
-                type="checkbox"
-                checked={s.isDone}
-                disabled={!canEdit}
-                onChange={(e) => e.currentTarget.form?.requestSubmit()}
-                className="h-4 w-4 accent-brand-600"
-              />
-            </form>
-            <span className={`flex-1 text-sm ${s.isDone ? 'text-zinc-400 line-through' : 'text-zinc-800 dark:text-zinc-200'}`}>
-              {s.title}
-            </span>
-            {(s.plannedStartDate || s.plannedEndDate) && (
-              <span className="text-[11px] tabular-nums text-zinc-400">
-                {s.plannedStartDate ?? '—'} → {s.plannedEndDate ?? '—'}
-              </span>
-            )}
-            {canEdit && (
-              <form action={removeSubtask}>
+          <li key={s.id} className="rounded-md px-1 py-1 hover:bg-zinc-50 dark:hover:bg-zinc-900">
+            <div className="flex items-center gap-2">
+              <form action={toggleSubtask} className="flex items-center">
                 <input type="hidden" name="id" value={s.id} />
                 <input type="hidden" name="taskId" value={taskId} />
                 <input type="hidden" name="projectId" value={projectId} />
-                <button type="submit" className="text-[11px] text-zinc-400 hover:text-red-500" title="Remove">
-                  ✕
-                </button>
+                <input type="hidden" name="done" value={s.isDone ? 'false' : 'true'} />
+                <input
+                  type="checkbox"
+                  checked={s.isDone}
+                  disabled={!canEdit}
+                  onChange={(e) => e.currentTarget.form?.requestSubmit()}
+                  className="h-4 w-4 accent-brand-600"
+                />
               </form>
+              <span className={`flex-1 text-sm ${s.isDone ? 'text-zinc-400 line-through' : 'text-zinc-800 dark:text-zinc-200'}`}>
+                {s.title}
+              </span>
+              {(s.plannedStartDate || s.plannedEndDate) && (
+                <span className="text-[11px] tabular-nums text-zinc-400">
+                  {s.plannedStartDate ?? '—'} → {s.plannedEndDate ?? '—'}
+                </span>
+              )}
+              {canEdit && (
+                <form action={removeSubtask}>
+                  <input type="hidden" name="id" value={s.id} />
+                  <input type="hidden" name="taskId" value={taskId} />
+                  <input type="hidden" name="projectId" value={projectId} />
+                  <button type="submit" className="text-[11px] text-zinc-400 hover:text-red-500" title="Remove">
+                    ✕
+                  </button>
+                </form>
+              )}
+            </div>
+
+            {(canEdit || (mediaBySubtask[s.id]?.length ?? 0) > 0) && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-6">
+                {(mediaBySubtask[s.id] ?? []).map((m) =>
+                  m.url ? (
+                    <a key={m.id} href={m.url} target="_blank" rel="noreferrer" title="Open photo">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={m.url}
+                        alt="Step evidence"
+                        className="h-11 w-11 rounded-md border border-zinc-200 object-cover dark:border-zinc-800"
+                      />
+                    </a>
+                  ) : null,
+                )}
+                {canEdit && (
+                  <MediaUploader
+                    taskId={taskId}
+                    projectId={projectId}
+                    orgId={orgId}
+                    purpose="subtask"
+                    subtaskId={s.id}
+                    accept="image/*"
+                    label="Add step photo"
+                    compact
+                  />
+                )}
+              </div>
             )}
           </li>
         ))}
