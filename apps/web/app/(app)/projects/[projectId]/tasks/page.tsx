@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getProject } from '@/lib/data/projects';
 import { listTasksByProject, listOrgMembers, type TaskRow } from '@/lib/data/tasks';
 import { getProjectSchedule, type ProjectSchedule } from '@/lib/data/scheduling';
-import { progressForTasks, taskPct, getProjectProgress } from '@/lib/data/subtasks';
+import { progressForTasks, getProjectProgress } from '@/lib/data/subtasks';
 import { Button } from '@/components/ui/button';
 import { ChevronRight } from '@/components/icons';
 import { parseDate, formatDayMonth } from '@/lib/date';
@@ -55,22 +55,56 @@ const PRIORITY_LABEL: Record<TaskPriority, string> = {
   low: 'Low',
 };
 
-/** Derive a 0–100 completion percent from status + planned window. There's no
- *  stored per-task percent, so done = 100, todo = 0, and in-flight tasks read
- *  how far into their planned window "now" sits (falling back to sensible
- *  midpoints when a task is undated). */
-function taskPercent(t: TaskRow): number {
+/** ACTUAL completion — real work done, never time-based. Done = 100, submitted =
+ *  100 (delivered, in review), otherwise the ticked share of the subtask plan;
+ *  a task with no plan reads 0 until steps are ticked. This drives the % and the
+ *  green bar. */
+function actualPercent(t: TaskRow, entry?: { done: number; total: number }): number {
   if (t.status === 'done') return 100;
-  if (t.status === 'todo') return 0;
-  const start = parseDate(t.planned_start_date);
-  const end = parseDate(t.planned_end_date ?? t.due_date);
-  if (start && end && end.getTime() > start.getTime()) {
-    const frac = (Date.now() - start.getTime()) / (end.getTime() - start.getTime());
-    return Math.round(Math.min(1, Math.max(0, frac)) * 100);
-  }
-  if (t.status === 'submitted') return 90;
-  if (t.status === 'blocked') return 40;
-  return 50;
+  if (entry && entry.total > 0) return Math.round((100 * entry.done) / entry.total);
+  if (t.status === 'submitted') return 100;
+  return 0;
+}
+
+/** EXPECTED position — how far into the planned window "now" sits (0 before it
+ *  starts, 100 after it ends). This is the faint "where it should be" bar; null
+ *  when there's no window to measure against. */
+function expectedFromWindow(start: Date | null, end: Date | null): number | null {
+  if (!start || !end || end.getTime() <= start.getTime()) return null;
+  const frac = (Date.now() - start.getTime()) / (end.getTime() - start.getTime());
+  return Math.round(Math.min(1, Math.max(0, frac)) * 100);
+}
+function taskExpected(t: TaskRow): number | null {
+  if (t.status === 'done') return null;
+  return expectedFromWindow(parseDate(t.planned_start_date), parseDate(t.planned_end_date ?? t.due_date));
+}
+
+/** Planned-vs-actual rail: a faint fill for where the schedule says we should be,
+ *  a solid completion fill on top (green on/ahead of schedule, amber when behind),
+ *  and a hairline marker at the on-schedule target. */
+function ScheduleBar({ actual, expected, done }: { actual: number; expected: number | null; done?: boolean }) {
+  const behind = !done && expected != null && actual < expected - 1;
+  const fill = done ? '#16a34a' : behind ? '#f59e0b' : '#10b981';
+  return (
+    <div
+      className="relative h-2 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800"
+      title={expected != null ? `${actual}% done · on-schedule target ${expected}%` : `${actual}% done`}
+    >
+      {expected != null && (
+        <div
+          className="absolute left-0 top-0 h-2 bg-zinc-300/70 dark:bg-zinc-600/60"
+          style={{ width: `${expected}%` }}
+        />
+      )}
+      <div className="absolute left-0 top-0 h-2 rounded-full" style={{ width: `${actual}%`, background: fill }} />
+      {expected != null && expected > 0 && expected < 100 && (
+        <div
+          className="absolute top-0 h-2 w-px bg-zinc-500/70 dark:bg-zinc-300/70"
+          style={{ left: `${expected}%` }}
+        />
+      )}
+    </div>
+  );
 }
 
 /** The small coloured line under the progress rail. Priority: signed-off →
@@ -118,6 +152,21 @@ export default async function TaskBoardPage({
     getProjectProgress(projectId),
   ]);
 
+  // The project's on-schedule target: how far into its overall window (earliest
+  // task start → latest task end) "now" sits.
+  const projStart = tasks.reduce<string | null>(
+    (m, t) => (t.planned_start_date && (!m || t.planned_start_date < m) ? t.planned_start_date : m),
+    null,
+  );
+  const projEnd = tasks.reduce<string | null>((m, t) => {
+    const e = t.planned_end_date ?? t.due_date;
+    return e && (!m || e > m) ? e : m;
+  }, null);
+  const projectExpected = expectedFromWindow(
+    projStart ? parseDate(projStart) : null,
+    projEnd ? parseDate(projEnd) : null,
+  );
+
   return (
     <main className="mx-auto flex max-w-[1152px] flex-col gap-8 px-10 py-8">
       <header className="flex items-start justify-between gap-4">
@@ -127,12 +176,32 @@ export default async function TaskBoardPage({
           </Link>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Tasks</h1>
           {tasks.length > 0 && (
-            <div className="mt-2 flex items-center gap-2">
-              <div className="h-2 w-40 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
-                <div className="h-2 rounded-full bg-brand-600 transition-all" style={{ width: `${projectPct}%` }} />
+            <>
+              <div className="mt-2 flex items-center gap-2">
+                <div className="w-40">
+                  <ScheduleBar actual={projectPct} expected={projectExpected} />
+                </div>
+                <span className="text-xs font-medium tabular-nums text-zinc-500">{projectPct}% complete</span>
+                {projectExpected != null && (
+                  <span className="text-[11px] tabular-nums text-zinc-400">
+                    · target {projectExpected}%
+                    {projectPct < projectExpected - 1 ? ' (behind)' : ''}
+                  </span>
+                )}
               </div>
-              <span className="text-xs font-medium tabular-nums text-zinc-500">{projectPct}% complete</span>
-            </div>
+              {/* Legend for the two-layer bars */}
+              <div className="mt-2 flex items-center gap-3 text-[10px] text-zinc-400">
+                <span className="flex items-center gap-1">
+                  <span className="inline-block h-2 w-3 rounded-sm bg-emerald-500" /> Completed
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block h-2 w-3 rounded-sm bg-zinc-300 dark:bg-zinc-600" /> Should be (schedule)
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block h-2 w-3 rounded-sm bg-amber-500" /> Behind
+                </span>
+              </div>
+            </>
           )}
         </div>
         <Link href={`/projects/${projectId}/tasks/new`}>
@@ -162,7 +231,8 @@ export default async function TaskBoardPage({
           <div className="flex flex-col gap-2">
             {tasks.map((t) => {
               const status = STATUS_META[t.status];
-              const pct = taskPct(t.status, progress.get(t.id), taskPercent(t));
+              const pct = actualPercent(t, progress.get(t.id));
+              const expected = taskExpected(t);
               const note = statusNote(t, schedule);
               const assignee = t.assignee_id ? nameById.get(t.assignee_id) ?? 'Member' : 'Unassigned';
               const due = parseDate(t.due_date);
@@ -183,12 +253,7 @@ export default async function TaskBoardPage({
 
                   {/* Progress */}
                   <div className="min-w-0">
-                    <div className="relative h-2 rounded-full bg-zinc-100 dark:bg-zinc-800">
-                      <div
-                        className="absolute left-0 top-0 h-2 rounded-full"
-                        style={{ width: `${pct}%`, background: status.fill }}
-                      />
-                    </div>
+                    <ScheduleBar actual={pct} expected={expected} done={t.status === 'done'} />
                     <div className="mt-1 flex items-center justify-between gap-2 text-[10px]">
                       <span className={`truncate ${note.className}`}>{note.text}</span>
                       <span className="flex-shrink-0 text-zinc-400">
