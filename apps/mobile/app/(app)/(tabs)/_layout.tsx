@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../../../lib/theme';
+import { font } from '../../../lib/theme';
+import { useTheme } from '../../../lib/theme-context';
 import { listInbox } from '../../../lib/data/chat';
 import { unreadNotificationCount } from '../../../lib/data/notifications';
 
 export default function TabsLayout() {
+  const { colors } = useTheme();
   const [unread, setUnread] = useState(0);
   const [notif, setNotif] = useState(0);
 
@@ -38,16 +40,16 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: theme.color.accent,
-        tabBarInactiveTintColor: theme.color.subtle,
+        tabBarActiveTintColor: colors.brand,
+        tabBarInactiveTintColor: colors.subtle,
         tabBarStyle: {
-          backgroundColor: theme.color.card,
-          borderTopColor: theme.color.border,
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
           height: 84,
           paddingTop: 6,
           paddingBottom: 28,
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarLabelStyle: { fontSize: 11, fontFamily: font.bodySemi },
       }}
     >
       <Tabs.Screen
@@ -69,7 +71,7 @@ export default function TabsLayout() {
         options={{
           title: 'Messages',
           tabBarBadge: unread > 0 ? (unread > 99 ? '99+' : unread) : undefined,
-          tabBarBadgeStyle: { backgroundColor: theme.color.accent, fontSize: 11 },
+          tabBarBadgeStyle: { backgroundColor: colors.accent, color: colors.onAccent, fontSize: 11 },
           tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles-outline" size={size} color={color} />,
         }}
       />
@@ -85,7 +87,7 @@ export default function TabsLayout() {
         options={{
           title: 'More',
           tabBarBadge: notif > 0 ? (notif > 99 ? '99+' : notif) : undefined,
-          tabBarBadgeStyle: { backgroundColor: theme.color.accent, fontSize: 11 },
+          tabBarBadgeStyle: { backgroundColor: colors.accent, color: colors.onAccent, fontSize: 11 },
           tabBarIcon: ({ color, size }) => <Ionicons name="ellipsis-horizontal" size={size} color={color} />,
         }}
       />

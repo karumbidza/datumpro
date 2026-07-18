@@ -1,24 +1,38 @@
 import type { ReactNode } from 'react';
 import { View, Text, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
-import { theme, type Tone } from '../lib/theme';
+import { radius, font, type Tone } from '../lib/theme';
+import { useTheme } from '../lib/theme-context';
 
 export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
-  return <View style={[styles.card, style]}>{children}</View>;
+  const { colors, scheme } = useTheme();
+  return (
+    <View
+      style={[
+        layout.card,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+        scheme === 'light' && layout.cardShadow,
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  );
 }
 
 export function Pill({ label, tone }: { label: string; tone: Tone }) {
   return (
-    <View style={[styles.pill, { backgroundColor: tone.bg }]}>
-      <Text style={[styles.pillText, { color: tone.fg }]}>{label}</Text>
+    <View style={[layout.pill, { backgroundColor: tone.bg }]}>
+      <Text style={[layout.pillText, { color: tone.fg }]}>{label}</Text>
     </View>
   );
 }
 
 export function ProgressBar({ value, color }: { value: number; color?: string }) {
+  const { colors } = useTheme();
   const pct = Math.max(0, Math.min(100, value));
   return (
-    <View style={styles.track}>
-      <View style={[styles.fill, { width: `${pct}%`, backgroundColor: color ?? theme.color.accent }]} />
+    <View style={[layout.track, { backgroundColor: colors.sunk }]}>
+      <View style={[layout.fill, { width: `${pct}%`, backgroundColor: color ?? colors.brand }]} />
     </View>
   );
 }
@@ -34,17 +48,25 @@ export function StatTile({
   hint?: string;
   accent?: string;
 }) {
+  const { colors, scheme } = useTheme();
   return (
-    <View style={styles.stat}>
-      <Text style={[styles.statValue, accent ? { color: accent } : null]}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-      {hint ? <Text style={styles.statHint}>{hint}</Text> : null}
+    <View
+      style={[
+        layout.stat,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+        scheme === 'light' && layout.cardShadow,
+      ]}
+    >
+      <Text style={[layout.statValue, { color: accent ?? colors.text }]}>{value}</Text>
+      <Text style={[layout.statLabel, { color: colors.muted }]}>{label}</Text>
+      {hint ? <Text style={[layout.statHint, { color: colors.subtle }]}>{hint}</Text> : null}
     </View>
   );
 }
 
 /** Initials avatar (we don't store profile photos yet). */
 export function Avatar({ name, size = 34 }: { name: string; size?: number }) {
+  const { colors } = useTheme();
   const initials = name
     .split(/\s+/)
     .slice(0, 2)
@@ -52,40 +74,52 @@ export function Avatar({ name, size = 34 }: { name: string; size?: number }) {
     .join('');
   return (
     <View
-      style={[
-        styles.avatar,
-        { width: size, height: size, borderRadius: size / 2 },
-      ]}
+      style={[layout.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: colors.brand }]}
     >
-      <Text style={[styles.avatarText, { fontSize: size * 0.4 }]}>{initials || '?'}</Text>
+      <Text style={[layout.avatarText, { fontSize: size * 0.4, color: colors.onBrand }]}>{initials || '?'}</Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+/** Uppercase section label (11px, tracked). */
+export function SectionLabel({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  const { colors } = useTheme();
+  return <Text style={[layout.sectionLabel, { color: colors.subtle }, style]}>{children}</Text>;
+}
+
+const layout = StyleSheet.create({
   card: {
-    backgroundColor: theme.color.card,
-    borderRadius: theme.radius.md,
+    borderRadius: radius.lg,
     padding: 16,
     borderWidth: 1,
-    borderColor: theme.color.border,
   },
-  pill: { alignSelf: 'flex-start', borderRadius: theme.radius.pill, paddingHorizontal: 10, paddingVertical: 3 },
-  pillText: { fontSize: 11, fontWeight: '700' },
-  track: { flex: 1, height: 8, borderRadius: 999, backgroundColor: '#eef0f2', overflow: 'hidden' },
+  cardShadow: {
+    shadowColor: '#101828',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  pill: { alignSelf: 'flex-start', borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 3 },
+  pillText: { fontSize: 11, fontFamily: font.bodyBold },
+  track: { flex: 1, height: 8, borderRadius: 999, overflow: 'hidden' },
   fill: { height: 8, borderRadius: 999 },
   stat: {
     flex: 1,
-    backgroundColor: theme.color.card,
-    borderRadius: theme.radius.md,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: theme.color.border,
     padding: 14,
     gap: 2,
   },
-  statValue: { fontSize: 22, fontWeight: '800', color: theme.color.text },
-  statLabel: { fontSize: 12, color: theme.color.muted },
-  statHint: { fontSize: 11, color: theme.color.subtle },
-  avatar: { backgroundColor: theme.color.dark, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#fff', fontWeight: '700' },
+  statValue: { fontSize: 22, fontFamily: font.displayBold },
+  statLabel: { fontSize: 12, fontFamily: font.body },
+  statHint: { fontSize: 11, fontFamily: font.body },
+  avatar: { alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontFamily: font.bodyBold },
+  sectionLabel: {
+    fontSize: 11,
+    fontFamily: font.bodyBold,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
 });

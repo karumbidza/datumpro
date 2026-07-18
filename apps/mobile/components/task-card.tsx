@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import type { MyTask } from '../lib/data/tasks';
 import { Pill, ProgressBar } from './ui';
 import { formatDate, slaLabel, statusLabel } from '../lib/ui';
-import { theme, slaTone, statusProgress } from '../lib/theme';
+import { theme, slaTone, statusProgress, lightColors } from '../lib/theme';
 
 function statusIcon(status: string): keyof typeof Ionicons.glyphMap {
   switch (status) {
@@ -25,7 +25,7 @@ function statusIcon(status: string): keyof typeof Ionicons.glyphMap {
  *  name (handy in the Tasks tab); pass a custom one when the project is obvious. */
 export function TaskCard({ task, subtitle }: { task: MyTask; subtitle?: string }) {
   const router = useRouter();
-  const tone = slaTone(task.slaStatus);
+  const tone = slaTone(lightColors, task.slaStatus);
   const pending = task.acceptanceStatus === 'pending';
   const pct = pending ? 0 : statusProgress(task.status);
 

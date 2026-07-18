@@ -13,7 +13,7 @@ import { listSubtasks, subtaskPct, type Subtask } from '../../../lib/data/subtas
 import { listSubtaskPhotos, type TaskPhoto } from '../../../lib/data/media';
 import { Card, Pill, ProgressBar } from '../../../components/ui';
 import { formatDate, slaLabel, statusLabel } from '../../../lib/ui';
-import { theme, slaTone, statusProgress, contentWidth } from '../../../lib/theme';
+import { theme, slaTone, statusProgress, contentWidth, lightColors } from '../../../lib/theme';
 
 export default function TaskDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -72,7 +72,7 @@ export default function TaskDetailScreen() {
     );
   }
 
-  const tone = slaTone(task.slaStatus);
+  const tone = slaTone(lightColors, task.slaStatus);
   const acceptancePending = task.acceptanceStatus === 'pending';
   const planComplete = subtasks.length === 0 || subtasks.every((s) => s.isDone);
   const pct = acceptancePending

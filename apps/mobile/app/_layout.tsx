@@ -6,7 +6,21 @@ import { StatusBar, setStatusBarHidden } from 'expo-status-bar';
 import { AppState, Platform, View } from 'react-native';
 import * as NavigationBar from 'expo-navigation-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useFonts } from 'expo-font';
+import {
+  SpaceGrotesk_500Medium,
+  SpaceGrotesk_600SemiBold,
+  SpaceGrotesk_700Bold,
+} from '@expo-google-fonts/space-grotesk';
+import {
+  Manrope_400Regular,
+  Manrope_500Medium,
+  Manrope_600SemiBold,
+  Manrope_700Bold,
+  Manrope_800ExtraBold,
+} from '@expo-google-fonts/manrope';
 import { SessionProvider, useSession } from '../lib/auth';
+import { ThemeProvider } from '../lib/theme-context';
 
 /** Android immersive mode: hide the status + navigation bars for a true
  *  fullscreen view; a swipe from the edge reveals them transiently
@@ -63,12 +77,32 @@ function AuthGate() {
 
 export default function RootLayout() {
   useImmersiveAndroid();
+  const [fontsLoaded, fontError] = useFonts({
+    SpaceGrotesk_500Medium,
+    SpaceGrotesk_600SemiBold,
+    SpaceGrotesk_700Bold,
+    Manrope_400Regular,
+    Manrope_500Medium,
+    Manrope_600SemiBold,
+    Manrope_700Bold,
+    Manrope_800ExtraBold,
+  });
+  const fontsReady = fontsLoaded || !!fontError;
+
   return (
     <SafeAreaProvider>
-      <SessionProvider>
-        <StatusBar style="auto" hidden />
-        <AuthGate />
-      </SessionProvider>
+      <ThemeProvider>
+        <SessionProvider>
+          <StatusBar style="auto" hidden />
+          {fontsReady ? (
+            <AuthGate />
+          ) : (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+              <BrandLoader />
+            </View>
+          )}
+        </SessionProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
