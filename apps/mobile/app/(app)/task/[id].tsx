@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { BrandLoader } from '../../../components/brand-loader';
 import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -13,11 +13,14 @@ import { listSubtasks, subtaskPct, type Subtask } from '../../../lib/data/subtas
 import { listSubtaskPhotos, type TaskPhoto } from '../../../lib/data/media';
 import { Card, Pill, ProgressBar } from '../../../components/ui';
 import { formatDate, slaLabel, statusLabel } from '../../../lib/ui';
-import { theme, slaTone, statusProgress, contentWidth, lightColors } from '../../../lib/theme';
+import { slaTone, statusProgress, contentWidth, radius, font, type Colors } from '../../../lib/theme';
+import { useTheme } from '../../../lib/theme-context';
 
 export default function TaskDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [perms, setPerms] = useState<TaskPermissions | null>(null);
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
@@ -72,7 +75,7 @@ export default function TaskDetailScreen() {
     );
   }
 
-  const tone = slaTone(lightColors, task.slaStatus);
+  const tone = slaTone(colors, task.slaStatus);
   const acceptancePending = task.acceptanceStatus === 'pending';
   const planComplete = subtasks.length === 0 || subtasks.every((s) => s.isDone);
   const pct = acceptancePending
@@ -85,15 +88,19 @@ export default function TaskDetailScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Stack.Screen options={{ title: task.projectName }} />
+      <Stack.Screen
+        options={{
+          title: task.projectName,
+          headerStyle: { backgroundColor: colors.surface },
+          headerTintColor: colors.text,
+          headerTitleStyle: { fontFamily: font.displayBold },
+        }}
+      />
 
       <Text style={styles.title}>{task.title}</Text>
       <View style={styles.badges}>
         <Pill label={slaLabel(task.slaStatus)} tone={tone} />
-        <Pill
-          label={statusLabel(task.status)}
-          tone={{ bg: '#eef0f2', fg: theme.color.muted, bar: theme.color.muted }}
-        />
+        <Pill label={statusLabel(task.status)} tone={{ bg: colors.sunk, fg: colors.muted, bar: colors.muted }} />
       </View>
 
       <View style={styles.progressRow}>
@@ -115,7 +122,7 @@ export default function TaskDetailScreen() {
       })()}
 
       <Pressable style={styles.discussion} onPress={() => router.push(`/(app)/chat/${task.id}`)}>
-        <Ionicons name="chatbubble-ellipses-outline" size={16} color={theme.color.accent} />
+        <Ionicons name="chatbubble-ellipses-outline" size={16} color={colors.brandDeep} />
         <Text style={styles.discussionText}>Open discussion</Text>
         {unread > 0 && (
           <View style={styles.unread}>
@@ -185,6 +192,8 @@ export default function TaskDetailScreen() {
 }
 
 function Field({ label, value, last }: { label: string; value: string; last?: boolean }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={[styles.fieldRow, last && { borderBottomWidth: 0 }]}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -193,46 +202,54 @@ function Field({ label, value, last }: { label: string; value: string; last?: bo
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: theme.color.bg },
-  content: { padding: 16, gap: 12, ...contentWidth },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.color.bg },
-  muted: { color: theme.color.muted },
-  title: { fontSize: 22, fontWeight: '800', color: theme.color.text },
-  badges: { flexDirection: 'row', gap: 8 },
-  progressRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  pct: { fontSize: 13, fontWeight: '700', color: theme.color.text, width: 42, textAlign: 'right' },
-  elapsed: { fontSize: 11, color: theme.color.subtle, marginTop: -4 },
-  behind: { color: theme.color.danger, fontWeight: '600' },
-  discussion: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: theme.color.accentSoft,
-    borderRadius: theme.radius.md,
-    paddingVertical: 14,
-  },
-  discussionText: { color: theme.color.accent, fontWeight: '700' },
-  unread: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    backgroundColor: theme.color.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  unreadText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  fieldRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 9,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.color.border,
-  },
-  fieldLabel: { fontSize: 12, color: theme.color.subtle, textTransform: 'uppercase', letterSpacing: 0.5 },
-  fieldValue: { fontSize: 14, color: theme.color.text, fontWeight: '500' },
-  blockLabel: { fontSize: 12, color: theme.color.subtle, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
-  body: { fontSize: 14, color: theme.color.text, lineHeight: 21 },
-});
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: c.bg },
+    content: { padding: 16, gap: 12, ...contentWidth },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg },
+    muted: { color: c.muted, fontFamily: font.body },
+    title: { fontSize: 23, fontFamily: font.displayBold, color: c.text },
+    badges: { flexDirection: 'row', gap: 8 },
+    progressRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    pct: { fontSize: 13, fontFamily: font.display, color: c.text, width: 42, textAlign: 'right' },
+    elapsed: { fontSize: 11, fontFamily: font.body, color: c.subtle, marginTop: -4 },
+    behind: { color: c.danger, fontFamily: font.bodySemi },
+    discussion: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      backgroundColor: c.brandSoft,
+      borderRadius: radius.md,
+      paddingVertical: 14,
+    },
+    discussionText: { color: c.brandDeep, fontFamily: font.bodyBold },
+    unread: {
+      minWidth: 20,
+      height: 20,
+      borderRadius: 10,
+      paddingHorizontal: 6,
+      backgroundColor: c.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    unreadText: { color: c.onAccent, fontSize: 11, fontFamily: font.bodyBold },
+    fieldRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingVertical: 9,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+    },
+    fieldLabel: { fontSize: 12, fontFamily: font.body, color: c.subtle, textTransform: 'uppercase', letterSpacing: 0.5 },
+    fieldValue: { fontSize: 14, fontFamily: font.bodySemi, color: c.text },
+    blockLabel: {
+      fontSize: 12,
+      fontFamily: font.bodyBold,
+      color: c.subtle,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      marginBottom: 6,
+    },
+    body: { fontSize: 14, fontFamily: font.body, color: c.text, lineHeight: 21 },
+  });
