@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -25,7 +25,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../lib/auth';
-import { theme } from '../lib/theme';
+import { font, type Colors } from '../lib/theme';
+import { useTheme } from '../lib/theme-context';
 import {
   listMessages,
   sendMessage,
@@ -52,6 +53,8 @@ export function ChatThread({
 }) {
   const { session } = useSession();
   const meId = session?.user.id;
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -273,12 +276,12 @@ export function ChatThread({
     <View style={styles.screen}>
       {members.length > 0 && (
         <Pressable style={styles.peopleBar} onPress={() => setSheetOpen(true)}>
-          <Ionicons name="people-outline" size={16} color={theme.color.accent} />
+          <Ionicons name="people-outline" size={16} color={colors.brand} />
           <Text style={styles.peopleText}>
             {members.length} member{members.length === 1 ? '' : 's'}
             {onlineCount > 0 && <Text style={styles.onlineText}> · {onlineCount} online</Text>}
           </Text>
-          <Ionicons name="chevron-forward" size={16} color={theme.color.subtle} />
+          <Ionicons name="chevron-forward" size={16} color={colors.subtle} />
         </Pressable>
       )}
 
@@ -320,7 +323,7 @@ export function ChatThread({
       {recorderState.isRecording ? (
         <View style={styles.composer}>
           <Pressable style={styles.attach} onPress={() => void cancelRecording()}>
-            <Ionicons name="trash-outline" size={22} color={theme.color.danger} />
+            <Ionicons name="trash-outline" size={22} color={colors.danger} />
           </Pressable>
           <View style={styles.recording}>
             <View style={styles.recDot} />
@@ -328,18 +331,18 @@ export function ChatThread({
             <Text style={styles.recHint}>Recording…</Text>
           </View>
           <Pressable style={styles.send} onPress={() => void stopAndSendRecording()} disabled={sending}>
-            <Ionicons name="send" size={18} color="#ffffff" />
+            <Ionicons name="send" size={18} color={colors.onBrand} />
           </Pressable>
         </View>
       ) : (
         <View style={styles.composer}>
           <Pressable style={styles.attach} onPress={pickPhoto} disabled={sending}>
-            <Ionicons name="camera-outline" size={22} color="#4f46e5" />
+            <Ionicons name="camera-outline" size={22} color={colors.brand} />
           </Pressable>
           <TextInput
             style={styles.input}
             placeholder="Write a message…"
-            placeholderTextColor="#a1a1aa"
+            placeholderTextColor={colors.subtle}
             value={input}
             onChangeText={setInput}
             multiline
@@ -354,7 +357,7 @@ export function ChatThread({
             </Pressable>
           ) : (
             <Pressable style={styles.mic} onPress={() => void startRecording()} disabled={sending}>
-              <Ionicons name="mic" size={22} color="#4f46e5" />
+              <Ionicons name="mic" size={22} color={colors.brand} />
             </Pressable>
           )}
         </View>
@@ -365,78 +368,79 @@ export function ChatThread({
   );
 }
 
-const styles = StyleSheet.create({
-  list: { flex: 1 },
-  screen: { flex: 1, backgroundColor: '#fafafa' },
-  peopleBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e4e4e7',
-  },
-  peopleText: { flex: 1, fontSize: 13, fontWeight: '600', color: theme.color.text },
-  onlineText: { color: theme.color.success, fontWeight: '600' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fafafa' },
-  muted: { color: '#71717a' },
-  listContent: { padding: 12, gap: 8 },
-  row: { flexDirection: 'row' },
-  rowMine: { justifyContent: 'flex-end' },
-  rowOther: { justifyContent: 'flex-start' },
-  bubble: { maxWidth: '82%', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8 },
-  bubbleMine: { backgroundColor: '#4f46e5' },
-  bubbleOther: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#eee' },
-  sender: { fontSize: 11, color: '#71717a', marginBottom: 2, fontWeight: '600' },
-  body: { fontSize: 14, color: '#18181b' },
-  bodyMine: { color: '#fff' },
-  bodyWithImage: { marginTop: 6 },
-  image: { width: 200, height: 200, borderRadius: 10, backgroundColor: '#f4f4f5' },
-  composer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 8,
-    padding: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#e4e4e7',
-    backgroundColor: '#fff',
-  },
-  attach: { alignSelf: 'center', paddingHorizontal: 4, paddingVertical: 6 },
-  input: {
-    flex: 1,
-    maxHeight: 120,
-    borderWidth: 1,
-    borderColor: '#e4e4e7',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    fontSize: 15,
-    color: '#18181b',
-  },
-  send: {
-    backgroundColor: '#4f46e5',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    alignSelf: 'center',
-    justifyContent: 'center',
-  },
-  sendDisabled: { opacity: 0.5 },
-  sendText: { color: '#fff', fontWeight: '600' },
-  mic: { alignSelf: 'center', paddingHorizontal: 8, paddingVertical: 8 },
-  recording: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 10,
-  },
-  recDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#dc2626' },
-  recTime: { fontSize: 15, fontWeight: '700', color: '#18181b', fontVariant: ['tabular-nums'] },
-  recHint: { fontSize: 13, color: '#9ca3af' },
-});
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    list: { flex: 1 },
+    screen: { flex: 1, backgroundColor: c.bg },
+    peopleBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      backgroundColor: c.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+    },
+    peopleText: { flex: 1, fontSize: 13, fontFamily: font.bodySemi, color: c.text },
+    onlineText: { color: c.success, fontFamily: font.bodySemi },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg },
+    muted: { color: c.muted },
+    listContent: { padding: 12, gap: 8 },
+    row: { flexDirection: 'row' },
+    rowMine: { justifyContent: 'flex-end' },
+    rowOther: { justifyContent: 'flex-start' },
+    bubble: { maxWidth: '82%', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8 },
+    bubbleMine: { backgroundColor: c.brand },
+    bubbleOther: { backgroundColor: c.surface, borderWidth: 1, borderColor: c.border },
+    sender: { fontSize: 11, color: c.muted, marginBottom: 2, fontFamily: font.bodySemi },
+    body: { fontSize: 14, color: c.text },
+    bodyMine: { color: c.onBrand },
+    bodyWithImage: { marginTop: 6 },
+    image: { width: 200, height: 200, borderRadius: 10, backgroundColor: c.sunk },
+    composer: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: 8,
+      padding: 10,
+      borderTopWidth: 1,
+      borderTopColor: c.border,
+      backgroundColor: c.surface,
+    },
+    attach: { alignSelf: 'center', paddingHorizontal: 4, paddingVertical: 6 },
+    input: {
+      flex: 1,
+      maxHeight: 120,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: 20,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      fontSize: 15,
+      color: c.text,
+    },
+    send: {
+      backgroundColor: c.brand,
+      borderRadius: 20,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      alignSelf: 'center',
+      justifyContent: 'center',
+    },
+    sendDisabled: { opacity: 0.5 },
+    sendText: { color: c.onBrand, fontFamily: font.bodySemi },
+    mic: { alignSelf: 'center', paddingHorizontal: 8, paddingVertical: 8 },
+    recording: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingVertical: 10,
+    },
+    recDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: c.danger },
+    recTime: { fontSize: 15, fontFamily: font.bodyBold, color: c.text, fontVariant: ['tabular-nums'] },
+    recHint: { fontSize: 13, color: c.subtle },
+  });
 
 function fmtDuration(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000));

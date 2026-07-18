@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { View, Animated, StyleSheet, Easing } from 'react-native';
-import { theme } from '../lib/theme';
+import { type Colors } from '../lib/theme';
+import { useTheme } from '../lib/theme-context';
 
 /** Dot centres tracing the DatumPro logo's up-trending line chart, in a 76×44 box. */
 const DOTS = [
@@ -25,6 +26,8 @@ const LINES = [segment(DOTS[0]!, DOTS[1]!), segment(DOTS[1]!, DOTS[2]!), segment
  *  up left-to-right in a loop as if the line is "filling in". Drop-in for an
  *  ActivityIndicator. */
 export function BrandLoader({ size = 1 }: { size?: number }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const v0 = useRef(new Animated.Value(0.25)).current;
   const v1 = useRef(new Animated.Value(0.25)).current;
   const v2 = useRef(new Animated.Value(0.25)).current;
@@ -68,14 +71,15 @@ export function BrandLoader({ size = 1 }: { size?: number }) {
   );
 }
 
-const styles = StyleSheet.create({
-  box: { width: 76, height: 44 },
-  line: { position: 'absolute', height: 2, borderRadius: 1, backgroundColor: theme.color.accent, opacity: 0.35 },
-  dot: {
-    position: 'absolute',
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: theme.color.accent,
-  },
-});
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    box: { width: 76, height: 44 },
+    line: { position: 'absolute', height: 2, borderRadius: 1, backgroundColor: c.brand, opacity: 0.35 },
+    dot: {
+      position: 'absolute',
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: c.brand,
+    },
+  });

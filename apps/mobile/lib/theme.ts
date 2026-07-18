@@ -115,30 +115,3 @@ export function statusProgress(status: string): number {
       return 8;
   }
 }
-
-/* ── Legacy bridge ────────────────────────────────────────────────────────────
- *  Screens not yet migrated to useTheme() still import `theme.color.*`. Point it
- *  at the light tokens so they keep building and pick up the refreshed palette
- *  until each is migrated, then this block is removed. */
-export const theme = {
-  color: {
-    bg: lightColors.bg,
-    card: lightColors.surface,
-    text: lightColors.text,
-    muted: lightColors.muted,
-    subtle: lightColors.subtle,
-    border: lightColors.border,
-    accent: lightColors.brand,
-    accentSoft: lightColors.brandSoft,
-    dark: lightColors.text,
-    onDark: '#ffffff',
-    success: lightColors.success,
-    successSoft: lightColors.successSoft,
-    warning: lightColors.accent,
-    warningSoft: lightColors.accentSoft,
-    danger: lightColors.danger,
-    dangerSoft: lightColors.dangerSoft,
-  },
-  radius,
-  maxWidth,
-} as const;

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { BrandLoader } from '../../components/brand-loader';
 import {
   View,
@@ -30,16 +30,20 @@ import {
   type MyDocument,
 } from '../../lib/data/contractor-documents';
 import { Card, Pill } from '../../components/ui';
-import { theme, contentWidth, type Tone } from '../../lib/theme';
+import { contentWidth, radius, font, type Colors, type Tone } from '../../lib/theme';
+import { useTheme } from '../../lib/theme-context';
 import { useResponsive } from '../../lib/responsive';
 
-const TONE: Record<ContractorDocStatus, Tone> = {
-  submitted: { bg: theme.color.accentSoft, fg: theme.color.accent, bar: theme.color.accent },
-  verified: { bg: theme.color.successSoft, fg: theme.color.success, bar: theme.color.success },
-  rejected: { bg: '#e5e7eb', fg: '#374151', bar: '#6b7280' },
-};
+const docTone = (c: Colors): Record<ContractorDocStatus, Tone> => ({
+  submitted: { bg: c.accentSoft, fg: c.accentDeep, bar: c.accent },
+  verified: { bg: c.successSoft, fg: c.success, bar: c.success },
+  rejected: { bg: c.sunk, fg: c.muted, bar: c.subtle },
+});
 
 export default function Documents() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const tones = useMemo(() => docTone(colors), [colors]);
   const { columns, contentMaxWidth } = useResponsive();
   const [docs, setDocs] = useState<MyDocument[]>([]);
   const [orgs, setOrgs] = useState<{ id: string; name: string }[]>([]);
@@ -61,7 +65,14 @@ export default function Documents() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <Stack.Screen options={{ title: 'Documents' }} />
+      <Stack.Screen
+        options={{
+          title: 'Documents',
+          headerStyle: { backgroundColor: colors.surface },
+          headerTintColor: colors.text,
+          headerTitleStyle: { fontFamily: font.displayBold },
+        }}
+      />
       <View style={styles.head}>
         <Text style={styles.title}>Compliance documents</Text>
         {orgs.length > 0 && (
@@ -87,7 +98,7 @@ export default function Documents() {
             <Card style={[styles.doc, columns > 1 ? styles.col : null]}>
               <View style={styles.docTop}>
                 <Text style={styles.docTitle}>{item.title || CONTRACTOR_DOC_TYPE_LABEL[item.docType]}</Text>
-                <Pill label={CONTRACTOR_DOC_STATUS_LABEL[item.status]} tone={TONE[item.status]} />
+                <Pill label={CONTRACTOR_DOC_STATUS_LABEL[item.status]} tone={tones[item.status]} />
               </View>
               <Text style={styles.docMeta}>
                 {CONTRACTOR_DOC_TYPE_LABEL[item.docType]}
@@ -122,6 +133,8 @@ function AddDocumentModal({
   onClose: () => void;
   onDone: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [orgId, setOrgId] = useState(orgs[0]?.id ?? '');
   const [docType, setDocType] = useState<ContractorDocType>('tax_clearance');
   const [title, setTitle] = useState('');
@@ -197,17 +210,17 @@ function AddDocumentModal({
           </View>
 
           <Text style={styles.label}>Label (optional)</Text>
-          <TextInput value={title} onChangeText={setTitle} placeholder="e.g. Tax Clearance 2026" placeholderTextColor={theme.color.subtle} style={styles.input} />
+          <TextInput value={title} onChangeText={setTitle} placeholder="e.g. Tax Clearance 2026" placeholderTextColor={colors.subtle} style={styles.input} />
 
           <Text style={styles.label}>Expiry date (optional, YYYY-MM-DD)</Text>
-          <TextInput value={expiry} onChangeText={setExpiry} placeholder="2027-01-01" placeholderTextColor={theme.color.subtle} style={styles.input} autoCapitalize="none" />
+          <TextInput value={expiry} onChangeText={setExpiry} placeholder="2027-01-01" placeholderTextColor={colors.subtle} style={styles.input} autoCapitalize="none" />
 
           <Pressable onPress={attach} style={styles.attach}>
             <Text style={styles.attachText}>{doc ? '✓ Document attached — replace' : 'Attach a photo of the document'}</Text>
           </Pressable>
 
           <Pressable onPress={submit} disabled={busy} style={[styles.submit, busy && styles.busy]}>
-            {busy ? <ActivityIndicator color={theme.color.onDark} /> : <Text style={styles.submitText}>Submit</Text>}
+            {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.submitText}>Submit</Text>}
           </Pressable>
         </ScrollView>
       </View>
@@ -215,36 +228,37 @@ function AddDocumentModal({
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.color.bg },
-  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8 },
-  title: { fontSize: 22, fontWeight: '800', color: theme.color.text },
-  sub: { fontSize: 13, color: theme.color.subtle, paddingHorizontal: 20, marginTop: 2 },
-  addBtn: { backgroundColor: theme.color.dark, borderRadius: theme.radius.pill, paddingHorizontal: 16, paddingVertical: 8 },
-  addText: { color: theme.color.onDark, fontWeight: '700', fontSize: 13 },
-  list: { padding: 16, gap: 10, ...contentWidth },
-  row: { gap: 10 },
-  col: { flex: 1 },
-  empty: { color: theme.color.subtle, fontSize: 14, textAlign: 'center', marginTop: 32 },
-  doc: { gap: 4 },
-  docTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  docTitle: { fontSize: 15, fontWeight: '700', color: theme.color.text, flex: 1 },
-  docMeta: { fontSize: 12, color: theme.color.muted },
-  reject: { fontSize: 12, color: '#dc2626', fontStyle: 'italic' },
-  link: { fontSize: 13, fontWeight: '600', color: theme.color.accent, marginTop: 2 },
-  sheet: { flex: 1, backgroundColor: theme.color.bg },
-  cancel: { fontSize: 15, color: theme.color.subtle },
-  form: { padding: 16, gap: 8 },
-  label: { fontSize: 12, fontWeight: '700', color: theme.color.subtle, marginTop: 8 },
-  input: { backgroundColor: theme.color.card, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.color.border, paddingHorizontal: 12, paddingVertical: 12, fontSize: 15, color: theme.color.text },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: theme.radius.pill, borderWidth: 1, borderColor: theme.color.border },
-  chipOn: { backgroundColor: theme.color.dark, borderColor: theme.color.dark },
-  chipText: { fontSize: 13, color: theme.color.text },
-  chipTextOn: { color: theme.color.onDark, fontWeight: '700' },
-  attach: { marginTop: 12, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.color.border, paddingVertical: 12, alignItems: 'center' },
-  attachText: { fontSize: 14, color: theme.color.accent, fontWeight: '600' },
-  submit: { marginTop: 16, backgroundColor: theme.color.dark, borderRadius: theme.radius.pill, paddingVertical: 14, alignItems: 'center' },
-  busy: { opacity: 0.6 },
-  submitText: { color: theme.color.onDark, fontWeight: '800', fontSize: 15 },
-});
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    safe: { flex: 1, backgroundColor: c.bg },
+    head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8 },
+    title: { fontSize: 22, fontFamily: font.displayBold, color: c.text },
+    sub: { fontSize: 13, fontFamily: font.body, color: c.subtle, paddingHorizontal: 20, marginTop: 2 },
+    addBtn: { backgroundColor: c.brand, borderRadius: radius.pill, paddingHorizontal: 16, paddingVertical: 8 },
+    addText: { color: c.onBrand, fontFamily: font.bodyBold, fontSize: 13 },
+    list: { padding: 16, gap: 10, ...contentWidth },
+    row: { gap: 10 },
+    col: { flex: 1 },
+    empty: { color: c.subtle, fontSize: 14, fontFamily: font.body, textAlign: 'center', marginTop: 32 },
+    doc: { gap: 4 },
+    docTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    docTitle: { fontSize: 15, fontFamily: font.bodyBold, color: c.text, flex: 1 },
+    docMeta: { fontSize: 12, fontFamily: font.body, color: c.muted },
+    reject: { fontSize: 12, fontFamily: font.body, color: c.danger, fontStyle: 'italic' },
+    link: { fontSize: 13, fontFamily: font.bodySemi, color: c.brand, marginTop: 2 },
+    sheet: { flex: 1, backgroundColor: c.bg },
+    cancel: { fontSize: 15, fontFamily: font.body, color: c.subtle },
+    form: { padding: 16, gap: 8 },
+    label: { fontSize: 12, fontFamily: font.bodyBold, color: c.subtle, marginTop: 8 },
+    input: { backgroundColor: c.surface, borderRadius: radius.md, borderWidth: 1, borderColor: c.border, paddingHorizontal: 12, paddingVertical: 12, fontSize: 15, fontFamily: font.body, color: c.text },
+    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.pill, borderWidth: 1, borderColor: c.border },
+    chipOn: { backgroundColor: c.brand, borderColor: c.brand },
+    chipText: { fontSize: 13, fontFamily: font.body, color: c.text },
+    chipTextOn: { color: c.onBrand, fontFamily: font.bodyBold },
+    attach: { marginTop: 12, borderRadius: radius.md, borderWidth: 1, borderColor: c.border, paddingVertical: 12, alignItems: 'center' },
+    attachText: { fontSize: 14, fontFamily: font.bodySemi, color: c.brand },
+    submit: { marginTop: 16, backgroundColor: c.brand, borderRadius: radius.pill, paddingVertical: 14, alignItems: 'center' },
+    busy: { opacity: 0.6 },
+    submitText: { color: c.onBrand, fontFamily: font.bodyBold, fontSize: 15 },
+  });

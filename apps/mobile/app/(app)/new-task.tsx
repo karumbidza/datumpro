@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,8 @@ import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rou
 import { TASK_PRIORITIES } from '@datumpro/shared/domain';
 import { listProjectMembers, type Member } from '../../lib/data/members';
 import { createTask } from '../../lib/data/task-actions';
-import { theme, contentWidth } from '../../lib/theme';
+import { contentWidth, radius, font, type Colors } from '../../lib/theme';
+import { useTheme } from '../../lib/theme-context';
 
 function isoOffset(days: number): string {
   return new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
@@ -24,6 +25,8 @@ function isoOffset(days: number): string {
 export default function NewTask() {
   const { projectId, projectName } = useLocalSearchParams<{ projectId: string; projectName?: string }>();
   const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -65,32 +68,39 @@ export default function NewTask() {
 
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Stack.Screen options={{ title: 'New task' }} />
+      <Stack.Screen
+        options={{
+          title: 'New task',
+          headerStyle: { backgroundColor: colors.surface },
+          headerTintColor: colors.text,
+          headerTitleStyle: { fontFamily: font.displayBold },
+        }}
+      />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {projectName ? <Text style={styles.project}>{projectName}</Text> : null}
 
-        <Field label="Title">
+        <Field label="Title" styles={styles}>
           <TextInput
             style={styles.input}
             placeholder="e.g. Pour ground-floor slab"
-            placeholderTextColor={theme.color.subtle}
+            placeholderTextColor={colors.subtle}
             value={title}
             onChangeText={setTitle}
           />
         </Field>
 
-        <Field label="Description">
+        <Field label="Description" styles={styles}>
           <TextInput
             style={[styles.input, styles.multiline]}
             placeholder="Optional details"
-            placeholderTextColor={theme.color.subtle}
+            placeholderTextColor={colors.subtle}
             value={description}
             onChangeText={setDescription}
             multiline
           />
         </Field>
 
-        <Field label="Priority">
+        <Field label="Priority" styles={styles}>
           <View style={styles.chips}>
             {TASK_PRIORITIES.map((p) => (
               <Pressable
@@ -104,7 +114,7 @@ export default function NewTask() {
           </View>
         </Field>
 
-        <Field label="Assignee">
+        <Field label="Assignee" styles={styles}>
           <View style={styles.chips}>
             <Pressable
               onPress={() => setAssignee(null)}
@@ -124,11 +134,11 @@ export default function NewTask() {
           </View>
         </Field>
 
-        <Field label="Due date">
+        <Field label="Due date" styles={styles}>
           <TextInput
             style={styles.input}
             placeholder="YYYY-MM-DD"
-            placeholderTextColor={theme.color.subtle}
+            placeholderTextColor={colors.subtle}
             value={dueDate}
             onChangeText={setDueDate}
             autoCapitalize="none"
@@ -147,14 +157,26 @@ export default function NewTask() {
         </Field>
 
         <Pressable style={[styles.submit, busy && styles.disabled]} onPress={submit} disabled={busy}>
-          {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>Create task</Text>}
+          {busy ? (
+            <ActivityIndicator color={colors.onBrand} />
+          ) : (
+            <Text style={styles.submitText}>Create task</Text>
+          )}
         </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  children,
+  styles,
+}: {
+  label: string;
+  children: React.ReactNode;
+  styles: ReturnType<typeof makeStyles>;
+}) {
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
@@ -163,41 +185,43 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: theme.color.bg },
-  content: { padding: 16, gap: 16, paddingBottom: 40, ...contentWidth },
-  project: { fontSize: 12, color: theme.color.subtle, textTransform: 'uppercase', letterSpacing: 0.5 },
-  field: { gap: 8 },
-  label: { fontSize: 13, fontWeight: '700', color: theme.color.text },
-  input: {
-    backgroundColor: theme.color.card,
-    borderWidth: 1,
-    borderColor: theme.color.border,
-    borderRadius: theme.radius.sm,
-    padding: 12,
-    fontSize: 15,
-    color: theme.color.text,
-  },
-  multiline: { minHeight: 80, textAlignVertical: 'top' },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: {
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: theme.color.card,
-    borderWidth: 1,
-    borderColor: theme.color.border,
-  },
-  chipActive: { backgroundColor: theme.color.dark, borderColor: theme.color.dark },
-  chipText: { fontSize: 13, fontWeight: '600', color: theme.color.muted, textTransform: 'capitalize' },
-  chipTextActive: { color: '#fff' },
-  submit: {
-    backgroundColor: theme.color.accent,
-    borderRadius: theme.radius.sm,
-    paddingVertical: 15,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  disabled: { opacity: 0.6 },
-  submitText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-});
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: c.bg },
+    content: { padding: 16, gap: 16, paddingBottom: 40, ...contentWidth },
+    project: { fontSize: 12, fontFamily: font.body, color: c.subtle, textTransform: 'uppercase', letterSpacing: 0.5 },
+    field: { gap: 8 },
+    label: { fontSize: 13, fontFamily: font.bodyBold, color: c.text },
+    input: {
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: radius.sm,
+      padding: 12,
+      fontSize: 15,
+      fontFamily: font.body,
+      color: c.text,
+    },
+    multiline: { minHeight: 80, textAlignVertical: 'top' },
+    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    chip: {
+      borderRadius: 999,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    chipActive: { backgroundColor: c.text, borderColor: c.text },
+    chipText: { fontSize: 13, fontFamily: font.bodySemi, color: c.muted, textTransform: 'capitalize' },
+    chipTextActive: { color: c.bg },
+    submit: {
+      backgroundColor: c.brand,
+      borderRadius: radius.sm,
+      paddingVertical: 15,
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    disabled: { opacity: 0.6 },
+    submitText: { color: c.onBrand, fontFamily: font.bodyBold, fontSize: 15 },
+  });

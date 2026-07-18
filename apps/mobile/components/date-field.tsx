@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View, Text, Pressable, Modal, Platform, StyleSheet } from 'react-native';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../lib/theme';
+import { radius, font, type Colors } from '../lib/theme';
+import { useTheme } from '../lib/theme-context';
 
 /** 'YYYY-MM-DD' ↔ Date without timezone drift — anchor at local noon so a day
  *  never rolls backwards/forwards when the device is far from UTC. */
@@ -33,6 +34,8 @@ export function DateField({
   max?: string | null;
 }) {
   const [iosOpen, setIosOpen] = useState(false);
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const minimumDate = min ? parseISO(min) : undefined;
   const maximumDate = max ? parseISO(max) : undefined;
@@ -58,13 +61,13 @@ export function DateField({
   return (
     <View style={styles.wrap}>
       <Pressable style={styles.field} onPress={open}>
-        <Ionicons name="calendar-outline" size={14} color={theme.color.subtle} />
+        <Ionicons name="calendar-outline" size={14} color={colors.subtle} />
         <Text style={[styles.value, !value && styles.placeholder]} numberOfLines={1}>
           {value ?? label}
         </Text>
         {value ? (
           <Pressable hitSlop={8} onPress={() => onChange(null)}>
-            <Ionicons name="close-circle" size={15} color={theme.color.subtle} />
+            <Ionicons name="close-circle" size={15} color={colors.subtle} />
           </Pressable>
         ) : null}
       </Pressable>
@@ -103,30 +106,31 @@ function clampSeed(d: Date, min?: Date, max?: Date): Date {
   return d;
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1 },
-  field: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderWidth: 1,
-    borderColor: theme.color.border,
-    borderRadius: theme.radius.md,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-    backgroundColor: theme.color.card,
-  },
-  value: { flex: 1, fontSize: 13, color: theme.color.text },
-  placeholder: { color: theme.color.subtle },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: theme.color.card,
-    borderTopLeftRadius: theme.radius.lg,
-    borderTopRightRadius: theme.radius.lg,
-    padding: 16,
-    paddingBottom: 32,
-  },
-  sheetHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  sheetTitle: { fontSize: 15, fontWeight: '700', color: theme.color.text },
-  done: { fontSize: 15, fontWeight: '700', color: theme.color.dark },
-});
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    wrap: { flex: 1 },
+    field: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: radius.md,
+      paddingHorizontal: 10,
+      paddingVertical: 9,
+      backgroundColor: c.surface,
+    },
+    value: { flex: 1, fontSize: 13, color: c.text },
+    placeholder: { color: c.subtle },
+    backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
+    sheet: {
+      backgroundColor: c.surface,
+      borderTopLeftRadius: radius.lg,
+      borderTopRightRadius: radius.lg,
+      padding: 16,
+      paddingBottom: 32,
+    },
+    sheetHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+    sheetTitle: { fontSize: 15, fontFamily: font.bodyBold, color: c.text },
+    done: { fontSize: 15, fontFamily: font.bodyBold, color: c.text },
+  });

@@ -1,11 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Modal, View, Text, Pressable, ScrollView, StyleSheet, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../lib/theme';
+import { radius, font, type Colors } from '../lib/theme';
+import { useTheme } from '../lib/theme-context';
 import type { RosterMember } from '../lib/data/chat-roster';
 
-const ONLINE = '#22c55e';
-const OFFLINE = '#d4d4d8';
 const AVATAR_COLORS = ['#2563eb', '#7e22ce', '#c2410c', '#15803d', '#b45309', '#db2777', '#0891b2'];
 
 function avatarColor(id: string): string {
@@ -34,6 +33,7 @@ function activeAgo(iso: string | null): string {
 }
 
 function Avatar({ member, size, online }: { member: RosterMember; size: number; online: boolean }) {
+  const { colors } = useTheme();
   const dot = size >= 60 ? 15 : 10;
   return (
     <View style={{ width: size, height: size }}>
@@ -48,7 +48,7 @@ function Avatar({ member, size, online }: { member: RosterMember; size: number; 
           opacity: online ? 1 : 0.55,
         }}
       >
-        <Text style={{ color: '#fff', fontWeight: '700', fontSize: size * 0.4 }}>{initials(member.name)}</Text>
+        <Text style={{ color: '#ffffff', fontFamily: font.bodyBold, fontSize: size * 0.4 }}>{initials(member.name)}</Text>
       </View>
       <View
         style={{
@@ -58,9 +58,9 @@ function Avatar({ member, size, online }: { member: RosterMember; size: number; 
           width: dot,
           height: dot,
           borderRadius: dot / 2,
-          backgroundColor: online ? ONLINE : OFFLINE,
+          backgroundColor: online ? colors.success : colors.subtle,
           borderWidth: 2,
-          borderColor: '#fff',
+          borderColor: colors.surface,
         }}
       />
     </View>
@@ -80,6 +80,8 @@ export function ChatMembersSheet({
   onlineIds: Set<string>;
   meId: string;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = selectedId ? members.find((m) => m.userId === selectedId) ?? null : null;
 
@@ -97,7 +99,7 @@ export function ChatMembersSheet({
         <View style={styles.header}>
           {selected ? (
             <Pressable onPress={() => setSelectedId(null)} hitSlop={10} style={styles.back}>
-              <Ionicons name="chevron-back" size={22} color={theme.color.text} />
+              <Ionicons name="chevron-back" size={22} color={colors.text} />
             </Pressable>
           ) : (
             <View style={styles.back} />
@@ -141,13 +143,13 @@ export function ChatMembersSheet({
               <View style={styles.contact}>
                 {selected.phone && (
                   <View style={styles.contactRow}>
-                    <Ionicons name="call-outline" size={16} color={theme.color.subtle} />
+                    <Ionicons name="call-outline" size={16} color={colors.subtle} />
                     <Text style={styles.contactText}>{selected.phone}</Text>
                   </View>
                 )}
                 {selected.email && (
                   <View style={styles.contactRow}>
-                    <Ionicons name="mail-outline" size={16} color={theme.color.subtle} />
+                    <Ionicons name="mail-outline" size={16} color={colors.subtle} />
                     <Text style={styles.contactText} numberOfLines={1}>
                       {selected.email}
                     </Text>
@@ -185,6 +187,8 @@ function Row({
   meId: string;
   onPress: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <Pressable style={styles.row} onPress={onPress}>
       <Avatar member={member} size={40} online={online} />
@@ -197,7 +201,7 @@ function Row({
           {online ? member.role : activeAgo(member.lastActiveAt)}
         </Text>
       </View>
-      <Ionicons name="chevron-forward" size={18} color={theme.color.subtle} />
+      <Ionicons name="chevron-forward" size={18} color={colors.subtle} />
     </Pressable>
   );
 }
@@ -213,54 +217,57 @@ function Action({
   disabled: boolean;
   onPress: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <Pressable style={[styles.action, disabled && styles.actionDisabled]} onPress={onPress} disabled={disabled}>
-      <Ionicons name={icon} size={20} color={disabled ? theme.color.subtle : theme.color.accent} />
-      <Text style={[styles.actionText, disabled && { color: theme.color.subtle }]}>{label}</Text>
+      <Ionicons name={icon} size={20} color={disabled ? colors.subtle : colors.brand} />
+      <Text style={[styles.actionText, disabled && { color: colors.subtle }]}>{label}</Text>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
-  sheet: { flex: 1, backgroundColor: theme.color.bg },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.color.border,
-  },
-  back: { width: 40 },
-  title: { fontSize: 16, fontWeight: '700', color: theme.color.text },
-  cancel: { fontSize: 15, color: theme.color.accent, fontWeight: '600', width: 40, textAlign: 'right' },
-  list: { padding: 12 },
-  groupLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5, color: theme.color.subtle, marginTop: 12, marginBottom: 4, marginLeft: 4 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 4 },
-  rowText: { flex: 1 },
-  rowName: { fontSize: 15, fontWeight: '600', color: theme.color.text },
-  rowSub: { fontSize: 12, color: theme.color.subtle, marginTop: 1 },
-  empty: { color: theme.color.subtle, textAlign: 'center', marginTop: 24 },
-  detail: { alignItems: 'center', padding: 24, gap: 8 },
-  detailName: { fontSize: 18, fontWeight: '700', color: theme.color.text, marginTop: 6 },
-  detailStatus: { fontSize: 13, color: theme.color.subtle },
-  statusOn: { color: theme.color.success },
-  rolePill: { backgroundColor: theme.color.accentSoft, borderRadius: theme.radius.pill, paddingHorizontal: 12, paddingVertical: 4, marginTop: 2 },
-  rolePillText: { fontSize: 12, fontWeight: '700', color: theme.color.accent, textTransform: 'capitalize' },
-  actions: { flexDirection: 'row', gap: 12, marginTop: 12 },
-  action: {
-    alignItems: 'center',
-    gap: 4,
-    borderWidth: 1,
-    borderColor: theme.color.border,
-    borderRadius: theme.radius.md,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    backgroundColor: theme.color.card,
-  },
-  actionDisabled: { opacity: 0.5 },
-  actionText: { fontSize: 12, fontWeight: '600', color: theme.color.accent },
-  contact: { alignSelf: 'stretch', marginTop: 16, gap: 10 },
-  contactRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  contactText: { fontSize: 14, color: theme.color.text, flex: 1 },
-});
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    sheet: { flex: 1, backgroundColor: c.bg },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+    },
+    back: { width: 40 },
+    title: { fontSize: 16, fontFamily: font.bodyBold, color: c.text },
+    cancel: { fontSize: 15, color: c.brand, fontFamily: font.bodySemi, width: 40, textAlign: 'right' },
+    list: { padding: 12 },
+    groupLabel: { fontSize: 10, fontFamily: font.bodyBold, letterSpacing: 0.5, color: c.subtle, marginTop: 12, marginBottom: 4, marginLeft: 4 },
+    row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 4 },
+    rowText: { flex: 1 },
+    rowName: { fontSize: 15, fontFamily: font.bodySemi, color: c.text },
+    rowSub: { fontSize: 12, color: c.subtle, marginTop: 1 },
+    empty: { color: c.subtle, textAlign: 'center', marginTop: 24 },
+    detail: { alignItems: 'center', padding: 24, gap: 8 },
+    detailName: { fontSize: 18, fontFamily: font.bodyBold, color: c.text, marginTop: 6 },
+    detailStatus: { fontSize: 13, color: c.subtle },
+    statusOn: { color: c.success },
+    rolePill: { backgroundColor: c.brandSoft, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 4, marginTop: 2 },
+    rolePillText: { fontSize: 12, fontFamily: font.bodyBold, color: c.brand, textTransform: 'capitalize' },
+    actions: { flexDirection: 'row', gap: 12, marginTop: 12 },
+    action: {
+      alignItems: 'center',
+      gap: 4,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: radius.md,
+      paddingVertical: 12,
+      paddingHorizontal: 24,
+      backgroundColor: c.surface,
+    },
+    actionDisabled: { opacity: 0.5 },
+    actionText: { fontSize: 12, fontFamily: font.bodySemi, color: c.brand },
+    contact: { alignSelf: 'stretch', marginTop: 16, gap: 10 },
+    contactRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    contactText: { fontSize: 14, color: c.text, flex: 1 },
+  });

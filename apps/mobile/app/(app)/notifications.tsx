@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { BrandLoader } from '../../components/brand-loader';
 import { View, Text, FlatList, Pressable, StyleSheet, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,7 +8,8 @@ import {
   markAllNotificationsRead,
   type AppNotification,
 } from '../../lib/data/notifications';
-import { theme, contentWidth } from '../../lib/theme';
+import { contentWidth, radius, font, type Colors } from '../../lib/theme';
+import { useTheme } from '../../lib/theme-context';
 
 function relTime(iso: string): string {
   const secs = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
@@ -24,6 +25,8 @@ function relTime(iso: string): string {
 
 export default function Notifications() {
   const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [items, setItems] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -48,7 +51,14 @@ export default function Notifications() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['left', 'right', 'bottom']}>
-      <Stack.Screen options={{ title: 'Notifications' }} />
+      <Stack.Screen
+        options={{
+          title: 'Notifications',
+          headerStyle: { backgroundColor: colors.surface },
+          headerTintColor: colors.text,
+          headerTitleStyle: { fontFamily: font.displayBold },
+        }}
+      />
       {loading ? (
         <View style={styles.center}>
           <BrandLoader />
@@ -61,6 +71,7 @@ export default function Notifications() {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
+              tintColor={colors.brand}
               onRefresh={() => {
                 setRefreshing(true);
                 void load();
@@ -89,22 +100,23 @@ export default function Notifications() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.color.bg },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  list: { padding: 16, gap: 8, ...contentWidth },
-  emptyWrap: { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
-  empty: { color: theme.color.subtle, fontSize: 14 },
-  item: {
-    backgroundColor: theme.color.card,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.color.border,
-    padding: 14,
-  },
-  unreadItem: { borderColor: theme.color.accent, backgroundColor: theme.color.accentSoft },
-  itemHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  itemTitle: { flex: 1, fontSize: 15, fontWeight: '700', color: theme.color.text },
-  time: { fontSize: 11, color: theme.color.subtle },
-  body: { fontSize: 13, color: theme.color.muted, marginTop: 3 },
-});
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    safe: { flex: 1, backgroundColor: c.bg },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    list: { padding: 16, gap: 8, ...contentWidth },
+    emptyWrap: { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
+    empty: { color: c.subtle, fontSize: 14, fontFamily: font.body },
+    item: {
+      backgroundColor: c.surface,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: c.border,
+      padding: 14,
+    },
+    unreadItem: { borderColor: c.brand, backgroundColor: c.brandSoft },
+    itemHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    itemTitle: { flex: 1, fontSize: 15, fontFamily: font.bodyBold, color: c.text },
+    time: { fontSize: 11, fontFamily: font.body, color: c.subtle },
+    body: { fontSize: 13, fontFamily: font.body, color: c.muted, marginTop: 3 },
+  });

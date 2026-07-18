@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { BrandLoader } from '../../../components/brand-loader';
 import { View, Text, FlatList, Pressable, StyleSheet, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,12 +7,15 @@ import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rou
 import { listProjectTasks, canManageProjectById, type MyTask } from '../../../lib/data/tasks';
 import { getProjectConversationId, getUnreadCount } from '../../../lib/data/chat';
 import { TaskCard } from '../../../components/task-card';
-import { theme, contentWidth } from '../../../lib/theme';
+import { contentWidth, radius, font, type Colors } from '../../../lib/theme';
+import { useTheme } from '../../../lib/theme-context';
 import { useResponsive } from '../../../lib/responsive';
 
 export default function ProjectScreen() {
   const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
   const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { columns, contentMaxWidth } = useResponsive();
   const [tasks, setTasks] = useState<MyTask[]>([]);
   const [canManage, setCanManage] = useState(false);
@@ -44,6 +47,9 @@ export default function ProjectScreen() {
       <Stack.Screen
         options={{
           title: name ?? 'Project',
+          headerStyle: { backgroundColor: colors.surface },
+          headerTintColor: colors.text,
+          headerTitleStyle: { fontFamily: font.displayBold },
           headerRight: () =>
             canManage ? (
               <Pressable
@@ -52,7 +58,7 @@ export default function ProjectScreen() {
                 }
                 hitSlop={8}
               >
-                <Ionicons name="add" size={26} color="#fff" />
+                <Ionicons name="add" size={26} color={colors.text} />
               </Pressable>
             ) : null,
         }}
@@ -74,6 +80,7 @@ export default function ProjectScreen() {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
+              tintColor={colors.brand}
               onRefresh={() => {
                 setRefreshing(true);
                 void load();
@@ -91,14 +98,14 @@ export default function ProjectScreen() {
                   })
                 }
               >
-                <Ionicons name="chatbubbles-outline" size={18} color={theme.color.accent} />
+                <Ionicons name="chatbubbles-outline" size={18} color={colors.brand} />
                 <Text style={styles.teamChatText}>Team channel</Text>
                 {teamUnread > 0 && (
                   <View style={styles.unread}>
                     <Text style={styles.unreadText}>{teamUnread > 99 ? '99+' : teamUnread}</Text>
                   </View>
                 )}
-                <Ionicons name="chevron-forward" size={16} color={theme.color.subtle} style={{ marginLeft: 'auto' }} />
+                <Ionicons name="chevron-forward" size={16} color={colors.subtle} style={{ marginLeft: 'auto' }} />
               </Pressable>
               <Pressable
                 style={styles.teamChat}
@@ -109,9 +116,9 @@ export default function ProjectScreen() {
                   })
                 }
               >
-                <Ionicons name="git-compare-outline" size={18} color={theme.color.accent} />
+                <Ionicons name="git-compare-outline" size={18} color={colors.brand} />
                 <Text style={styles.teamChatText}>Change orders</Text>
-                <Ionicons name="chevron-forward" size={16} color={theme.color.subtle} style={{ marginLeft: 'auto' }} />
+                <Ionicons name="chevron-forward" size={16} color={colors.subtle} style={{ marginLeft: 'auto' }} />
               </Pressable>
               {tasks.length > 0 && <Text style={styles.count}>{tasks.length} tasks</Text>}
             </View>
@@ -128,36 +135,37 @@ export default function ProjectScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: theme.color.bg },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  listContent: { padding: 16, gap: 10, ...contentWidth },
-  row: { gap: 10 },
-  col: { flex: 1 },
-  header: { gap: 10, marginBottom: 4 },
-  teamChat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: theme.color.card,
-    borderWidth: 1,
-    borderColor: theme.color.border,
-    borderRadius: theme.radius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  teamChatText: { fontSize: 15, fontWeight: '600', color: theme.color.text },
-  unread: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    backgroundColor: theme.color.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  unreadText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  count: { fontSize: 12, color: theme.color.subtle, marginBottom: 4 },
-  emptyWrap: { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
-  empty: { color: theme.color.subtle, fontSize: 14 },
-});
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: c.bg },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    listContent: { padding: 16, gap: 10, ...contentWidth },
+    row: { gap: 10 },
+    col: { flex: 1 },
+    header: { gap: 10, marginBottom: 4 },
+    teamChat: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: radius.md,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    teamChatText: { fontSize: 15, fontFamily: font.bodySemi, color: c.text },
+    unread: {
+      minWidth: 20,
+      height: 20,
+      borderRadius: 10,
+      paddingHorizontal: 6,
+      backgroundColor: c.brand,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    unreadText: { color: c.onBrand, fontSize: 11, fontFamily: font.bodyBold },
+    count: { fontSize: 12, fontFamily: font.body, color: c.subtle, marginBottom: 4 },
+    emptyWrap: { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
+    empty: { color: c.subtle, fontSize: 14, fontFamily: font.body },
+  });

@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import { theme } from '../lib/theme';
+import { useTheme } from '../lib/theme-context';
 
 function fmt(seconds: number): string {
   const s = Math.max(0, Math.round(seconds));
@@ -12,6 +12,7 @@ function fmt(seconds: number): string {
 /** A playable voice-note bubble. One player per rendered audio message. Colours
  *  invert on the sender's own (dark) bubbles for contrast. */
 export function VoiceNote({ url, mine }: { url: string; mine: boolean }) {
+  const { colors } = useTheme();
   const player = useAudioPlayer(url);
   const status = useAudioPlayerStatus(player);
 
@@ -24,8 +25,8 @@ export function VoiceNote({ url, mine }: { url: string; mine: boolean }) {
   const pos = status.currentTime || 0;
   const pct = dur > 0 ? Math.min(100, (pos / dur) * 100) : 0;
 
-  const fg = mine ? '#ffffff' : theme.color.text;
-  const trackBg = mine ? 'rgba(255,255,255,0.3)' : theme.color.border;
+  const fg = mine ? colors.onBrand : colors.text;
+  const trackBg = mine ? 'rgba(255,255,255,0.3)' : colors.border;
 
   function toggle() {
     if (status.playing) {

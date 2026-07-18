@@ -1,8 +1,11 @@
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { registerForPush } from '../../lib/push';
+import { font } from '../../lib/theme';
+import { useTheme } from '../../lib/theme-context';
 
 export default function AppLayout() {
+  const { colors } = useTheme();
   // We're past the auth gate here, so a session exists — register for push once.
   useEffect(() => {
     void registerForPush();
@@ -11,9 +14,9 @@ export default function AppLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: '#0e0e10' },
-        headerTintColor: '#fff',
-        headerTitleStyle: { fontWeight: '600' },
+        headerStyle: { backgroundColor: colors.surface },
+        headerTintColor: colors.text,
+        headerTitleStyle: { fontFamily: font.displayBold },
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
