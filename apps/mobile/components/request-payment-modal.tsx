@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Modal,
   View,
@@ -18,7 +18,8 @@ import {
   uploadPaymentDoc,
   type RequestProject,
 } from '../lib/data/payment-requests';
-import { theme } from '../lib/theme';
+import { radius, font, type Colors } from '../lib/theme';
+import { useTheme } from '../lib/theme-context';
 
 /** Contractor's "Request payment" modal — pick a project, enter amount + title,
  *  optionally attach an invoice photo, submit. */
@@ -33,6 +34,8 @@ export function RequestPaymentModal({
   onClose: () => void;
   onDone: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [projectId, setProjectId] = useState(projects[0]?.id ?? '');
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
@@ -148,22 +151,22 @@ export function RequestPaymentModal({
           )}
 
           <Text style={styles.label}>Description</Text>
-          <TextInput value={title} onChangeText={setTitle} placeholder="e.g. Foundations — 40%" placeholderTextColor={theme.color.subtle} style={styles.input} />
+          <TextInput value={title} onChangeText={setTitle} placeholder="e.g. Foundations — 40%" placeholderTextColor={colors.subtle} style={styles.input} />
 
           <Text style={styles.label}>Amount (USD)</Text>
-          <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={theme.color.subtle} style={styles.input} />
+          <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={colors.subtle} style={styles.input} />
 
           <Text style={styles.label}>Note (optional)</Text>
-          <TextInput value={note} onChangeText={setNote} placeholder="Anything the reviewer should know" placeholderTextColor={theme.color.subtle} style={styles.input} />
+          <TextInput value={note} onChangeText={setNote} placeholder="Anything the reviewer should know" placeholderTextColor={colors.subtle} style={styles.input} />
 
-          <Pressable onPress={attach} style={styles.attach}>
+          <Pressable onPress={attach} style={({ pressed }) => [styles.attach, pressed && styles.pressed]}>
             <Text style={styles.attachText} numberOfLines={1}>
               {doc ? `✓ ${doc.name} — replace` : 'Attach invoice — photo or PDF (optional)'}
             </Text>
           </Pressable>
 
-          <Pressable onPress={submit} disabled={busy} style={[styles.submit, busy && styles.busy]}>
-            {busy ? <ActivityIndicator color={theme.color.onDark} /> : <Text style={styles.submitText}>Submit request</Text>}
+          <Pressable onPress={submit} disabled={busy} style={({ pressed }) => [styles.submit, busy && styles.busy, pressed && styles.pressed]}>
+            {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.submitText}>Submit request</Text>}
           </Pressable>
         </ScrollView>
       </View>
@@ -171,31 +174,34 @@ export function RequestPaymentModal({
   );
 }
 
-const styles = StyleSheet.create({
-  sheet: { flex: 1, backgroundColor: theme.color.bg },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16 },
-  title: { fontSize: 18, fontWeight: '800', color: theme.color.text },
-  cancel: { fontSize: 15, color: theme.color.subtle },
-  body: { padding: 16, gap: 8 },
-  label: { fontSize: 12, fontWeight: '700', color: theme.color.subtle, marginTop: 8 },
-  input: {
-    backgroundColor: theme.color.card,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.color.border,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: theme.color.text,
-  },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: theme.radius.pill, borderWidth: 1, borderColor: theme.color.border },
-  chipOn: { backgroundColor: theme.color.dark, borderColor: theme.color.dark },
-  chipText: { fontSize: 13, color: theme.color.text },
-  chipTextOn: { color: theme.color.onDark, fontWeight: '700' },
-  attach: { marginTop: 12, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.color.border, paddingVertical: 12, alignItems: 'center' },
-  attachText: { fontSize: 14, color: theme.color.accent, fontWeight: '600' },
-  submit: { marginTop: 16, backgroundColor: theme.color.dark, borderRadius: theme.radius.pill, paddingVertical: 14, alignItems: 'center' },
-  busy: { opacity: 0.6 },
-  submitText: { color: theme.color.onDark, fontWeight: '800', fontSize: 15 },
-});
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    sheet: { flex: 1, backgroundColor: c.bg },
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16 },
+    title: { fontSize: 20, fontFamily: font.displayBold, color: c.text, letterSpacing: -0.3 },
+    cancel: { fontSize: 15, fontFamily: font.body, color: c.muted },
+    body: { padding: 16, gap: 8 },
+    pressed: { opacity: 0.85 },
+    label: { fontSize: 12, fontFamily: font.bodyBold, color: c.subtle, marginTop: 8 },
+    input: {
+      backgroundColor: c.surface,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: c.border,
+      paddingHorizontal: 12,
+      paddingVertical: 12,
+      fontSize: 15,
+      fontFamily: font.body,
+      color: c.text,
+    },
+    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.pill, borderWidth: 1, borderColor: c.border },
+    chipOn: { backgroundColor: c.text, borderColor: c.text },
+    chipText: { fontSize: 13, fontFamily: font.body, color: c.text },
+    chipTextOn: { color: c.bg, fontFamily: font.bodyBold },
+    attach: { marginTop: 12, borderRadius: radius.md, borderWidth: 1, borderColor: c.border, paddingVertical: 12, alignItems: 'center' },
+    attachText: { fontSize: 14, fontFamily: font.bodySemi, color: c.brand },
+    submit: { marginTop: 16, backgroundColor: c.brand, borderRadius: radius.pill, paddingVertical: 14, alignItems: 'center' },
+    busy: { opacity: 0.6 },
+    submitText: { color: c.onBrand, fontFamily: font.bodyBold, fontSize: 15 },
+  });

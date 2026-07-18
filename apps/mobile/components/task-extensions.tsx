@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import {
   listExtensions,
@@ -7,20 +7,21 @@ import {
   type ExtensionRequest,
 } from '../lib/data/extensions';
 import { Pill } from './ui';
-import { theme, type Tone } from '../lib/theme';
+import { radius, font, type Colors, type Tone } from '../lib/theme';
+import { useTheme } from '../lib/theme-context';
 
-const STATUS: Record<ExtensionRequest['status'], { label: string; tone: Tone }> = {
+const makeStatus = (c: Colors): Record<ExtensionRequest['status'], { label: string; tone: Tone }> => ({
   pending: {
     label: 'awaiting decision',
-    tone: { bg: theme.color.warningSoft, fg: theme.color.warning, bar: theme.color.warning },
+    tone: { bg: c.accentSoft, fg: c.accent, bar: c.accent },
   },
   approved: {
     label: 'approved',
-    tone: { bg: theme.color.successSoft, fg: theme.color.success, bar: theme.color.success },
+    tone: { bg: c.successSoft, fg: c.success, bar: c.success },
   },
-  rejected: { label: 'rejected', tone: { bg: '#e5e7eb', fg: '#374151', bar: '#6b7280' } },
-  cancelled: { label: 'cancelled', tone: { bg: '#e5e7eb', fg: '#374151', bar: '#6b7280' } },
-};
+  rejected: { label: 'rejected', tone: { bg: c.sunk, fg: c.subtle, bar: c.muted } },
+  cancelled: { label: 'cancelled', tone: { bg: c.sunk, fg: c.subtle, bar: c.muted } },
+});
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -39,6 +40,9 @@ export function TaskExtensions({
   isAssignee: boolean;
   canManage: boolean;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const STATUS = useMemo(() => makeStatus(colors), [colors]);
   const [rows, setRows] = useState<ExtensionRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -126,7 +130,7 @@ export function TaskExtensions({
                     <Text style={styles.btnPrimaryText}>Approve</Text>
                   </Pressable>
                   <Pressable style={styles.btn} onPress={() => decide(r, false)}>
-                    <Text style={[styles.btnText, { color: theme.color.danger }]}>Reject</Text>
+                    <Text style={[styles.btnText, { color: colors.danger }]}>Reject</Text>
                   </Pressable>
                 </View>
               )}
@@ -141,7 +145,7 @@ export function TaskExtensions({
             <TextInput
               style={styles.input}
               placeholder="New due date (YYYY-MM-DD)"
-              placeholderTextColor={theme.color.subtle}
+              placeholderTextColor={colors.subtle}
               value={date}
               onChangeText={setDate}
               autoCapitalize="none"
@@ -149,7 +153,7 @@ export function TaskExtensions({
             <TextInput
               style={styles.input}
               placeholder="Reason (optional)"
-              placeholderTextColor={theme.color.subtle}
+              placeholderTextColor={colors.subtle}
               value={reason}
               onChangeText={setReason}
               multiline
@@ -173,35 +177,37 @@ export function TaskExtensions({
   );
 }
 
-const styles = StyleSheet.create({
-  label: { fontSize: 12, color: theme.color.subtle, textTransform: 'uppercase', letterSpacing: 0.5 },
-  empty: { fontSize: 14, color: theme.color.muted },
-  item: { borderWidth: 1, borderColor: theme.color.border, borderRadius: theme.radius.sm, padding: 10, gap: 4 },
-  itemTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  date: { fontSize: 14, fontWeight: '600', color: theme.color.text },
-  reason: { fontSize: 13, color: theme.color.muted },
-  by: { fontSize: 12, color: theme.color.subtle },
-  decideRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
-  link: { fontSize: 14, fontWeight: '600', color: theme.color.accent, marginTop: 2 },
-  input: {
-    borderWidth: 1,
-    borderColor: theme.color.border,
-    borderRadius: theme.radius.sm,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: theme.color.text,
-  },
-  btn: {
-    borderRadius: theme.radius.pill,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    alignItems: 'center',
-    backgroundColor: theme.color.card,
-    borderWidth: 1,
-    borderColor: theme.color.border,
-  },
-  btnText: { fontWeight: '700', fontSize: 14, color: theme.color.text },
-  btnPrimary: { backgroundColor: theme.color.dark, borderColor: theme.color.dark },
-  btnPrimaryText: { color: theme.color.onDark, fontWeight: '700', fontSize: 14 },
-});
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    label: { fontSize: 12, fontFamily: font.body, color: c.subtle, textTransform: 'uppercase', letterSpacing: 0.5 },
+    empty: { fontSize: 14, fontFamily: font.body, color: c.muted },
+    item: { borderWidth: 1, borderColor: c.border, borderRadius: radius.sm, padding: 10, gap: 4 },
+    itemTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    date: { fontSize: 14, fontFamily: font.bodySemi, color: c.text },
+    reason: { fontSize: 13, fontFamily: font.body, color: c.muted },
+    by: { fontSize: 12, fontFamily: font.body, color: c.subtle },
+    decideRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+    link: { fontSize: 14, fontFamily: font.bodySemi, color: c.brand, marginTop: 2 },
+    input: {
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: radius.sm,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 14,
+      fontFamily: font.body,
+      color: c.text,
+    },
+    btn: {
+      borderRadius: radius.pill,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      alignItems: 'center',
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    btnText: { fontFamily: font.bodyBold, fontSize: 14, color: c.text },
+    btnPrimary: { backgroundColor: c.brand, borderColor: c.brand },
+    btnPrimaryText: { color: c.onBrand, fontFamily: font.bodyBold, fontSize: 14 },
+  });

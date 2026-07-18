@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { BrandLoader } from '../../../components/brand-loader';
 import {
   View,
@@ -26,33 +26,41 @@ import {
   type RequestProject,
 } from '../../../lib/data/payment-requests';
 import { RequestPaymentModal } from '../../../components/request-payment-modal';
-import { Card, Pill, StatTile } from '../../../components/ui';
-import { theme, contentWidth, type Tone } from '../../../lib/theme';
+import { contentWidth, radius, font, type Colors } from '../../../lib/theme';
+import { useTheme } from '../../../lib/theme-context';
 import { useResponsive } from '../../../lib/responsive';
 
 const EMPTY: MyPaymentsSummary = { earnedCents: 0, claimedCents: 0, paidCents: 0, outstandingCents: 0 };
 
-const REQ_TONE: Record<PaymentRequestStatus, Tone> = {
-  requested: { bg: theme.color.accentSoft, fg: theme.color.accent, bar: theme.color.accent },
-  approved: { bg: '#e0edff', fg: '#1d4ed8', bar: '#1d4ed8' },
-  paid: { bg: theme.color.successSoft, fg: theme.color.success, bar: theme.color.success },
-  rejected: { bg: '#e5e7eb', fg: '#374151', bar: '#6b7280' },
-};
+type PillPair = { bg: string; fg: string };
 
-const STATUS: Record<MyDraw['status'], { label: string; tone: Tone }> = {
-  pending: { label: 'Not claimed', tone: { bg: '#e5e7eb', fg: '#374151', bar: '#6b7280' } },
-  invoiced: {
-    label: 'Awaiting payment',
-    tone: { bg: theme.color.accentSoft, fg: theme.color.accent, bar: theme.color.accent },
-  },
-  paid: {
-    label: 'Paid',
-    tone: { bg: theme.color.successSoft, fg: theme.color.success, bar: theme.color.success },
-  },
+/** Status pill colour PAIRS — soft bg + deep fg — so they stay legible in dark
+ *  mode. Shared by payment requests and scheduled draws. */
+function reqPill(c: Colors, status: PaymentRequestStatus): PillPair {
+  switch (status) {
+    case 'requested':
+      return { bg: c.accentSoft, fg: c.accentDeep };
+    case 'approved':
+      return { bg: c.brandSoft, fg: c.brandDeep };
+    case 'paid':
+      return { bg: c.successSoft, fg: c.success };
+    case 'rejected':
+      return { bg: c.sunk, fg: c.muted };
+    default:
+      return { bg: c.sunk, fg: c.muted };
+  }
+}
+
+const DRAW_STATUS: Record<MyDraw['status'], { label: string; status: PaymentRequestStatus }> = {
+  pending: { label: 'Not claimed', status: 'rejected' },
+  invoiced: { label: 'Awaiting payment', status: 'requested' },
+  paid: { label: 'Paid', status: 'paid' },
 };
 
 export default function Payments() {
   const router = useRouter();
+  const { colors, scheme } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { contentMaxWidth } = useResponsive();
   const [lines, setLines] = useState<MyDraw[]>([]);
   const [summary, setSummary] = useState<MyPaymentsSummary>(EMPTY);
@@ -128,6 +136,7 @@ export default function Payments() {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
+              tintColor={colors.brand}
               onRefresh={() => {
                 setRefreshing(true);
                 void load();
@@ -135,30 +144,43 @@ export default function Payments() {
             />
           }
           ListHeaderComponent={
-            <View style={{ gap: 12 }}>
-              <Card style={styles.summary}>
-                <View style={styles.statsRow}>
-                  <StatTile label="Earned" value={formatUsd(summary.earnedCents)} />
-                  <StatTile
-                    label="Awaiting"
-                    value={formatUsd(summary.claimedCents)}
-                    accent={theme.color.accent}
-                  />
+            <View style={{ gap: 14 }}>
+              {/* 2×2 summary grid */}
+              <View style={styles.grid}>
+                <View style={styles.gridRow}>
+                  <View style={[styles.tile, scheme === 'light' && styles.shadow]}>
+                    <Text style={styles.tileLabel}>Earned</Text>
+                    <Text style={styles.tileValue}>{formatUsd(summary.earnedCents)}</Text>
+                  </View>
+                  <View style={[styles.tile, scheme === 'light' && styles.shadow]}>
+                    <Text style={styles.tileLabel}>Awaiting</Text>
+                    <Text style={[styles.tileValue, { color: colors.brand }]}>
+                      {formatUsd(summary.claimedCents)}
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.statsRow}>
-                  <StatTile
-                    label="Paid"
-                    value={formatUsd(summary.paidCents)}
-                    accent={theme.color.success}
-                  />
-                  <StatTile label="Outstanding" value={formatUsd(summary.outstandingCents)} />
+                <View style={styles.gridRow}>
+                  <View style={[styles.tile, scheme === 'light' && styles.shadow]}>
+                    <Text style={styles.tileLabel}>Paid</Text>
+                    <Text style={[styles.tileValue, { color: colors.success }]}>
+                      {formatUsd(summary.paidCents)}
+                    </Text>
+                  </View>
+                  <View style={[styles.tile, scheme === 'light' && styles.shadow]}>
+                    <Text style={styles.tileLabel}>Outstanding</Text>
+                    <Text style={styles.tileValue}>{formatUsd(summary.outstandingCents)}</Text>
+                  </View>
                 </View>
-              </Card>
+              </View>
 
+              {/* Payment requests */}
               <View style={styles.sectionHead}>
                 <Text style={styles.sectionTitle}>Payment requests</Text>
                 {projects.length > 0 && (
-                  <Pressable onPress={() => setModalOpen(true)} style={styles.reqBtn}>
+                  <Pressable
+                    onPress={() => setModalOpen(true)}
+                    style={({ pressed }) => [styles.reqBtn, pressed && styles.pressed]}
+                  >
                     <Text style={styles.reqBtnText}>Request payment</Text>
                   </Pressable>
                 )}
@@ -170,15 +192,23 @@ export default function Payments() {
                 </Text>
               ) : (
                 requests.map((r) => {
-                  const t = REQ_TONE[r.status];
+                  const pill = reqPill(colors, r.status);
                   return (
-                    <Card key={r.id} style={styles.reqCard}>
+                    <View key={r.id} style={[styles.card, scheme === 'light' && styles.shadow]}>
                       <View style={styles.drawTop}>
-                        <Text style={styles.project}>{r.projectName}</Text>
-                        <Pill label={PAYMENT_REQUEST_STATUS_LABEL[r.status]} tone={t} />
+                        <Text style={styles.project} numberOfLines={1}>
+                          {r.projectName}
+                        </Text>
+                        <View style={[styles.pill, { backgroundColor: pill.bg }]}>
+                          <Text style={[styles.pillText, { color: pill.fg }]}>
+                            {PAYMENT_REQUEST_STATUS_LABEL[r.status]}
+                          </Text>
+                        </View>
                       </View>
                       <View style={styles.drawBottom}>
-                        <Text style={styles.task}>{r.title}</Text>
+                        <Text style={styles.task} numberOfLines={1}>
+                          {r.title}
+                        </Text>
                         <Text style={styles.amount}>{formatUsd(r.amountCents)}</Text>
                       </View>
                       {r.status === 'rejected' && r.reviewNote ? (
@@ -196,12 +226,14 @@ export default function Payments() {
                           </Pressable>
                         ) : null}
                       </View>
-                    </Card>
+                    </View>
                   );
                 })
               )}
 
-              {lines.length > 0 && <Text style={styles.sectionTitle}>Scheduled draws</Text>}
+              {lines.length > 0 && (
+                <Text style={[styles.sectionTitle, styles.drawsHead]}>Scheduled draws</Text>
+              )}
             </View>
           }
           ListEmptyComponent={
@@ -210,14 +242,22 @@ export default function Payments() {
             </Text>
           }
           renderItem={({ item }) => {
-            const s = STATUS[item.status];
+            const meta = DRAW_STATUS[item.status];
+            const pill = reqPill(colors, meta.status);
             return (
-              <Card style={styles.draw}>
+              <View style={[styles.card, scheme === 'light' && styles.shadow]}>
                 <View style={styles.drawTop}>
-                  <Text style={styles.project}>{item.projectName}</Text>
-                  <Pill label={s.label} tone={s.tone} />
+                  <Text style={styles.project} numberOfLines={1}>
+                    {item.projectName}
+                  </Text>
+                  <View style={[styles.pill, { backgroundColor: pill.bg }]}>
+                    <Text style={[styles.pillText, { color: pill.fg }]}>{meta.label}</Text>
+                  </View>
                 </View>
-                <Pressable onPress={() => item.taskId && router.push(`/(app)/task/${item.taskId}`)}>
+                <Pressable
+                  onPress={() => item.taskId && router.push(`/(app)/task/${item.taskId}`)}
+                  style={({ pressed }) => pressed && item.taskId ? styles.pressed : undefined}
+                >
                   <Text style={styles.task}>{item.taskTitle ?? item.name}</Text>
                 </Pressable>
                 <View style={styles.drawBottom}>
@@ -236,14 +276,18 @@ export default function Payments() {
                   <Pressable
                     onPress={() => claim(item)}
                     disabled={claiming === item.id}
-                    style={[styles.claimBtn, claiming === item.id && styles.claimBtnBusy]}
+                    style={({ pressed }) => [
+                      styles.claimBtn,
+                      claiming === item.id && styles.claimBtnBusy,
+                      pressed && styles.pressed,
+                    ]}
                   >
                     <Text style={styles.claimText}>
                       {claiming === item.id ? 'Submitting…' : 'Claim payment'}
                     </Text>
                   </Pressable>
                 ) : null}
-              </Card>
+              </View>
             );
           }}
         />
@@ -262,39 +306,75 @@ export default function Payments() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.color.bg },
-  title: { fontSize: 24, fontWeight: '800', color: theme.color.text, paddingHorizontal: 20, paddingTop: 8 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  listContent: { padding: 16, gap: 10, ...contentWidth },
-  emptyWrap: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  empty: { color: theme.color.subtle, fontSize: 14, textAlign: 'center' },
-  summary: { gap: 12, marginBottom: 4 },
-  statsRow: { flexDirection: 'row', gap: 12 },
-  sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sectionTitle: { fontSize: 14, fontWeight: '800', color: theme.color.text },
-  reqBtn: { backgroundColor: theme.color.dark, borderRadius: theme.radius.pill, paddingHorizontal: 14, paddingVertical: 8 },
-  reqBtnText: { color: theme.color.onDark, fontWeight: '700', fontSize: 13 },
-  reqCard: { gap: 6 },
-  hint: { fontSize: 13, color: theme.color.subtle },
-  linkRow: { flexDirection: 'row', gap: 16, marginTop: 2 },
-  link: { fontSize: 13, fontWeight: '600', color: theme.color.accent },
-  draw: { gap: 6 },
-  drawTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  project: { fontSize: 12, fontWeight: '600', color: theme.color.subtle },
-  task: { fontSize: 15, fontWeight: '700', color: theme.color.text },
-  drawBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  drawName: { fontSize: 13, color: theme.color.muted },
-  amount: { fontSize: 15, fontWeight: '800', color: theme.color.text },
-  note: { fontSize: 12, color: theme.color.muted, fontStyle: 'italic' },
-  paidRef: { fontSize: 12, color: theme.color.success },
-  claimBtn: {
-    marginTop: 6,
-    backgroundColor: theme.color.dark,
-    borderRadius: theme.radius.pill,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  claimBtnBusy: { opacity: 0.6 },
-  claimText: { color: theme.color.onDark, fontWeight: '700', fontSize: 14 },
-});
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    safe: { flex: 1, backgroundColor: c.bg },
+    title: {
+      fontSize: 26,
+      fontFamily: font.displayBold,
+      color: c.text,
+      paddingHorizontal: 20,
+      paddingTop: 8,
+      letterSpacing: -0.3,
+    },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    listContent: { padding: 16, gap: 10, ...contentWidth },
+    emptyWrap: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+    empty: { color: c.subtle, fontSize: 14, fontFamily: font.body, textAlign: 'center' },
+    pressed: { opacity: 0.85 },
+    shadow: {
+      shadowColor: '#101828',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06,
+      shadowRadius: 3,
+      elevation: 1,
+    },
+    grid: { gap: 12 },
+    gridRow: { flexDirection: 'row', gap: 12 },
+    tile: {
+      flex: 1,
+      backgroundColor: c.surface,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: c.border,
+      padding: 14,
+      gap: 4,
+    },
+    tileLabel: { fontSize: 12, fontFamily: font.body, color: c.muted },
+    tileValue: { fontSize: 22, fontFamily: font.displayBold, color: c.text, fontVariant: ['tabular-nums'] },
+    sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    sectionTitle: { fontSize: 17, fontFamily: font.displayBold, color: c.text },
+    drawsHead: { marginTop: 4 },
+    reqBtn: { backgroundColor: c.text, borderRadius: radius.pill, paddingHorizontal: 14, paddingVertical: 8 },
+    reqBtnText: { color: c.bg, fontFamily: font.bodyBold, fontSize: 13 },
+    hint: { fontSize: 13, fontFamily: font.body, color: c.subtle },
+    card: {
+      backgroundColor: c.surface,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: c.border,
+      padding: 16,
+      gap: 8,
+    },
+    pill: { alignSelf: 'flex-start', borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 3 },
+    pillText: { fontSize: 11, fontFamily: font.bodyBold },
+    linkRow: { flexDirection: 'row', gap: 16, marginTop: 2 },
+    link: { fontSize: 13, fontFamily: font.bodySemi, color: c.brand },
+    drawTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    project: { fontSize: 12, fontFamily: font.bodySemi, color: c.subtle, flex: 1 },
+    task: { fontSize: 15, fontFamily: font.bodyBold, color: c.text },
+    drawBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    drawName: { fontSize: 13, fontFamily: font.body, color: c.muted },
+    amount: { fontSize: 15, fontFamily: font.display, color: c.text, fontVariant: ['tabular-nums'] },
+    note: { fontSize: 12, fontFamily: font.body, color: c.muted, fontStyle: 'italic' },
+    paidRef: { fontSize: 12, fontFamily: font.body, color: c.success },
+    claimBtn: {
+      marginTop: 6,
+      backgroundColor: c.text,
+      borderRadius: radius.pill,
+      paddingVertical: 10,
+      alignItems: 'center',
+    },
+    claimBtnBusy: { opacity: 0.6 },
+    claimText: { color: c.bg, fontFamily: font.bodyBold, fontSize: 14 },
+  });

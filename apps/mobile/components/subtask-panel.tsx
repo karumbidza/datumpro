@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View, Text, TextInput, Pressable, Image, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Card, ProgressBar } from './ui';
-import { theme } from '../lib/theme';
+import { radius, font, type Colors } from '../lib/theme';
+import { useTheme } from '../lib/theme-context';
 import {
   acceptTask,
   declineTask,
@@ -44,6 +45,8 @@ export function SubtaskPanel({
   taskEnd: string | null;
   onChanged: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [busy, setBusy] = useState(false);
   const [declineOpen, setDeclineOpen] = useState(false);
   const [handBackOpen, setHandBackOpen] = useState(false);
@@ -128,7 +131,7 @@ export function SubtaskPanel({
               value={reason}
               onChangeText={setReason}
               placeholder="Reason (shared with the PM)"
-              placeholderTextColor={theme.color.subtle}
+              placeholderTextColor={colors.subtle}
               style={styles.input}
               multiline
             />
@@ -164,7 +167,7 @@ export function SubtaskPanel({
       )}
 
       <View style={styles.progressRow}>
-        <ProgressBar value={pct} color={theme.color.accent} />
+        <ProgressBar value={pct} color={colors.brand} />
       </View>
 
       <View style={styles.list}>
@@ -179,7 +182,7 @@ export function SubtaskPanel({
                 <Ionicons
                   name={s.isDone ? 'checkmark-circle' : 'ellipse-outline'}
                   size={22}
-                  color={s.isDone ? theme.color.success : theme.color.subtle}
+                  color={s.isDone ? colors.success : colors.subtle}
                 />
               </Pressable>
               <View style={{ flex: 1 }}>
@@ -192,7 +195,7 @@ export function SubtaskPanel({
               </View>
               {canEdit && (
                 <Pressable disabled={busy} onPress={() => run(() => removeSubtask(s.id))} hitSlop={8}>
-                  <Ionicons name="close" size={18} color={theme.color.subtle} />
+                  <Ionicons name="close" size={18} color={colors.subtle} />
                 </Pressable>
               )}
             </View>
@@ -204,7 +207,7 @@ export function SubtaskPanel({
                 )}
                 {canEdit && (
                   <Pressable style={styles.addPhoto} disabled={busy} onPress={() => attachPhoto(s.id)}>
-                    <Ionicons name="camera-outline" size={16} color={theme.color.accent} />
+                    <Ionicons name="camera-outline" size={16} color={colors.brand} />
                   </Pressable>
                 )}
               </View>
@@ -223,7 +226,7 @@ export function SubtaskPanel({
               value={newTitle}
               onChangeText={setNewTitle}
               placeholder="Add a step…"
-              placeholderTextColor={theme.color.subtle}
+              placeholderTextColor={colors.subtle}
               style={[styles.input, { flex: 1 }]}
             />
             <Pressable
@@ -247,7 +250,7 @@ export function SubtaskPanel({
                 })
               }
             >
-              {busy ? <ActivityIndicator color={theme.color.onDark} /> : <Text style={styles.addBtnText}>Add</Text>}
+              {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.addBtnText}>Add</Text>}
             </Pressable>
           </View>
           <View style={styles.dateRow}>
@@ -273,7 +276,7 @@ export function SubtaskPanel({
                 value={reason}
                 onChangeText={setReason}
                 placeholder="Why are you handing it back? (shared with the PM)"
-                placeholderTextColor={theme.color.subtle}
+                placeholderTextColor={colors.subtle}
                 style={styles.input}
                 multiline
               />
@@ -303,55 +306,57 @@ export function SubtaskPanel({
   );
 }
 
-const styles = StyleSheet.create({
-  title: { fontSize: 15, fontWeight: '800', color: theme.color.text },
-  hint: { fontSize: 13, color: theme.color.muted, marginTop: 4, marginBottom: 10 },
-  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  count: { fontSize: 12, fontWeight: '700', color: theme.color.muted },
-  pending: { fontSize: 13, color: theme.color.warning, marginTop: 4 },
-  progressRow: { marginTop: 10 },
-  list: { marginTop: 10, gap: 12 },
-  itemWrap: { gap: 6 },
-  item: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  photoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginLeft: 32 },
-  thumb: { width: 44, height: 44, borderRadius: 8, backgroundColor: theme.color.border },
-  addPhoto: {
-    width: 44,
-    height: 44,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: theme.color.border,
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  itemText: { fontSize: 14, color: theme.color.text },
-  itemDone: { color: theme.color.subtle, textDecorationLine: 'line-through' },
-  itemDates: { fontSize: 11, color: theme.color.subtle, marginTop: 1 },
-  empty: { fontSize: 13, color: theme.color.subtle, paddingVertical: 6 },
-  row: { flexDirection: 'row', gap: 8, marginTop: 4 },
-  btn: { flex: 1, borderRadius: theme.radius.md, paddingVertical: 12, alignItems: 'center' },
-  btnPrimary: { backgroundColor: theme.color.accent },
-  btnPrimaryText: { color: theme.color.onDark, fontWeight: '700' },
-  btnDanger: { backgroundColor: theme.color.danger },
-  btnOutline: { borderWidth: 1, borderColor: theme.color.border },
-  btnOutlineText: { color: theme.color.text, fontWeight: '600' },
-  input: {
-    backgroundColor: theme.color.card,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.color.border,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: theme.color.text,
-  },
-  addBlock: { marginTop: 12, gap: 8 },
-  addRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  dateRow: { flexDirection: 'row', gap: 8 },
-  addBtn: { backgroundColor: theme.color.dark, borderRadius: theme.radius.md, paddingHorizontal: 18, paddingVertical: 11 },
-  addBtnText: { color: theme.color.onDark, fontWeight: '700' },
-  gateHint: { fontSize: 11, color: theme.color.subtle, marginTop: 8 },
-  handBack: { marginTop: 14, borderTopWidth: 1, borderTopColor: theme.color.border, paddingTop: 12 },
-  handBackLink: { fontSize: 12, fontWeight: '600', color: theme.color.subtle },
-});
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    title: { fontSize: 15, fontFamily: font.bodyHeavy, color: c.text },
+    hint: { fontSize: 13, fontFamily: font.body, color: c.muted, marginTop: 4, marginBottom: 10 },
+    headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    count: { fontSize: 12, fontFamily: font.bodyBold, color: c.muted },
+    pending: { fontSize: 13, fontFamily: font.body, color: c.accent, marginTop: 4 },
+    progressRow: { marginTop: 10 },
+    list: { marginTop: 10, gap: 12 },
+    itemWrap: { gap: 6 },
+    item: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    photoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginLeft: 32 },
+    thumb: { width: 44, height: 44, borderRadius: 8, backgroundColor: c.border },
+    addPhoto: {
+      width: 44,
+      height: 44,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderStyle: 'dashed',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    itemText: { fontSize: 14, fontFamily: font.body, color: c.text },
+    itemDone: { color: c.subtle, textDecorationLine: 'line-through' },
+    itemDates: { fontSize: 11, fontFamily: font.body, color: c.subtle, marginTop: 1 },
+    empty: { fontSize: 13, fontFamily: font.body, color: c.subtle, paddingVertical: 6 },
+    row: { flexDirection: 'row', gap: 8, marginTop: 4 },
+    btn: { flex: 1, borderRadius: radius.md, paddingVertical: 12, alignItems: 'center' },
+    btnPrimary: { backgroundColor: c.brand },
+    btnPrimaryText: { color: c.onBrand, fontFamily: font.bodyBold },
+    btnDanger: { backgroundColor: c.danger },
+    btnOutline: { borderWidth: 1, borderColor: c.border },
+    btnOutlineText: { color: c.text, fontFamily: font.bodySemi },
+    input: {
+      backgroundColor: c.surface,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: c.border,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 14,
+      fontFamily: font.body,
+      color: c.text,
+    },
+    addBlock: { marginTop: 12, gap: 8 },
+    addRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+    dateRow: { flexDirection: 'row', gap: 8 },
+    addBtn: { backgroundColor: c.brand, borderRadius: radius.md, paddingHorizontal: 18, paddingVertical: 11 },
+    addBtnText: { color: c.onBrand, fontFamily: font.bodyBold },
+    gateHint: { fontSize: 11, fontFamily: font.body, color: c.subtle, marginTop: 8 },
+    handBack: { marginTop: 14, borderTopWidth: 1, borderTopColor: c.border, paddingTop: 12 },
+    handBackLink: { fontSize: 12, fontFamily: font.bodySemi, color: c.subtle },
+  });

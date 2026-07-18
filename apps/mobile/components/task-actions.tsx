@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { TaskDetail, TaskPermissions } from '../lib/data/tasks';
 import { startTask, submitTask, approveTask, rejectTask } from '../lib/data/task-actions';
-import { theme } from '../lib/theme';
+import { radius, font, type Colors } from '../lib/theme';
+import { useTheme } from '../lib/theme-context';
 
 type Mode = 'none' | 'submit' | 'reject';
 
@@ -25,6 +26,8 @@ export function TaskActions({
   /** At least one planned step exists — required before "Start". */
   hasPlan?: boolean;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [mode, setMode] = useState<Mode>('none');
   const [notes, setNotes] = useState('');
   const [declared, setDeclared] = useState(false);
@@ -61,7 +64,7 @@ export function TaskActions({
 
       {canStart && (
         <Pressable style={[styles.btn, styles.primary]} disabled={busy} onPress={() => run(() => startTask(task.id, task.orgId))}>
-          {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Start task</Text>}
+          {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.primaryText}>Start task</Text>}
         </Pressable>
       )}
       {startBlockedNoPlan && (
@@ -81,7 +84,7 @@ export function TaskActions({
           <TextInput
             style={styles.input}
             placeholder="What was completed? (min 10 characters)"
-            placeholderTextColor={theme.color.subtle}
+            placeholderTextColor={colors.subtle}
             value={notes}
             onChangeText={setNotes}
             multiline
@@ -93,7 +96,7 @@ export function TaskActions({
             <Ionicons
               name={declared ? 'checkbox' : 'square-outline'}
               size={20}
-              color={declared ? theme.color.accent : theme.color.subtle}
+              color={declared ? colors.brand : colors.subtle}
             />
             <Text style={styles.checkText}>I confirm this work is complete and accurate.</Text>
           </Pressable>
@@ -108,7 +111,7 @@ export function TaskActions({
                 run(() => submitTask({ taskId: task.id, orgId: task.orgId, notes, requiresPhoto: task.requiresPhoto }))
               }
             >
-              {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Submit</Text>}
+              {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.primaryText}>Submit</Text>}
             </Pressable>
           </View>
         </View>
@@ -121,10 +124,10 @@ export function TaskActions({
             disabled={busy}
             onPress={() => run(() => approveTask({ taskId: task.id, orgId: task.orgId, dueDate: task.dueDate }))}
           >
-            {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Approve</Text>}
+            {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.primaryText}>Approve</Text>}
           </Pressable>
           <Pressable style={[styles.btn, styles.ghost]} onPress={() => setMode('reject')}>
-            <Text style={[styles.ghostText, { color: theme.color.danger }]}>Reject</Text>
+            <Text style={[styles.ghostText, { color: colors.danger }]}>Reject</Text>
           </Pressable>
         </View>
       )}
@@ -133,7 +136,7 @@ export function TaskActions({
           <TextInput
             style={styles.input}
             placeholder="Reason for sending back"
-            placeholderTextColor={theme.color.subtle}
+            placeholderTextColor={colors.subtle}
             value={reason}
             onChangeText={setReason}
             multiline
@@ -147,7 +150,7 @@ export function TaskActions({
               disabled={busy || !reason.trim()}
               onPress={() => run(() => rejectTask({ taskId: task.id, orgId: task.orgId, reason }))}
             >
-              {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Reject</Text>}
+              {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.primaryText}>Reject</Text>}
             </Pressable>
           </View>
         </View>
@@ -156,37 +159,39 @@ export function TaskActions({
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: theme.color.card,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.color.border,
-    padding: 14,
-    gap: 10,
-  },
-  label: { fontSize: 12, color: theme.color.subtle, textTransform: 'uppercase', letterSpacing: 0.5 },
-  btn: { flex: 1, borderRadius: theme.radius.sm, paddingVertical: 13, alignItems: 'center', justifyContent: 'center' },
-  primary: { backgroundColor: theme.color.accent },
-  primaryText: { color: '#fff', fontWeight: '700' },
-  success: { backgroundColor: theme.color.success },
-  danger: { backgroundColor: theme.color.danger },
-  ghost: { backgroundColor: '#f1f2f4' },
-  ghostText: { color: theme.color.muted, fontWeight: '700' },
-  disabled: { opacity: 0.5 },
-  row: { flexDirection: 'row', gap: 10 },
-  form: { gap: 10 },
-  input: {
-    borderWidth: 1,
-    borderColor: theme.color.border,
-    borderRadius: theme.radius.sm,
-    padding: 12,
-    fontSize: 14,
-    color: theme.color.text,
-    minHeight: 64,
-    textAlignVertical: 'top',
-  },
-  hint: { fontSize: 12, color: theme.color.warning },
-  check: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  checkText: { flex: 1, fontSize: 13, color: theme.color.muted },
-});
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    card: {
+      backgroundColor: c.surface,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: c.border,
+      padding: 14,
+      gap: 10,
+    },
+    label: { fontSize: 12, fontFamily: font.body, color: c.subtle, textTransform: 'uppercase', letterSpacing: 0.5 },
+    btn: { flex: 1, borderRadius: radius.sm, paddingVertical: 13, alignItems: 'center', justifyContent: 'center' },
+    primary: { backgroundColor: c.brand },
+    primaryText: { color: c.onBrand, fontFamily: font.bodyBold },
+    success: { backgroundColor: c.success },
+    danger: { backgroundColor: c.danger },
+    ghost: { backgroundColor: c.sunk },
+    ghostText: { color: c.muted, fontFamily: font.bodyBold },
+    disabled: { opacity: 0.5 },
+    row: { flexDirection: 'row', gap: 10 },
+    form: { gap: 10 },
+    input: {
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: radius.sm,
+      padding: 12,
+      fontSize: 14,
+      fontFamily: font.body,
+      color: c.text,
+      minHeight: 64,
+      textAlignVertical: 'top',
+    },
+    hint: { fontSize: 12, fontFamily: font.body, color: c.accent },
+    check: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    checkText: { flex: 1, fontSize: 13, fontFamily: font.body, color: c.muted },
+  });

@@ -1,10 +1,16 @@
-import { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Image } from 'react-native';
+import { useMemo, useState } from 'react';
+import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
+import { radius, font, type Colors } from '../lib/theme';
+import { useTheme } from '../lib/theme-context';
 
 type Method = 'password' | 'code';
 
 export default function SignIn() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const [method, setMethod] = useState<Method>('password');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -64,8 +70,10 @@ export default function SignIn() {
 
   return (
     <View style={styles.screen}>
-      <Image source={require('../assets/logo.png')} style={styles.logo} resizeMode="cover" />
-      <Text style={styles.brand}>DatumPro Field</Text>
+      <View style={styles.brandTile}>
+        <Ionicons name="stats-chart" size={34} color={colors.onBrand} />
+      </View>
+      <Text style={styles.brand}>datumpro Field</Text>
       <Text style={styles.subtitle}>Sign in to your site account</Text>
 
       {/* Method toggle */}
@@ -84,31 +92,37 @@ export default function SignIn() {
         </Pressable>
       </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="you@company.com"
-        placeholderTextColor="#a1a1aa"
-        autoCapitalize="none"
-        autoComplete="email"
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
-        editable={!codeSent}
-      />
+      <View style={styles.field}>
+        <Ionicons name="mail-outline" size={18} color={colors.subtle} style={styles.fieldIcon} />
+        <TextInput
+          style={styles.input}
+          placeholder="you@company.com"
+          placeholderTextColor={colors.subtle}
+          autoCapitalize="none"
+          autoComplete="email"
+          keyboardType="email-address"
+          value={email}
+          onChangeText={setEmail}
+          editable={!codeSent}
+        />
+      </View>
 
       {method === 'password' ? (
         <>
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor="#a1a1aa"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
+          <View style={styles.field}>
+            <Ionicons name="lock-closed-outline" size={18} color={colors.subtle} style={styles.fieldIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor={colors.subtle}
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+            />
+          </View>
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <Pressable style={[styles.button, busy && styles.buttonDisabled]} onPress={signInPassword} disabled={busy}>
-            {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign in</Text>}
+            {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.buttonText}>Sign in</Text>}
           </Pressable>
           <Text style={styles.hint}>Signed up with Google or LinkedIn? Use “Email code” instead.</Text>
         </>
@@ -117,26 +131,29 @@ export default function SignIn() {
           {info ? <Text style={styles.info}>{info}</Text> : null}
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <Pressable style={[styles.button, busy && styles.buttonDisabled]} onPress={sendCode} disabled={busy}>
-            {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Email me a code</Text>}
+            {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.buttonText}>Email me a code</Text>}
           </Pressable>
           <Text style={styles.hint}>Works whether you signed up with a password, Google or LinkedIn.</Text>
         </>
       ) : (
         <>
-          <TextInput
-            style={styles.input}
-            placeholder="6-digit code"
-            placeholderTextColor="#a1a1aa"
-            keyboardType="number-pad"
-            autoComplete="one-time-code"
-            maxLength={6}
-            value={code}
-            onChangeText={setCode}
-          />
+          <View style={styles.field}>
+            <Ionicons name="keypad-outline" size={18} color={colors.subtle} style={styles.fieldIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="6-digit code"
+              placeholderTextColor={colors.subtle}
+              keyboardType="number-pad"
+              autoComplete="one-time-code"
+              maxLength={6}
+              value={code}
+              onChangeText={setCode}
+            />
+          </View>
           {info ? <Text style={styles.info}>{info}</Text> : null}
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <Pressable style={[styles.button, busy && styles.buttonDisabled]} onPress={verifyCode} disabled={busy}>
-            {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Verify &amp; sign in</Text>}
+            {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.buttonText}>Verify &amp; sign in</Text>}
           </Pressable>
           <Pressable onPress={sendCode} disabled={busy}>
             <Text style={styles.link}>Resend code</Text>
@@ -150,42 +167,67 @@ export default function SignIn() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, justifyContent: 'center', paddingHorizontal: 24, gap: 12, backgroundColor: '#fff' },
-  logo: { width: 88, height: 88, borderRadius: 20, alignSelf: 'center', marginBottom: 4 },
-  brand: { fontSize: 24, fontWeight: '700', color: '#18181b' },
-  subtitle: { fontSize: 14, color: '#71717a', marginBottom: 8 },
-  toggle: {
-    flexDirection: 'row',
-    backgroundColor: '#f4f4f5',
-    borderRadius: 10,
-    padding: 4,
-    marginBottom: 4,
-  },
-  toggleBtn: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
-  toggleBtnActive: { backgroundColor: '#fff' },
-  toggleText: { fontSize: 14, color: '#71717a', fontWeight: '600' },
-  toggleTextActive: { color: '#18181b' },
-  input: {
-    borderWidth: 1,
-    borderColor: '#e4e4e7',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: '#18181b',
-  },
-  error: { color: '#dc2626', fontSize: 13 },
-  info: { color: '#3f3f46', fontSize: 13 },
-  hint: { color: '#a1a1aa', fontSize: 12, textAlign: 'center', marginTop: 2 },
-  link: { color: '#4f46e5', fontSize: 14, fontWeight: '600', textAlign: 'center', paddingVertical: 6 },
-  button: {
-    backgroundColor: '#4f46e5',
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: '#fff', fontWeight: '600', fontSize: 15 },
-});
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    screen: { flex: 1, justifyContent: 'center', paddingHorizontal: 24, gap: 12, backgroundColor: c.bg },
+    brandTile: {
+      width: 72,
+      height: 72,
+      borderRadius: radius.md,
+      backgroundColor: c.brand,
+      alignItems: 'center',
+      justifyContent: 'center',
+      alignSelf: 'center',
+      marginBottom: 4,
+    },
+    brand: { fontSize: 24, fontFamily: font.displayBold, color: c.text, textAlign: 'center' },
+    subtitle: { fontSize: 14, fontFamily: font.body, color: c.muted, marginBottom: 8, textAlign: 'center' },
+    toggle: {
+      flexDirection: 'row',
+      backgroundColor: c.sunk,
+      borderRadius: radius.sm,
+      padding: 4,
+      marginBottom: 4,
+    },
+    toggleBtn: { flex: 1, paddingVertical: 8, borderRadius: radius.sm - 4, alignItems: 'center' },
+    toggleBtnActive: {
+      backgroundColor: c.surface,
+      shadowColor: '#101828',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.08,
+      shadowRadius: 3,
+      elevation: 1,
+    },
+    toggleText: { fontSize: 14, fontFamily: font.bodySemi, color: c.muted },
+    toggleTextActive: { color: c.text },
+    field: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: radius.md,
+      paddingHorizontal: 14,
+    },
+    fieldIcon: { marginRight: 10 },
+    input: {
+      flex: 1,
+      paddingVertical: 12,
+      fontSize: 15,
+      fontFamily: font.body,
+      color: c.text,
+    },
+    error: { color: c.danger, fontSize: 13, fontFamily: font.body },
+    info: { color: c.muted, fontSize: 13, fontFamily: font.body },
+    hint: { color: c.subtle, fontSize: 12, fontFamily: font.body, textAlign: 'center', marginTop: 2 },
+    link: { color: c.brand, fontSize: 14, fontFamily: font.bodySemi, textAlign: 'center', paddingVertical: 6 },
+    button: {
+      backgroundColor: c.brand,
+      borderRadius: radius.md,
+      paddingVertical: 14,
+      alignItems: 'center',
+      marginTop: 4,
+    },
+    buttonDisabled: { opacity: 0.6 },
+    buttonText: { color: c.onBrand, fontFamily: font.bodyBold, fontSize: 15 },
+  });

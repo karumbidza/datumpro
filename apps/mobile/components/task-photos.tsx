@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Image, Pressable, StyleSheet, Alert, ActivityIndicator, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { listTaskPhotos, uploadTaskPhoto, type TaskPhoto } from '../lib/data/media';
-import { theme } from '../lib/theme';
+import { font, type Colors } from '../lib/theme';
+import { useTheme } from '../lib/theme-context';
 
 interface Props {
   orgId: string;
@@ -38,6 +39,8 @@ function openInMaps(lat: number, lng: number) {
 /** Site-evidence photos for a task: capture with the camera or pick from the
  *  library, geotag from the photo's EXIF, upload, and show what's attached. */
 export function TaskPhotos({ orgId, projectId, taskId }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [photos, setPhotos] = useState<TaskPhoto[]>([]);
   const [busy, setBusy] = useState(false);
 
@@ -126,26 +129,27 @@ export function TaskPhotos({ orgId, projectId, taskId }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  block: { gap: 8, marginTop: 8 },
-  label: { fontSize: 12, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: 0.5 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  thumb: { width: 96, height: 96, borderRadius: 8, backgroundColor: '#f4f4f5' },
-  geoBadge: {
-    position: 'absolute',
-    left: 4,
-    bottom: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 999,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  geoText: { color: '#fff', fontSize: 10, fontWeight: '600' },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  btn: { backgroundColor: theme.color.accentSoft, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10 },
-  btnDisabled: { opacity: 0.5 },
-  btnText: { color: theme.color.accent, fontWeight: '600' },
-});
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    block: { gap: 8, marginTop: 8 },
+    label: { fontSize: 12, fontFamily: font.body, color: c.subtle, textTransform: 'uppercase', letterSpacing: 0.5 },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    thumb: { width: 96, height: 96, borderRadius: 8, backgroundColor: c.sunk },
+    geoBadge: {
+      position: 'absolute',
+      left: 4,
+      bottom: 4,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      borderRadius: 999,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+    },
+    geoText: { color: '#ffffff', fontSize: 10, fontFamily: font.bodySemi },
+    actions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    btn: { backgroundColor: c.brandSoft, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10 },
+    btnDisabled: { opacity: 0.5 },
+    btnText: { color: c.brand, fontFamily: font.bodySemi },
+  });
