@@ -15,6 +15,7 @@ import {
 import type { SidebarProject, OrgMembershipSummary } from '@/lib/data/org';
 import { signOut, setActiveOrg } from '@/app/(app)/actions';
 import { NotificationsBell } from '@/components/shell/notifications-bell';
+import { ThemeToggle } from '@/components/shell/theme-toggle';
 import { activeProjectId, computeNav, isNavActive } from '@/components/shell/nav-items';
 
 interface SidebarProps {
@@ -94,6 +95,7 @@ export function Sidebar({ projects, orgs, activeOrgId, email, canManageMembers, 
           >
             {email}
           </Link>
+          <ThemeToggle />
           <NotificationsBell />
           <form action={signOut}>
             <button

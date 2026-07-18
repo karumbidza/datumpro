@@ -7,6 +7,7 @@ import { Menu, X, Check, LogOut, Users, BrandMark } from '@/components/icons';
 import type { SidebarProject, OrgMembershipSummary } from '@/lib/data/org';
 import { signOut, setActiveOrg } from '@/app/(app)/actions';
 import { activeProjectId, computeNav, isNavActive } from '@/components/shell/nav-items';
+import { ThemeToggle } from '@/components/shell/theme-toggle';
 
 interface Props {
   projects: SidebarProject[];
@@ -48,6 +49,9 @@ export function MobileNav({ projects, orgs, activeOrgId, email, canManageMembers
         <span className="truncate text-sm font-semibold text-zinc-900 dark:text-white">
           {activeProject?.name ?? activeOrgName}
         </span>
+        <div className="ml-auto">
+          <ThemeToggle />
+        </div>
       </header>
 
       {open && (

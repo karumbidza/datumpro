@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* Class-based dark mode: the `dark:` variant responds to a `.dark` class on the
+   <html> element (set by next-themes) rather than the OS media query, so the
+   in-app toggle can override the system preference. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* DatumPro design tokens — clean, minimal, neutral zinc with a single blue accent.
    Mirrors the existing app's restrained aesthetic. */
 @theme {
@@ -14,15 +19,15 @@
   --foreground: #18181b; /* zinc-900 */
   --muted: #71717a;      /* zinc-500 */
   --border: #e4e4e7;     /* zinc-200 */
+  color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #09090b; /* zinc-950 */
-    --foreground: #fafafa;
-    --muted: #a1a1aa;
-    --border: #27272a;     /* zinc-800 */
-  }
+.dark {
+  --background: #09090b; /* zinc-950 */
+  --foreground: #fafafa;
+  --muted: #a1a1aa;
+  --border: #27272a;     /* zinc-800 */
+  color-scheme: dark;
 }
 
 html,
