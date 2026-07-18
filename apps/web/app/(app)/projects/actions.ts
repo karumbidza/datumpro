@@ -93,7 +93,7 @@ export async function createProject(_prev: FormState, formData: FormData): Promi
     );
 
   revalidatePath('/projects');
-  redirect(`/projects/${projectId}`);
+  redirect(`/projects/${projectId}/setup`);
 }
 
 /** Creates a client inline from the project form's "New client" sub-form. Returns
