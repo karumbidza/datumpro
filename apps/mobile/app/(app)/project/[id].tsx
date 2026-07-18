@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { listProjectTasks, canManageProjectById, type MyTask } from '../../../lib/data/tasks';
+import { subtaskProgressForTasks } from '../../../lib/data/subtasks';
 import { getProjectConversationId, getUnreadCount } from '../../../lib/data/chat';
 import { TaskCard } from '../../../components/task-card';
 import { contentWidth, radius, font, type Colors } from '../../../lib/theme';
@@ -18,6 +19,7 @@ export default function ProjectScreen() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { columns, contentMaxWidth } = useResponsive();
   const [tasks, setTasks] = useState<MyTask[]>([]);
+  const [progressMap, setProgressMap] = useState<Map<string, { done: number; total: number }>>(new Map());
   const [canManage, setCanManage] = useState(false);
   const [teamUnread, setTeamUnread] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -30,6 +32,7 @@ export default function ProjectScreen() {
       getProjectConversationId(String(id)),
     ]);
     setTasks(rows);
+    setProgressMap(await subtaskProgressForTasks(rows.map((t) => t.id)));
     setCanManage(manage);
     setTeamUnread(conv ? await getUnreadCount(conv) : 0);
     setLoading(false);
@@ -126,7 +129,7 @@ export default function ProjectScreen() {
           ListEmptyComponent={<Text style={styles.empty}>No tasks in this project yet.</Text>}
           renderItem={({ item }) => (
             <View style={columns > 1 ? styles.col : undefined}>
-              <TaskCard task={item} subtitle={`Priority: ${item.priority}`} />
+              <TaskCard task={item} subtitle={`Priority: ${item.priority}`} progress={progressMap.get(item.id)} />
             </View>
           )}
         />

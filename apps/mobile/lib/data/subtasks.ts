@@ -37,6 +37,23 @@ export function subtaskPct(subs: Subtask[]): number {
   return Math.round((100 * subs.filter((s) => s.isDone).length) / subs.length);
 }
 
+/** done/total subtask counts for a set of tasks, keyed by task id — for the
+ *  completion layer of the task-card progress bars. */
+export async function subtaskProgressForTasks(
+  taskIds: string[],
+): Promise<Map<string, { done: number; total: number }>> {
+  const map = new Map<string, { done: number; total: number }>();
+  if (taskIds.length === 0) return map;
+  const { data } = await supabase.from('task_subtasks').select('task_id, is_done').in('task_id', taskIds);
+  for (const s of ((data ?? []) as { task_id: string; is_done: boolean }[])) {
+    const e = map.get(s.task_id) ?? { done: 0, total: 0 };
+    e.total += 1;
+    if (s.is_done) e.done += 1;
+    map.set(s.task_id, e);
+  }
+  return map;
+}
+
 export async function acceptTask(taskId: string): Promise<void> {
   const { error } = await supabase
     .from('tasks')

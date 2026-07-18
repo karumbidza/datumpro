@@ -3,10 +3,29 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import type { MyTask } from '../lib/data/tasks';
-import { Pill, ProgressBar } from './ui';
+import { Pill, ScheduleBar } from './ui';
 import { formatDate, slaLabel, statusLabel } from '../lib/ui';
-import { slaTone, statusProgress, radius, font, type Colors } from '../lib/theme';
+import { slaTone, radius, font, type Colors } from '../lib/theme';
 import { useTheme } from '../lib/theme-context';
+
+/** ACTUAL completion — real work, never time-based. Done/submitted = 100, else the
+ *  ticked share of the plan; no plan reads 0 until steps are ticked. */
+function actualPct(task: MyTask, progress?: { done: number; total: number }): number {
+  if (task.status === 'done') return 100;
+  if (progress && progress.total > 0) return Math.round((100 * progress.done) / progress.total);
+  if (task.status === 'submitted') return 100;
+  return 0;
+}
+
+/** EXPECTED position — how far into the planned window "now" sits (the faint bar);
+ *  null when there's no window to measure against or the task is done. */
+function expectedPct(task: MyTask): number | null {
+  if (task.status === 'done') return null;
+  const s = task.plannedStartDate ? new Date(task.plannedStartDate).getTime() : null;
+  const e = (task.plannedEndDate ?? task.dueDate) ? new Date((task.plannedEndDate ?? task.dueDate) as string).getTime() : null;
+  if (s == null || e == null || e <= s) return null;
+  return Math.round(Math.min(1, Math.max(0, (Date.now() - s) / (e - s))) * 100);
+}
 
 function statusIcon(status: string): keyof typeof Ionicons.glyphMap {
   switch (status) {
@@ -25,13 +44,22 @@ function statusIcon(status: string): keyof typeof Ionicons.glyphMap {
 
 /** Task summary card — tap to open the task. `subtitle` defaults to the project
  *  name (handy in the Tasks tab); pass a custom one when the project is obvious. */
-export function TaskCard({ task, subtitle }: { task: MyTask; subtitle?: string }) {
+export function TaskCard({
+  task,
+  subtitle,
+  progress,
+}: {
+  task: MyTask;
+  subtitle?: string;
+  progress?: { done: number; total: number };
+}) {
   const router = useRouter();
   const { colors, scheme } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const tone = slaTone(colors, task.slaStatus);
   const pending = task.acceptanceStatus === 'pending';
-  const pct = pending ? 0 : statusProgress(task.status);
+  const pct = pending ? 0 : actualPct(task, progress);
+  const expected = pending ? null : expectedPct(task);
 
   return (
     <Pressable
@@ -60,7 +88,7 @@ export function TaskCard({ task, subtitle }: { task: MyTask; subtitle?: string }
       </View>
 
       <View style={styles.progress}>
-        <ProgressBar value={pct} color={tone.bar} />
+        <ScheduleBar actual={pct} expected={expected} done={task.status === 'done'} />
         <Text style={styles.pct}>{pct}%</Text>
       </View>
 

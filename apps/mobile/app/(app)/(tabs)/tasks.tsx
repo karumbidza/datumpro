@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { listMyTasks, type MyTask } from '../../../lib/data/tasks';
+import { subtaskProgressForTasks } from '../../../lib/data/subtasks';
 import { TaskCard } from '../../../components/task-card';
 import { contentWidth, radius, font, type Colors } from '../../../lib/theme';
 import { useTheme } from '../../../lib/theme-context';
@@ -24,13 +25,16 @@ export default function Tasks() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [tasks, setTasks] = useState<MyTask[]>([]);
+  const [progressMap, setProgressMap] = useState<Map<string, { done: number; total: number }>>(new Map());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
 
   const load = useCallback(async () => {
-    setTasks(await listMyTasks());
+    const rows = await listMyTasks();
+    setTasks(rows);
+    setProgressMap(await subtaskProgressForTasks(rows.map((t) => t.id)));
     setLoading(false);
     setRefreshing(false);
   }, []);
@@ -137,7 +141,7 @@ export default function Tasks() {
           ListEmptyComponent={<Text style={styles.empty}>Nothing here.</Text>}
           renderItem={({ item }) => (
             <View style={columns > 1 ? styles.col : undefined}>
-              <TaskCard task={item} />
+              <TaskCard task={item} progress={progressMap.get(item.id)} />
             </View>
           )}
         />

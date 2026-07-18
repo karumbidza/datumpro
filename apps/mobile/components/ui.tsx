@@ -37,6 +37,28 @@ export function ProgressBar({ value, color }: { value: number; color?: string })
   );
 }
 
+/** Planned-vs-actual rail: a faint "where it should be" fill (schedule/time),
+ *  a solid completion fill on top (green on/ahead, amber when behind), and a
+ *  hairline marker at the on-schedule target. Mirrors the web task list. */
+export function ScheduleBar({ actual, expected, done }: { actual: number; expected: number | null; done?: boolean }) {
+  const { colors } = useTheme();
+  const a = Math.max(0, Math.min(100, actual));
+  const e = expected == null ? null : Math.max(0, Math.min(100, expected));
+  const behind = !done && e != null && a < e - 1;
+  const fill = done ? colors.success : behind ? colors.accent : colors.success;
+  return (
+    <View style={[layout.track, { backgroundColor: colors.sunk }]}>
+      {e != null && (
+        <View style={[layout.barFill, { width: `${e}%`, backgroundColor: colors.subtle, opacity: 0.35 }]} />
+      )}
+      <View style={[layout.barFill, { width: `${a}%`, backgroundColor: fill }]} />
+      {e != null && e > 0 && e < 100 && (
+        <View style={[layout.marker, { left: `${e}%`, backgroundColor: colors.muted }]} />
+      )}
+    </View>
+  );
+}
+
 export function StatTile({
   label,
   value,
@@ -104,6 +126,8 @@ const layout = StyleSheet.create({
   pillText: { fontSize: 11, fontFamily: font.bodyBold },
   track: { flex: 1, height: 8, borderRadius: 999, overflow: 'hidden' },
   fill: { height: 8, borderRadius: 999 },
+  barFill: { position: 'absolute', left: 0, top: 0, height: 8, borderRadius: 999 },
+  marker: { position: 'absolute', top: 0, height: 8, width: 1.5, opacity: 0.6 },
   stat: {
     flex: 1,
     borderRadius: radius.lg,

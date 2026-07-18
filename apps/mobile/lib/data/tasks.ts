@@ -10,6 +10,8 @@ export interface MyTask {
   projectId: string;
   projectName: string;
   acceptanceStatus: 'pending' | 'accepted' | 'rejected' | null;
+  plannedStartDate: string | null;
+  plannedEndDate: string | null;
 }
 
 export interface TaskDetail extends MyTask {
@@ -17,9 +19,6 @@ export interface TaskDetail extends MyTask {
   assigneeId: string | null;
   requiresPhoto: boolean;
   description: string | null;
-  plannedStartDate: string | null;
-  plannedEndDate: string | null;
-  acceptanceStatus: 'pending' | 'accepted' | 'rejected' | null;
 }
 
 /** The current user's role relative to a task's project — drives which actions
@@ -83,21 +82,31 @@ export async function listMyTasks(): Promise<MyTask[]> {
 
   const { data } = await supabase
     .from('tasks')
-    .select('id, title, status, sla_status, due_date, priority, project_id, acceptance_status, projects(name)')
+    .select(
+      'id, title, status, sla_status, due_date, priority, project_id, acceptance_status, planned_start_date, planned_end_date, projects(name)',
+    )
     .eq('assignee_id', user.id)
     .order('due_date', { ascending: true, nullsFirst: false });
 
-  return ((data ?? []) as {
-    id: string;
-    title: string;
-    status: string;
-    sla_status: string;
-    due_date: string | null;
-    priority: string;
-    project_id: string;
-    acceptance_status: 'pending' | 'accepted' | 'rejected' | null;
-    projects: ProjectJoin;
-  }[]).map((t) => ({
+  return ((data ?? []) as TaskRow[]).map(mapTaskRow);
+}
+
+/** Shared row shape + mapper for the two task-list queries. */
+type TaskRow = {
+  id: string;
+  title: string;
+  status: string;
+  sla_status: string;
+  due_date: string | null;
+  priority: string;
+  project_id: string;
+  acceptance_status: 'pending' | 'accepted' | 'rejected' | null;
+  planned_start_date: string | null;
+  planned_end_date: string | null;
+  projects: ProjectJoin;
+};
+function mapTaskRow(t: TaskRow): MyTask {
+  return {
     id: t.id,
     title: t.title,
     status: t.status,
@@ -107,7 +116,9 @@ export async function listMyTasks(): Promise<MyTask[]> {
     projectId: t.project_id,
     projectName: projectName(t.projects),
     acceptanceStatus: t.acceptance_status,
-  }));
+    plannedStartDate: t.planned_start_date,
+    plannedEndDate: t.planned_end_date,
+  };
 }
 
 /** Every task in a project (RLS-scoped: managers/PMs see all, members see the
@@ -115,31 +126,13 @@ export async function listMyTasks(): Promise<MyTask[]> {
 export async function listProjectTasks(projectId: string): Promise<MyTask[]> {
   const { data } = await supabase
     .from('tasks')
-    .select('id, title, status, sla_status, due_date, priority, project_id, acceptance_status, projects(name)')
+    .select(
+      'id, title, status, sla_status, due_date, priority, project_id, acceptance_status, planned_start_date, planned_end_date, projects(name)',
+    )
     .eq('project_id', projectId)
     .order('due_date', { ascending: true, nullsFirst: false });
 
-  return ((data ?? []) as {
-    id: string;
-    title: string;
-    status: string;
-    sla_status: string;
-    due_date: string | null;
-    priority: string;
-    project_id: string;
-    acceptance_status: 'pending' | 'accepted' | 'rejected' | null;
-    projects: ProjectJoin;
-  }[]).map((t) => ({
-    id: t.id,
-    title: t.title,
-    status: t.status,
-    slaStatus: t.sla_status,
-    dueDate: t.due_date,
-    priority: t.priority,
-    projectId: t.project_id,
-    projectName: projectName(t.projects),
-    acceptanceStatus: t.acceptance_status,
-  }));
+  return ((data ?? []) as TaskRow[]).map(mapTaskRow);
 }
 
 /** A single task's detail (RLS-scoped). */
