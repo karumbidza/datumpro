@@ -135,7 +135,10 @@ export async function getPortfolioTimeline(orgId: string): Promise<DashboardTask
       .select('id, name, start_date, end_date')
       .eq('org_id', orgId)
       .order('created_at', { ascending: true }),
-    supabase.from('tasks').select('project_id, status, sla_status').eq('org_id', orgId),
+    supabase
+      .from('tasks')
+      .select('project_id, status, sla_status, planned_start_date, planned_end_date, due_date')
+      .eq('org_id', orgId),
   ]);
 
   const projects = (projectsRes.data ?? []) as {
@@ -144,14 +147,34 @@ export async function getPortfolioTimeline(orgId: string): Promise<DashboardTask
     start_date: string | null;
     end_date: string | null;
   }[];
-  const rawTasks = (tasksRes.data ?? []) as { project_id: string; status: TaskStatus; sla_status: TaskSlaStatus }[];
+  const rawTasks = (tasksRes.data ?? []) as {
+    project_id: string;
+    status: TaskStatus;
+    sla_status: TaskSlaStatus;
+    planned_start_date: string | null;
+    planned_end_date: string | null;
+    due_date: string | null;
+  }[];
 
-  const byProject = new Map<string, { status: TaskStatus; sla_status: TaskSlaStatus }[]>();
+  const byProject = new Map<string, typeof rawTasks>();
   for (const t of rawTasks) {
     const list = byProject.get(t.project_id) ?? [];
     list.push(t);
     byProject.set(t.project_id, list);
   }
+
+  // A project with no explicit start/end still belongs on the timeline — derive
+  // its window from its tasks' planned dates so it isn't silently dropped.
+  const taskWindow = (ts: typeof rawTasks) => {
+    let start: string | null = null;
+    let end: string | null = null;
+    for (const t of ts) {
+      if (t.planned_start_date && (!start || t.planned_start_date < start)) start = t.planned_start_date;
+      const e = t.planned_end_date ?? t.due_date;
+      if (e && (!end || e > end)) end = e;
+    }
+    return { start, end };
+  };
 
   return projects.map((p) => {
     const ts = byProject.get(p.id) ?? [];
@@ -168,6 +191,9 @@ export async function getPortfolioTimeline(orgId: string): Promise<DashboardTask
       : ts.some((t) => t.sla_status === 'at_risk')
         ? 'at_risk'
         : 'on_track';
+    const win = taskWindow(ts);
+    const start = p.start_date ?? win.start;
+    const end = p.end_date ?? win.end;
     return {
       id: p.id,
       title: p.name,
@@ -176,9 +202,9 @@ export async function getPortfolioTimeline(orgId: string): Promise<DashboardTask
       project_id: p.id,
       projectName: '',
       assigneeName: n ? `${n} task${n === 1 ? '' : 's'}` : 'No tasks',
-      planned_start_date: p.start_date,
-      planned_end_date: p.end_date,
-      due_date: p.end_date,
+      planned_start_date: start,
+      planned_end_date: end,
+      due_date: end,
     };
   });
 }
