@@ -3,7 +3,7 @@
 
 import { z } from 'zod';
 import { ORG_ROLES } from '../access/roles';
-import { PROJECT_TYPES } from '../domain/projects';
+import { PROJECT_TYPES, CONSTRUCTION_TYPES, CURRENCIES, DURATION_UNITS } from '../domain/projects';
 import { REQUEST_TYPES } from '../domain/requests';
 import { REPORT_STATUSES, WEATHER_OPTIONS } from '../domain/monitoring';
 import { PAYMENT_METHODS } from '../domain/finance';
@@ -35,14 +35,28 @@ export type PaymentRequestInput = z.infer<typeof paymentRequestSchema>;
 
 export const createProjectSchema = z.object({
   name: z.string().trim().min(2).max(160),
-  code: z.string().trim().max(40).optional(),
+  // `code` is auto-generated server-side (collision-safe) — never trusted from the client.
   type: z.enum(PROJECT_TYPES).default('construction'),
-  clientName: z.string().trim().max(160).optional(),
+  constructionType: z.enum(CONSTRUCTION_TYPES),
+  clientId: z.string().uuid(),
+  managerId: z.string().uuid(),
+  startDate: z.string().date(),
+  durationValue: z.number().int().positive().max(3650),
+  durationUnit: z.enum(DURATION_UNITS).default('weeks'),
+  calendarId: z.string().uuid(),
+  currency: z.enum(CURRENCIES),
   contractValueCents: z.number().int().nonnegative().default(0),
-  startDate: z.string().date().optional(),
-  endDate: z.string().date().optional(),
+  templateId: z.string().uuid().optional().nullable(),
 });
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
+
+/** Inline "New client" sub-form (name required; email/phone optional). */
+export const createClientSchema = z.object({
+  name: z.string().trim().min(2).max(160),
+  email: z.string().trim().email().optional().or(z.literal('')),
+  phone: z.string().trim().max(40).optional().or(z.literal('')),
+});
+export type CreateClientInput = z.infer<typeof createClientSchema>;
 
 export const createRequestSchema = z.object({
   projectId: z.string().uuid(),
