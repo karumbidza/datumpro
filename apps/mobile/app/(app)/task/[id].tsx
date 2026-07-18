@@ -11,9 +11,9 @@ import { TaskActions } from '../../../components/task-actions';
 import { SubtaskPanel } from '../../../components/subtask-panel';
 import { listSubtasks, subtaskPct, type Subtask } from '../../../lib/data/subtasks';
 import { listSubtaskPhotos, type TaskPhoto } from '../../../lib/data/media';
-import { Card, Pill, ProgressBar } from '../../../components/ui';
+import { Card, Pill, ScheduleBar } from '../../../components/ui';
 import { formatDate, slaLabel, statusLabel } from '../../../lib/ui';
-import { slaTone, statusProgress, contentWidth, radius, font, type Colors } from '../../../lib/theme';
+import { slaTone, contentWidth, radius, font, type Colors } from '../../../lib/theme';
 import { useTheme } from '../../../lib/theme-context';
 
 export default function TaskDetailScreen() {
@@ -78,13 +78,24 @@ export default function TaskDetailScreen() {
   const tone = slaTone(colors, task.slaStatus);
   const acceptancePending = task.acceptanceStatus === 'pending';
   const planComplete = subtasks.length === 0 || subtasks.every((s) => s.isDone);
+  // ACTUAL completion — real work only (never time-based).
   const pct = acceptancePending
     ? 0
     : task.status === 'done'
       ? 100
       : subtasks.length > 0
         ? subtaskPct(subtasks)
-        : statusProgress(task.status);
+        : task.status === 'submitted'
+          ? 100
+          : 0;
+  // EXPECTED position — how far into the planned window "now" sits (the faint bar).
+  const expected = (() => {
+    if (acceptancePending || task.status === 'done' || !task.plannedStartDate || !task.plannedEndDate) return null;
+    const s = new Date(task.plannedStartDate).getTime();
+    const e = new Date(task.plannedEndDate).getTime();
+    if (!(e > s)) return null;
+    return Math.round(Math.min(100, Math.max(0, ((Date.now() - s) / (e - s)) * 100)));
+  })();
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -104,19 +115,15 @@ export default function TaskDetailScreen() {
       </View>
 
       <View style={styles.progressRow}>
-        <ProgressBar value={pct} color={tone.bar} />
+        <ScheduleBar actual={pct} expected={expected} done={task.status === 'done'} />
         <Text style={styles.pct}>{pct}%</Text>
       </View>
       {(() => {
-        if (!task.plannedStartDate || !task.plannedEndDate) return null;
-        const s = new Date(task.plannedStartDate).getTime();
-        const e = new Date(task.plannedEndDate).getTime();
-        if (!(e > s)) return null;
-        const elapsed = Math.round(Math.min(100, Math.max(0, ((Date.now() - s) / (e - s)) * 100)));
-        const behind = elapsed > pct + 5;
+        if (expected == null) return null;
+        const behind = pct < expected - 1;
         return (
           <Text style={[styles.elapsed, behind && styles.behind]}>
-            {elapsed}% of the timeline elapsed{behind ? ' · behind schedule' : ''}
+            {expected}% of the timeline elapsed{behind ? ' · behind schedule' : ''}
           </Text>
         );
       })()}
