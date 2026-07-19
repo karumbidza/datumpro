@@ -1,11 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import {
-  listExtensions,
-  requestExtension,
-  decideExtension,
-  type ExtensionRequest,
-} from '../lib/data/extensions';
+import { listExtensions, requestExtension, type ExtensionRequest } from '../lib/data/extensions';
+import { stepsByEntity, myOrgRole, type ApprovalStep } from '../lib/data/approvals';
+import { ApprovalChain } from './approval-chain';
 import { Pill } from './ui';
 import { radius, font, type Colors, type Tone } from '../lib/theme';
 import { useTheme } from '../lib/theme-context';
@@ -32,13 +29,14 @@ export function TaskExtensions({
   orgId,
   projectId,
   isAssignee,
-  canManage,
 }: {
   taskId: string;
   orgId: string;
   projectId: string;
   isAssignee: boolean;
-  canManage: boolean;
+  // canManage still accepted from the parent, but decide-eligibility now comes
+  // from the viewer's org role via the approval chain.
+  canManage?: boolean;
 }) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -49,11 +47,20 @@ export function TaskExtensions({
   const [showForm, setShowForm] = useState(false);
   const [date, setDate] = useState('');
   const [reason, setReason] = useState('');
+  const [steps, setSteps] = useState<Map<string, ApprovalStep[]>>(new Map());
+  const [viewerRole, setViewerRole] = useState('');
 
   const load = useCallback(async () => {
-    setRows(await listExtensions(taskId));
+    const list = await listExtensions(taskId);
+    setRows(list);
+    const [stepMap, role] = await Promise.all([
+      stepsByEntity('extension', list.map((r) => r.id)),
+      myOrgRole(orgId),
+    ]);
+    setSteps(stepMap);
+    setViewerRole(role ?? '');
     setLoading(false);
-  }, [taskId]);
+  }, [taskId, orgId]);
 
   useEffect(() => {
     void load();
@@ -81,28 +88,6 @@ export function TaskExtensions({
     }
   }
 
-  function decide(r: ExtensionRequest, approve: boolean) {
-    Alert.alert(
-      approve ? 'Approve extension?' : 'Reject extension?',
-      approve ? `The due date will move to ${r.proposedDueDate}.` : undefined,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: approve ? 'Approve' : 'Reject',
-          style: approve ? 'default' : 'destructive',
-          onPress: async () => {
-            try {
-              await decideExtension({ requestId: r.id, taskId, approve });
-              await load();
-            } catch (e) {
-              Alert.alert('Failed', e instanceof Error ? e.message : 'Please try again.');
-            }
-          },
-        },
-      ],
-    );
-  }
-
   if (loading) {
     return <ActivityIndicator style={{ marginVertical: 8 }} />;
   }
@@ -124,15 +109,8 @@ export function TaskExtensions({
               </View>
               {r.reason ? <Text style={styles.reason}>{r.reason}</Text> : null}
               {r.requesterName ? <Text style={styles.by}>by {r.requesterName}</Text> : null}
-              {canManage && r.status === 'pending' && (
-                <View style={styles.decideRow}>
-                  <Pressable style={[styles.btn, styles.btnPrimary]} onPress={() => decide(r, true)}>
-                    <Text style={styles.btnPrimaryText}>Approve</Text>
-                  </Pressable>
-                  <Pressable style={styles.btn} onPress={() => decide(r, false)}>
-                    <Text style={[styles.btnText, { color: colors.danger }]}>Reject</Text>
-                  </Pressable>
-                </View>
+              {r.status === 'pending' && (
+                <ApprovalChain steps={steps.get(r.id) ?? []} viewerRole={viewerRole} onDecided={load} />
               )}
             </View>
           );
