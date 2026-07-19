@@ -22,6 +22,7 @@ import { PaymentsPanel } from '@/components/task/payments-panel';
 import { ChatPanel } from '@/components/chat/chat-panel';
 import { CompletionEvidence } from '@/components/task/completion-evidence';
 import { ExtensionPanel } from '@/components/task/extension-panel';
+import { stepsByEntity } from '@/lib/data/approvals';
 import { TaskTabs, type TaskTab } from '@/components/task/task-tabs';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -89,6 +90,7 @@ export default async function TaskDetailPage({
     getTaskConversationId(taskId),
   ]);
   const sched = schedule?.meta[taskId];
+  const extSteps = await stepsByEntity('extension', extensions.map((e) => e.id));
 
   // Task DM (created on assignment; visible only to staff / PM / the assigned contractor).
   let dm: { id: string; messages: Awaited<ReturnType<typeof listMessages>>; othersRead: number } | null = null;
@@ -346,9 +348,11 @@ export default async function TaskDetailPage({
     content: (
       <ExtensionPanel
         taskId={taskId}
-        canManage={canManage}
+        projectId={projectId}
         canRequest={canRequestExtension}
         requests={extensions}
+        stepsByExt={Object.fromEntries(extSteps)}
+        viewerRole={orgRole ?? ''}
       />
     ),
   });
