@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
+import { LiveRefresh } from '@/components/live-refresh';
 import { getProject } from '@/lib/data/projects';
 import { listTasksByProject, listOrgMembers, type TaskRow } from '@/lib/data/tasks';
 import { getProjectSchedule, type ProjectSchedule } from '@/lib/data/scheduling';
@@ -166,6 +167,12 @@ export default async function TaskBoardPage({
 
   return (
     <main className="mx-auto flex max-w-[1152px] flex-col gap-8 px-10 py-8">
+      <LiveRefresh
+        subscriptions={[
+          { table: 'tasks', filter: `project_id=eq.${projectId}` },
+          { table: 'task_subtasks', filter: `org_id=eq.${project.org_id}` },
+        ]}
+      />
       <header className="flex items-start justify-between gap-4">
         <div>
           <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 hover:underline">

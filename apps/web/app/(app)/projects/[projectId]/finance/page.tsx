@@ -10,6 +10,7 @@ import { listProjectPaymentRequests } from '@/lib/data/payment-requests';
 import { BudgetVsCost } from '@/components/finance/budget-vs-cost';
 import { ManageRequest } from '@/components/payments/manage-request';
 import { stepsByEntity } from '@/lib/data/approvals';
+import { LiveRefresh } from '@/components/live-refresh';
 import { Card, CardTitle, CardValue } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { can, type OrgRole } from '@datumpro/shared/access';
@@ -52,6 +53,12 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
+      <LiveRefresh
+        subscriptions={[
+          { table: 'contractor_payment_requests', filter: `project_id=eq.${projectId}` },
+          { table: 'approvals', filter: `org_id=eq.${project.org_id}` },
+        ]}
+      />
       <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 hover:underline">
         ← {project.name}
       </Link>

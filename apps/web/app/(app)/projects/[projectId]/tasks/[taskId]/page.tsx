@@ -23,6 +23,7 @@ import { ChatPanel } from '@/components/chat/chat-panel';
 import { CompletionEvidence } from '@/components/task/completion-evidence';
 import { ExtensionPanel } from '@/components/task/extension-panel';
 import { stepsByEntity } from '@/lib/data/approvals';
+import { LiveRefresh } from '@/components/live-refresh';
 import { TaskTabs, type TaskTab } from '@/components/task/task-tabs';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -377,6 +378,17 @@ export default async function TaskDetailPage({
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-10">
+      <LiveRefresh
+        subscriptions={[
+          { table: 'task_subtasks', filter: `task_id=eq.${taskId}` },
+          { table: 'task_media', filter: `task_id=eq.${taskId}` },
+          { table: 'task_extension_requests', filter: `task_id=eq.${taskId}` },
+          { table: 'task_quotes', filter: `task_id=eq.${taskId}` },
+          { table: 'task_activity', filter: `task_id=eq.${taskId}` },
+          { table: 'tasks', filter: `id=eq.${taskId}` },
+          { table: 'approvals', filter: `org_id=eq.${task.org_id}` },
+        ]}
+      />
       <Link href={`/projects/${projectId}/tasks`} className="text-xs text-zinc-500 hover:underline">
         ← Tasks
       </Link>

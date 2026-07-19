@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
+import { LiveRefresh } from '@/components/live-refresh';
 import { getProject } from '@/lib/data/projects';
 import { getDashboardData } from '@/lib/data/dashboard';
 import { getProjectProgress, getProgressHistory } from '@/lib/data/subtasks';
@@ -32,6 +33,12 @@ export default async function ProjectOverviewPage({
 
   return (
     <div className="mx-auto flex max-w-[1152px] flex-col gap-8 px-10 py-8">
+      <LiveRefresh
+        subscriptions={[
+          { table: 'tasks', filter: `project_id=eq.${projectId}` },
+          { table: 'task_subtasks', filter: `org_id=eq.${project.org_id}` },
+        ]}
+      />
       <header className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
