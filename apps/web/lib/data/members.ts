@@ -17,6 +17,36 @@ export interface AddableMember {
   memberType: MemberType;
 }
 
+/** The current user's member type in an org (default 'staff' if unresolved). */
+export async function myMemberType(orgId: string): Promise<MemberType> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return 'staff';
+  const { data } = await supabase
+    .from('org_members')
+    .select('member_type')
+    .eq('org_id', orgId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  return ((data as { member_type: string } | null)?.member_type ?? 'staff') as MemberType;
+}
+
+/** Redact contact details (email) per the viewer's standing:
+ *   · internal (owner/admin/pm/staff) → see everyone's contact
+ *   · contractor → sees the project PM + fellow contractors; owner/admin hidden
+ *   · client / viewer → sees the project PM only
+ *  Names + roles stay visible; only the way-to-reach-them is hidden. */
+export function redactContacts(viewerType: MemberType, members: ProjectMemberRow[]): ProjectMemberRow[] {
+  const internal = viewerType === 'owner' || viewerType === 'admin' || viewerType === 'pm' || viewerType === 'staff';
+  if (internal) return members;
+  return members.map((m) => {
+    const visible = m.role === 'pm' || (viewerType === 'contractor' && m.memberType === 'contractor');
+    return visible ? m : { ...m, email: null };
+  });
+}
+
 /** Map user_id → member_type for members of an org (default 'staff'). */
 async function memberTypes(orgId: string, ids: string[]): Promise<Map<string, MemberType>> {
   if (ids.length === 0) return new Map();

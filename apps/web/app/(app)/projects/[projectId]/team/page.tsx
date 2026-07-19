@@ -3,7 +3,7 @@ import { redirect, notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getProject } from '@/lib/data/projects';
 import { myOrgRole } from '@/lib/data/tasks';
-import { listProjectMembers, listAddableOrgMembers, myProjectRole } from '@/lib/data/members';
+import { listProjectMembers, listAddableOrgMembers, myProjectRole, myMemberType, redactContacts } from '@/lib/data/members';
 import { updateProjectMemberRole, removeProjectMember } from './actions';
 import { AddTeammateForm } from './add-teammate-form';
 import { Card, CardTitle } from '@/components/ui/card';
@@ -53,11 +53,15 @@ export default async function ProjectTeamPage({
   const project = await getProject(projectId);
   if (!project) notFound();
 
-  const [members, orgRole, projectRole] = await Promise.all([
+  const [rawMembers, orgRole, projectRole, viewerType] = await Promise.all([
     listProjectMembers(projectId),
     myOrgRole(project.org_id),
     myProjectRole(projectId),
+    myMemberType(project.org_id),
   ]);
+  // Contractors/clients don't get owner/admin contact details — only the PM (+
+  // fellow contractors). Internal roles see everyone.
+  const members = redactContacts(viewerType, rawMembers);
 
   const canManage =
     orgRole === 'owner' || orgRole === 'admin' || projectRole === 'pm';
