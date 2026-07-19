@@ -65,8 +65,11 @@ const ROLE_PERMISSIONS: Record<OrgRole, readonly Permission[]> = {
     'invoice:create', 'invoice:send', 'payment:record', 'pop:verify',
     'request:create',
   ],
+  // PM runs delivery on the projects they're assigned to: manages the project,
+  // is the FIRST-LEVEL approver (requests/variations), but cannot CREATE projects
+  // — that's an owner/admin act. Two-step finalisation sits with admin/owner.
   pm: [
-    'project:create', 'project:update',
+    'project:update',
     'report:create', 'report:view',
     'request:create', 'request:approve', 'variation:approve',
     'finance:view', 'budget:manage',

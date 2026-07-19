@@ -19,7 +19,9 @@ export type ProjectRole = (typeof PROJECT_ROLES)[number];
  * re-shaped later at project assignment. `owner` is never invited (it comes from
  * creating the org), so INVITABLE_MEMBER_TYPES excludes it.
  */
-export const MEMBER_TYPES = ['owner', 'admin', 'pm', 'finance', 'staff', 'contractor', 'client', 'viewer'] as const;
+// 'finance' is retired — its authority (invoicing, payments, POP) is absorbed
+// into 'admin'. The org_role enum keeps a dormant 'finance' value for back-compat.
+export const MEMBER_TYPES = ['owner', 'admin', 'pm', 'staff', 'contractor', 'client', 'viewer'] as const;
 export type MemberType = (typeof MEMBER_TYPES)[number];
 
 export const INVITABLE_MEMBER_TYPES = MEMBER_TYPES.filter((t) => t !== 'owner') as readonly MemberType[];
@@ -27,8 +29,7 @@ export const INVITABLE_MEMBER_TYPES = MEMBER_TYPES.filter((t) => t !== 'owner') 
 export const MEMBER_TYPE_META: Record<MemberType, { label: string; hint: string }> = {
   owner: { label: 'Owner', hint: 'Full control of the organisation.' },
   admin: { label: 'Admin', hint: 'Manages members, projects, and money.' },
-  pm: { label: 'Project Manager', hint: 'Runs delivery & approvals across projects.' },
-  finance: { label: 'Finance', hint: 'Invoicing and payments (no approvals).' },
+  pm: { label: 'Project Manager', hint: 'Runs delivery & first-level approvals on assigned projects.' },
   staff: { label: 'Staff', hint: 'Internal team member — fieldwork & reports.' },
   contractor: { label: 'Contractor', hint: 'External — quotes and works on assigned tasks.' },
   client: { label: 'Client', hint: 'External — read-only view of their project.' },
@@ -41,7 +42,6 @@ export function memberTypeToOrgRole(type: MemberType): OrgRole {
     case 'owner': return 'owner';
     case 'admin': return 'admin';
     case 'pm': return 'pm';
-    case 'finance': return 'finance';
     case 'staff': return 'member';
     case 'contractor': return 'member';
     case 'client': return 'viewer';
@@ -66,7 +66,6 @@ export function projectRolesForType(type: MemberType): readonly ProjectRole[] {
       return ['contractor', 'contributor'];
     case 'client':
       return ['client', 'viewer'];
-    case 'finance':
     case 'viewer':
       return ['viewer', 'client'];
   }
