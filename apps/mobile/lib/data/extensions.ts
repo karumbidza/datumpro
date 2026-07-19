@@ -67,37 +67,5 @@ export async function requestExtension(params: {
   if (error) throw new Error(error.message);
 }
 
-/** PM approves (shifts the task deadline) or rejects. RLS restricts the update
- *  to a manager; the deadline shift mirrors the web decideExtension. */
-export async function decideExtension(params: {
-  requestId: string;
-  taskId: string;
-  approve: boolean;
-}): Promise<void> {
-  const user = await currentUser();
-
-  const { data: req } = await supabase
-    .from('task_extension_requests')
-    .select('proposed_due_date')
-    .eq('id', params.requestId)
-    .maybeSingle();
-  const proposed = (req as { proposed_due_date: string } | null)?.proposed_due_date ?? null;
-
-  const { error } = await supabase
-    .from('task_extension_requests')
-    .update({
-      status: params.approve ? 'approved' : 'rejected',
-      decided_by: user?.id ?? null,
-      decided_at: new Date().toISOString(),
-    })
-    .eq('id', params.requestId)
-    .eq('task_id', params.taskId);
-  if (error) throw new Error(error.message);
-
-  if (params.approve && proposed) {
-    await supabase
-      .from('tasks')
-      .update({ due_date: proposed, planned_end_date: proposed })
-      .eq('id', params.taskId);
-  }
-}
+// decideExtension retired — extension approvals now run through the shared
+// two-step chain (decideApprovalStep + finalize_approval).

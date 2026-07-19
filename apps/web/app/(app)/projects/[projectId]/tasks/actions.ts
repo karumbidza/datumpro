@@ -9,7 +9,7 @@ import { completionMediaCount } from '@/lib/data/quotes';
 import { notifyUser, notifyProjectManagers } from '@/lib/data/notifications';
 import type { FormState } from '@/components/ui/form-error';
 import { emailUser } from '@/lib/email/notify';
-import { extensionDecisionEmail, quoteAwardedEmail, appUrl } from '@/lib/email/templates';
+import { quoteAwardedEmail, appUrl } from '@/lib/email/templates';
 
 async function requireUser() {
   const supabase = await createClient();
@@ -849,48 +849,5 @@ export async function requestExtension(_prev: FormState, formData: FormData): Pr
   return {};
 }
 
-/** PM approves (shifts the deadline → CPM recomputes) or rejects. */
-export async function decideExtension(formData: FormData) {
-  const { supabase, user } = await requireUser();
-  const taskId = String(formData.get('taskId') ?? '');
-  const requestId = String(formData.get('requestId') ?? '');
-  const decision = String(formData.get('decision') ?? ''); // approve | reject
-  const task = await loadTask(supabase, taskId);
-  if (!task) throw new Error('Task not found');
-
-  const { data: reqRow } = await supabase
-    .from('task_extension_requests')
-    .select('proposed_due_date, requested_by')
-    .eq('id', requestId)
-    .maybeSingle();
-  const extReq = reqRow as { proposed_due_date: string; requested_by: string | null } | null;
-  const proposed = extReq?.proposed_due_date ?? null;
-
-  const status = decision === 'approve' ? 'approved' : 'rejected';
-  const { error } = await supabase
-    .from('task_extension_requests')
-    .update({ status, decided_by: user.id, decided_at: new Date().toISOString() })
-    .eq('id', requestId)
-    .eq('task_id', taskId);
-  if (error) throw new Error(error.message);
-
-  if (decision === 'approve' && proposed) {
-    // Shift the working deadline; baseline stays frozen so variance is visible.
-    await supabase
-      .from('tasks')
-      .update({ due_date: proposed, planned_end_date: proposed })
-      .eq('id', taskId);
-  }
-  await logActivity(supabase, task, user.id, 'extension', `Extension ${status}`);
-  await emailUser(
-    extReq?.requested_by,
-    extensionDecisionEmail({
-      taskTitle: task.title,
-      decision: status,
-      deciderName: user.email?.split('@')[0] ?? 'The project manager',
-      url: `${appUrl()}/projects/${task.project_id}/tasks/${taskId}`,
-      newDate: status === 'approved' && proposed ? proposed : undefined,
-    }),
-  );
-  revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
-}
+// decideExtension retired — extension approvals now run through the shared
+// two-step chain (decideApprovalStep + finalize_approval).

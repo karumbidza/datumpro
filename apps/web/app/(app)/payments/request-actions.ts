@@ -65,25 +65,8 @@ async function managerUpdate(
   return { ok: true };
 }
 
-export async function approvePaymentRequest(formData: FormData): Promise<Result> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: 'Not signed in.' };
-  const id = String(formData.get('id') ?? '');
-  const projectId = String(formData.get('projectId') ?? '');
-  return managerUpdate(
-    id,
-    {
-      status: 'approved',
-      reviewed_by: user.id,
-      reviewed_at: new Date().toISOString(),
-      review_note: (formData.get('reviewNote') as string) || null,
-    },
-    projectId,
-  );
-}
+// approvePaymentRequest retired — payment approval now runs through the shared
+// two-step chain (decideApprovalStep + finalize_approval flips requested→approved).
 
 export async function rejectPaymentRequest(formData: FormData): Promise<Result> {
   const supabase = await createClient();
