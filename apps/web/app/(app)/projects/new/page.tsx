@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
-import { getActiveContext } from '@/lib/data/org';
+import { getActiveContext, getAuthUser } from '@/lib/data/org';
 import { listClients } from '@/lib/data/clients';
 import { listWorkCalendars } from '@/lib/data/calendars';
 import { listOrgMembers } from '@/lib/data/org-members';
@@ -9,10 +8,7 @@ import { NewProjectForm } from './new-project-form';
 import { Card } from '@/components/ui/card';
 
 export default async function NewProjectPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect('/sign-in');
 
   const ctx = await getActiveContext();

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getAuthUser } from '@/lib/data/org';
 import { NewReportForm } from './new-report-form';
 import { Card } from '@/components/ui/card';
 
@@ -11,10 +11,7 @@ export default async function NewReportPage({
 }) {
   const { projectId } = await params;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect('/sign-in');
 
   const today = new Date().toISOString().slice(0, 10);

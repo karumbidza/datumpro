@@ -1,6 +1,20 @@
+import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import type { OrgRole } from '@datumpro/shared/access';
+
+/** The signed-in auth user, memoised for the lifetime of ONE server request
+ *  (React.cache). Every `auth.getUser()` is a network round-trip to the auth
+ *  server; deduping means the layout + page + helpers share a single call instead
+ *  of each making their own. Use this instead of `supabase.auth.getUser()` on the
+ *  render path. */
+export const getAuthUser = cache(async () => {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user;
+});
 
 /** Cookie that remembers which org the user last switched to. Read on the server
  *  to resolve the "active" org; falls back to the first membership. */
@@ -31,14 +45,13 @@ function orgName(row: MembershipQueryRow): string {
 }
 
 /** Resolve the signed-in user, all their active org memberships, and which one is
- *  "active" (cookie preference, else the first). RLS already scopes the query. */
-export async function getActiveContext(): Promise<ActiveContext | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+ *  "active" (cookie preference, else the first). RLS already scopes the query.
+ *  Memoised per request — the layout and page share one resolution. */
+export const getActiveContext = cache(async (): Promise<ActiveContext | null> => {
+  const user = await getAuthUser();
   if (!user) return null;
 
+  const supabase = await createClient();
   const { data } = await supabase
     .from('org_members')
     .select('role, org_id, organizations(id, name)')
@@ -56,7 +69,7 @@ export async function getActiveContext(): Promise<ActiveContext | null> {
   const active = memberships.find((m) => m.orgId === preferred) ?? memberships[0] ?? null;
 
   return { userId: user.id, email: user.email ?? null, memberships, active };
-}
+});
 
 export interface SidebarProject {
   id: string;

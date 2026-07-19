@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { getActiveContext } from '@/lib/data/org';
+import { getActiveContext, getAuthUser } from '@/lib/data/org';
 import { updateDisplayName } from './actions';
 import { signOut } from '@/app/(app)/actions';
 import { Card, CardTitle } from '@/components/ui/card';
@@ -12,9 +12,7 @@ const inputClass =
 
 export default async function AccountPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect('/sign-in');
 
   const [{ data: profile }, ctx] = await Promise.all([

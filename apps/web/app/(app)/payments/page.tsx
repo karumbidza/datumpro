@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getAuthUser } from '@/lib/data/org';
 import { listMyPayments, type MyPaymentLine } from '@/lib/data/payments';
 import { submitPaymentClaim } from '@/app/(app)/projects/[projectId]/tasks/actions';
 import { Card, CardTitle, CardValue } from '@/components/ui/card';
@@ -45,10 +45,7 @@ const STATUS: Record<MyPaymentLine['status'], { tone: 'neutral' | 'blue' | 'gree
 };
 
 export default async function MyPaymentsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect('/sign-in');
 
   const { lines, summary } = await listMyPayments(user.id);

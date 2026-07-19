@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getAuthUser } from '@/lib/data/org';
 import { listNotifications } from '@/lib/data/notifications';
 import { MarkReadOnMount } from './mark-read-on-mount';
 
@@ -17,10 +17,7 @@ function relTime(iso: string): string {
 }
 
 export default async function NotificationsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect('/sign-in');
 
   const items = await listNotifications(50);

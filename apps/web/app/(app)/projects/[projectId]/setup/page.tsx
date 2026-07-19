@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getAuthUser } from '@/lib/data/org';
 import { getProject } from '@/lib/data/projects';
 import { getProjectSetup, SETUP_ITEMS } from '@/lib/data/project-setup';
 import { Button } from '@/components/ui/button';
@@ -12,10 +12,7 @@ export default async function ProjectSetupPage({
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect('/sign-in');
 
   const project = await getProject(projectId);

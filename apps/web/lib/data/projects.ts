@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { createClient } from '@/lib/supabase/server';
 import type { ProjectStatus, ProjectType } from '@datumpro/shared/domain';
 
@@ -31,7 +32,9 @@ export async function listProjects(): Promise<ProjectRow[]> {
   return (data ?? []) as ProjectRow[];
 }
 
-export async function getProject(projectId: string): Promise<ProjectRow | null> {
+/** A single project by id. Memoised per request (React.cache): a project page and
+ *  its notFound()/org-id lookups share one query instead of repeating it. */
+export const getProject = cache(async (projectId: string): Promise<ProjectRow | null> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('projects')
@@ -40,5 +43,5 @@ export async function getProject(projectId: string): Promise<ProjectRow | null> 
     .maybeSingle();
   if (error) throw error;
   return (data as ProjectRow | null) ?? null;
-}
+});
 

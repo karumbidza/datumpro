@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getAuthUser } from '@/lib/data/org';
 import { createOrg } from '../actions';
 import { Card } from '@/components/ui/card';
 import { SubmitButton } from '@/components/ui/submit-button';
@@ -8,10 +8,7 @@ const inputClass =
   'w-full rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
 
 export default async function NewOrgPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect('/sign-in');
 
   return (

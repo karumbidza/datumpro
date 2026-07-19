@@ -1,14 +1,11 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getAuthUser } from '@/lib/data/org';
 import { Button } from '@/components/ui/button';
 
 /** Public landing. Signed-in users skip straight to their dashboard. */
 export default async function HomePage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (user) redirect('/dashboard');
 
   return (

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
+import { getAuthUser } from '@/lib/data/org';
 import { getInvitationPreview } from '@/lib/data/org-members';
 import { acceptInvitation } from './actions';
 import { Card, CardTitle } from '@/components/ui/card';
@@ -16,10 +16,7 @@ export default async function InvitePage({
   const { token } = await params;
   const { error } = await searchParams;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   const preview = await getInvitationPreview(token);
 
   return (

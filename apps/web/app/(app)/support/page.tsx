@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
+import { getAuthUser } from '@/lib/data/org';
 import { SupportChat } from '@/components/support/support-chat';
 
 export const dynamic = 'force-dynamic';
@@ -14,9 +15,7 @@ export default async function SupportPage({
 }) {
   const { org } = await searchParams;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect('/sign-in');
 
   // Orgs where this user is an admin — the ones they may raise support for.

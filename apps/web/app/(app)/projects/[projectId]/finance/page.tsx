@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getAuthUser } from '@/lib/data/org';
 import { getProject } from '@/lib/data/projects';
 import { myOrgRole } from '@/lib/data/tasks';
 import { myProjectRole } from '@/lib/data/members';
@@ -30,10 +30,7 @@ const PAY_STATUS = {
 
 export default async function FinancePage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect('/sign-in');
 
   const project = await getProject(projectId);

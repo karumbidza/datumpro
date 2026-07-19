@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getAuthUser } from '@/lib/data/org';
 import { getRequestDetail } from '@/lib/data/requests';
 import { myOrgRole } from '@/lib/data/tasks';
 import { submitRequest, decideApproval } from '../actions';
@@ -21,10 +21,7 @@ export default async function RequestDetailPage({
   params: Promise<{ projectId: string; requestId: string }>;
 }) {
   const { projectId, requestId } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect('/sign-in');
 
   const detail = await getRequestDetail(requestId);

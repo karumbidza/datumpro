@@ -1,19 +1,15 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
 import { can } from '@datumpro/shared/access';
 import { listProjectsOverview } from '@/lib/data/projects-overview';
-import { getActiveContext } from '@/lib/data/org';
+import { getActiveContext, getAuthUser } from '@/lib/data/org';
 import { getPortfolioTimeline } from '@/lib/data/dashboard';
 import { Button } from '@/components/ui/button';
 import { ProjectOverviewCard } from '@/components/projects/project-overview-card';
 import { TimelineOverview } from '@/components/dashboard/timeline-overview';
 
 export default async function ProjectsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect('/sign-in');
 
   const [projects, ctx] = await Promise.all([listProjectsOverview(), getActiveContext()]);

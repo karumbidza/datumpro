@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getAuthUser } from '@/lib/data/org';
 import { getProject } from '@/lib/data/projects';
 import { myOrgRole } from '@/lib/data/tasks';
 import { listProjectMembers, listAddableOrgMembers, myProjectRole, myMemberType, redactContacts } from '@/lib/data/members';
@@ -44,10 +44,7 @@ export default async function ProjectTeamPage({
     : sp.added
       ? { kind: 'ok' as const, text: 'Added to the project.' }
       : null;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect('/sign-in');
 
   const project = await getProject(projectId);

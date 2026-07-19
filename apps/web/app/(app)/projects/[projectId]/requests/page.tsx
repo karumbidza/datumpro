@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getAuthUser } from '@/lib/data/org';
 import { getProject } from '@/lib/data/projects';
 import { listRequestsByProject } from '@/lib/data/requests';
 import { Card } from '@/components/ui/card';
@@ -18,10 +18,7 @@ const STATUS_TONE: Record<RequestStatus, 'green' | 'blue' | 'amber' | 'neutral'>
 
 export default async function RequestsPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect('/sign-in');
 
   const project = await getProject(projectId);
