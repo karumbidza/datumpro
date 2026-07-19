@@ -26,6 +26,8 @@ import {
   type RequestProject,
 } from '../../../lib/data/payment-requests';
 import { RequestPaymentModal } from '../../../components/request-payment-modal';
+import { ApprovalChain } from '../../../components/approval-chain';
+import { stepsByEntity, type ApprovalStep } from '../../../lib/data/approvals';
 import { contentWidth, radius, font, type Colors } from '../../../lib/theme';
 import { useTheme } from '../../../lib/theme-context';
 import { useResponsive } from '../../../lib/responsive';
@@ -69,6 +71,7 @@ export default function Payments() {
   const [claiming, setClaiming] = useState<string | null>(null);
   const [requests, setRequests] = useState<MyPaymentRequest[]>([]);
   const [projects, setProjects] = useState<RequestProject[]>([]);
+  const [reqSteps, setReqSteps] = useState<Map<string, ApprovalStep[]>>(new Map());
   const [modalOpen, setModalOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -81,6 +84,7 @@ export default function Payments() {
     setSummary(res.summary);
     setRequests(reqs);
     setProjects(projs);
+    setReqSteps(await stepsByEntity('payment', reqs.map((r) => r.id)));
     setLoading(false);
     setRefreshing(false);
   }, []);
@@ -214,6 +218,9 @@ export default function Payments() {
                       {r.status === 'rejected' && r.reviewNote ? (
                         <Text style={styles.note}>“{r.reviewNote}”</Text>
                       ) : null}
+                      {r.status === 'requested' && (
+                        <ApprovalChain steps={reqSteps.get(r.id) ?? []} viewerRole="" onDecided={load} />
+                      )}
                       <View style={styles.linkRow}>
                         {r.invoiceUrl ? (
                           <Pressable onPress={() => Linking.openURL(r.invoiceUrl!)}>
