@@ -20,6 +20,7 @@ import { MyTasksCard } from '@/components/dashboard/my-tasks-card';
 import { ManagedProjectsCard } from '@/components/dashboard/managed-projects-card';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { LiveRefresh } from '@/components/live-refresh';
 import { formatLongDate } from '@/lib/date';
 import { can } from '@datumpro/shared/access';
 import { formatUsd } from '@datumpro/shared/domain';
@@ -59,6 +60,20 @@ export default async function DashboardPage() {
     </Link>
   ) : null;
 
+  // Org-wide (broad) live subscriptions — the portfolio home spans every project.
+  const live = (
+    <LiveRefresh
+      subscriptions={[
+        { table: 'tasks', filter: `org_id=eq.${active.orgId}` },
+        { table: 'site_reports', filter: `org_id=eq.${active.orgId}` },
+        { table: 'contractor_payment_requests', filter: `org_id=eq.${active.orgId}` },
+        { table: 'requests', filter: `org_id=eq.${active.orgId}` },
+        { table: 'projects', filter: `org_id=eq.${active.orgId}` },
+        { table: 'approvals', filter: `org_id=eq.${active.orgId}` },
+      ]}
+    />
+  );
+
   // ── Portfolio home — owner / admin / finance ──────────────────────────────
   if (persona === 'portfolio') {
     const [projectTimeline, portfolio] = await Promise.all([
@@ -67,6 +82,7 @@ export default async function DashboardPage() {
     ]);
     return (
       <div className="mx-auto flex max-w-[1152px] flex-col gap-8 px-10 py-8">
+        {live}
         <Greeting
           name={displayName}
           subtitle={`Here's what's happening across ${active.name} today · ${formatLongDate(new Date())}`}
@@ -88,6 +104,7 @@ export default async function DashboardPage() {
     ]);
     return (
       <div className="mx-auto max-w-5xl space-y-6 px-6 py-8">
+        {live}
         <Greeting
           name={displayName}
           subtitle={`Your delivery overview · ${formatLongDate(new Date())}`}
@@ -110,6 +127,7 @@ export default async function DashboardPage() {
   const hasPay = myPay.summary.earnedCents > 0;
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-6 py-8">
+      {live}
       <Greeting name={displayName} subtitle={`Here's your work today · ${formatLongDate(new Date())}`} />
       {approvals.length > 0 && <ApprovalsInbox items={approvals} />}
       <MyTasksCard tasks={myTasks} />

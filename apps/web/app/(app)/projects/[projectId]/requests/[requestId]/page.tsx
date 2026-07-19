@@ -7,6 +7,7 @@ import { submitRequest, decideApproval } from '../actions';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { LiveRefresh } from '@/components/live-refresh';
 import { formatUsd } from '@datumpro/shared/domain';
 
 const inputClass =
@@ -36,6 +37,12 @@ export default async function RequestDetailPage({
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-10">
+      <LiveRefresh
+        subscriptions={[
+          { table: 'requests', filter: `id=eq.${requestId}` },
+          { table: 'approvals', filter: `entity_id=eq.${requestId}` },
+        ]}
+      />
       <Link href={`/projects/${projectId}/requests`} className="text-xs text-zinc-500 hover:underline">
         ← Requests
       </Link>

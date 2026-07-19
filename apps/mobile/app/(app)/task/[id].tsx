@@ -15,6 +15,7 @@ import { Card, Pill, ScheduleBar } from '../../../components/ui';
 import { formatDate, slaLabel, statusLabel } from '../../../lib/ui';
 import { slaTone, contentWidth, radius, font, type Colors } from '../../../lib/theme';
 import { useTheme } from '../../../lib/theme-context';
+import { useLiveRefresh, type LiveSub } from '../../../lib/use-live-refresh';
 
 export default function TaskDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -59,6 +60,23 @@ export default function TaskDetailScreen() {
       void load();
     }, [load]),
   );
+
+  // Live-refresh while the screen is open: the task itself, its subtasks, media,
+  // extension requests, and approvals in the task's org. Guarded so nothing
+  // subscribes until the ids are known (taskId from the route, orgId once loaded).
+  const liveSubs = useMemo<LiveSub[]>(() => {
+    const taskId = String(id);
+    if (!taskId) return [];
+    const subs: LiveSub[] = [
+      { table: 'tasks', filter: `id=eq.${taskId}` },
+      { table: 'task_subtasks', filter: `task_id=eq.${taskId}` },
+      { table: 'task_media', filter: `task_id=eq.${taskId}` },
+      { table: 'task_extension_requests', filter: `task_id=eq.${taskId}` },
+    ];
+    if (task?.orgId) subs.push({ table: 'approvals', filter: `org_id=eq.${task.orgId}` });
+    return subs;
+  }, [id, task?.orgId]);
+  useLiveRefresh(liveSubs, () => void load());
 
   if (loading) {
     return (

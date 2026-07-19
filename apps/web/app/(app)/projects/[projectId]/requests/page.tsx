@@ -6,6 +6,7 @@ import { listRequestsByProject } from '@/lib/data/requests';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { LiveRefresh } from '@/components/live-refresh';
 import { formatUsd, type RequestStatus } from '@datumpro/shared/domain';
 
 const STATUS_TONE: Record<RequestStatus, 'green' | 'blue' | 'amber' | 'neutral'> = {
@@ -27,6 +28,12 @@ export default async function RequestsPage({ params }: { params: Promise<{ proje
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-10">
+      <LiveRefresh
+        subscriptions={[
+          { table: 'requests', filter: `project_id=eq.${projectId}` },
+          { table: 'approvals', filter: `org_id=eq.${project.org_id}` },
+        ]}
+      />
       <header className="mb-8 flex items-start justify-between gap-4">
         <div>
           <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 hover:underline">

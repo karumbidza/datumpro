@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BrandLoader } from '../../../components/brand-loader';
 import {
   View,
@@ -31,6 +31,8 @@ import { stepsByEntity, type ApprovalStep } from '../../../lib/data/approvals';
 import { contentWidth, radius, font, type Colors } from '../../../lib/theme';
 import { useTheme } from '../../../lib/theme-context';
 import { useResponsive } from '../../../lib/responsive';
+import { currentUser } from '../../../lib/supabase';
+import { useLiveRefresh, type LiveSub } from '../../../lib/use-live-refresh';
 
 const EMPTY: MyPaymentsSummary = { earnedCents: 0, claimedCents: 0, paidCents: 0, outstandingCents: 0 };
 
@@ -73,6 +75,7 @@ export default function Payments() {
   const [projects, setProjects] = useState<RequestProject[]>([]);
   const [reqSteps, setReqSteps] = useState<Map<string, ApprovalStep[]>>(new Map());
   const [modalOpen, setModalOpen] = useState(false);
+  const [meId, setMeId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const [res, reqs, projs] = await Promise.all([
@@ -94,6 +97,26 @@ export default function Payments() {
       void load();
     }, [load]),
   );
+
+  // Resolve our own user id once so we can scope the realtime subscription to
+  // this contractor's payment requests.
+  useEffect(() => {
+    let active = true;
+    void currentUser().then((u) => {
+      if (active) setMeId(u?.id ?? null);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Live-refresh while the screen is open: this contractor's own payment
+  // requests. No org id is in scope here, so approvals aren't subscribed.
+  const liveSubs = useMemo<LiveSub[]>(
+    () => (meId ? [{ table: 'contractor_payment_requests', filter: `contractor_id=eq.${meId}` }] : []),
+    [meId],
+  );
+  useLiveRefresh(liveSubs, () => void load());
 
   const claim = useCallback(
     (draw: MyDraw) => {

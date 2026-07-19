@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { listNotifications } from '@/lib/data/notifications';
+import { LiveRefresh } from '@/components/live-refresh';
 import { MarkReadOnMount } from './mark-read-on-mount';
 
 function relTime(iso: string): string {
@@ -24,6 +25,7 @@ export default async function NotificationsPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-10">
+      <LiveRefresh subscriptions={[{ table: 'notifications', filter: `user_id=eq.${user.id}` }]} />
       <MarkReadOnMount />
       <h1 className="text-2xl font-semibold tracking-tight">Notifications</h1>
       <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">

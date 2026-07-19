@@ -9,6 +9,7 @@ import { AddTeammateForm } from './add-teammate-form';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SubmitButton } from '@/components/ui/submit-button';
+import { LiveRefresh } from '@/components/live-refresh';
 import { PROJECT_ROLES, projectRolesForType } from '@datumpro/shared/access';
 
 const inputClass =
@@ -66,6 +67,7 @@ export default async function ProjectTeamPage({
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-10">
+      <LiveRefresh subscriptions={[{ table: 'project_members', filter: `project_id=eq.${projectId}` }]} />
       <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 hover:underline">
         ← {project.name}
       </Link>

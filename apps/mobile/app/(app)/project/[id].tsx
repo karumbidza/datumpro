@@ -11,6 +11,7 @@ import { TaskCard } from '../../../components/task-card';
 import { contentWidth, radius, font, type Colors } from '../../../lib/theme';
 import { useTheme } from '../../../lib/theme-context';
 import { useResponsive } from '../../../lib/responsive';
+import { useLiveRefresh, type LiveSub } from '../../../lib/use-live-refresh';
 
 export default function ProjectScreen() {
   const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
@@ -44,6 +45,13 @@ export default function ProjectScreen() {
       void load();
     }, [load]),
   );
+
+  // Live-refresh the task list while the project screen is open.
+  const liveSubs = useMemo<LiveSub[]>(() => {
+    const projectId = String(id);
+    return projectId ? [{ table: 'tasks', filter: `project_id=eq.${projectId}` }] : [];
+  }, [id]);
+  useLiveRefresh(liveSubs, () => void load());
 
   return (
     <SafeAreaView style={styles.screen} edges={['left', 'right', 'bottom']}>

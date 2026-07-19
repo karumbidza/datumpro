@@ -16,6 +16,7 @@ import {
 } from '@datumpro/shared/domain';
 import { listMyDocuments, listMyOrgs } from '@/lib/data/contractor-documents';
 import { UploadDocumentForm } from '@/components/documents/upload-document-form';
+import { LiveRefresh } from '@/components/live-refresh';
 
 const REQ_TONE: Record<PaymentRequestStatus, 'neutral' | 'blue' | 'green' | 'amber'> = {
   requested: 'amber',
@@ -70,6 +71,9 @@ export default async function MyPaymentsPage() {
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-10">
+      <LiveRefresh
+        subscriptions={[{ table: 'contractor_payment_requests', filter: `contractor_id=eq.${user.id}` }]}
+      />
       <Link href="/dashboard" className="text-xs text-zinc-500 hover:underline">
         ← Dashboard
       </Link>
