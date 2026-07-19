@@ -849,37 +849,6 @@ export async function requestExtension(_prev: FormState, formData: FormData): Pr
   return {};
 }
 
-/** Decide one step of an approval chain (any entity type). The DB finalizes the
- *  entity + applies its effect once every step is approved; SoD blocks approving
- *  your own item. Reused across extensions, payments, variations, requests. */
-export async function decideApprovalStep(formData: FormData) {
-  const { supabase, user } = await requireUser();
-  const approvalId = String(formData.get('approvalId') ?? '');
-  const decision = String(formData.get('decision') ?? '');
-  const projectId = String(formData.get('projectId') ?? '');
-  const taskId = String(formData.get('taskId') ?? '');
-  if (decision !== 'approved' && decision !== 'rejected') return;
-
-  const { error } = await supabase
-    .from('approvals')
-    .update({
-      decision,
-      approver_id: user.id,
-      comment: (formData.get('comment') as string) || null,
-      decided_at: new Date().toISOString(),
-    })
-    .eq('id', approvalId);
-  if (error) {
-    throw new Error(
-      error.message.includes('segregation of duties')
-        ? 'You cannot approve your own request'
-        : error.message,
-    );
-  }
-  if (taskId) revalidatePath(`/projects/${projectId}/tasks/${taskId}`);
-  else if (projectId) revalidatePath(`/projects/${projectId}`);
-}
-
 /** PM approves (shifts the deadline → CPM recomputes) or rejects. */
 export async function decideExtension(formData: FormData) {
   const { supabase, user } = await requireUser();

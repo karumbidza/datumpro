@@ -3,11 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import {
-  approvePaymentRequest,
-  rejectPaymentRequest,
-  markPaymentRequestPaid,
-} from '@/app/(app)/payments/request-actions';
+import { rejectPaymentRequest, markPaymentRequestPaid } from '@/app/(app)/payments/request-actions';
+import { ApprovalChain } from '@/components/approvals/approval-chain';
+import type { ApprovalStep } from '@/lib/data/approvals';
 
 const BUCKET = 'project-media';
 
@@ -21,11 +19,15 @@ export function ManageRequest({
   orgId,
   projectId,
   status,
+  steps,
+  viewerRole,
 }: {
   id: string;
   orgId: string;
   projectId: string;
   status: 'requested' | 'approved' | 'paid' | 'rejected';
+  steps: ApprovalStep[];
+  viewerRole: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -95,7 +97,11 @@ export function ManageRequest({
 
   return (
     <div className="mt-2">
-      {rejectOpen ? (
+      {status === 'requested' && (
+        <ApprovalChain steps={steps} viewerRole={viewerRole} path={`/projects/${projectId}/finance`} />
+      )}
+      {status === 'approved' &&
+        (rejectOpen ? (
         <div className="space-y-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
           <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-300">
             Reason for rejecting <span className="text-zinc-400">(shared with the contractor)</span>
@@ -130,15 +136,6 @@ export function ManageRequest({
         </div>
       ) : !payOpen ? (
         <div className="flex flex-wrap items-center gap-2">
-          {status === 'requested' && (
-            <button
-              disabled={busy}
-              onClick={() => run(approvePaymentRequest, base())}
-              className="rounded-md bg-brand-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-500 disabled:opacity-50"
-            >
-              Approve
-            </button>
-          )}
           <button
             disabled={busy}
             onClick={() => setPayOpen(true)}
@@ -188,7 +185,7 @@ export function ManageRequest({
             </button>
           </div>
         </div>
-      )}
+        ))}
       {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
     </div>
   );

@@ -9,6 +9,7 @@ import { listProjectPayments } from '@/lib/data/payments';
 import { listProjectPaymentRequests } from '@/lib/data/payment-requests';
 import { BudgetVsCost } from '@/components/finance/budget-vs-cost';
 import { ManageRequest } from '@/components/payments/manage-request';
+import { stepsByEntity } from '@/lib/data/approvals';
 import { Card, CardTitle, CardValue } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { can, type OrgRole } from '@datumpro/shared/access';
@@ -44,6 +45,7 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
     myProjectRole(projectId),
     listProjectPaymentRequests(projectId),
   ]);
+  const paymentSteps = await stepsByEntity('payment', paymentRequests.map((r) => r.id));
   // The budget is the project's contract value; committed cost + payments track
   // against it (buy-side, request-and-pay — no client invoicing here).
   const budgetCents = project.contract_value_cents;
@@ -128,7 +130,14 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
                     </p>
                   )}
                   {canManagePayments && (
-                    <ManageRequest id={r.id} orgId={r.orgId} projectId={projectId} status={r.status} />
+                    <ManageRequest
+                      id={r.id}
+                      orgId={r.orgId}
+                      projectId={projectId}
+                      status={r.status}
+                      steps={paymentSteps.get(r.id) ?? []}
+                      viewerRole={orgRole ?? ''}
+                    />
                   )}
                 </li>
               ))}
