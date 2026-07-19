@@ -20,6 +20,57 @@ async function requireUser() {
   return { supabase, user };
 }
 
+/** The project role to enrol a task assignee at, from their org member type —
+ *  mirrors enforce_project_role_for_type so the insert is always accepted. A
+ *  contractor stays a contractor (never a PM); clients/viewers stay read-only. */
+function projectRoleForMemberType(memberType: string): 'contractor' | 'client' | 'viewer' | 'contributor' {
+  switch (memberType) {
+    case 'contractor':
+      return 'contractor';
+    case 'client':
+      return 'client';
+    case 'finance':
+    case 'viewer':
+      return 'viewer';
+    default:
+      return 'contributor'; // owner / admin / pm / staff
+  }
+}
+
+/** Ensure a user is a member of the project so a task can be assigned to them
+ *  (the tasks_assignee_member trigger requires it). Assigning to anyone in the
+ *  org is thus safe: it enrols them at their type-correct role, never elevating a
+ *  contractor. Returns an error string, or null on success. */
+async function ensureProjectMember(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  orgId: string,
+  projectId: string,
+  userId: string,
+): Promise<string | null> {
+  const { data: existing } = await supabase
+    .from('project_members')
+    .select('id')
+    .eq('project_id', projectId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (existing) return null;
+
+  const { data: om } = await supabase
+    .from('org_members')
+    .select('member_type')
+    .eq('org_id', orgId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (!om) return 'That person is not a member of this organisation.';
+
+  const role = projectRoleForMemberType((om as { member_type: string }).member_type);
+  const { error } = await supabase
+    .from('project_members')
+    .insert({ org_id: orgId, project_id: projectId, user_id: userId, role });
+  if (error) return error.message;
+  return null;
+}
+
 /** Log a timeline entry. Best-effort — never blocks the main action. */
 async function logActivity(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -79,6 +130,13 @@ export async function createTask(_prev: FormState, formData: FormData): Promise<
     .maybeSingle();
   if (!project) return { error: 'Project not found or access denied.' };
   const orgId = (project as { org_id: string }).org_id;
+
+  // Assigning to anyone in the org: enrol them on the project first (at their
+  // type-correct role) so the assignee-must-be-a-member rule holds.
+  if (parsed.data.assigneeId) {
+    const enrolErr = await ensureProjectMember(supabase, orgId, projectId, parsed.data.assigneeId);
+    if (enrolErr) return { error: enrolErr };
+  }
 
   const { data: created, error } = await supabase
     .from('tasks')

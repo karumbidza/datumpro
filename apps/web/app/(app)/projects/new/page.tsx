@@ -24,8 +24,11 @@ export default async function NewProjectPage() {
     listWorkCalendars(orgId),
     listOrgMembers(orgId),
   ]);
+  // Only people who can actually run a project may be its PM — owners, admins,
+  // and project managers. (Contractors/clients/viewers are blocked from the PM
+  // role at the DB anyway; this stops them dangling as options.)
   const activeMembers = members
-    .filter((m) => m.status === 'active')
+    .filter((m) => m.status === 'active' && ['owner', 'admin', 'pm'].includes(m.role))
     .map((m) => ({ userId: m.userId, name: m.name }));
   const defaultCalendarId = calendars.find((c) => c.isDefault)?.id ?? calendars[0]?.id ?? '';
 

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getProject } from '@/lib/data/projects';
-import { listProjectMembers } from '@/lib/data/members';
+import { listOrgMembers } from '@/lib/data/org-members';
 import { NewTaskForm } from '@/components/task/new-task-form';
 import { Card } from '@/components/ui/card';
 
@@ -20,7 +20,11 @@ export default async function NewTaskPage({
 
   const project = await getProject(projectId);
   if (!project) notFound();
-  const members = await listProjectMembers(projectId);
+  // Anyone in the org can receive a task; assigning a non-member enrols them at
+  // their type-correct project role (handled in createTask).
+  const members = (await listOrgMembers(project.org_id))
+    .filter((m) => m.status === 'active')
+    .map((m) => ({ userId: m.userId, name: m.name, role: m.memberType }));
 
   return (
     <main className="mx-auto max-w-xl px-6 py-10">
