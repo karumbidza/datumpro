@@ -15,12 +15,9 @@ import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rou
 import { TASK_PRIORITIES } from '@datumpro/shared/domain';
 import { listProjectMembers, type Member } from '../../lib/data/members';
 import { createTask } from '../../lib/data/task-actions';
+import { DateField } from '../../components/date-field';
 import { contentWidth, radius, font, type Colors } from '../../lib/theme';
 import { useTheme } from '../../lib/theme-context';
-
-function isoOffset(days: number): string {
-  return new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
-}
 
 export default function NewTask() {
   const { projectId, projectName } = useLocalSearchParams<{ projectId: string; projectName?: string }>();
@@ -32,7 +29,8 @@ export default function NewTask() {
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('medium');
   const [assignee, setAssignee] = useState<string | null>(null);
-  const [dueDate, setDueDate] = useState('');
+  const [startDate, setStartDate] = useState<string | null>(null);
+  const [endDate, setEndDate] = useState<string | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [busy, setBusy] = useState(false);
 
@@ -48,6 +46,10 @@ export default function NewTask() {
       Alert.alert('Title required', 'Give the task a short title.');
       return;
     }
+    if (startDate && endDate && startDate > endDate) {
+      Alert.alert('Check the dates', 'The start date is after the end date.');
+      return;
+    }
     setBusy(true);
     try {
       const id = await createTask({
@@ -56,7 +58,8 @@ export default function NewTask() {
         description,
         priority,
         assigneeId: assignee,
-        dueDate: dueDate || null,
+        plannedStartDate: startDate,
+        plannedEndDate: endDate,
       });
       router.replace(`/(app)/task/${id}`);
     } catch (e) {
@@ -132,27 +135,16 @@ export default function NewTask() {
               </Pressable>
             ))}
           </View>
+          <Text style={styles.assignHint}>
+            Assigned to a person, they accept and price the work. To compare bids, leave it Unassigned and invite
+            contractors from the web app.
+          </Text>
         </Field>
 
-        <Field label="Due date" styles={styles}>
-          <TextInput
-            style={styles.input}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={colors.subtle}
-            value={dueDate}
-            onChangeText={setDueDate}
-            autoCapitalize="none"
-          />
-          <View style={[styles.chips, { marginTop: 8 }]}>
-            {[
-              { label: 'Today', days: 0 },
-              { label: '+1 week', days: 7 },
-              { label: '+1 month', days: 30 },
-            ].map((q) => (
-              <Pressable key={q.label} onPress={() => setDueDate(isoOffset(q.days))} style={styles.chip}>
-                <Text style={styles.chipText}>{q.label}</Text>
-              </Pressable>
-            ))}
+        <Field label="Schedule" styles={styles}>
+          <View style={styles.dateRow}>
+            <DateField label="Start" value={startDate} onChange={setStartDate} max={endDate} />
+            <DateField label="End · due" value={endDate} onChange={setEndDate} min={startDate} />
           </View>
         </Field>
 
@@ -203,6 +195,8 @@ const makeStyles = (c: Colors) =>
       color: c.text,
     },
     multiline: { minHeight: 80, textAlignVertical: 'top' },
+    assignHint: { fontSize: 12, fontFamily: font.body, color: c.subtle, marginTop: 6 },
+    dateRow: { flexDirection: 'row', gap: 12 },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     chip: {
       borderRadius: 999,

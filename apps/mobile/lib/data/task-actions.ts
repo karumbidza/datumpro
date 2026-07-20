@@ -114,7 +114,8 @@ export async function createTask(input: {
   description?: string;
   priority: string;
   assigneeId?: string | null;
-  dueDate?: string | null;
+  plannedStartDate?: string | null;
+  plannedEndDate?: string | null;
 }): Promise<string> {
   const parsed = createTaskSchema.safeParse({
     projectId: input.projectId,
@@ -122,7 +123,8 @@ export async function createTask(input: {
     description: input.description || undefined,
     priority: input.priority || 'medium',
     assigneeId: input.assigneeId || undefined,
-    dueDate: input.dueDate || undefined,
+    plannedStartDate: input.plannedStartDate || undefined,
+    plannedEndDate: input.plannedEndDate || undefined,
   });
   if (!parsed.success) throw new Error(parsed.error.issues.map((i) => i.message).join(', '));
 
@@ -143,7 +145,12 @@ export async function createTask(input: {
       description: parsed.data.description ?? null,
       priority: parsed.data.priority,
       assignee_id: parsed.data.assigneeId ?? null,
-      due_date: parsed.data.dueDate ?? null,
+      // The end date IS the due date.
+      due_date: parsed.data.plannedEndDate ?? null,
+      planned_start_date: parsed.data.plannedStartDate ?? null,
+      planned_end_date: parsed.data.plannedEndDate ?? null,
+      baseline_start_date: parsed.data.plannedStartDate ?? null,
+      baseline_end_date: parsed.data.plannedEndDate ?? null,
       created_by: await meId(),
     })
     .select('id')
