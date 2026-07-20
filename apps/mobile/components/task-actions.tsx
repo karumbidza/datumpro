@@ -15,6 +15,7 @@ export function TaskActions({
   planComplete = true,
   acceptancePending = false,
   hasPlan = true,
+  planApproved = true,
 }: {
   task: TaskDetail;
   perms: TaskPermissions;
@@ -25,6 +26,8 @@ export function TaskActions({
   acceptancePending?: boolean;
   /** At least one planned step exists — required before "Start". */
   hasPlan?: boolean;
+  /** The priced plan has been approved (or this task doesn't use the plan flow). */
+  planApproved?: boolean;
 }) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -51,8 +54,11 @@ export function TaskActions({
     }
   };
 
-  const startBlockedNoPlan = perms.isAssignee && task.status === 'todo' && !acceptancePending && !hasPlan;
-  const canStart = perms.isAssignee && task.status === 'todo' && !acceptancePending && hasPlan;
+  // When the plan isn't approved yet, the plan panel drives the messaging (submit
+  // / awaiting approval), so Actions stays quiet on the start CTA.
+  const startBlockedNoPlan =
+    perms.isAssignee && task.status === 'todo' && !acceptancePending && planApproved && !hasPlan;
+  const canStart = perms.isAssignee && task.status === 'todo' && !acceptancePending && planApproved && hasPlan;
   const canSubmit = perms.isAssignee && task.status === 'in_progress' && !acceptancePending;
   const canDecide = perms.canManage && task.status === 'submitted';
 

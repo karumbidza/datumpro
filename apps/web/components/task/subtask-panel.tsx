@@ -387,6 +387,16 @@ export function SubtaskPanel({
                       {s.plannedStartDate ? ` · ${s.plannedStartDate}` : ''}
                     </span>
                   )}
+                  {!usesPlanFlow && canTick && (
+                    <form action={removeSubtask}>
+                      <input type="hidden" name="id" value={s.id} />
+                      <input type="hidden" name="taskId" value={taskId} />
+                      <input type="hidden" name="projectId" value={projectId} />
+                      <button type="submit" className="text-[11px] text-zinc-400 hover:text-red-500" title="Remove">
+                        ✕
+                      </button>
+                    </form>
+                  )}
                 </div>
 
                 {((s.plannedStartDate || (mediaBySubtask[s.id]?.length ?? 0) > 0) || canTick) && (
@@ -419,8 +429,37 @@ export function SubtaskPanel({
                 )}
               </li>
             ))}
-            {counted.length === 0 && <li className="py-2 text-sm text-zinc-400">No plan steps.</li>}
+            {counted.length === 0 && (
+              <li className="py-2 text-sm text-zinc-400">
+                {!usesPlanFlow && canTick ? 'Break the task into steps below.' : 'No plan steps.'}
+              </li>
+            )}
           </ul>
+
+          {/* Legacy/internal tasks keep a simple (uncosted) add-step form. */}
+          {!usesPlanFlow && canTick && (
+            <form
+              action={addSubtask}
+              className="mt-3 flex flex-wrap items-end gap-2 border-t border-zinc-100 pt-3 dark:border-zinc-800"
+            >
+              <input type="hidden" name="taskId" value={taskId} />
+              <div className="min-w-40 flex-1">
+                <label className="mb-1 block text-[11px] font-medium text-zinc-500">Step</label>
+                <input name="title" required placeholder="e.g. Set formwork" className={`${inputClass} w-full`} />
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-medium text-zinc-500">Start</label>
+                <input type="date" name="plannedStartDate" min={taskStart ?? undefined} max={taskEnd ?? undefined} className={inputClass} />
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-medium text-zinc-500">End</label>
+                <input type="date" name="plannedEndDate" min={taskStart ?? undefined} max={taskEnd ?? undefined} className={inputClass} />
+              </div>
+              <SubmitButton variant="secondary" pendingText="Adding…">
+                Add step
+              </SubmitButton>
+            </form>
+          )}
 
           {canTick && counted.length > 0 && doneCount < counted.length && (
             <p className="mt-2 text-[11px] text-zinc-400">Tick off every step to unlock “Submit for sign-off”.</p>

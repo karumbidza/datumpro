@@ -10,6 +10,7 @@ import { TaskExtensions } from '../../../components/task-extensions';
 import { TaskActions } from '../../../components/task-actions';
 import { SubtaskPanel } from '../../../components/subtask-panel';
 import { listSubtasks, subtaskPct, type Subtask } from '../../../lib/data/subtasks';
+import { stepsByEntity, myOrgRole, type ApprovalStep } from '../../../lib/data/approvals';
 import { listSubtaskPhotos, type TaskPhoto } from '../../../lib/data/media';
 import { Card, Pill, ScheduleBar } from '../../../components/ui';
 import { formatDate, slaLabel, statusLabel } from '../../../lib/ui';
@@ -26,6 +27,8 @@ export default function TaskDetailScreen() {
   const [perms, setPerms] = useState<TaskPermissions | null>(null);
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [subtaskMedia, setSubtaskMedia] = useState<Record<string, TaskPhoto[]>>({});
+  const [planSteps, setPlanSteps] = useState<ApprovalStep[]>([]);
+  const [viewerRole, setViewerRole] = useState('');
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -41,15 +44,19 @@ export default function TaskDetailScreen() {
     }
     // Everything below depends only on the task — fetch it all in parallel
     // instead of one round-trip at a time.
-    const [perms, subs, media, conv] = await Promise.all([
+    const [perms, subs, media, conv, planStepsMap, role] = await Promise.all([
       getTaskPermissions(t.orgId, t.projectId, t.assigneeId),
       listSubtasks(String(id)),
       listSubtaskPhotos(String(id)),
       getTaskConversationId(String(id)),
+      stepsByEntity('task_plan', [String(id)]),
+      myOrgRole(t.orgId),
     ]);
     setPerms(perms);
     setSubtasks(subs);
     setSubtaskMedia(media);
+    setPlanSteps(planStepsMap.get(String(id)) ?? []);
+    setViewerRole(role ?? '');
     setUnread(conv ? await getUnreadCount(conv) : 0);
     setLoading(false);
   }, [id]);
@@ -95,7 +102,12 @@ export default function TaskDetailScreen() {
 
   const tone = slaTone(colors, task.slaStatus);
   const acceptancePending = task.acceptanceStatus === 'pending';
-  const planComplete = subtasks.length === 0 || subtasks.every((s) => s.isDone);
+  // Only the agreed scope (baseline + approved variations) gates completion.
+  const countedSubtasks = subtasks.filter((s) => !s.isVariation || s.variationStatus === 'approved');
+  const planComplete = countedSubtasks.length === 0 || countedSubtasks.every((s) => s.isDone);
+  // Contractor tasks can't start until the priced plan is approved.
+  const usesPlanFlow = task.acceptanceStatus !== null;
+  const planApproved = !usesPlanFlow || !!task.planApprovedAt;
   // ACTUAL completion — real work only (never time-based).
   const pct = acceptancePending
     ? 0
@@ -169,6 +181,11 @@ export default function TaskDetailScreen() {
           taskStatus={task.status}
           taskStart={task.plannedStartDate}
           taskEnd={task.plannedEndDate}
+          planSubmittedAt={task.planSubmittedAt}
+          planApprovedAt={task.planApprovedAt}
+          awardedCostCents={task.awardedCostCents}
+          planSteps={planSteps}
+          viewerRole={viewerRole}
           onChanged={load}
         />
       )}
@@ -181,6 +198,7 @@ export default function TaskDetailScreen() {
           planComplete={planComplete}
           acceptancePending={acceptancePending}
           hasPlan={subtasks.length > 0}
+          planApproved={planApproved}
         />
       )}
 
