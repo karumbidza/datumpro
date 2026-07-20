@@ -11,8 +11,10 @@ export interface TaskTab {
 
 /** Client-side tab strip for the task detail page. Panels are rendered on the
  *  server and passed in as `content`; this only toggles which one is visible. */
-export function TaskTabs({ tabs }: { tabs: TaskTab[] }) {
-  const [active, setActive] = useState(tabs[0]?.key);
+export function TaskTabs({ tabs, initialKey }: { tabs: TaskTab[]; initialKey?: string }) {
+  const [active, setActive] = useState(
+    initialKey && tabs.some((t) => t.key === initialKey) ? initialKey : tabs[0]?.key,
+  );
   const current = tabs.find((t) => t.key === active) ?? tabs[0];
   if (!current) return null;
 

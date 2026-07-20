@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { createTask } from '@/app/(app)/projects/[projectId]/tasks/actions';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { FormError } from '@/components/ui/form-error';
@@ -8,6 +8,14 @@ import { TASK_PRIORITIES } from '@datumpro/shared/domain';
 
 const inputClass =
   'w-full rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
+
+type Mode = 'direct' | 'tender' | 'unassigned';
+
+const MODES: { value: Mode; label: string; hint: string }[] = [
+  { value: 'direct', label: 'Assign directly', hint: 'Send it to one person to accept and price.' },
+  { value: 'tender', label: 'Put out to tender', hint: 'Invite contractors to bid, then award the winner.' },
+  { value: 'unassigned', label: 'Leave unassigned', hint: 'Park it — assign or tender later.' },
+];
 
 export function NewTaskForm({
   projectId,
@@ -17,11 +25,14 @@ export function NewTaskForm({
   members: { userId: string; name: string; role: string }[];
 }) {
   const [state, formAction] = useActionState(createTask, {});
+  const [mode, setMode] = useState<Mode>('direct');
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} className="space-y-5">
       <input type="hidden" name="projectId" value={projectId} />
+      <input type="hidden" name="assignmentMode" value={mode} />
       <FormError error={state.error} />
+
       <div>
         <label className="mb-1 block text-sm font-medium">Title</label>
         <input name="title" required placeholder="e.g. Pour ground-floor slab" className={inputClass} />
@@ -30,21 +41,48 @@ export function NewTaskForm({
         <label className="mb-1 block text-sm font-medium">Description</label>
         <textarea name="description" rows={3} className={inputClass} />
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="mb-1 block text-sm font-medium">Priority</label>
-          <select name="priority" defaultValue="medium" className={inputClass}>
-            {TASK_PRIORITIES.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
+
+      <div className="max-w-[50%]">
+        <label className="mb-1 block text-sm font-medium">Priority</label>
+        <select name="priority" defaultValue="medium" className={inputClass}>
+          {TASK_PRIORITIES.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Assignment mode */}
+      <div>
+        <label className="mb-1.5 block text-sm font-medium">How is this handled?</label>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {MODES.map((m) => (
+            <button
+              key={m.value}
+              type="button"
+              onClick={() => setMode(m.value)}
+              aria-pressed={mode === m.value}
+              className={`rounded-md border px-3 py-2 text-left text-sm transition-colors ${
+                mode === m.value
+                  ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10'
+                  : 'border-zinc-200 hover:border-zinc-300 dark:border-zinc-800'
+              }`}
+            >
+              <span className="block font-medium">{m.label}</span>
+            </button>
+          ))}
         </div>
+        <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">{MODES.find((m) => m.value === mode)!.hint}</p>
+      </div>
+
+      {mode === 'direct' && (
         <div>
           <label className="mb-1 block text-sm font-medium">Assignee</label>
           <select name="assigneeId" defaultValue="" className={inputClass}>
-            <option value="">Unassigned</option>
+            <option value="" disabled>
+              Choose a person…
+            </option>
             {members.map((m) => (
               <option key={m.userId} value={m.userId}>
                 {m.name} ({m.role})
@@ -52,28 +90,26 @@ export function NewTaskForm({
             ))}
           </select>
         </div>
-      </div>
-      <p className="-mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-        Prefer to compare bids? Leave this <span className="font-medium">Unassigned</span>, create the task,
-        then open its <span className="font-medium">Quotes</span> panel to invite two or more contractors and
-        award the winner.
-      </p>
-      <div className="grid grid-cols-3 gap-3">
+      )}
+
+      {/* Schedule — the end date IS the due date. */}
+      <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="mb-1 block text-sm font-medium">Start</label>
           <input type="date" name="plannedStartDate" className={inputClass} />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium">End</label>
+          <label className="mb-1 block text-sm font-medium">
+            End <span className="font-normal text-zinc-400">· due date</span>
+          </label>
           <input type="date" name="plannedEndDate" className={inputClass} />
         </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium">Due</label>
-          <input type="date" name="dueDate" className={inputClass} />
-        </div>
       </div>
-      <div className="pt-2">
-        <SubmitButton pendingText="Creating…">Create task</SubmitButton>
+
+      <div className="pt-1">
+        <SubmitButton pendingText="Creating…">
+          {mode === 'tender' ? 'Create & invite bids' : 'Create task'}
+        </SubmitButton>
       </div>
     </form>
   );

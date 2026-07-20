@@ -65,18 +65,16 @@ export default async function EditTaskPage({
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-sm font-medium">Start</label>
               <input type="date" name="plannedStartDate" defaultValue={task.planned_start_date ?? ''} className={inputClass} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">End</label>
+              <label className="mb-1 block text-sm font-medium">
+                End <span className="font-normal text-zinc-400">· due date</span>
+              </label>
               <input type="date" name="plannedEndDate" defaultValue={task.planned_end_date ?? ''} className={inputClass} />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Due</label>
-              <input type="date" name="dueDate" defaultValue={task.due_date ?? ''} className={inputClass} />
             </div>
           </div>
           <div className="flex gap-2 pt-2">

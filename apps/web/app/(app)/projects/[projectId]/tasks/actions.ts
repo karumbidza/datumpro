@@ -113,13 +113,20 @@ export async function createTask(_prev: FormState, formData: FormData): Promise<
   const { supabase, user } = await requireUser();
   const projectId = String(formData.get('projectId') ?? '');
 
+  // How the task is handled decides who (if anyone) it's assigned to.
+  const mode = (String(formData.get('assignmentMode') ?? 'direct')) as 'direct' | 'tender' | 'unassigned';
+  const assigneeId = mode === 'direct' ? (formData.get('assigneeId') as string) || undefined : undefined;
+  if (mode === 'direct' && !assigneeId) {
+    return { error: 'Choose who to assign this to — or pick Tender / Leave unassigned.' };
+  }
+
   const parsed = createTaskSchema.safeParse({
     projectId,
     title: String(formData.get('title') ?? ''),
     description: (formData.get('description') as string) || undefined,
     priority: (formData.get('priority') as string) || 'medium',
-    assigneeId: (formData.get('assigneeId') as string) || undefined,
-    dueDate: (formData.get('dueDate') as string) || undefined,
+    assigneeId,
+    // The end date IS the due date — no separate Due field.
     plannedStartDate: (formData.get('plannedStartDate') as string) || undefined,
     plannedEndDate: (formData.get('plannedEndDate') as string) || undefined,
   });
@@ -149,7 +156,8 @@ export async function createTask(_prev: FormState, formData: FormData): Promise<
       description: parsed.data.description ?? null,
       priority: parsed.data.priority,
       assignee_id: parsed.data.assigneeId ?? null,
-      due_date: parsed.data.dueDate ?? null,
+      // End date drives the due date; both kept in sync for downstream consumers.
+      due_date: parsed.data.plannedEndDate ?? null,
       planned_start_date: parsed.data.plannedStartDate ?? null,
       planned_end_date: parsed.data.plannedEndDate ?? null,
       baseline_start_date: parsed.data.plannedStartDate ?? null,
@@ -174,7 +182,8 @@ export async function createTask(_prev: FormState, formData: FormData): Promise<
     });
   }
   revalidatePath(`/projects/${projectId}/tasks`);
-  redirect(`/projects/${projectId}/tasks/${newId}`);
+  // Tender lands straight in the Quotes panel to invite bidders.
+  redirect(`/projects/${projectId}/tasks/${newId}${mode === 'tender' ? '?tab=quotes' : ''}`);
 }
 
 export async function updateTask(formData: FormData) {
@@ -195,7 +204,8 @@ export async function updateTask(formData: FormData) {
       assignee_id: (formData.get('assigneeId') as string) || null,
       planned_start_date: (formData.get('plannedStartDate') as string) || null,
       planned_end_date: (formData.get('plannedEndDate') as string) || null,
-      due_date: (formData.get('dueDate') as string) || null,
+      // The end date IS the due date — keep them in sync.
+      due_date: (formData.get('plannedEndDate') as string) || null,
     })
     .eq('id', taskId);
   if (error) throw new Error(error.message);

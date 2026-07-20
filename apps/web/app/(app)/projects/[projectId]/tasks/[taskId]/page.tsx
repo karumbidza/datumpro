@@ -46,10 +46,13 @@ const STATUS_TONE = { done: 'green', submitted: 'blue', blocked: 'amber', in_pro
 
 export default async function TaskDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ projectId: string; taskId: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const { projectId, taskId } = await params;
+  const { tab: initialTab } = await searchParams;
   const user = await getAuthUser();
   if (!user) redirect('/sign-in');
 
@@ -477,7 +480,7 @@ export default async function TaskDetailPage({
 
       {workflowActions}
 
-      <TaskTabs tabs={tabs} />
+      <TaskTabs tabs={tabs} initialKey={initialTab} />
     </main>
   );
 }
