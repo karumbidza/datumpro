@@ -88,7 +88,11 @@ export default async function TaskDetailPage({
     getTaskConversationId(taskId),
   ]);
   const sched = schedule?.meta[taskId];
-  const extSteps = await stepsByEntity('extension', extensions.map((e) => e.id));
+  const [extSteps, planStepsMap] = await Promise.all([
+    stepsByEntity('extension', extensions.map((e) => e.id)),
+    stepsByEntity('task_plan', [taskId]),
+  ]);
+  const planSteps = planStepsMap.get(taskId) ?? [];
 
   // Task DM (created on assignment; visible only to staff / PM / the assigned contractor).
   let dm: { id: string; messages: Awaited<ReturnType<typeof listMessages>>; othersRead: number } | null = null;
@@ -121,7 +125,11 @@ export default async function TaskDetailPage({
 
   const assigneeName = members.find((m) => m.userId === task.assignee_id)?.name ?? 'Unassigned';
   const acceptancePending = task.acceptance_status === 'pending';
-  const planComplete = subtasks.length === 0 || subtasks.every((s) => s.isDone);
+  // Only the agreed scope (baseline + approved variations) gates completion.
+  const countedSubtasks = subtasks.filter((s) => !s.isVariation || s.variationStatus === 'approved');
+  const planComplete = countedSubtasks.length === 0 || countedSubtasks.every((s) => s.isDone);
+  // A contractor task can't start until its priced plan is approved.
+  const planNotApproved = task.acceptance_status !== null && !task.plan_approved_at;
   const isAssignee = task.assignee_id === user.id;
   // Sign-off authority mirrors the DB guard: org admin OR the project's PM.
   const canManage = orgRole === 'owner' || orgRole === 'admin' || projectRole === 'pm';
@@ -139,7 +147,13 @@ export default async function TaskDetailPage({
     task.status !== 'done' && canAct && !acceptancePending ? (
       <div className="mt-6 space-y-4">
         {task.status === 'todo' &&
-          (subtasks.length > 0 ? (
+          (planNotApproved ? (
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              {task.plan_submitted_at
+                ? 'Your plan is awaiting approval — you can start once it’s approved.'
+                : 'Build your priced plan below and submit it for approval before starting.'}
+            </p>
+          ) : subtasks.length > 0 ? (
             <form action={startTask}>
               <input type="hidden" name="taskId" value={taskId} />
               <Button type="submit">Start task</Button>
@@ -448,6 +462,11 @@ export default async function TaskDetailPage({
             taskStart={task.planned_start_date}
             taskEnd={task.planned_end_date ?? task.due_date}
             taskStatus={task.status}
+            planSubmittedAt={task.plan_submitted_at}
+            planApprovedAt={task.plan_approved_at}
+            awardedCostCents={task.awarded_cost_cents}
+            planSteps={planSteps}
+            viewerRole={orgRole ?? ''}
           />
         </div>
       )}

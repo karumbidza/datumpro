@@ -429,13 +429,13 @@ export async function addSubtask(formData: FormData) {
   const estUnitRaw = String(formData.get('estUnit') ?? '');
   const estUnit = estUnitRaw === 'hours' || estUnitRaw === 'days' ? estUnitRaw : null;
   const estQtyRaw = Number(formData.get('estQty'));
-  const costRaw = Number(formData.get('costCents'));
+  const costRaw = Number(formData.get('cost')); // dollars from the form
   // is_variation / variation_status are set by the DB from the task's plan state.
   const { error } = await supabase.from('task_subtasks').insert({
     org_id: info.org_id,
     task_id: taskId,
     title,
-    cost_cents: Number.isFinite(costRaw) ? Math.max(0, Math.round(costRaw)) : 0,
+    cost_cents: Number.isFinite(costRaw) ? Math.max(0, Math.round(costRaw * 100)) : 0,
     est_qty: Number.isFinite(estQtyRaw) && estQtyRaw > 0 ? estQtyRaw : null,
     est_unit: estUnit,
     planned_start_date: (formData.get('plannedStartDate') as string) || null,
@@ -454,8 +454,8 @@ export async function updateSubtask(formData: FormData) {
   const row: Record<string, unknown> = {};
   const title = formData.get('title');
   if (title !== null) row.title = String(title).trim();
-  const cost = formData.get('costCents');
-  if (cost !== null) row.cost_cents = Math.max(0, Math.round(Number(cost) || 0));
+  const cost = formData.get('cost'); // dollars from the form
+  if (cost !== null) row.cost_cents = Math.max(0, Math.round((Number(cost) || 0) * 100));
   const qty = formData.get('estQty');
   if (qty !== null) row.est_qty = Number(qty) > 0 ? Number(qty) : null;
   const unit = formData.get('estUnit');
@@ -472,7 +472,7 @@ export async function updateSubtask(formData: FormData) {
 /** Contractor submits the priced plan for PM→Admin approval. Every baseline line
  *  needs a cost, a duration and a start date; the DB seeds the chain and the task
  *  is locked for review until approved. */
-export async function submitPlan(formData: FormData): Promise<FormState> {
+export async function submitPlan(_prev: FormState, formData: FormData): Promise<FormState> {
   const { supabase, user } = await requireUser();
   const taskId = String(formData.get('taskId') ?? '');
   const task = await loadTask(supabase, taskId);
