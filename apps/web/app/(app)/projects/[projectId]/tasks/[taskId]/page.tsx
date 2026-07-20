@@ -12,10 +12,11 @@ import {
 import { listProjectMembers, myProjectRole } from '@/lib/data/members';
 import { listChatRoster } from '@/lib/data/chat-roster';
 import { getProjectSchedule } from '@/lib/data/scheduling';
-import { listTaskQuotes, listTaskMedia, listSubtaskMedia } from '@/lib/data/quotes';
+import { listTaskMedia, listSubtaskMedia } from '@/lib/data/quotes';
+import { listTenderInvites, listBidLinesByContractor } from '@/lib/data/tenders';
 import { listTaskPayments } from '@/lib/data/payments';
 import { getTaskConversationId, listMessages, othersMaxReadSeq } from '@/lib/data/chat';
-import { QuotePanel } from '@/components/task/quote-panel';
+import { TenderPanel } from '@/components/task/tender-panel';
 import { SubtaskPanel } from '@/components/task/subtask-panel';
 import { listSubtasks } from '@/lib/data/subtasks';
 import { PaymentsPanel } from '@/components/task/payments-panel';
@@ -67,7 +68,8 @@ export default async function TaskDetailPage({
     taskOptions,
     activity,
     schedule,
-    quotes,
+    tenderInvites,
+    bidLinesMap,
     completionMedia,
     extensions,
     payments,
@@ -82,7 +84,8 @@ export default async function TaskDetailPage({
     listProjectTaskOptions(projectId, taskId),
     listTaskActivity(taskId),
     getProjectSchedule(projectId),
-    listTaskQuotes(taskId),
+    listTenderInvites(taskId),
+    listBidLinesByContractor(taskId),
     listTaskMedia(taskId, 'completion'),
     listExtensionRequests(taskId),
     listTaskPayments(taskId),
@@ -323,22 +326,26 @@ export default async function TaskDetailPage({
     ),
   });
 
-  tabs.push({
-    key: 'quotes',
-    label: 'Quotes',
-    count: quotes.length,
-    content: (
-      <QuotePanel
-        taskId={taskId}
-        projectId={projectId}
-        orgId={task.org_id}
-        canManage={canManage}
-        currentUserId={user.id}
-        quotes={quotes}
-        contractors={contractors}
-      />
-    ),
-  });
+  if (tenderInvites.length > 0) {
+    const invitedIds = new Set(tenderInvites.map((i) => i.contractorId));
+    const tenderDecided = tenderInvites.some((i) => i.status === 'awarded');
+    tabs.push({
+      key: 'tender',
+      label: 'Tender',
+      count: tenderInvites.length,
+      content: (
+        <TenderPanel
+          taskId={taskId}
+          projectId={projectId}
+          invites={tenderInvites}
+          bidLines={Object.fromEntries(bidLinesMap)}
+          availableContractors={contractors.filter((c) => !invitedIds.has(c.userId))}
+          canManage={canManage}
+          decided={tenderDecided}
+        />
+      ),
+    });
+  }
 
   if (payments.length > 0) {
     tabs.push({
@@ -411,7 +418,7 @@ export default async function TaskDetailPage({
           { table: 'task_subtasks', filter: `task_id=eq.${taskId}` },
           { table: 'task_media', filter: `task_id=eq.${taskId}` },
           { table: 'task_extension_requests', filter: `task_id=eq.${taskId}` },
-          { table: 'task_quotes', filter: `task_id=eq.${taskId}` },
+          { table: 'task_tender_invites', filter: `task_id=eq.${taskId}` },
           { table: 'task_activity', filter: `task_id=eq.${taskId}` },
           { table: 'tasks', filter: `id=eq.${taskId}` },
           { table: 'approvals', filter: `org_id=eq.${task.org_id}` },

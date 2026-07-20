@@ -31,6 +31,11 @@ export function NewTaskForm({
   const [deps, setDeps] = useState<string[]>([]);
   const toggleDep = (id: string) =>
     setDeps((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+  const [invitees, setInvitees] = useState<string[]>([]);
+  const toggleInvitee = (id: string) =>
+    setInvitees((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+  const contractors = members.filter((m) => m.role === 'contractor');
+  const tenderPool = contractors.length > 0 ? contractors : members;
 
   return (
     <form action={formAction} className="space-y-5">
@@ -94,6 +99,35 @@ export function NewTaskForm({
               </option>
             ))}
           </select>
+        </div>
+      )}
+
+      {mode === 'tender' && (
+        <div>
+          <label className="mb-1 block text-sm font-medium">Invite contractors to bid</label>
+          <p className="mb-2 text-xs text-zinc-500 dark:text-zinc-400">
+            Each one gets a sealed invitation and builds their own priced plan. You compare the bids and award the
+            winner — they can’t see each other.
+          </p>
+          <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-zinc-200 p-2 dark:border-zinc-800">
+            {tenderPool.map((m) => (
+              <label key={m.userId} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900">
+                <input
+                  type="checkbox"
+                  checked={invitees.includes(m.userId)}
+                  onChange={() => toggleInvitee(m.userId)}
+                  className="h-4 w-4 accent-brand-600"
+                />
+                <span className="truncate">
+                  {m.name} <span className="text-zinc-400">({m.role})</span>
+                </span>
+              </label>
+            ))}
+            {tenderPool.length === 0 && <p className="px-1 py-1 text-sm text-zinc-400">No contractors in this org yet.</p>}
+          </div>
+          {invitees.map((id) => (
+            <input key={id} type="hidden" name="tenderContractorIds" value={id} />
+          ))}
         </div>
       )}
 

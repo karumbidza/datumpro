@@ -179,6 +179,35 @@ export async function createTask(_prev: FormState, formData: FormData): Promise<
     );
   }
 
+  // Tender: invite the chosen contractors to bid — each builds a competing plan.
+  if (mode === 'tender') {
+    const contractorIds = [...new Set(formData.getAll('tenderContractorIds').map(String).filter(Boolean))];
+    if (contractorIds.length > 0) {
+      await supabase.from('task_tender_invites').insert(
+        contractorIds.map((cid) => ({
+          org_id: orgId,
+          project_id: projectId,
+          task_id: newId,
+          contractor_id: cid,
+          invited_by: user.id,
+        })),
+      );
+      await Promise.all(
+        contractorIds.map((cid) =>
+          notifyUser(supabase, {
+            orgId,
+            userId: cid,
+            type: 'tender_invited',
+            title: 'Invited to tender',
+            body: `You're invited to bid on “${parsed.data.title}” — build your plan and quote.`,
+            link: `/projects/${projectId}/tasks/${newId}`,
+            entityId: newId,
+          }),
+        ),
+      );
+    }
+  }
+
   await logActivity(supabase, { id: newId, org_id: orgId }, user.id, 'created', 'Task created');
   if (parsed.data.assigneeId) {
     await notifyUser(supabase, {
@@ -192,8 +221,8 @@ export async function createTask(_prev: FormState, formData: FormData): Promise<
     });
   }
   revalidatePath(`/projects/${projectId}/tasks`);
-  // Tender lands straight in the Quotes panel to invite bidders.
-  redirect(`/projects/${projectId}/tasks/${newId}${mode === 'tender' ? '?tab=quotes' : ''}`);
+  // Tender lands straight in the Tender panel to invite / compare bidders.
+  redirect(`/projects/${projectId}/tasks/${newId}${mode === 'tender' ? '?tab=tender' : ''}`);
 }
 
 export async function updateTask(formData: FormData) {
@@ -949,3 +978,92 @@ export async function requestExtension(_prev: FormState, formData: FormData): Pr
 
 // decideExtension retired — extension approvals now run through the shared
 // two-step chain (decideApprovalStep + finalize_approval).
+
+// ── Tender by competing plans ────────────────────────────────────────────────
+/** Invite more contractors to an open tender (each builds a competing plan). */
+export async function inviteTenderContractors(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const taskId = String(formData.get('taskId') ?? '');
+  const contractorIds = [...new Set(formData.getAll('contractorIds').map(String).filter(Boolean))];
+  if (contractorIds.length === 0) return;
+  const task = await loadTask(supabase, taskId);
+  if (!task) throw new Error('Task not found');
+  await supabase.from('task_tender_invites').insert(
+    contractorIds.map((cid) => ({
+      org_id: task.org_id,
+      project_id: task.project_id,
+      task_id: taskId,
+      contractor_id: cid,
+      invited_by: user.id,
+    })),
+  );
+  await logActivity(supabase, task, user.id, 'tender', `Invited ${contractorIds.length} contractor(s) to tender`);
+  await Promise.all(
+    contractorIds.map((cid) =>
+      notifyUser(supabase, {
+        orgId: task.org_id,
+        userId: cid,
+        type: 'tender_invited',
+        title: 'Invited to tender',
+        body: `You're invited to bid on “${task.title}” — build your plan and quote.`,
+        link: `/projects/${task.project_id}/tasks/${taskId}`,
+        entityId: taskId,
+      }),
+    ),
+  );
+  revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
+}
+
+/** Pull an invite (and that contractor's bid lines) before award. */
+export async function withdrawTenderInvite(formData: FormData) {
+  const { supabase } = await requireUser();
+  const inviteId = String(formData.get('inviteId') ?? '');
+  const taskId = String(formData.get('taskId') ?? '');
+  const projectId = String(formData.get('projectId') ?? '');
+  const { data: inv } = await supabase
+    .from('task_tender_invites')
+    .select('contractor_id')
+    .eq('id', inviteId)
+    .maybeSingle();
+  const cid = (inv as { contractor_id: string } | null)?.contractor_id;
+  await supabase.from('task_tender_invites').delete().eq('id', inviteId);
+  if (cid) await supabase.from('task_subtasks').delete().eq('task_id', taskId).eq('bid_contractor_id', cid);
+  revalidatePath(`/projects/${projectId}/tasks/${taskId}`);
+}
+
+/** Award the tender to a submitted bid — the winner's plan becomes the task's. */
+export async function awardTender(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const taskId = String(formData.get('taskId') ?? '');
+  const winnerId = String(formData.get('winnerId') ?? '');
+  if (!winnerId) throw new Error('Choose a winning bid');
+  const task = await loadTask(supabase, taskId);
+  if (!task) throw new Error('Task not found');
+  // Enrol the winner (assignee-is-a-member rule) before the atomic DB award.
+  const enrolErr = await ensureProjectMember(supabase, task.org_id, task.project_id, winnerId);
+  if (enrolErr) throw new Error(enrolErr);
+  const { error } = await supabase.rpc('award_tender', { p_task_id: taskId, p_winner: winnerId });
+  if (error) throw new Error(error.message);
+  await logActivity(supabase, task, user.id, 'tender', 'Awarded the tender');
+  const { data: invites } = await supabase
+    .from('task_tender_invites')
+    .select('contractor_id, status')
+    .eq('task_id', taskId);
+  await Promise.all(
+    ((invites ?? []) as { contractor_id: string; status: string }[]).map((i) =>
+      notifyUser(supabase, {
+        orgId: task.org_id,
+        userId: i.contractor_id,
+        type: i.status === 'awarded' ? 'tender_awarded' : 'tender_not_selected',
+        title: i.status === 'awarded' ? 'You won the tender' : 'Tender result',
+        body:
+          i.status === 'awarded'
+            ? `Your bid on “${task.title}” was accepted — the work is yours.`
+            : `“${task.title}” was awarded to another contractor.`,
+        link: `/projects/${task.project_id}/tasks/${taskId}`,
+        entityId: taskId,
+      }),
+    ),
+  );
+  revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
+}
