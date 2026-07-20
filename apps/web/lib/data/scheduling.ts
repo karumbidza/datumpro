@@ -14,6 +14,8 @@ import { myProjectRole } from '@/lib/data/members';
 export interface TaskScheduleMeta {
   critical: boolean;
   floatDays: number;
+  /** Titles of predecessor tasks that aren't done yet — non-empty ⇒ blocked. */
+  waitingOn: string[];
 }
 
 export interface ProjectSchedule {
@@ -30,6 +32,7 @@ export interface ProjectSchedule {
 interface RawTask {
   id: string;
   org_id: string;
+  title: string;
   status: TaskStatus;
   planned_start_date: string | null;
   planned_end_date: string | null;
@@ -49,7 +52,7 @@ export async function getProjectSchedule(projectId: string): Promise<ProjectSche
 
   const { data: taskData } = await supabase
     .from('tasks')
-    .select('id, org_id, status, planned_start_date, planned_end_date, due_date')
+    .select('id, org_id, title, status, planned_start_date, planned_end_date, due_date')
     .eq('project_id', projectId);
   const tasks = (taskData ?? []) as RawTask[];
   if (tasks.length === 0) return null;
@@ -102,10 +105,17 @@ export async function getProjectSchedule(projectId: string): Promise<ProjectSche
   const schedule = computeSchedule(sched);
   const progress = computeProgress(sched);
 
+  // A task is blocked while any predecessor isn't done — surface which ones.
+  const titleById = new Map(tasks.map((t) => [t.id, t.title]));
+  const statusById = new Map(tasks.map((t) => [t.id, t.status]));
+
   const meta: Record<string, TaskScheduleMeta> = {};
   for (const id of ids) {
     const s = schedule.tasks[id];
-    meta[id] = { critical: s?.critical ?? false, floatDays: s?.float ?? 0 };
+    const waitingOn = (depsBySuccessor.get(id) ?? [])
+      .filter((d) => statusById.get(d.predecessorId) !== 'done')
+      .map((d) => titleById.get(d.predecessorId) ?? 'a task');
+    meta[id] = { critical: s?.critical ?? false, floatDays: s?.float ?? 0, waitingOn };
   }
 
   const starts = tasks

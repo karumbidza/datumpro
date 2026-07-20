@@ -136,6 +136,10 @@ export default async function TaskDetailPage({
   const planComplete = countedSubtasks.length === 0 || countedSubtasks.every((s) => s.isDone);
   // A contractor task can't start until its priced plan is approved.
   const planNotApproved = task.acceptance_status !== null && !task.plan_approved_at;
+  // Dependency block: predecessors that aren't done yet. Can't start; can still
+  // be assigned/tendered. The DB enforces the start rule too.
+  const waitingOn = dependencies.filter((d) => d.status !== 'done').map((d) => d.title);
+  const blockedByDeps = waitingOn.length > 0 && task.status !== 'done';
   const isAssignee = task.assignee_id === user.id;
   // Sign-off authority mirrors the DB guard: org admin OR the project's PM.
   const canManage = orgRole === 'owner' || orgRole === 'admin' || projectRole === 'pm';
@@ -153,7 +157,11 @@ export default async function TaskDetailPage({
     task.status !== 'done' && canAct && !acceptancePending ? (
       <div className="mt-6 space-y-4">
         {task.status === 'todo' &&
-          (planNotApproved ? (
+          (blockedByDeps ? (
+            <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
+              🔒 Blocked — waiting on {waitingOn.join(', ')} to be completed before this can start.
+            </p>
+          ) : planNotApproved ? (
             <p className="text-sm text-zinc-500 dark:text-zinc-400">
               {task.plan_submitted_at
                 ? 'Your plan is awaiting approval — you can start once it’s approved.'
@@ -438,6 +446,11 @@ export default async function TaskDetailPage({
         {task.planned_start_date && <Row label="Start" value={task.planned_start_date} />}
         {task.due_date && <Row label="Due" value={task.due_date} />}
         {task.description && <p className="pt-2 text-zinc-600 dark:text-zinc-300">{task.description}</p>}
+        {blockedByDeps && (
+          <p className="rounded-md bg-amber-50 p-2 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
+            🔒 Blocked — waiting on {waitingOn.join(', ')}. Can’t start until done; you can still assign or tender it.
+          </p>
+        )}
         {task.status === 'blocked' && task.blocker_description && (
           <p className="rounded-md bg-amber-50 p-2 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
             🚧 {task.blocker_description}

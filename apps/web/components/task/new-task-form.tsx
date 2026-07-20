@@ -20,12 +20,17 @@ const MODES: { value: Mode; label: string; hint: string }[] = [
 export function NewTaskForm({
   projectId,
   members,
+  taskOptions,
 }: {
   projectId: string;
   members: { userId: string; name: string; role: string }[];
+  taskOptions: { id: string; title: string }[];
 }) {
   const [state, formAction] = useActionState(createTask, {});
   const [mode, setMode] = useState<Mode>('direct');
+  const [deps, setDeps] = useState<string[]>([]);
+  const toggleDep = (id: string) =>
+    setDeps((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
 
   return (
     <form action={formAction} className="space-y-5">
@@ -105,6 +110,35 @@ export function NewTaskForm({
           <input type="date" name="plannedEndDate" className={inputClass} />
         </div>
       </div>
+
+      {/* Dependencies — this task can't start until these are done. */}
+      {taskOptions.length > 0 && (
+        <div>
+          <label className="mb-1 block text-sm font-medium">
+            Depends on <span className="font-normal text-zinc-400">· optional</span>
+          </label>
+          <p className="mb-2 text-xs text-zinc-500 dark:text-zinc-400">
+            Pick tasks that must finish first. This task stays <span className="font-medium">blocked</span> until they’re
+            done — you can still assign or tender it in the meantime.
+          </p>
+          <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-zinc-200 p-2 dark:border-zinc-800">
+            {taskOptions.map((t) => (
+              <label key={t.id} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900">
+                <input
+                  type="checkbox"
+                  checked={deps.includes(t.id)}
+                  onChange={() => toggleDep(t.id)}
+                  className="h-4 w-4 accent-brand-600"
+                />
+                <span className="truncate">{t.title}</span>
+              </label>
+            ))}
+          </div>
+          {deps.map((id) => (
+            <input key={id} type="hidden" name="predecessorIds" value={id} />
+          ))}
+        </div>
+      )}
 
       <div className="pt-1">
         <SubmitButton pendingText="Creating…">

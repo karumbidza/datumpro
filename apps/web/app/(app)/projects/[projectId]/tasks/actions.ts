@@ -169,6 +169,16 @@ export async function createTask(_prev: FormState, formData: FormData): Promise<
   if (error) return { error: error.message };
 
   const newId = (created as { id: string }).id;
+
+  // Dependencies (optional): predecessors that must finish before this can start.
+  // The task stays blocked until they're done; the DB cycle-check guards inserts.
+  const predecessorIds = [...new Set(formData.getAll('predecessorIds').map(String).filter(Boolean))];
+  if (predecessorIds.length > 0) {
+    await supabase.from('task_dependencies').insert(
+      predecessorIds.map((pid) => ({ org_id: orgId, predecessor_id: pid, successor_id: newId })),
+    );
+  }
+
   await logActivity(supabase, { id: newId, org_id: orgId }, user.id, 'created', 'Task created');
   if (parsed.data.assigneeId) {
     await notifyUser(supabase, {

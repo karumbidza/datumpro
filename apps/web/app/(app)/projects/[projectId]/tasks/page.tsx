@@ -122,6 +122,12 @@ function statusNote(
     };
   }
   const meta = schedule?.meta[t.id];
+  if (meta && meta.waitingOn.length > 0) {
+    return {
+      text: `🔒 Waiting on ${meta.waitingOn.length} task${meta.waitingOn.length === 1 ? '' : 's'}`,
+      className: 'text-amber-600 dark:text-amber-400',
+    };
+  }
   if (meta?.critical) return { text: '● Critical path', className: 'text-red-600 dark:text-red-400' };
   if (t.status === 'submitted') return { text: 'In review', className: 'text-zinc-400' };
   if (meta && meta.floatDays > 0) return { text: `${meta.floatDays}d slack`, className: 'text-zinc-400' };
@@ -234,7 +240,9 @@ export default async function TaskBoardPage({
 
           <div className="flex flex-col gap-2">
             {tasks.map((t) => {
-              const status = STATUS_META[t.status];
+              // A todo task with unfinished predecessors reads as Blocked.
+              const depBlocked = t.status === 'todo' && (schedule?.meta[t.id]?.waitingOn.length ?? 0) > 0;
+              const status = depBlocked ? STATUS_META.blocked : STATUS_META[t.status];
               const pct = actualPercent(t, progress.get(t.id));
               const expected = taskExpected(t);
               const note = statusNote(t, schedule);
