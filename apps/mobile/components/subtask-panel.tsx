@@ -79,6 +79,25 @@ export function SubtaskPanel({
   const [newStart, setNewStart] = useState<string | null>(null);
   const [newEnd, setNewEnd] = useState<string | null>(null);
   const [newCost, setNewCost] = useState('');
+  const [addOpen, setAddOpen] = useState(false);
+  // Editing an existing plan step — one local buffer, saved on Done (no
+  // save-on-every-keystroke churn).
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [eTitle, setETitle] = useState('');
+  const [eQty, setEQty] = useState('');
+  const [eUnit, setEUnit] = useState<'hours' | 'days'>('days');
+  const [eStart, setEStart] = useState<string | null>(null);
+  const [eCost, setECost] = useState('');
+
+  function openEdit(s: Subtask) {
+    setEditingId(s.id);
+    setETitle(s.title);
+    setEQty(s.estQty != null ? String(s.estQty) : '');
+    setEUnit(s.estUnit ?? 'days');
+    setEStart(s.plannedStartDate);
+    setECost(s.costCents ? dollars(s.costCents) : '');
+  }
+  const stepIncomplete = (s: Subtask) => !s.estQty || !s.estUnit || !s.plannedStartDate || s.costCents <= 0;
 
   const baseline = subtasks.filter((s) => !s.isVariation);
   const counted = subtasks.filter(isCounted);
@@ -253,121 +272,130 @@ export function SubtaskPanel({
             your quote; it goes to the PM &amp; admin for approval.
           </Text>
 
-          {baseline.map((s) => (
-            <View key={s.id} style={styles.editRow}>
-              <View style={styles.editTop}>
+          {baseline.map((s) =>
+            editingId === s.id ? (
+              <View key={s.id} style={styles.editRow}>
                 <TextInput
-                  defaultValue={s.title}
-                  onEndEditing={(e) => run(() => updateSubtask(s.id, { title: e.nativeEvent.text.trim() }))}
-                  placeholder="Step"
+                  value={eTitle}
+                  onChangeText={setETitle}
+                  placeholder="What's the step?"
                   placeholderTextColor={colors.subtle}
-                  style={[styles.input, { flex: 1 }]}
+                  style={styles.input}
                 />
+                <View style={styles.editGrid}>
+                  <TextInput value={eQty} onChangeText={setEQty} keyboardType="numeric" placeholder="Qty" placeholderTextColor={colors.subtle} style={[styles.input, styles.qty]} />
+                  <View style={styles.unitToggle}>
+                    {(['hours', 'days'] as const).map((u) => (
+                      <Pressable key={u} style={[styles.unitBtn, eUnit === u && styles.unitBtnOn]} onPress={() => setEUnit(u)}>
+                        <Text style={[styles.unitText, eUnit === u && styles.unitTextOn]}>{u === 'hours' ? 'hrs' : 'days'}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <TextInput value={eCost} onChangeText={setECost} keyboardType="numeric" placeholder="Cost $" placeholderTextColor={colors.subtle} style={[styles.input, styles.cost]} />
+                </View>
+                <DateField label="Start" value={eStart} onChange={setEStart} min={taskStart} max={taskEnd} />
+                <View style={styles.row}>
+                  <Pressable
+                    style={[styles.btn, styles.btnPrimary, (!eTitle.trim() || busy) && { opacity: 0.5 }]}
+                    disabled={!eTitle.trim() || busy}
+                    onPress={() =>
+                      run(async () => {
+                        await updateSubtask(s.id, {
+                          title: eTitle.trim(),
+                          estQty: Number(eQty) || null,
+                          estUnit: eUnit,
+                          plannedStartDate: eStart,
+                          costCents: Math.round((Number(eCost) || 0) * 100),
+                        });
+                        setEditingId(null);
+                      })
+                    }
+                  >
+                    {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.btnPrimaryText}>Done</Text>}
+                  </Pressable>
+                  <Pressable style={[styles.btn, styles.btnOutline]} onPress={() => setEditingId(null)}>
+                    <Text style={styles.btnOutlineText}>Cancel</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <View key={s.id} style={styles.stepCard}>
+                <Pressable style={{ flex: 1 }} onPress={() => openEdit(s)}>
+                  <Text style={styles.stepTitle}>{s.title}</Text>
+                  <Text style={[styles.stepMeta, stepIncomplete(s) && styles.stepWarn]}>
+                    {stepIncomplete(s)
+                      ? '⚠ Tap to add duration, start date & cost'
+                      : `${s.estQty} ${s.estUnit} · ${s.plannedStartDate} · ${formatUsd(s.costCents)}`}
+                  </Text>
+                </Pressable>
+                <Pressable onPress={() => openEdit(s)} hitSlop={8}>
+                  <Ionicons name="create-outline" size={18} color={colors.subtle} />
+                </Pressable>
                 <Pressable disabled={busy} onPress={() => run(() => removeSubtask(s.id))} hitSlop={8}>
                   <Ionicons name="close" size={18} color={colors.subtle} />
                 </Pressable>
               </View>
+            ),
+          )}
+
+          {/* Add a step */}
+          {!addOpen ? (
+            <Pressable style={styles.addStepBtn} onPress={() => setAddOpen(true)}>
+              <Ionicons name="add-circle-outline" size={18} color={colors.brand} />
+              <Text style={styles.addStepText}>Add a step</Text>
+            </Pressable>
+          ) : (
+            <View style={styles.addBlock}>
+              <TextInput
+                value={newTitle}
+                onChangeText={setNewTitle}
+                placeholder="What's the step?"
+                placeholderTextColor={colors.subtle}
+                style={styles.input}
+              />
               <View style={styles.editGrid}>
-                <TextInput
-                  defaultValue={s.estQty != null ? String(s.estQty) : ''}
-                  onEndEditing={(e) => run(() => updateSubtask(s.id, { estQty: Number(e.nativeEvent.text) || null }))}
-                  keyboardType="numeric"
-                  placeholder="Qty"
-                  placeholderTextColor={colors.subtle}
-                  style={[styles.input, styles.qty]}
-                />
+                <TextInput value={newQty} onChangeText={setNewQty} keyboardType="numeric" placeholder="Qty" placeholderTextColor={colors.subtle} style={[styles.input, styles.qty]} />
                 <View style={styles.unitToggle}>
                   {(['hours', 'days'] as const).map((u) => (
-                    <Pressable
-                      key={u}
-                      style={[styles.unitBtn, s.estUnit === u && styles.unitBtnOn]}
-                      disabled={busy}
-                      onPress={() => run(() => updateSubtask(s.id, { estUnit: u }))}
-                    >
-                      <Text style={[styles.unitText, s.estUnit === u && styles.unitTextOn]}>{u === 'hours' ? 'hrs' : 'days'}</Text>
+                    <Pressable key={u} style={[styles.unitBtn, newUnit === u && styles.unitBtnOn]} onPress={() => setNewUnit(u)}>
+                      <Text style={[styles.unitText, newUnit === u && styles.unitTextOn]}>{u === 'hours' ? 'hrs' : 'days'}</Text>
                     </Pressable>
                   ))}
                 </View>
-                <TextInput
-                  defaultValue={dollars(s.costCents)}
-                  onEndEditing={(e) =>
-                    run(() => updateSubtask(s.id, { costCents: Math.round((Number(e.nativeEvent.text) || 0) * 100) }))
+                <TextInput value={newCost} onChangeText={setNewCost} keyboardType="numeric" placeholder="Cost $" placeholderTextColor={colors.subtle} style={[styles.input, styles.cost]} />
+              </View>
+              <DateField label="Start" value={newStart} onChange={setNewStart} min={taskStart} max={taskEnd} />
+              <View style={styles.row}>
+                <Pressable
+                  style={[styles.btn, styles.btnPrimary, (!newTitle.trim() || busy) && { opacity: 0.5 }]}
+                  disabled={!newTitle.trim() || busy}
+                  onPress={() =>
+                    run(async () => {
+                      await addSubtask({
+                        taskId,
+                        orgId,
+                        title: newTitle.trim(),
+                        costCents: Math.round((Number(newCost) || 0) * 100),
+                        estQty: Number(newQty) || null,
+                        estUnit: newUnit,
+                        plannedStartDate: newStart,
+                      });
+                      setNewTitle('');
+                      setNewQty('');
+                      setNewCost('');
+                      setNewStart(null);
+                      setAddOpen(false);
+                    })
                   }
-                  keyboardType="numeric"
-                  placeholder="Cost $"
-                  placeholderTextColor={colors.subtle}
-                  style={[styles.input, styles.cost]}
-                />
+                >
+                  {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.btnPrimaryText}>Add step</Text>}
+                </Pressable>
+                <Pressable style={[styles.btn, styles.btnOutline]} onPress={() => setAddOpen(false)}>
+                  <Text style={styles.btnOutlineText}>Cancel</Text>
+                </Pressable>
               </View>
-              <DateField
-                label="Start"
-                value={s.plannedStartDate}
-                onChange={(d) => run(() => updateSubtask(s.id, { plannedStartDate: d }))}
-                min={taskStart}
-                max={taskEnd}
-              />
             </View>
-          ))}
-
-          {/* Add a step */}
-          <View style={styles.addBlock}>
-            <TextInput
-              value={newTitle}
-              onChangeText={setNewTitle}
-              placeholder="Add a step…"
-              placeholderTextColor={colors.subtle}
-              style={styles.input}
-            />
-            <View style={styles.editGrid}>
-              <TextInput
-                value={newQty}
-                onChangeText={setNewQty}
-                keyboardType="numeric"
-                placeholder="Qty"
-                placeholderTextColor={colors.subtle}
-                style={[styles.input, styles.qty]}
-              />
-              <View style={styles.unitToggle}>
-                {(['hours', 'days'] as const).map((u) => (
-                  <Pressable key={u} style={[styles.unitBtn, newUnit === u && styles.unitBtnOn]} onPress={() => setNewUnit(u)}>
-                    <Text style={[styles.unitText, newUnit === u && styles.unitTextOn]}>{u === 'hours' ? 'hrs' : 'days'}</Text>
-                  </Pressable>
-                ))}
-              </View>
-              <TextInput
-                value={newCost}
-                onChangeText={setNewCost}
-                keyboardType="numeric"
-                placeholder="Cost $"
-                placeholderTextColor={colors.subtle}
-                style={[styles.input, styles.cost]}
-              />
-            </View>
-            <DateField label="Start" value={newStart} onChange={setNewStart} min={taskStart} max={taskEnd} />
-            <Pressable
-              style={[styles.addBtn, (!newTitle.trim() || busy) && { opacity: 0.5 }]}
-              disabled={!newTitle.trim() || busy}
-              onPress={() =>
-                run(async () => {
-                  await addSubtask({
-                    taskId,
-                    orgId,
-                    title: newTitle.trim(),
-                    costCents: Math.round((Number(newCost) || 0) * 100),
-                    estQty: Number(newQty) || null,
-                    estUnit: newUnit,
-                    plannedStartDate: newStart,
-                  });
-                  setNewTitle('');
-                  setNewQty('');
-                  setNewCost('');
-                  setNewStart(null);
-                })
-              }
-            >
-              {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.addBtnText}>Add step</Text>}
-            </Pressable>
-          </View>
+          )}
 
           {/* Total + submit */}
           <View style={styles.totalRow}>
@@ -375,9 +403,20 @@ export function SubtaskPanel({
               Total quote: <Text style={styles.totalValue}>{formatUsd(draftTotal)}</Text>
             </Text>
           </View>
+          {(() => {
+            const need = baseline.filter(stepIncomplete).length;
+            if (baseline.length === 0) return <Text style={styles.gateHint}>Add at least one step to build your plan.</Text>;
+            if (need > 0)
+              return (
+                <Text style={styles.gateHint}>
+                  {need} step{need === 1 ? '' : 's'} still need a duration, start date &amp; cost.
+                </Text>
+              );
+            return null;
+          })()}
           <Pressable
-            style={[styles.btn, styles.btnPrimary, (baseline.length === 0 || busy) && { opacity: 0.5 }]}
-            disabled={baseline.length === 0 || busy}
+            style={[styles.btn, styles.btnPrimary, (baseline.length === 0 || baseline.some(stepIncomplete) || busy) && { opacity: 0.5 }]}
+            disabled={baseline.length === 0 || baseline.some(stepIncomplete) || busy}
             onPress={() => run(() => submitPlan(taskId))}
           >
             {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.btnPrimaryText}>Submit plan for approval</Text>}
@@ -681,8 +720,20 @@ const makeStyles = (c: Colors) =>
       fontFamily: font.body,
       color: c.text,
     },
-    editRow: { gap: 8, borderWidth: 1, borderColor: c.border, borderRadius: radius.md, padding: 10 },
-    editTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    editRow: { gap: 8, borderWidth: 1, borderColor: c.brand, borderRadius: radius.md, padding: 10 },
+    stepCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: radius.md,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+    },
+    stepTitle: { fontSize: 14, fontFamily: font.bodySemi, color: c.text },
+    stepMeta: { fontSize: 11, fontFamily: font.body, color: c.subtle, marginTop: 2 },
+    stepWarn: { color: c.accent, fontFamily: font.bodySemi },
     editGrid: { flexDirection: 'row', gap: 8, alignItems: 'center' },
     qty: { width: 64, textAlign: 'center' },
     cost: { flex: 1, textAlign: 'right' },
@@ -691,11 +742,22 @@ const makeStyles = (c: Colors) =>
     unitBtnOn: { backgroundColor: c.brand },
     unitText: { fontSize: 12, fontFamily: font.bodySemi, color: c.muted },
     unitTextOn: { color: c.onBrand },
-    addBlock: { gap: 8, borderTopWidth: 1, borderTopColor: c.border, paddingTop: 10 },
+    addBlock: { gap: 8, borderWidth: 1, borderColor: c.border, borderRadius: radius.md, padding: 10 },
     addRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-    addBtn: { backgroundColor: c.brand, borderRadius: radius.md, paddingVertical: 11, alignItems: 'center' },
     addBtnInline: { backgroundColor: c.brand, borderRadius: radius.md, paddingHorizontal: 18, paddingVertical: 11 },
     addBtnText: { color: c.onBrand, fontFamily: font.bodyBold },
+    addStepBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      borderWidth: 1,
+      borderColor: c.brand,
+      borderStyle: 'dashed',
+      borderRadius: radius.md,
+      paddingVertical: 12,
+    },
+    addStepText: { color: c.brand, fontFamily: font.bodyBold, fontSize: 14 },
     totalRow: { flexDirection: 'row', justifyContent: 'flex-end', borderTopWidth: 1, borderTopColor: c.border, paddingTop: 10 },
     totalLabel: { fontSize: 13, fontFamily: font.body, color: c.muted },
     totalValue: { fontFamily: font.bodyBold, color: c.text },
