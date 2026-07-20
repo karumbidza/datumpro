@@ -19,11 +19,17 @@ async function logActivity(orgId: string, taskId: string, type: string, message:
 
 /** todo → in_progress (assignee). */
 export async function startTask(taskId: string, orgId: string) {
-  const { count } = await supabase
-    .from('task_subtasks')
-    .select('id', { count: 'exact', head: true })
-    .eq('task_id', taskId);
-  if ((count ?? 0) === 0) throw new Error('Add at least one step to your task plan before starting.');
+  // A task that went through acceptance can't start until its priced plan is
+  // approved (the DB enforces this too).
+  const { data: t } = await supabase
+    .from('tasks')
+    .select('acceptance_status, plan_approved_at')
+    .eq('id', taskId)
+    .maybeSingle();
+  const task = t as { acceptance_status: string | null; plan_approved_at: string | null } | null;
+  if (task && task.acceptance_status !== null && !task.plan_approved_at) {
+    throw new Error('Your plan must be approved before you can start this task.');
+  }
   const now = new Date().toISOString();
   const { error } = await supabase
     .from('tasks')
@@ -50,9 +56,16 @@ export async function submitTask(params: {
       .eq('purpose', 'completion');
     if ((count ?? 0) === 0) throw new Error('Attach at least one completion photo before submitting.');
   }
-  // Plan gate: if a subtask plan exists, every item must be ticked first.
-  const { data: subs } = await supabase.from('task_subtasks').select('is_done').eq('task_id', params.taskId);
-  if (subs && subs.length > 0 && (subs as { is_done: boolean }[]).some((s) => !s.is_done)) {
+  // Plan gate: every item in the agreed scope (baseline + approved variations)
+  // must be ticked first. Pending/rejected variations don't block completion.
+  const { data: subs } = await supabase
+    .from('task_subtasks')
+    .select('is_done, is_variation, variation_status')
+    .eq('task_id', params.taskId);
+  const counted = ((subs ?? []) as { is_done: boolean; is_variation: boolean; variation_status: string | null }[]).filter(
+    (s) => !s.is_variation || s.variation_status === 'approved',
+  );
+  if (counted.length > 0 && counted.some((s) => !s.is_done)) {
     throw new Error('Complete every item in your task plan before submitting for approval.');
   }
   const { error } = await supabase

@@ -8,6 +8,18 @@ export interface Subtask {
   plannedStartDate: string | null;
   plannedEndDate: string | null;
   position: number;
+  costCents: number;
+  estQty: number | null;
+  estUnit: 'hours' | 'days' | null;
+  isVariation: boolean;
+  /** null for baseline plan lines; pending|approved|rejected for variations. */
+  variationStatus: 'pending' | 'approved' | 'rejected' | null;
+}
+
+/** A subtask counts toward the agreed scope (progress + cost) if it's a baseline
+ *  line or an APPROVED variation. Pending/rejected variations don't count. */
+export function isCounted(s: Pick<Subtask, 'isVariation' | 'variationStatus'>): boolean {
+  return !s.isVariation || s.variationStatus === 'approved';
 }
 
 /** A task's subtask plan, in plan order. RLS scopes to project viewers. */
@@ -15,7 +27,7 @@ export async function listSubtasks(taskId: string): Promise<Subtask[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from('task_subtasks')
-    .select('id, title, is_done, done_at, planned_start_date, planned_end_date, position')
+    .select('id, title, is_done, done_at, planned_start_date, planned_end_date, position, cost_cents, est_qty, est_unit, is_variation, variation_status')
     .eq('task_id', taskId)
     .order('position', { ascending: true });
   return ((data ?? []) as {
@@ -26,6 +38,11 @@ export async function listSubtasks(taskId: string): Promise<Subtask[]> {
     planned_start_date: string | null;
     planned_end_date: string | null;
     position: number;
+    cost_cents: number | null;
+    est_qty: number | null;
+    est_unit: 'hours' | 'days' | null;
+    is_variation: boolean;
+    variation_status: 'pending' | 'approved' | 'rejected' | null;
   }[]).map((s) => ({
     id: s.id,
     title: s.title,
@@ -34,13 +51,19 @@ export async function listSubtasks(taskId: string): Promise<Subtask[]> {
     plannedStartDate: s.planned_start_date,
     plannedEndDate: s.planned_end_date,
     position: s.position,
+    costCents: s.cost_cents ?? 0,
+    estQty: s.est_qty,
+    estUnit: s.est_unit,
+    isVariation: s.is_variation,
+    variationStatus: s.variation_status,
   }));
 }
 
-/** Equal-weight completion %: done ÷ total (0 when there's no plan yet). */
+/** Equal-weight completion % across the agreed scope (0 when there's no plan). */
 export function subtaskProgress(subs: Subtask[]): number {
-  if (subs.length === 0) return 0;
-  return Math.round((100 * subs.filter((s) => s.isDone).length) / subs.length);
+  const counted = subs.filter(isCounted);
+  if (counted.length === 0) return 0;
+  return Math.round((100 * counted.filter((s) => s.isDone).length) / counted.length);
 }
 
 /** The project's overall % — an effort-weighted roll-up of its tasks' progress
@@ -76,8 +99,18 @@ export async function progressForTasks(
   const map = new Map<string, { done: number; total: number }>();
   if (taskIds.length === 0) return map;
   const supabase = await createClient();
-  const { data } = await supabase.from('task_subtasks').select('task_id, is_done').in('task_id', taskIds);
-  for (const s of (data ?? []) as { task_id: string; is_done: boolean }[]) {
+  const { data } = await supabase
+    .from('task_subtasks')
+    .select('task_id, is_done, is_variation, variation_status')
+    .in('task_id', taskIds);
+  for (const s of (data ?? []) as {
+    task_id: string;
+    is_done: boolean;
+    is_variation: boolean;
+    variation_status: string | null;
+  }[]) {
+    // Only the agreed scope counts: baseline lines + approved variations.
+    if (s.is_variation && s.variation_status !== 'approved') continue;
     const e = map.get(s.task_id) ?? { done: 0, total: 0 };
     e.total += 1;
     if (s.is_done) e.done += 1;

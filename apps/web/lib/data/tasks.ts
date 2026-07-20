@@ -48,11 +48,14 @@ export interface TaskRow {
   completion_notes: string | null;
   rejection_reason: string | null;
   acceptance_status: 'pending' | 'accepted' | 'rejected' | null;
+  plan_submitted_at: string | null;
+  plan_approved_at: string | null;
+  awarded_cost_cents: number | null;
   created_at: string;
 }
 
 const TASK_COLUMNS =
-  'id, org_id, project_id, title, description, status, priority, sla_status, assignee_id, due_date, planned_start_date, planned_end_date, blocker_description, completion_notes, rejection_reason, acceptance_status, created_at';
+  'id, org_id, project_id, title, description, status, priority, sla_status, assignee_id, due_date, planned_start_date, planned_end_date, blocker_description, completion_notes, rejection_reason, acceptance_status, plan_submitted_at, plan_approved_at, awarded_cost_cents, created_at';
 
 export async function listTasksByProject(projectId: string): Promise<TaskRow[]> {
   const supabase = await createClient();

@@ -88,7 +88,7 @@ async function loadTask(supabase: Awaited<ReturnType<typeof createClient>>, task
   const { data } = await supabase
     .from('tasks')
     .select(
-      'id, org_id, project_id, title, status, due_date, sla_clock_paused_at, sla_total_paused_ms, requires_photo_on_complete',
+      'id, org_id, project_id, title, status, due_date, sla_clock_paused_at, sla_total_paused_ms, requires_photo_on_complete, acceptance_status, plan_approved_at',
     )
     .eq('id', taskId)
     .maybeSingle();
@@ -103,6 +103,8 @@ async function loadTask(supabase: Awaited<ReturnType<typeof createClient>>, task
         sla_clock_paused_at: string | null;
         sla_total_paused_ms: number;
         requires_photo_on_complete: boolean;
+        acceptance_status: 'pending' | 'accepted' | 'rejected' | null;
+        plan_approved_at: string | null;
       }
     | null;
 }
@@ -255,14 +257,10 @@ export async function startTask(formData: FormData) {
   const task = await loadTask(supabase, taskId);
   if (!task) throw new Error('Task not found');
 
-  // Plan gate: a task must have at least one planned step before work starts,
-  // so its % completion is real from day one.
-  const { count } = await supabase
-    .from('task_subtasks')
-    .select('id', { count: 'exact', head: true })
-    .eq('task_id', taskId);
-  if ((count ?? 0) === 0) {
-    throw new Error('Add at least one step to your task plan before starting.');
+  // Plan gate: a task that went through acceptance can't start until its priced
+  // plan has been approved (baseline locked). The DB enforces this too.
+  if (task.acceptance_status !== null && !task.plan_approved_at) {
+    throw new Error('Your plan must be approved before you can start this task.');
   }
 
   const now = new Date().toISOString();
@@ -428,16 +426,96 @@ export async function addSubtask(formData: FormData) {
     .limit(1)
     .maybeSingle();
   const position = ((last as { position: number } | null)?.position ?? -1) + 1;
+  const estUnitRaw = String(formData.get('estUnit') ?? '');
+  const estUnit = estUnitRaw === 'hours' || estUnitRaw === 'days' ? estUnitRaw : null;
+  const estQtyRaw = Number(formData.get('estQty'));
+  const costRaw = Number(formData.get('costCents'));
+  // is_variation / variation_status are set by the DB from the task's plan state.
   const { error } = await supabase.from('task_subtasks').insert({
     org_id: info.org_id,
     task_id: taskId,
     title,
+    cost_cents: Number.isFinite(costRaw) ? Math.max(0, Math.round(costRaw)) : 0,
+    est_qty: Number.isFinite(estQtyRaw) && estQtyRaw > 0 ? estQtyRaw : null,
+    est_unit: estUnit,
     planned_start_date: (formData.get('plannedStartDate') as string) || null,
     planned_end_date: (formData.get('plannedEndDate') as string) || null,
     position,
   });
   if (error) throw new Error(error.message);
   revalidatePath(`/projects/${info.project_id}/tasks/${taskId}`);
+}
+
+export async function updateSubtask(formData: FormData) {
+  const { supabase } = await requireUser();
+  const id = String(formData.get('id') ?? '');
+  const taskId = String(formData.get('taskId') ?? '');
+  const projectId = String(formData.get('projectId') ?? '');
+  const row: Record<string, unknown> = {};
+  const title = formData.get('title');
+  if (title !== null) row.title = String(title).trim();
+  const cost = formData.get('costCents');
+  if (cost !== null) row.cost_cents = Math.max(0, Math.round(Number(cost) || 0));
+  const qty = formData.get('estQty');
+  if (qty !== null) row.est_qty = Number(qty) > 0 ? Number(qty) : null;
+  const unit = formData.get('estUnit');
+  if (unit !== null) row.est_unit = unit === 'hours' || unit === 'days' ? unit : null;
+  const start = formData.get('plannedStartDate');
+  if (start !== null) row.planned_start_date = String(start) || null;
+  if (Object.keys(row).length > 0) {
+    const { error } = await supabase.from('task_subtasks').update(row).eq('id', id);
+    if (error) throw new Error(error.message);
+  }
+  revalidatePath(`/projects/${projectId}/tasks/${taskId}`);
+}
+
+/** Contractor submits the priced plan for PM→Admin approval. Every baseline line
+ *  needs a cost, a duration and a start date; the DB seeds the chain and the task
+ *  is locked for review until approved. */
+export async function submitPlan(formData: FormData): Promise<FormState> {
+  const { supabase, user } = await requireUser();
+  const taskId = String(formData.get('taskId') ?? '');
+  const task = await loadTask(supabase, taskId);
+  if (!task) return { error: 'Task not found.' };
+
+  const { data: subs } = await supabase
+    .from('task_subtasks')
+    .select('cost_cents, est_qty, est_unit, planned_start_date, is_variation')
+    .eq('task_id', taskId);
+  const baseline = ((subs ?? []) as {
+    cost_cents: number | null;
+    est_qty: number | null;
+    est_unit: string | null;
+    planned_start_date: string | null;
+    is_variation: boolean;
+  }[]).filter((s) => !s.is_variation);
+  if (baseline.length === 0) return { error: 'Add at least one step to your plan first.' };
+  const incomplete = baseline.some(
+    (s) => (s.cost_cents ?? 0) <= 0 || !s.est_qty || s.est_qty <= 0 || !s.est_unit || !s.planned_start_date,
+  );
+  if (incomplete) {
+    return { error: 'Every step needs a description, a duration, a start date and a cost before you can submit.' };
+  }
+
+  const { error } = await supabase
+    .from('tasks')
+    .update({ plan_submitted_at: new Date().toISOString() })
+    .eq('id', taskId)
+    .is('plan_approved_at', null);
+  if (error) return { error: error.message };
+
+  await logActivity(supabase, task, user.id, 'status', 'Submitted the plan + cost for approval');
+  await notifyProjectManagers(supabase, {
+    orgId: task.org_id,
+    projectId: task.project_id,
+    type: 'task_plan_submitted',
+    title: 'Plan awaiting approval',
+    body: `A priced plan for “${task.title}” needs your approval.`,
+    link: `/projects/${task.project_id}/tasks/${taskId}`,
+    entityId: taskId,
+  });
+  revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
+  return {};
 }
 
 export async function toggleSubtask(formData: FormData) {
