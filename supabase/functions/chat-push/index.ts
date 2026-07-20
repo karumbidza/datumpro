@@ -154,6 +154,9 @@ Deno.serve(async (req) => {
               title,
               body: bodyText,
               sound: 'default',
+              // Android: our HIGH-importance channel → heads-up banner + sound.
+              channelId: 'messages',
+              priority: 'high',
               data: { url, conversationId: conv.id },
             }),
           });

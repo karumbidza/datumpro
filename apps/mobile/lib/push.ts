@@ -34,9 +34,21 @@ export async function registerForPush(): Promise<void> {
     if (!Device.isDevice) return;
 
     if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'Default',
-        importance: Notifications.AndroidImportance.DEFAULT,
+      // HIGH importance is what makes Android show a heads-up banner AND play a
+      // sound; DEFAULT drops it silently into the tray on many devices. The sound
+      // + vibration are bound to the channel at creation, so this must match what
+      // we want before the first notification arrives.
+      // NOTE: Android freezes a channel's importance/sound at creation time — you
+      // can't upgrade an existing channel from code. Existing installs already have
+      // a low-importance 'default' channel, so we create a *new* id ('messages')
+      // that server pushes target via `channelId`.
+      await Notifications.setNotificationChannelAsync('messages', {
+        name: 'Messages & reminders',
+        importance: Notifications.AndroidImportance.HIGH,
+        sound: 'default',
+        enableVibrate: true,
+        vibrationPattern: [0, 250, 250, 250],
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       });
     }
 
