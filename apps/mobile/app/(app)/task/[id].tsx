@@ -28,6 +28,7 @@ export default function TaskDetailScreen() {
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [subtaskMedia, setSubtaskMedia] = useState<Record<string, TaskPhoto[]>>({});
   const [planSteps, setPlanSteps] = useState<ApprovalStep[]>([]);
+  const [variationSteps, setVariationSteps] = useState<Record<string, ApprovalStep[]>>({});
   const [viewerRole, setViewerRole] = useState('');
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -56,6 +57,8 @@ export default function TaskDetailScreen() {
     setSubtasks(subs);
     setSubtaskMedia(media);
     setPlanSteps(planStepsMap.get(String(id)) ?? []);
+    const variationIds = subs.filter((s) => s.isVariation).map((s) => s.id);
+    setVariationSteps(variationIds.length ? Object.fromEntries(await stepsByEntity('task_variation', variationIds)) : {});
     setViewerRole(role ?? '');
     setUnread(conv ? await getUnreadCount(conv) : 0);
     setLoading(false);
@@ -185,6 +188,7 @@ export default function TaskDetailScreen() {
           planApprovedAt={task.planApprovedAt}
           awardedCostCents={task.awardedCostCents}
           planSteps={planSteps}
+          variationSteps={variationSteps}
           viewerRole={viewerRole}
           onChanged={load}
         />

@@ -45,6 +45,7 @@ export function SubtaskPanel({
   planApprovedAt,
   awardedCostCents,
   planSteps,
+  variationSteps,
   viewerRole,
 }: {
   taskId: string;
@@ -63,6 +64,8 @@ export function SubtaskPanel({
   planApprovedAt: string | null;
   awardedCostCents: number | null;
   planSteps: ApprovalStep[];
+  /** task_variation approval chains, keyed by the variation subtask's id. */
+  variationSteps: Record<string, ApprovalStep[]>;
   viewerRole: string;
 }) {
   const [declineOpen, setDeclineOpen] = useState(false);
@@ -82,6 +85,10 @@ export function SubtaskPanel({
   const planPending = usesPlanFlow && !!planSubmittedAt && !planApprovedAt;
   const planLocked = usesPlanFlow && !!planApprovedAt;
   const wasSentBack = planSteps.some((s) => s.decision === 'rejected');
+  // Variations not yet part of the agreed scope (approved ones show in the checklist).
+  const openVariations = subtasks.filter((s) => s.isVariation && s.variationStatus !== 'approved');
+  const canAddVariation = isAssignee && planLocked && taskStatus !== 'submitted' && taskStatus !== 'done';
+  const [variationOpen, setVariationOpen] = useState(false);
 
   const canHandBack =
     isAssignee && acceptanceStatus === 'accepted' && taskStatus !== 'submitted' && taskStatus !== 'done';
@@ -463,6 +470,83 @@ export function SubtaskPanel({
 
           {canTick && counted.length > 0 && doneCount < counted.length && (
             <p className="mt-2 text-[11px] text-zinc-400">Tick off every step to unlock “Submit for sign-off”.</p>
+          )}
+
+          {/* ── VARIATIONS (extra scope raised after the baseline was locked) ── */}
+          {planLocked && (openVariations.length > 0 || canAddVariation) && (
+            <div className="mt-4 border-t border-zinc-100 pt-3 dark:border-zinc-800">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">Variations</p>
+
+              {openVariations.map((v) => (
+                <div key={v.id} className="mt-2 rounded-md border border-zinc-100 p-2 dark:border-zinc-800">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm text-zinc-800 dark:text-zinc-200">{v.title}</span>
+                    <span className="flex items-center gap-2">
+                      <span className="text-[11px] tabular-nums text-zinc-400">{formatUsd(v.costCents)}</span>
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                          v.variationStatus === 'rejected'
+                            ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300'
+                            : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
+                        }`}
+                      >
+                        {v.variationStatus === 'rejected' ? 'Declined' : 'Pending'}
+                      </span>
+                    </span>
+                  </div>
+                  {v.variationStatus === 'pending' && (
+                    <ApprovalChain steps={variationSteps[v.id] ?? []} viewerRole={viewerRole} path={path} />
+                  )}
+                </div>
+              ))}
+
+              {canAddVariation &&
+                (!variationOpen ? (
+                  <button
+                    type="button"
+                    onClick={() => setVariationOpen(true)}
+                    className="mt-2 text-[11px] font-medium text-brand-600 hover:underline"
+                  >
+                    + Add a variation (needs approval)
+                  </button>
+                ) : (
+                  <form
+                    action={addSubtask}
+                    className="mt-2 flex flex-wrap items-end gap-2 rounded-md border border-brand-500/30 bg-brand-50 p-2 dark:bg-brand-500/10"
+                  >
+                    <input type="hidden" name="taskId" value={taskId} />
+                    <div className="min-w-40 flex-1">
+                      <label className="mb-1 block text-[11px] font-medium text-zinc-500">Extra step</label>
+                      <input name="title" required placeholder="e.g. Additional rockbreaking" className={`${inputClass} w-full`} />
+                    </div>
+                    <div className="w-16">
+                      <label className="mb-1 block text-[11px] font-medium text-zinc-500">Qty</label>
+                      <input name="estQty" type="number" min="0" step="0.5" className={`${inputClass} w-full`} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-[11px] font-medium text-zinc-500">Unit</label>
+                      <select name="estUnit" defaultValue="days" className={inputClass}>
+                        <option value="hours">hours</option>
+                        <option value="days">day(s)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-[11px] font-medium text-zinc-500">Start</label>
+                      <input type="date" name="plannedStartDate" min={taskStart ?? undefined} max={taskEnd ?? undefined} className={inputClass} />
+                    </div>
+                    <div className="w-24">
+                      <label className="mb-1 block text-[11px] font-medium text-zinc-500">Cost ($)</label>
+                      <input name="cost" type="number" min="0" step="0.01" className={`${inputClass} w-full`} />
+                    </div>
+                    <SubmitButton variant="secondary" pendingText="Sending…">
+                      Submit variation
+                    </SubmitButton>
+                    <button type="button" onClick={() => setVariationOpen(false)} className="pb-1 text-sm text-zinc-500 hover:underline">
+                      Cancel
+                    </button>
+                  </form>
+                ))}
+            </div>
           )}
         </>
       )}

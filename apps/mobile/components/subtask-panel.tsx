@@ -41,6 +41,7 @@ export function SubtaskPanel({
   planApprovedAt,
   awardedCostCents,
   planSteps,
+  variationSteps,
   viewerRole,
   onChanged,
 }: {
@@ -60,6 +61,8 @@ export function SubtaskPanel({
   planApprovedAt: string | null;
   awardedCostCents: number | null;
   planSteps: ApprovalStep[];
+  /** task_variation approval chains, keyed by the variation subtask's id. */
+  variationSteps: Record<string, ApprovalStep[]>;
   viewerRole: string;
   onChanged: () => void;
 }) {
@@ -88,6 +91,10 @@ export function SubtaskPanel({
   const planPending = usesPlanFlow && !!planSubmittedAt && !planApprovedAt;
   const planLocked = usesPlanFlow && !!planApprovedAt;
   const wasSentBack = planSteps.some((s) => s.decision === 'rejected');
+
+  const openVariations = subtasks.filter((s) => s.isVariation && s.variationStatus !== 'approved');
+  const canAddVariation = isAssignee && planLocked && taskStatus !== 'submitted' && taskStatus !== 'done';
+  const [variationOpen, setVariationOpen] = useState(false);
 
   const canTick = isAssignee && (planLocked || !usesPlanFlow);
   const canHandBack =
@@ -473,6 +480,89 @@ export function SubtaskPanel({
           {canTick && counted.length > 0 && done < counted.length && (
             <Text style={styles.gateHint}>Tick every step to unlock Submit for sign-off.</Text>
           )}
+
+          {/* Variations — extra scope raised after the baseline was locked */}
+          {planLocked && (openVariations.length > 0 || canAddVariation) && (
+            <View style={styles.variations}>
+              <Text style={styles.varHeader}>Variations</Text>
+              {openVariations.map((v) => (
+                <View key={v.id} style={styles.varCard}>
+                  <View style={styles.varTop}>
+                    <Text style={styles.varTitle}>{v.title}</Text>
+                    <View style={styles.varRight}>
+                      <Text style={styles.varCost}>{formatUsd(v.costCents)}</Text>
+                      <View style={[styles.varBadge, v.variationStatus === 'rejected' ? styles.varBadgeRej : styles.varBadgePend]}>
+                        <Text style={[styles.varBadgeText, v.variationStatus === 'rejected' ? styles.varBadgeTextRej : styles.varBadgeTextPend]}>
+                          {v.variationStatus === 'rejected' ? 'Declined' : 'Pending'}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                  {v.variationStatus === 'pending' && (
+                    <ApprovalChain steps={variationSteps[v.id] ?? []} viewerRole={viewerRole} onDecided={onChanged} />
+                  )}
+                </View>
+              ))}
+
+              {canAddVariation &&
+                (!variationOpen ? (
+                  <Pressable onPress={() => setVariationOpen(true)}>
+                    <Text style={styles.varAddLink}>+ Add a variation (needs approval)</Text>
+                  </Pressable>
+                ) : (
+                  <View style={styles.varForm}>
+                    <TextInput
+                      value={newTitle}
+                      onChangeText={setNewTitle}
+                      placeholder="Extra step…"
+                      placeholderTextColor={colors.subtle}
+                      style={styles.input}
+                    />
+                    <View style={styles.editGrid}>
+                      <TextInput value={newQty} onChangeText={setNewQty} keyboardType="numeric" placeholder="Qty" placeholderTextColor={colors.subtle} style={[styles.input, styles.qty]} />
+                      <View style={styles.unitToggle}>
+                        {(['hours', 'days'] as const).map((u) => (
+                          <Pressable key={u} style={[styles.unitBtn, newUnit === u && styles.unitBtnOn]} onPress={() => setNewUnit(u)}>
+                            <Text style={[styles.unitText, newUnit === u && styles.unitTextOn]}>{u === 'hours' ? 'hrs' : 'days'}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                      <TextInput value={newCost} onChangeText={setNewCost} keyboardType="numeric" placeholder="Cost $" placeholderTextColor={colors.subtle} style={[styles.input, styles.cost]} />
+                    </View>
+                    <DateField label="Start" value={newStart} onChange={setNewStart} min={taskStart} max={taskEnd} />
+                    <View style={styles.row}>
+                      <Pressable
+                        style={[styles.btn, styles.btnPrimary, (!newTitle.trim() || busy) && { opacity: 0.5 }]}
+                        disabled={!newTitle.trim() || busy}
+                        onPress={() =>
+                          run(async () => {
+                            await addSubtask({
+                              taskId,
+                              orgId,
+                              title: newTitle.trim(),
+                              costCents: Math.round((Number(newCost) || 0) * 100),
+                              estQty: Number(newQty) || null,
+                              estUnit: newUnit,
+                              plannedStartDate: newStart,
+                            });
+                            setNewTitle('');
+                            setNewQty('');
+                            setNewCost('');
+                            setNewStart(null);
+                            setVariationOpen(false);
+                          })
+                        }
+                      >
+                        {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.btnPrimaryText}>Submit variation</Text>}
+                      </Pressable>
+                      <Pressable style={[styles.btn, styles.btnOutline]} disabled={busy} onPress={() => setVariationOpen(false)}>
+                        <Text style={styles.btnOutlineText}>Cancel</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ))}
+            </View>
+          )}
         </>
       )}
 
@@ -610,6 +700,21 @@ const makeStyles = (c: Colors) =>
     totalLabel: { fontSize: 13, fontFamily: font.body, color: c.muted },
     totalValue: { fontFamily: font.bodyBold, color: c.text },
     gateHint: { fontSize: 11, fontFamily: font.body, color: c.subtle, marginTop: 8 },
+    variations: { marginTop: 14, borderTopWidth: 1, borderTopColor: c.border, paddingTop: 12, gap: 8 },
+    varHeader: { fontSize: 11, fontFamily: font.bodyBold, color: c.subtle, textTransform: 'uppercase', letterSpacing: 0.5 },
+    varCard: { borderWidth: 1, borderColor: c.border, borderRadius: radius.md, padding: 10, gap: 4 },
+    varTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    varTitle: { flex: 1, fontSize: 14, fontFamily: font.body, color: c.text },
+    varRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    varCost: { fontSize: 11, fontFamily: font.body, color: c.subtle },
+    varBadge: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
+    varBadgePend: { backgroundColor: c.sunk },
+    varBadgeRej: { backgroundColor: c.danger },
+    varBadgeText: { fontSize: 10, fontFamily: font.bodyBold },
+    varBadgeTextPend: { color: c.accent },
+    varBadgeTextRej: { color: c.onBrand },
+    varAddLink: { fontSize: 12, fontFamily: font.bodySemi, color: c.brand },
+    varForm: { gap: 8 },
     handBack: { marginTop: 14, borderTopWidth: 1, borderTopColor: c.border, paddingTop: 12 },
     handBackLink: { fontSize: 12, fontFamily: font.bodySemi, color: c.subtle },
   });

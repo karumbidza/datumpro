@@ -88,11 +88,14 @@ export default async function TaskDetailPage({
     getTaskConversationId(taskId),
   ]);
   const sched = schedule?.meta[taskId];
-  const [extSteps, planStepsMap] = await Promise.all([
+  const variationIds = subtasks.filter((s) => s.isVariation).map((s) => s.id);
+  const [extSteps, planStepsMap, variationStepsMap] = await Promise.all([
     stepsByEntity('extension', extensions.map((e) => e.id)),
     stepsByEntity('task_plan', [taskId]),
+    stepsByEntity('task_variation', variationIds),
   ]);
   const planSteps = planStepsMap.get(taskId) ?? [];
+  const variationSteps = Object.fromEntries(variationStepsMap);
 
   // Task DM (created on assignment; visible only to staff / PM / the assigned contractor).
   let dm: { id: string; messages: Awaited<ReturnType<typeof listMessages>>; othersRead: number } | null = null;
@@ -466,6 +469,7 @@ export default async function TaskDetailPage({
             planApprovedAt={task.plan_approved_at}
             awardedCostCents={task.awarded_cost_cents}
             planSteps={planSteps}
+            variationSteps={variationSteps}
             viewerRole={orgRole ?? ''}
           />
         </div>
