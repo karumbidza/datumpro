@@ -21,6 +21,8 @@ import {
 } from '../lib/data/subtasks';
 import { ApprovalChain } from './approval-chain';
 import type { ApprovalStep } from '../lib/data/approvals';
+import { DocAttach } from './doc-attach';
+import type { TaskDoc } from '../lib/data/tenders';
 import { uploadTaskPhoto, type TaskPhoto } from '../lib/data/media';
 import { DateField } from './date-field';
 
@@ -43,6 +45,7 @@ export function SubtaskPanel({
   planSteps,
   variationSteps,
   viewerRole,
+  planDocs,
   onChanged,
 }: {
   taskId: string;
@@ -64,6 +67,7 @@ export function SubtaskPanel({
   /** task_variation approval chains, keyed by the variation subtask's id. */
   variationSteps: Record<string, ApprovalStep[]>;
   viewerRole: string;
+  planDocs: TaskDoc[];
   onChanged: () => void;
 }) {
   const { colors } = useTheme();
@@ -603,6 +607,10 @@ export function SubtaskPanel({
             </View>
           )}
         </>
+      )}
+
+      {usesPlanFlow && (planDraft || planPending || planLocked) && (
+        <DocAttach taskId={taskId} orgId={orgId} projectId={projectId} docs={planDocs} canEdit={isAssignee} onChanged={onChanged} />
       )}
 
       {canHandBack && (

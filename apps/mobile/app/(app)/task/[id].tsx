@@ -11,7 +11,7 @@ import { TaskActions } from '../../../components/task-actions';
 import { SubtaskPanel } from '../../../components/subtask-panel';
 import { listSubtasks, subtaskPct, type Subtask } from '../../../lib/data/subtasks';
 import { stepsByEntity, myOrgRole, type ApprovalStep } from '../../../lib/data/approvals';
-import { myBidStatus, type TenderStatus } from '../../../lib/data/tenders';
+import { myBidStatus, listTaskDocuments, type TenderStatus, type TaskDoc } from '../../../lib/data/tenders';
 import { BidEditor } from '../../../components/bid-editor';
 import { listSubtaskPhotos, type TaskPhoto } from '../../../lib/data/media';
 import { Card, Pill, ScheduleBar } from '../../../components/ui';
@@ -33,6 +33,7 @@ export default function TaskDetailScreen() {
   const [variationSteps, setVariationSteps] = useState<Record<string, ApprovalStep[]>>({});
   const [viewerRole, setViewerRole] = useState('');
   const [bidStatus, setBidStatus] = useState<TenderStatus | null>(null);
+  const [taskDocs, setTaskDocs] = useState<TaskDoc[]>([]);
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -48,7 +49,7 @@ export default function TaskDetailScreen() {
     }
     // Everything below depends only on the task — fetch it all in parallel
     // instead of one round-trip at a time.
-    const [perms, subs, media, conv, planStepsMap, role, bid] = await Promise.all([
+    const [perms, subs, media, conv, planStepsMap, role, bid, docs] = await Promise.all([
       getTaskPermissions(t.orgId, t.projectId, t.assigneeId),
       listSubtasks(String(id)),
       listSubtaskPhotos(String(id)),
@@ -56,8 +57,10 @@ export default function TaskDetailScreen() {
       stepsByEntity('task_plan', [String(id)]),
       myOrgRole(t.orgId),
       myBidStatus(String(id)),
+      listTaskDocuments(String(id)),
     ]);
     setBidStatus(bid);
+    setTaskDocs(docs);
     setPerms(perms);
     setSubtasks(subs);
     setSubtaskMedia(media);
@@ -118,6 +121,9 @@ export default function TaskDetailScreen() {
   const planApproved = !usesPlanFlow || !!task.planApprovedAt;
   // An open tender invitee builds their sealed bid instead of the normal panels.
   const isBidder = bidStatus === 'invited' || bidStatus === 'submitted';
+  // Plan docs (bid_contractor_id null) vs my own bid docs (RLS only returns mine).
+  const planDocs = taskDocs.filter((d) => d.contractorId === null);
+  const bidDocs = taskDocs.filter((d) => d.contractorId !== null);
   // ACTUAL completion — real work only (never time-based).
   const pct = acceptancePending
     ? 0
@@ -192,7 +198,9 @@ export default function TaskDetailScreen() {
         <BidEditor
           taskId={task.id}
           orgId={task.orgId}
+          projectId={task.projectId}
           subtasks={subtasks}
+          docs={bidDocs}
           submitted={bidStatus === 'submitted'}
           taskStart={task.plannedStartDate}
           taskEnd={task.plannedEndDate}
@@ -219,6 +227,7 @@ export default function TaskDetailScreen() {
           planSteps={planSteps}
           variationSteps={variationSteps}
           viewerRole={viewerRole}
+          planDocs={planDocs}
           onChanged={load}
         />
       )}

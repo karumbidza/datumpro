@@ -504,6 +504,40 @@ export async function addSubtask(formData: FormData) {
   revalidatePath(`/projects/${info.project_id}/tasks/${taskId}`);
 }
 
+/** Record a BoQ / invoice PDF (already uploaded to storage) against a task's
+ *  plan (bid=off) or the uploader's sealed bid (bid=on). RLS gates the insert. */
+export async function recordTaskDocument(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const taskId = String(formData.get('taskId') ?? '');
+  const path = String(formData.get('path') ?? '');
+  const filename = String(formData.get('filename') ?? '').slice(0, 200);
+  const kind = formData.get('kind') === 'invoice' ? 'invoice' : 'boq';
+  if (!path || !filename) return;
+  const info = await taskOrgProject(supabase, taskId);
+  if (!info) throw new Error('Task not found');
+  const { error } = await supabase.from('task_documents').insert({
+    org_id: info.org_id,
+    project_id: info.project_id,
+    task_id: taskId,
+    uploaded_by: user.id,
+    bid_contractor_id: formData.get('bid') === '1' ? user.id : null,
+    kind,
+    filename,
+    path,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath(`/projects/${info.project_id}/tasks/${taskId}`);
+}
+
+export async function removeTaskDocument(formData: FormData) {
+  const { supabase } = await requireUser();
+  const id = String(formData.get('id') ?? '');
+  const taskId = String(formData.get('taskId') ?? '');
+  const projectId = String(formData.get('projectId') ?? '');
+  await supabase.from('task_documents').delete().eq('id', id);
+  revalidatePath(`/projects/${projectId}/tasks/${taskId}`);
+}
+
 /** A tender invitee seals their bid (their bid-scoped plan must be fully priced). */
 export async function submitBid(formData: FormData) {
   const { supabase } = await requireUser();

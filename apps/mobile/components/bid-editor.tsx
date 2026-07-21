@@ -7,7 +7,8 @@ import { DateField } from './date-field';
 import { radius, font, type Colors } from '../lib/theme';
 import { useTheme } from '../lib/theme-context';
 import { updateSubtask, removeSubtask, type Subtask } from '../lib/data/subtasks';
-import { addBidStep, submitBid } from '../lib/data/tenders';
+import { addBidStep, submitBid, type TaskDoc } from '../lib/data/tenders';
+import { DocAttach } from './doc-attach';
 
 const dollars = (cents: number) => (cents / 100).toFixed(2);
 
@@ -16,7 +17,9 @@ const dollars = (cents: number) => (cents / 100).toFixed(2);
 export function BidEditor({
   taskId,
   orgId,
+  projectId,
   subtasks,
+  docs,
   submitted,
   taskStart,
   taskEnd,
@@ -24,7 +27,9 @@ export function BidEditor({
 }: {
   taskId: string;
   orgId: string;
+  projectId: string;
   subtasks: Subtask[];
+  docs: TaskDoc[];
   submitted: boolean;
   taskStart: string | null;
   taskEnd: string | null;
@@ -217,6 +222,8 @@ export function BidEditor({
       >
         {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.btnPrimaryText}>{submitted ? 'Update bid' : 'Submit bid'}</Text>}
       </Pressable>
+
+      <DocAttach taskId={taskId} orgId={orgId} projectId={projectId} docs={docs} bid canEdit onChanged={onChanged} />
     </Card>
   );
 }

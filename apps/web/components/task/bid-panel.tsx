@@ -4,6 +4,8 @@ import { Card, CardTitle } from '@/components/ui/card';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { addSubtask, updateSubtask, removeSubtask, submitBid } from '@/app/(app)/projects/[projectId]/tasks/actions';
 import type { Subtask } from '@/lib/data/subtasks';
+import type { TaskDoc } from '@/lib/data/tenders';
+import { DocAttach } from '@/components/task/doc-attach';
 import { formatUsd } from '@datumpro/shared/domain';
 
 const inputClass =
@@ -15,14 +17,18 @@ const dollars = (cents: number) => (cents / 100).toFixed(2);
 export function BidPanel({
   taskId,
   projectId,
+  orgId,
   bidLines,
+  docs,
   submitted,
   taskStart,
   taskEnd,
 }: {
   taskId: string;
   projectId: string;
+  orgId: string;
   bidLines: Subtask[];
+  docs: TaskDoc[];
   submitted: boolean;
   taskStart: string | null;
   taskEnd: string | null;
@@ -135,6 +141,8 @@ export function BidPanel({
       {bidLines.length > 0 && incomplete && (
         <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">Every step needs a duration, a start date and a cost before you can submit.</p>
       )}
+
+      <DocAttach taskId={taskId} projectId={projectId} orgId={orgId} docs={docs} bid canEdit />
     </Card>
   );
 }

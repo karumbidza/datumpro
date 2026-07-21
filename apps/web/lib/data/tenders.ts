@@ -1,6 +1,38 @@
 import { createClient } from '@/lib/supabase/server';
+import { MEDIA_BUCKET } from '@/lib/data/quotes';
 
 export type TenderStatus = 'invited' | 'submitted' | 'awarded' | 'not_selected' | 'withdrawn';
+
+export interface TaskDoc {
+  id: string;
+  /** bid_contractor_id — null = the plan/awarded doc; a uuid = that bidder's doc. */
+  contractorId: string | null;
+  filename: string;
+  kind: string;
+  url: string | null;
+}
+
+/** BoQ / invoice PDFs visible to the viewer (RLS: plan doc to project viewers, a
+ *  bid doc only to its owner or the PM), with short-lived signed URLs. */
+export async function listTaskDocuments(taskId: string): Promise<TaskDoc[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('task_documents')
+    .select('id, bid_contractor_id, filename, kind, path')
+    .eq('task_id', taskId)
+    .order('created_at', { ascending: true });
+  const rows = (data ?? []) as { id: string; bid_contractor_id: string | null; filename: string; kind: string; path: string }[];
+  if (rows.length === 0) return [];
+  const { data: signed } = await supabase.storage.from(MEDIA_BUCKET).createSignedUrls(rows.map((r) => r.path), 3600);
+  const urlByPath = new Map(((signed ?? []) as { path: string | null; signedUrl: string }[]).map((s) => [s.path, s.signedUrl]));
+  return rows.map((r) => ({
+    id: r.id,
+    contractorId: r.bid_contractor_id,
+    filename: r.filename,
+    kind: r.kind,
+    url: urlByPath.get(r.path) ?? null,
+  }));
+}
 
 export interface TenderInvite {
   id: string;

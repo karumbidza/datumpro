@@ -5,7 +5,7 @@ import { Card, CardTitle } from '@/components/ui/card';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { formatUsd } from '@datumpro/shared/domain';
 import { awardTender, inviteTenderContractors, withdrawTenderInvite } from '@/app/(app)/projects/[projectId]/tasks/actions';
-import type { TenderInvite, BidLine } from '@/lib/data/tenders';
+import type { TenderInvite, BidLine, TaskDoc } from '@/lib/data/tenders';
 
 const STATUS_LABEL: Record<TenderInvite['status'], { label: string; cls: string }> = {
   invited: { label: 'Not submitted', cls: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800' },
@@ -20,6 +20,7 @@ export function TenderPanel({
   projectId,
   invites,
   bidLines,
+  bidDocs,
   availableContractors,
   canManage,
   decided,
@@ -29,6 +30,8 @@ export function TenderPanel({
   invites: TenderInvite[];
   /** Each contractor's competing plan, keyed by contractorId. */
   bidLines: Record<string, BidLine[]>;
+  /** Each contractor's BoQ/invoice docs, keyed by contractorId. */
+  bidDocs: Record<string, TaskDoc[]>;
   availableContractors: { userId: string; name: string }[];
   canManage: boolean;
   /** True once the tender has been awarded. */
@@ -113,6 +116,18 @@ export function TenderPanel({
                       </li>
                     ))}
                   </ul>
+                  {(bidDocs[inv.contractorId] ?? []).length > 0 && (
+                    <ul className="mt-2 space-y-1">
+                      {(bidDocs[inv.contractorId] ?? []).map((d) => (
+                        <li key={d.id}>
+                          <a href={d.url ?? '#'} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs text-brand-600 hover:underline">
+                            <span aria-hidden>📄</span>
+                            <span className="truncate">{d.filename}</span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   <div className="mt-2 flex items-center justify-between border-t border-zinc-100 pt-2 dark:border-zinc-800">
                     <span className="text-sm font-semibold tabular-nums">Total {formatUsd(inv.bidTotalCents)}</span>
                     {!decided && inv.status === 'submitted' && (

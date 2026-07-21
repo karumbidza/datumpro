@@ -17,6 +17,8 @@ import {
 } from '@/app/(app)/projects/[projectId]/tasks/actions';
 import type { Subtask } from '@/lib/data/subtasks';
 import type { ApprovalStep } from '@/lib/data/approvals';
+import type { TaskDoc } from '@/lib/data/tenders';
+import { DocAttach } from '@/components/task/doc-attach';
 import { formatUsd } from '@datumpro/shared/domain';
 import { MediaUploader } from '@/components/task/media-uploader';
 
@@ -47,6 +49,7 @@ export function SubtaskPanel({
   planSteps,
   variationSteps,
   viewerRole,
+  planDocs,
 }: {
   taskId: string;
   projectId: string;
@@ -67,6 +70,7 @@ export function SubtaskPanel({
   /** task_variation approval chains, keyed by the variation subtask's id. */
   variationSteps: Record<string, ApprovalStep[]>;
   viewerRole: string;
+  planDocs: TaskDoc[];
 }) {
   const [declineOpen, setDeclineOpen] = useState(false);
   const [handBackOpen, setHandBackOpen] = useState(false);
@@ -549,6 +553,10 @@ export function SubtaskPanel({
             </div>
           )}
         </>
+      )}
+
+      {usesPlanFlow && (planDraft || planPending || planLocked) && (
+        <DocAttach taskId={taskId} projectId={projectId} orgId={orgId} docs={planDocs} canEdit={isAssignee} />
       )}
 
       {canHandBack && (

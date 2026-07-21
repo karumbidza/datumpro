@@ -1,6 +1,67 @@
+import { decode } from 'base64-arraybuffer';
 import { supabase, currentUser } from '../supabase';
 
+const BUCKET = 'project-media';
+
 export type TenderStatus = 'invited' | 'submitted' | 'awarded' | 'not_selected' | 'withdrawn';
+
+export interface TaskDoc {
+  id: string;
+  contractorId: string | null;
+  filename: string;
+  url: string | null;
+}
+
+/** BoQ / invoice PDFs the viewer may see for a task (RLS-scoped), with signed URLs. */
+export async function listTaskDocuments(taskId: string): Promise<TaskDoc[]> {
+  const { data } = await supabase
+    .from('task_documents')
+    .select('id, bid_contractor_id, filename, path')
+    .eq('task_id', taskId)
+    .order('created_at', { ascending: true });
+  const rows = (data ?? []) as { id: string; bid_contractor_id: string | null; filename: string; path: string }[];
+  if (rows.length === 0) return [];
+  const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrls(rows.map((r) => r.path), 3600);
+  const urlByPath = new Map(((signed ?? []) as { path: string | null; signedUrl: string }[]).map((s) => [s.path, s.signedUrl]));
+  return rows.map((r) => ({ id: r.id, contractorId: r.bid_contractor_id, filename: r.filename, url: urlByPath.get(r.path) ?? null }));
+}
+
+/** Upload a BoQ/invoice PDF and record it against a plan (bid=false) or the
+ *  uploader's sealed bid (bid=true). */
+export async function uploadTaskDocument(params: {
+  taskId: string;
+  orgId: string;
+  projectId: string;
+  base64: string;
+  filename: string;
+  mime: string;
+  bid: boolean;
+}): Promise<void> {
+  const user = await currentUser();
+  if (!user) throw new Error('Not signed in');
+  const path = `${params.orgId}/${params.projectId}/tasks/${params.taskId}/${Date.now()}-${Math.random().toString(36).slice(2)}.pdf`;
+  const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, decode(params.base64), {
+    contentType: params.mime || 'application/pdf',
+    upsert: false,
+  });
+  if (upErr) throw new Error(upErr.message);
+  const { error } = await supabase.from('task_documents').insert({
+    org_id: params.orgId,
+    project_id: params.projectId,
+    task_id: params.taskId,
+    uploaded_by: user.id,
+    bid_contractor_id: params.bid ? user.id : null,
+    kind: /invoice/i.test(params.filename) ? 'invoice' : 'boq',
+    filename: params.filename.slice(0, 200),
+    path,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function removeTaskDocument(id: string): Promise<void> {
+  const { error } = await supabase.from('task_documents').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+}
 
 export interface MyTenderInvite {
   taskId: string;

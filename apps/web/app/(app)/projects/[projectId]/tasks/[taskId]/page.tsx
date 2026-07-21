@@ -13,7 +13,7 @@ import { listProjectMembers, myProjectRole } from '@/lib/data/members';
 import { listChatRoster } from '@/lib/data/chat-roster';
 import { getProjectSchedule } from '@/lib/data/scheduling';
 import { listTaskMedia, listSubtaskMedia } from '@/lib/data/quotes';
-import { listTenderInvites, listBidLinesByContractor } from '@/lib/data/tenders';
+import { listTenderInvites, listBidLinesByContractor, listTaskDocuments } from '@/lib/data/tenders';
 import { listTaskPayments } from '@/lib/data/payments';
 import { getTaskConversationId, listMessages, othersMaxReadSeq } from '@/lib/data/chat';
 import { TenderPanel } from '@/components/task/tender-panel';
@@ -103,6 +103,13 @@ export default async function TaskDetailPage({
   ]);
   const planSteps = planStepsMap.get(taskId) ?? [];
   const variationSteps = Object.fromEntries(variationStepsMap);
+  // BoQ / invoice PDFs. RLS returns only what the viewer may see (plan doc, own
+  // bid doc, or — for the PM — every bid doc).
+  const taskDocs = await listTaskDocuments(taskId);
+  const planDocs = taskDocs.filter((d) => d.contractorId === null);
+  const myBidDocs = taskDocs.filter((d) => d.contractorId === user.id);
+  const docsByBidder: Record<string, typeof taskDocs> = {};
+  for (const d of taskDocs) if (d.contractorId) (docsByBidder[d.contractorId] ??= []).push(d);
 
   // Task DM (created on assignment; visible only to staff / PM / the assigned contractor).
   let dm: { id: string; messages: Awaited<ReturnType<typeof listMessages>>; othersRead: number } | null = null;
@@ -353,6 +360,7 @@ export default async function TaskDetailPage({
           projectId={projectId}
           invites={tenderInvites}
           bidLines={Object.fromEntries(bidLinesMap)}
+          bidDocs={docsByBidder}
           availableContractors={contractors.filter((c) => !invitedIds.has(c.userId))}
           canManage={canManage}
           decided={tenderDecided}
@@ -510,7 +518,9 @@ export default async function TaskDetailPage({
           <BidPanel
             taskId={taskId}
             projectId={projectId}
+            orgId={task.org_id}
             bidLines={subtasks}
+            docs={myBidDocs}
             submitted={myInvite?.status === 'submitted'}
             taskStart={task.planned_start_date}
             taskEnd={task.planned_end_date ?? task.due_date}
@@ -539,6 +549,7 @@ export default async function TaskDetailPage({
             planSteps={planSteps}
             variationSteps={variationSteps}
             viewerRole={orgRole ?? ''}
+            planDocs={planDocs}
           />
         </div>
       )}
