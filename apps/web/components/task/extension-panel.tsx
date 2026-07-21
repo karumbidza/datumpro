@@ -11,6 +11,7 @@ export function ExtensionPanel({
   taskId,
   projectId,
   canRequest,
+  preStart,
   requests,
   stepsByExt,
   viewerRole,
@@ -18,6 +19,8 @@ export function ExtensionPanel({
   taskId: string;
   projectId: string;
   canRequest: boolean;
+  /** Assignee, but the task hasn't started yet — explain why they can't request. */
+  preStart?: boolean;
   requests: ExtensionRequestRow[];
   stepsByExt: Record<string, ApprovalStep[]>;
   viewerRole: string;
@@ -55,6 +58,11 @@ export function ExtensionPanel({
       )}
 
       {canRequest && !hasPending && <ExtensionRequestForm taskId={taskId} />}
+      {preStart && (
+        <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
+          You can request an extension once the task is underway.
+        </p>
+      )}
     </Card>
   );
 }

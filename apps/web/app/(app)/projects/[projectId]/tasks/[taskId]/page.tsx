@@ -158,9 +158,11 @@ export default async function TaskDetailPage({
   // Out to tender: no assignee yet, bids still open. Drives the "Open for bidding"
   // labelling so contractors know it's a tender, not an idle unassigned task.
   const isTendering = !task.assignee_id && tenderInvites.some((i) => i.status === 'invited' || i.status === 'submitted');
-  // The assignee RAISES an extension request; the admin/PM only sees it and
-  // approves (via the approval chain). Not a manager action.
-  const canRequestExtension = task.status !== 'done' && isAssignee;
+  // The assignee RAISES an extension request; the admin/PM only sees + approves.
+  // Only once the work has commenced (in progress / blocked) — there's nothing to
+  // extend before the task has started.
+  const canRequestExtension = isAssignee && (task.status === 'in_progress' || task.status === 'blocked');
+  const extensionPreStart = isAssignee && task.status === 'todo';
 
   const usedPredecessors = new Set(dependencies.map((d) => d.predecessorId));
   const addable = taskOptions.filter((t) => !usedPredecessors.has(t.id));
@@ -399,6 +401,7 @@ export default async function TaskDetailPage({
         taskId={taskId}
         projectId={projectId}
         canRequest={canRequestExtension}
+        preStart={extensionPreStart}
         requests={extensions}
         stepsByExt={Object.fromEntries(extSteps)}
         viewerRole={orgRole ?? ''}

@@ -261,7 +261,8 @@ export default function TaskDetailScreen() {
             taskId={task.id}
             orgId={task.orgId}
             projectId={task.projectId}
-            isAssignee={perms.isAssignee}
+            canRequest={perms.isAssignee && (task.status === 'in_progress' || task.status === 'blocked')}
+            preStart={perms.isAssignee && task.status === 'todo'}
             canManage={perms.canManage}
           />
         </Card>

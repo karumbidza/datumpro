@@ -283,7 +283,7 @@ export function SubtaskPanel({
                   style={styles.input}
                 />
                 <View style={styles.editGrid}>
-                  <TextInput value={eQty} onChangeText={setEQty} keyboardType="numeric" placeholder="Qty" placeholderTextColor={colors.subtle} style={[styles.input, styles.qty]} />
+                  <TextInput value={eQty} onChangeText={setEQty} keyboardType="numeric" placeholder="Duration" placeholderTextColor={colors.subtle} style={[styles.input, styles.qty]} />
                   <View style={styles.unitToggle}>
                     {(['hours', 'days'] as const).map((u) => (
                       <Pressable key={u} style={[styles.unitBtn, eUnit === u && styles.unitBtnOn]} onPress={() => setEUnit(u)}>
@@ -354,7 +354,7 @@ export function SubtaskPanel({
                 style={styles.input}
               />
               <View style={styles.editGrid}>
-                <TextInput value={newQty} onChangeText={setNewQty} keyboardType="numeric" placeholder="Qty" placeholderTextColor={colors.subtle} style={[styles.input, styles.qty]} />
+                <TextInput value={newQty} onChangeText={setNewQty} keyboardType="numeric" placeholder="Duration" placeholderTextColor={colors.subtle} style={[styles.input, styles.qty]} />
                 <View style={styles.unitToggle}>
                   {(['hours', 'days'] as const).map((u) => (
                     <Pressable key={u} style={[styles.unitBtn, newUnit === u && styles.unitBtnOn]} onPress={() => setNewUnit(u)}>
@@ -558,7 +558,7 @@ export function SubtaskPanel({
                       style={styles.input}
                     />
                     <View style={styles.editGrid}>
-                      <TextInput value={newQty} onChangeText={setNewQty} keyboardType="numeric" placeholder="Qty" placeholderTextColor={colors.subtle} style={[styles.input, styles.qty]} />
+                      <TextInput value={newQty} onChangeText={setNewQty} keyboardType="numeric" placeholder="Duration" placeholderTextColor={colors.subtle} style={[styles.input, styles.qty]} />
                       <View style={styles.unitToggle}>
                         {(['hours', 'days'] as const).map((u) => (
                           <Pressable key={u} style={[styles.unitBtn, newUnit === u && styles.unitBtnOn]} onPress={() => setNewUnit(u)}>

@@ -92,7 +92,7 @@ export function BidEditor({
             <View key={s.id} style={styles.editRow}>
               <TextInput value={eTitle} onChangeText={setETitle} placeholder="What's the step?" placeholderTextColor={colors.subtle} style={styles.input} />
               <View style={styles.grid}>
-                <TextInput value={eQty} onChangeText={setEQty} keyboardType="numeric" placeholder="Qty" placeholderTextColor={colors.subtle} style={[styles.input, styles.qty]} />
+                <TextInput value={eQty} onChangeText={setEQty} keyboardType="numeric" placeholder="Duration" placeholderTextColor={colors.subtle} style={[styles.input, styles.qty]} />
                 <View style={styles.unitToggle}>
                   {(['hours', 'days'] as const).map((u) => (
                     <Pressable key={u} style={[styles.unitBtn, eUnit === u && styles.unitBtnOn]} onPress={() => setEUnit(u)}>
@@ -158,7 +158,7 @@ export function BidEditor({
         <View style={styles.addBlock}>
           <TextInput value={newTitle} onChangeText={setNewTitle} placeholder="What's the step?" placeholderTextColor={colors.subtle} style={styles.input} />
           <View style={styles.grid}>
-            <TextInput value={newQty} onChangeText={setNewQty} keyboardType="numeric" placeholder="Qty" placeholderTextColor={colors.subtle} style={[styles.input, styles.qty]} />
+            <TextInput value={newQty} onChangeText={setNewQty} keyboardType="numeric" placeholder="Duration" placeholderTextColor={colors.subtle} style={[styles.input, styles.qty]} />
             <View style={styles.unitToggle}>
               {(['hours', 'days'] as const).map((u) => (
                 <Pressable key={u} style={[styles.unitBtn, newUnit === u && styles.unitBtnOn]} onPress={() => setNewUnit(u)}>

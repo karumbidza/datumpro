@@ -63,7 +63,7 @@ export function BidPanel({
               <input name="title" defaultValue={s.title} required className={`${inputClass} w-full`} />
             </div>
             <div className="w-16">
-              <label className="mb-1 block text-[11px] font-medium text-zinc-500">Qty</label>
+              <label className="mb-1 block text-[11px] font-medium text-zinc-500">Duration</label>
               <input name="estQty" type="number" min="0" step="0.5" defaultValue={s.estQty ?? ''} className={`${inputClass} w-full`} />
             </div>
             <div>
@@ -98,7 +98,7 @@ export function BidPanel({
           <input name="title" required placeholder="e.g. Excavate footing" className={`${inputClass} w-full`} />
         </div>
         <div className="w-16">
-          <label className="mb-1 block text-[11px] font-medium text-zinc-500">Qty</label>
+          <label className="mb-1 block text-[11px] font-medium text-zinc-500">Duration</label>
           <input name="estQty" type="number" min="0" step="0.5" className={`${inputClass} w-full`} />
         </div>
         <div>

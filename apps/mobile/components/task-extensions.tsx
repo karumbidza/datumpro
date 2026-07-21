@@ -28,12 +28,17 @@ export function TaskExtensions({
   taskId,
   orgId,
   projectId,
-  isAssignee,
+  canRequest,
+  preStart,
 }: {
   taskId: string;
   orgId: string;
   projectId: string;
-  isAssignee: boolean;
+  /** Assignee AND the task is underway — only then can they raise a request. */
+  canRequest: boolean;
+  /** Assignee but not started yet — explain why they can't request. */
+  preStart?: boolean;
+  isAssignee?: boolean;
   // canManage still accepted from the parent, but decide-eligibility now comes
   // from the viewer's org role via the approval chain.
   canManage?: boolean;
@@ -117,7 +122,11 @@ export function TaskExtensions({
         })
       )}
 
-      {isAssignee && !hasPending && (
+      {preStart && !hasPending && (
+        <Text style={styles.empty}>You can request an extension once the task is underway.</Text>
+      )}
+
+      {canRequest && !hasPending && (
         showForm ? (
           <View style={{ gap: 8, marginTop: 4 }}>
             <TextInput
