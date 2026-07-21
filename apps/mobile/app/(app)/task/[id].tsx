@@ -11,6 +11,8 @@ import { TaskActions } from '../../../components/task-actions';
 import { SubtaskPanel } from '../../../components/subtask-panel';
 import { listSubtasks, subtaskPct, type Subtask } from '../../../lib/data/subtasks';
 import { stepsByEntity, myOrgRole, type ApprovalStep } from '../../../lib/data/approvals';
+import { myBidStatus, type TenderStatus } from '../../../lib/data/tenders';
+import { BidEditor } from '../../../components/bid-editor';
 import { listSubtaskPhotos, type TaskPhoto } from '../../../lib/data/media';
 import { Card, Pill, ScheduleBar } from '../../../components/ui';
 import { formatDate, slaLabel, statusLabel } from '../../../lib/ui';
@@ -30,6 +32,7 @@ export default function TaskDetailScreen() {
   const [planSteps, setPlanSteps] = useState<ApprovalStep[]>([]);
   const [variationSteps, setVariationSteps] = useState<Record<string, ApprovalStep[]>>({});
   const [viewerRole, setViewerRole] = useState('');
+  const [bidStatus, setBidStatus] = useState<TenderStatus | null>(null);
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -45,14 +48,16 @@ export default function TaskDetailScreen() {
     }
     // Everything below depends only on the task — fetch it all in parallel
     // instead of one round-trip at a time.
-    const [perms, subs, media, conv, planStepsMap, role] = await Promise.all([
+    const [perms, subs, media, conv, planStepsMap, role, bid] = await Promise.all([
       getTaskPermissions(t.orgId, t.projectId, t.assigneeId),
       listSubtasks(String(id)),
       listSubtaskPhotos(String(id)),
       getTaskConversationId(String(id)),
       stepsByEntity('task_plan', [String(id)]),
       myOrgRole(t.orgId),
+      myBidStatus(String(id)),
     ]);
+    setBidStatus(bid);
     setPerms(perms);
     setSubtasks(subs);
     setSubtaskMedia(media);
@@ -111,6 +116,8 @@ export default function TaskDetailScreen() {
   // Contractor tasks can't start until the priced plan is approved.
   const usesPlanFlow = task.acceptanceStatus !== null;
   const planApproved = !usesPlanFlow || !!task.planApprovedAt;
+  // An open tender invitee builds their sealed bid instead of the normal panels.
+  const isBidder = bidStatus === 'invited' || bidStatus === 'submitted';
   // ACTUAL completion — real work only (never time-based).
   const pct = acceptancePending
     ? 0
@@ -171,7 +178,19 @@ export default function TaskDetailScreen() {
         )}
       </Pressable>
 
-      {perms && (task.assigneeId || subtasks.length > 0) && (
+      {isBidder && (
+        <BidEditor
+          taskId={task.id}
+          orgId={task.orgId}
+          subtasks={subtasks}
+          submitted={bidStatus === 'submitted'}
+          taskStart={task.plannedStartDate}
+          taskEnd={task.plannedEndDate}
+          onChanged={load}
+        />
+      )}
+
+      {!isBidder && perms && (task.assigneeId || subtasks.length > 0) && (
         <SubtaskPanel
           taskId={task.id}
           orgId={task.orgId}
@@ -194,7 +213,7 @@ export default function TaskDetailScreen() {
         />
       )}
 
-      {perms && (
+      {!isBidder && perms && (
         <TaskActions
           task={task}
           perms={perms}

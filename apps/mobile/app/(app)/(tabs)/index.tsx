@@ -11,6 +11,7 @@ import {
   type HomeData,
   type PendingApproval,
 } from '../../../lib/data/home';
+import { listMyTenderInvites, type MyTenderInvite } from '../../../lib/data/tenders';
 import { Card, ProgressBar, StatTile, Avatar } from '../../../components/ui';
 import { contentWidth, radius, font, type Colors } from '../../../lib/theme';
 import { useTheme } from '../../../lib/theme-context';
@@ -64,12 +65,14 @@ export default function Home() {
   const { contentMaxWidth } = useResponsive();
   const [data, setData] = useState<HomeData | null>(null);
   const [signoffs, setSignoffs] = useState<PendingApproval[]>([]);
+  const [tenders, setTenders] = useState<MyTenderInvite[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    const [home, pending] = await Promise.all([getHomeData(), listPendingApprovals()]);
+    const [home, pending, invites] = await Promise.all([getHomeData(), listPendingApprovals(), listMyTenderInvites()]);
     setData(home);
     setSignoffs(pending);
+    setTenders(invites);
     setRefreshing(false);
   }, []);
 
@@ -160,6 +163,38 @@ export default function Home() {
           <StatTile label="At risk" value={data?.myAtRisk ?? 0} accent={colors.accentDeep} />
           <StatTile label="Overdue" value={data?.myOverdue ?? 0} accent={colors.danger} />
         </View>
+
+        {/* Invited to tender — build & submit a sealed bid */}
+        {tenders.length > 0 && (
+          <>
+            <View style={styles.sectionHead}>
+              <Text style={styles.sectionTitle}>Invited to tender</Text>
+              <View style={styles.approvalCount}>
+                <Text style={styles.approvalCountText}>{tenders.length}</Text>
+              </View>
+            </View>
+            <View style={{ gap: 10 }}>
+              {tenders.map((t) => (
+                <Pressable key={t.taskId} onPress={() => router.push(`/(app)/task/${t.taskId}`)}>
+                  <Card>
+                    <View style={styles.tenderRow}>
+                      <View style={[styles.tenderMark, { backgroundColor: colors.violetSoft }]}>
+                        <Ionicons name="documents-outline" size={16} color={colors.violet} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.tenderTitle} numberOfLines={1}>{t.taskTitle}</Text>
+                        <Text style={styles.tenderSub}>
+                          {t.status === 'submitted' ? 'Bid submitted · tap to edit' : 'Tap to build & submit your bid'}
+                        </Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={18} color={colors.subtle} />
+                    </View>
+                  </Card>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        )}
 
         {/* Awaiting your approval */}
         {signoffs.length > 0 && (
@@ -338,6 +373,10 @@ const makeStyles = (c: Colors) =>
       justifyContent: 'center',
     },
     approvalCountText: { fontSize: 12, fontFamily: font.bodyBold, color: c.accentDeep },
+    tenderRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    tenderMark: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+    tenderTitle: { fontSize: 15, fontFamily: font.bodyBold, color: c.text },
+    tenderSub: { fontSize: 12, fontFamily: font.body, color: c.subtle, marginTop: 1 },
     approvalRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     kindBadge: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
     kindBadgeText: { fontSize: 12, fontFamily: font.displayBold, letterSpacing: 0.3 },
