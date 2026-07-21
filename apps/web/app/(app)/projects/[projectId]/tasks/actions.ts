@@ -119,6 +119,11 @@ export async function createTask(_prev: FormState, formData: FormData): Promise<
   if (mode === 'direct' && !assigneeId) {
     return { error: 'Choose who to assign this to — or pick Tender / Leave unassigned.' };
   }
+  const tenderIds =
+    mode === 'tender' ? [...new Set(formData.getAll('tenderContractorIds').map(String).filter(Boolean))] : [];
+  if (mode === 'tender' && tenderIds.length === 0) {
+    return { error: 'Pick at least one contractor to invite to tender.' };
+  }
 
   const parsed = createTaskSchema.safeParse({
     projectId,
@@ -181,7 +186,7 @@ export async function createTask(_prev: FormState, formData: FormData): Promise<
 
   // Tender: invite the chosen contractors to bid — each builds a competing plan.
   if (mode === 'tender') {
-    const contractorIds = [...new Set(formData.getAll('tenderContractorIds').map(String).filter(Boolean))];
+    const contractorIds = tenderIds;
     if (contractorIds.length > 0) {
       await supabase.from('task_tender_invites').insert(
         contractorIds.map((cid) => ({
