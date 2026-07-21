@@ -248,14 +248,11 @@ export default function TaskDetailScreen() {
         </Card>
       ) : null}
 
-      {/* Evidence + extensions are for the assignee/managers, not tender bidders. */}
-      {!isBidder && (
-        <Card>
-          <TaskPhotos orgId={task.orgId} projectId={task.projectId} taskId={task.id} />
-        </Card>
-      )}
+      <Card>
+        <TaskPhotos orgId={task.orgId} projectId={task.projectId} taskId={task.id} />
+      </Card>
 
-      {!isBidder && perms && (
+      {perms && (
         <Card>
           <TaskExtensions
             taskId={task.id}

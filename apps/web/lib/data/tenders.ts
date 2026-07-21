@@ -23,6 +23,17 @@ export interface BidLine {
   plannedStartDate: string | null;
 }
 
+/** Task ids in a project that are currently out to tender (open invites). */
+export async function tenderingTaskIds(projectId: string): Promise<Set<string>> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('task_tender_invites')
+    .select('task_id')
+    .eq('project_id', projectId)
+    .in('status', ['invited', 'submitted']);
+  return new Set(((data ?? []) as { task_id: string }[]).map((r) => r.task_id));
+}
+
 /** Is this task out to tender? True while any invite is still open. */
 export async function taskIsTendering(taskId: string): Promise<boolean> {
   const supabase = await createClient();

@@ -6,6 +6,7 @@ import { getProject } from '@/lib/data/projects';
 import { listTasksByProject, listOrgMembers, type TaskRow } from '@/lib/data/tasks';
 import { getProjectSchedule, type ProjectSchedule } from '@/lib/data/scheduling';
 import { progressForTasks, getProjectProgress } from '@/lib/data/subtasks';
+import { tenderingTaskIds } from '@/lib/data/tenders';
 import { Button } from '@/components/ui/button';
 import { ChevronRight } from '@/components/icons';
 import { parseDate, formatDayMonth } from '@/lib/date';
@@ -151,9 +152,10 @@ export default async function TaskBoardPage({
     listOrgMembers(project.org_id),
   ]);
   const nameById = new Map(members.map((m) => [m.userId, m.name]));
-  const [progress, projectPct] = await Promise.all([
+  const [progress, projectPct, tenderingIds] = await Promise.all([
     progressForTasks(tasks.map((t) => t.id)),
     getProjectProgress(projectId),
+    tenderingTaskIds(projectId),
   ]);
 
   // The project's on-schedule target: how far into its overall window (earliest
@@ -240,13 +242,23 @@ export default async function TaskBoardPage({
 
           <div className="flex flex-col gap-2">
             {tasks.map((t) => {
-              // A todo task with unfinished predecessors reads as Blocked.
+              // A todo task with unfinished predecessors reads as Blocked; one out
+              // to tender reads as "Bidding" (never a bare "Unassigned").
+              const tendering = !t.assignee_id && tenderingIds.has(t.id);
               const depBlocked = t.status === 'todo' && (schedule?.meta[t.id]?.waitingOn.length ?? 0) > 0;
-              const status = depBlocked ? STATUS_META.blocked : STATUS_META[t.status];
+              const status = tendering
+                ? { label: 'Bidding', pill: STATUS_META.blocked.pill, fill: STATUS_META.blocked.fill }
+                : depBlocked
+                  ? STATUS_META.blocked
+                  : STATUS_META[t.status];
               const pct = actualPercent(t, progress.get(t.id));
               const expected = taskExpected(t);
               const note = statusNote(t, schedule);
-              const assignee = t.assignee_id ? nameById.get(t.assignee_id) ?? 'Member' : 'Unassigned';
+              const assignee = tendering
+                ? 'Open for bidding'
+                : t.assignee_id
+                  ? nameById.get(t.assignee_id) ?? 'Member'
+                  : 'Unassigned';
               const due = parseDate(t.due_date);
               return (
                 <Link

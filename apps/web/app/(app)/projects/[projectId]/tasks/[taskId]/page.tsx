@@ -153,7 +153,11 @@ export default async function TaskDetailPage({
   const isBidder =
     !canManage && task.assignee_id !== user.id && !!myInvite && (myInvite.status === 'invited' || myInvite.status === 'submitted');
   const canAct = isAssignee || canManage;
-  const canUpload = task.status !== 'done' && (isAssignee || canManage);
+  // Completion evidence is the assignee's to upload, at completion time only.
+  const canUpload = isAssignee && task.status !== 'done';
+  // Out to tender: no assignee yet, bids still open. Drives the "Open for bidding"
+  // labelling so contractors know it's a tender, not an idle unassigned task.
+  const isTendering = !task.assignee_id && tenderInvites.some((i) => i.status === 'invited' || i.status === 'submitted');
   const canRequestExtension = task.status !== 'done' && (isAssignee || canManage);
 
   const usedPredecessors = new Set(dependencies.map((d) => d.predecessorId));
@@ -364,21 +368,25 @@ export default async function TaskDetailPage({
     });
   }
 
-  tabs.push({
-    key: 'evidence',
-    label: 'Evidence',
-    count: completionMedia.length,
-    content: (
-      <CompletionEvidence
-        taskId={taskId}
-        projectId={projectId}
-        orgId={task.org_id}
-        media={completionMedia}
-        canUpload={canUpload}
-        canManage={canManage}
-      />
-    ),
-  });
+  // Evidence is the assignee's to upload at completion. Managers only see the tab
+  // once there's evidence to review at sign-off — never during tender/planning.
+  if (isAssignee || (canManage && completionMedia.length > 0)) {
+    tabs.push({
+      key: 'evidence',
+      label: 'Evidence',
+      count: completionMedia.length,
+      content: (
+        <CompletionEvidence
+          taskId={taskId}
+          projectId={projectId}
+          orgId={task.org_id}
+          media={completionMedia}
+          canUpload={canUpload}
+          canManage={canManage}
+        />
+      ),
+    });
+  }
 
   tabs.push({
     key: 'extensions',
@@ -436,7 +444,11 @@ export default async function TaskDetailPage({
       <div className="mt-1 flex items-start justify-between gap-4">
         <h1 className="text-2xl font-semibold tracking-tight">{task.title}</h1>
         <div className="flex items-center gap-2">
-          <Badge tone={STATUS_TONE[task.status]}>{task.status.replace('_', ' ')}</Badge>
+          {isTendering ? (
+            <Badge tone="amber">{isBidder ? 'Bidding' : 'Open for bidding'}</Badge>
+          ) : (
+            <Badge tone={STATUS_TONE[task.status]}>{task.status.replace('_', ' ')}</Badge>
+          )}
           {canManage && task.status !== 'done' && (
             <Link href={`/projects/${projectId}/tasks/${taskId}/edit`}>
               <Button variant="secondary">Edit</Button>
@@ -447,7 +459,16 @@ export default async function TaskDetailPage({
 
       {/* Overview — at a glance + act. Everything else is tabbed below. */}
       <Card className="mt-6 space-y-2 text-sm">
-        <Row label="Assignee" value={assigneeName} />
+        <Row
+          label="Assignee"
+          value={isTendering ? (isBidder ? 'You’re bidding on this' : 'Open for bidding') : assigneeName}
+        />
+        {isTendering && canManage && (
+          <p className="rounded-md bg-amber-50 p-2 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
+            📣 Out to tender — {tenderInvites.filter((i) => i.status === 'submitted').length}/{tenderInvites.length} bid(s)
+            in. Compare and award in the Tender tab.
+          </p>
+        )}
         <Row label="Priority" value={task.priority} />
         <Row label="SLA" value={task.sla_status.replace('_', ' ')} />
         {task.status !== 'done' && sched && (
