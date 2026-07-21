@@ -461,9 +461,12 @@ async function taskOrgProject(
 }
 
 export async function addSubtask(formData: FormData) {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   const taskId = String(formData.get('taskId') ?? '');
   const title = String(formData.get('title') ?? '').trim();
+  // Bid mode: the line belongs to this contractor's sealed tender bid. RLS still
+  // guarantees they can only write their own bid, so scope it server-side.
+  const bidContractorId = formData.get('bid') === '1' ? user.id : null;
   if (!title) return;
   const info = await taskOrgProject(supabase, taskId);
   if (!info) throw new Error('Task not found');
@@ -489,10 +492,21 @@ export async function addSubtask(formData: FormData) {
     est_unit: estUnit,
     planned_start_date: (formData.get('plannedStartDate') as string) || null,
     planned_end_date: (formData.get('plannedEndDate') as string) || null,
+    bid_contractor_id: bidContractorId,
     position,
   });
   if (error) throw new Error(error.message);
   revalidatePath(`/projects/${info.project_id}/tasks/${taskId}`);
+}
+
+/** A tender invitee seals their bid (their bid-scoped plan must be fully priced). */
+export async function submitBid(formData: FormData) {
+  const { supabase } = await requireUser();
+  const taskId = String(formData.get('taskId') ?? '');
+  const projectId = String(formData.get('projectId') ?? '');
+  const { error } = await supabase.rpc('submit_tender_bid', { p_task_id: taskId });
+  if (error) throw new Error(error.message);
+  revalidatePath(`/projects/${projectId}/tasks/${taskId}`);
 }
 
 export async function updateSubtask(formData: FormData) {

@@ -17,6 +17,7 @@ import { listTenderInvites, listBidLinesByContractor } from '@/lib/data/tenders'
 import { listTaskPayments } from '@/lib/data/payments';
 import { getTaskConversationId, listMessages, othersMaxReadSeq } from '@/lib/data/chat';
 import { TenderPanel } from '@/components/task/tender-panel';
+import { BidPanel } from '@/components/task/bid-panel';
 import { SubtaskPanel } from '@/components/task/subtask-panel';
 import { listSubtasks } from '@/lib/data/subtasks';
 import { PaymentsPanel } from '@/components/task/payments-panel';
@@ -146,6 +147,11 @@ export default async function TaskDetailPage({
   const isAssignee = task.assignee_id === user.id;
   // Sign-off authority mirrors the DB guard: org admin OR the project's PM.
   const canManage = orgRole === 'owner' || orgRole === 'admin' || projectRole === 'pm';
+  // Am I an active tender invitee (building a sealed bid)? Then I get the bid
+  // editor instead of the normal plan/workflow panels.
+  const myInvite = tenderInvites.find((i) => i.contractorId === user.id);
+  const isBidder =
+    !canManage && task.assignee_id !== user.id && !!myInvite && (myInvite.status === 'invited' || myInvite.status === 'submitted');
   const canAct = isAssignee || canManage;
   const canUpload = task.status !== 'done' && (isAssignee || canManage);
   const canRequestExtension = task.status !== 'done' && (isAssignee || canManage);
@@ -157,7 +163,7 @@ export default async function TaskDetailPage({
   // the primary CTA is never buried behind a tab. The DB enforces the real
   // rules (e.g. only a lead can approve to DONE) regardless of what's shown.
   const workflowActions =
-    task.status !== 'done' && canAct && !acceptancePending ? (
+    task.status !== 'done' && canAct && !acceptancePending && !isBidder ? (
       <div className="mt-6 space-y-4">
         {task.status === 'todo' &&
           (blockedByDeps ? (
@@ -326,7 +332,7 @@ export default async function TaskDetailPage({
     ),
   });
 
-  if (tenderInvites.length > 0) {
+  if (tenderInvites.length > 0 && canManage) {
     const invitedIds = new Set(tenderInvites.map((i) => i.contractorId));
     const tenderDecided = tenderInvites.some((i) => i.status === 'awarded');
     tabs.push({
@@ -473,7 +479,20 @@ export default async function TaskDetailPage({
         )}
       </Card>
 
-      {(task.assignee_id || subtasks.length > 0) && (
+      {isBidder && (
+        <div className="mt-6">
+          <BidPanel
+            taskId={taskId}
+            projectId={projectId}
+            bidLines={subtasks}
+            submitted={myInvite?.status === 'submitted'}
+            taskStart={task.planned_start_date}
+            taskEnd={task.planned_end_date ?? task.due_date}
+          />
+        </div>
+      )}
+
+      {!isBidder && (task.assignee_id || subtasks.length > 0) && (
         <div className="mt-6">
           <SubtaskPanel
             taskId={taskId}
