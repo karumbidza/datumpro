@@ -38,7 +38,6 @@ export function BidEditor({
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [busy, setBusy] = useState(false);
-  const [addOpen, setAddOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newQty, setNewQty] = useState('');
   const [newUnit, setNewUnit] = useState<'hours' | 'days'>('days');
@@ -91,7 +90,48 @@ export function BidEditor({
         PM compares it against others. You can edit until they decide.
       </Text>
 
-      <View style={{ gap: 8, marginTop: 10 }}>
+      {/* Add a step — a labeled sub-card, first (matches the web layout) */}
+      <View style={[styles.addBlock, { marginTop: 14 }]}>
+        <Text style={styles.addLabel}>Add a step</Text>
+        <TextInput value={newTitle} onChangeText={setNewTitle} placeholder="e.g. Excavate footing" placeholderTextColor={colors.subtle} style={styles.input} />
+        <View style={styles.grid}>
+          <TextInput value={newQty} onChangeText={setNewQty} keyboardType="numeric" placeholder="Duration" placeholderTextColor={colors.subtle} style={[styles.input, styles.qty]} />
+          <View style={styles.unitToggle}>
+            {(['hours', 'days'] as const).map((u) => (
+              <Pressable key={u} style={[styles.unitBtn, newUnit === u && styles.unitBtnOn]} onPress={() => setNewUnit(u)}>
+                <Text style={[styles.unitText, newUnit === u && styles.unitTextOn]}>{u === 'hours' ? 'hrs' : 'days'}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <TextInput value={newCost} onChangeText={setNewCost} keyboardType="numeric" placeholder="Cost $" placeholderTextColor={colors.subtle} style={[styles.input, styles.cost]} />
+        </View>
+        <DateField label="Start" value={newStart} onChange={setNewStart} min={taskStart} max={taskEnd} />
+        <Pressable
+          style={[styles.btn, styles.btnPrimary, (!newTitle.trim() || busy) && { opacity: 0.5 }]}
+          disabled={!newTitle.trim() || busy}
+          onPress={() =>
+            run(async () => {
+              await addBidStep({
+                taskId,
+                orgId,
+                title: newTitle.trim(),
+                costCents: Math.round((Number(newCost) || 0) * 100),
+                estQty: Number(newQty) || null,
+                estUnit: newUnit,
+                plannedStartDate: newStart,
+              });
+              setNewTitle('');
+              setNewQty('');
+              setNewCost('');
+              setNewStart(null);
+            })
+          }
+        >
+          {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.btnPrimaryText}>Add step</Text>}
+        </Pressable>
+      </View>
+
+      <View style={{ gap: 8, marginTop: 12 }}>
         {subtasks.map((s) =>
           editingId === s.id ? (
             <View key={s.id} style={styles.editRow}>
@@ -152,59 +192,6 @@ export function BidEditor({
           ),
         )}
       </View>
-
-      {/* add a step */}
-      {!addOpen ? (
-        <Pressable style={styles.addStepBtn} onPress={() => setAddOpen(true)}>
-          <Ionicons name="add-circle-outline" size={18} color={colors.brand} />
-          <Text style={styles.addStepText}>Add a step</Text>
-        </Pressable>
-      ) : (
-        <View style={styles.addBlock}>
-          <TextInput value={newTitle} onChangeText={setNewTitle} placeholder="What's the step?" placeholderTextColor={colors.subtle} style={styles.input} />
-          <View style={styles.grid}>
-            <TextInput value={newQty} onChangeText={setNewQty} keyboardType="numeric" placeholder="Duration" placeholderTextColor={colors.subtle} style={[styles.input, styles.qty]} />
-            <View style={styles.unitToggle}>
-              {(['hours', 'days'] as const).map((u) => (
-                <Pressable key={u} style={[styles.unitBtn, newUnit === u && styles.unitBtnOn]} onPress={() => setNewUnit(u)}>
-                  <Text style={[styles.unitText, newUnit === u && styles.unitTextOn]}>{u === 'hours' ? 'hrs' : 'days'}</Text>
-                </Pressable>
-              ))}
-            </View>
-            <TextInput value={newCost} onChangeText={setNewCost} keyboardType="numeric" placeholder="Cost $" placeholderTextColor={colors.subtle} style={[styles.input, styles.cost]} />
-          </View>
-          <DateField label="Start" value={newStart} onChange={setNewStart} min={taskStart} max={taskEnd} />
-          <View style={styles.row}>
-            <Pressable
-              style={[styles.btn, styles.btnPrimary, (!newTitle.trim() || busy) && { opacity: 0.5 }]}
-              disabled={!newTitle.trim() || busy}
-              onPress={() =>
-                run(async () => {
-                  await addBidStep({
-                    taskId,
-                    orgId,
-                    title: newTitle.trim(),
-                    costCents: Math.round((Number(newCost) || 0) * 100),
-                    estQty: Number(newQty) || null,
-                    estUnit: newUnit,
-                    plannedStartDate: newStart,
-                  });
-                  setNewTitle('');
-                  setNewQty('');
-                  setNewCost('');
-                  setNewStart(null);
-                  setAddOpen(false);
-                })
-              }
-            >
-              {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.btnPrimaryText}>Add step</Text>}
-            </Pressable>
-            <Pressable style={[styles.btn, styles.btnOutline]} onPress={() => setAddOpen(false)}>
-              <Text style={styles.btnOutlineText}>Cancel</Text>
-            </Pressable>
-          </View>
-        </View>
-      )}
 
       {/* total + submit */}
       <View style={styles.totalRow}>
@@ -268,7 +255,8 @@ const makeStyles = (c: Colors) =>
       fontFamily: font.body,
       color: c.text,
     },
-    addBlock: { gap: 8, marginTop: 8, borderWidth: 1, borderColor: c.border, borderRadius: radius.md, padding: 10 },
+    addBlock: { gap: 8, marginTop: 8, borderWidth: 1, borderColor: c.border, borderRadius: radius.md, padding: 12 },
+    addLabel: { fontSize: 11, fontFamily: font.bodyBold, color: c.subtle, textTransform: 'uppercase', letterSpacing: 0.5 },
     addStepBtn: {
       flexDirection: 'row',
       alignItems: 'center',
