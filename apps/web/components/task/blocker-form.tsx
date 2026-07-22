@@ -2,7 +2,6 @@
 
 import { useActionState } from 'react';
 import { raiseBlocker } from '@/app/(app)/projects/[projectId]/tasks/actions';
-import { Button } from '@/components/ui/button';
 import { FormError } from '@/components/ui/form-error';
 
 const inputClass =
@@ -15,7 +14,12 @@ export function BlockerForm({ taskId }: { taskId: string }) {
       <input type="hidden" name="taskId" value={taskId} />
       <textarea name="description" rows={2} required placeholder="What's blocking you?" className={inputClass} />
       <FormError error={state.error} />
-      <Button type="submit" variant="secondary">Raise blocker</Button>
+      <button
+        type="submit"
+        className="inline-flex h-[42px] w-full items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+      >
+        Raise blocker
+      </button>
     </form>
   );
 }

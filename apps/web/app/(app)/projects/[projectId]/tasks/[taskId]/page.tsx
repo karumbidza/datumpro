@@ -32,15 +32,12 @@ import { Card, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  startTask,
   approveTask,
   rejectTask,
   resolveBlocker,
   addDependency,
   removeDependency,
 } from '../actions';
-import { SubmitTaskForm } from '@/components/task/submit-task-form';
-import { BlockerForm } from '@/components/task/blocker-form';
 
 const inputClass =
   'w-full rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
@@ -143,11 +140,6 @@ export default async function TaskDetailPage({
 
   const assigneeName = members.find((m) => m.userId === task.assignee_id)?.name ?? 'Unassigned';
   const acceptancePending = task.acceptance_status === 'pending';
-  // Only the agreed scope (baseline + approved variations) gates completion.
-  const countedSubtasks = subtasks.filter((s) => !s.isVariation || s.variationStatus === 'approved');
-  const planComplete = countedSubtasks.length === 0 || countedSubtasks.every((s) => s.isDone);
-  // A contractor task can't start until its priced plan is approved.
-  const planNotApproved = task.acceptance_status !== null && !task.plan_approved_at;
   // Dependency block: predecessors that aren't done yet. Can't start; can still
   // be assigned/tendered. The DB enforces the start rule too.
   const waitingOn = dependencies.filter((d) => d.status !== 'done').map((d) => d.title);
@@ -160,7 +152,6 @@ export default async function TaskDetailPage({
   const myInvite = tenderInvites.find((i) => i.contractorId === user.id);
   const isBidder =
     !canManage && task.assignee_id !== user.id && !!myInvite && (myInvite.status === 'invited' || myInvite.status === 'submitted');
-  const canAct = isAssignee || canManage;
   // Completion evidence is the assignee's to upload, at completion time only.
   const canUpload = isAssignee && task.status !== 'done';
   // Out to tender: no assignee yet, bids still open. Drives the "Open for bidding"
@@ -179,47 +170,12 @@ export default async function TaskDetailPage({
   // the primary CTA is never buried behind a tab. The DB enforces the real
   // rules (e.g. only a lead can approve to DONE) regardless of what's shown.
   const workflowActions =
-    task.status !== 'done' && canAct && !acceptancePending && !isBidder ? (
+    canManage &&
+    !acceptancePending &&
+    !isBidder &&
+    (task.status === 'submitted' || task.status === 'blocked') ? (
       <div className="mt-4 space-y-4">
-        {task.status === 'todo' &&
-          !blockedByDeps &&
-          (planNotApproved ? (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              {task.plan_submitted_at
-                ? 'Your plan is awaiting approval — you can start once it’s approved.'
-                : 'Build your priced plan below and submit it for approval before starting.'}
-            </p>
-          ) : subtasks.length > 0 ? (
-            <form action={startTask}>
-              <input type="hidden" name="taskId" value={taskId} />
-              <Button type="submit">Start task</Button>
-            </form>
-          ) : (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              Add at least one step to your task plan below, then you can start the task.
-            </p>
-          ))}
-
-        {task.status === 'in_progress' && (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Card>
-              <CardTitle>Submit for sign-off</CardTitle>
-              {planComplete ? (
-                <SubmitTaskForm taskId={taskId} />
-              ) : (
-                <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
-                  Complete every step in your task plan below before submitting for sign-off.
-                </p>
-              )}
-            </Card>
-            <Card>
-              <CardTitle>Raise a blocker</CardTitle>
-              <BlockerForm taskId={taskId} />
-            </Card>
-          </div>
-        )}
-
-        {task.status === 'submitted' && canManage && (
+        {task.status === 'submitted' && (
           <Card>
             <CardTitle>Review submission</CardTitle>
             <form action={approveTask} className="mt-3">
@@ -234,7 +190,7 @@ export default async function TaskDetailPage({
           </Card>
         )}
 
-        {task.status === 'blocked' && canManage && (
+        {task.status === 'blocked' && (
           <form action={resolveBlocker}>
             <input type="hidden" name="taskId" value={taskId} />
             <Button type="submit">Resolve blocker (resume, credit deadline)</Button>
@@ -548,6 +504,7 @@ export default async function TaskDetailPage({
             variationSteps={variationSteps}
             viewerRole={orgRole ?? ''}
             planDocs={planDocs}
+            blockedByDeps={blockedByDeps}
           />
         </div>
       )}

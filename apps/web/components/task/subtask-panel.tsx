@@ -14,6 +14,7 @@ import {
   removeSubtask,
   toggleSubtask,
   submitPlan,
+  startTask,
 } from '@/app/(app)/projects/[projectId]/tasks/actions';
 import type { Subtask } from '@/lib/data/subtasks';
 import type { ApprovalStep } from '@/lib/data/approvals';
@@ -21,6 +22,8 @@ import type { TaskDoc } from '@/lib/data/tenders';
 import { DocAttach } from '@/components/task/doc-attach';
 import { formatUsd } from '@datumpro/shared/domain';
 import { MediaUploader } from '@/components/task/media-uploader';
+import { SubmitTaskForm } from '@/components/task/submit-task-form';
+import { BlockerForm } from '@/components/task/blocker-form';
 
 const inputClass =
   'rounded-md border border-zinc-200 bg-transparent px-2 py-1 text-xs outline-none focus:border-brand-500 dark:border-zinc-800';
@@ -73,6 +76,7 @@ export function SubtaskPanel({
   variationSteps,
   viewerRole,
   planDocs,
+  blockedByDeps = false,
 }: {
   taskId: string;
   projectId: string;
@@ -94,6 +98,8 @@ export function SubtaskPanel({
   variationSteps: Record<string, ApprovalStep[]>;
   viewerRole: string;
   planDocs: TaskDoc[];
+  /** Predecessors not yet done — can't start the task while true. */
+  blockedByDeps?: boolean;
 }) {
   const [declineOpen, setDeclineOpen] = useState(false);
   const [handBackOpen, setHandBackOpen] = useState(false);
@@ -129,9 +135,18 @@ export function SubtaskPanel({
 
   const canHandBack =
     isAssignee && acceptanceStatus === 'accepted' && taskStatus !== 'submitted' && taskStatus !== 'done';
-  // Ticking belongs to the assignee, and only once the baseline is approved
-  // (or for legacy non-plan tasks).
-  const canTick = isAssignee && (planLocked || !usesPlanFlow);
+  // Work is "commenced" once the assignee hits Start (status → in_progress).
+  const started = taskStatus === 'in_progress';
+  // Ticking belongs to the assignee — only after they START the task (and the
+  // baseline is approved, or for legacy non-plan tasks). Start is the gate.
+  const canTick = isAssignee && started && (planLocked || !usesPlanFlow);
+  // Start is available once the plan is approved (or non-plan), the task hasn't
+  // begun, isn't blocked by predecessors, and has at least one step to work.
+  const canStartTask =
+    isAssignee && taskStatus === 'todo' && !blockedByDeps && (planLocked || !usesPlanFlow) && subtasks.length > 0;
+  // Submit / raise-blocker live at the foot of the plan once work has commenced.
+  const canWorkflow = isAssignee && started;
+  const planComplete = counted.length === 0 || counted.every((s) => s.isDone);
 
   const path = `/projects/${projectId}/tasks/${taskId}`;
 
@@ -398,6 +413,21 @@ export function SubtaskPanel({
       {/* ── LOCKED PLAN / LEGACY — checklist ── */}
       {(planLocked || !usesPlanFlow) && (
         <>
+          {/* Start the task — the gate that unlocks ticking steps off. */}
+          {canStartTask && (
+            <form action={startTask} className="mt-3">
+              <input type="hidden" name="taskId" value={taskId} />
+              <SubmitButton className="h-[42px] w-full text-[14.5px]" pendingText="Starting…">
+                Start task
+              </SubmitButton>
+            </form>
+          )}
+          {isAssignee && taskStatus === 'todo' && blockedByDeps && (
+            <p className="mt-3 text-[12px] text-zinc-400">
+              Waiting on predecessor tasks — you can start once they’re done.
+            </p>
+          )}
+
           <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
             <div className="h-2 rounded-full bg-brand-600 transition-all" style={{ width: `${pct}%` }} />
           </div>
@@ -575,6 +605,10 @@ export function SubtaskPanel({
               <p className="mt-2.5 text-[11.5px] text-zinc-400">
                 Open a step to tick it off and attach proof. Marking complete is final.
               </p>
+            ) : isAssignee && usesPlanFlow && taskStatus === 'todo' ? (
+              <p className="mt-2.5 text-[11.5px] text-zinc-400">
+                Start the task above to tick steps off and attach proof.
+              </p>
             ) : usesPlanFlow ? (
               <p className="mt-2.5 text-[11.5px] text-zinc-400">
                 Read-only — the assignee ticks steps and attaches proof. Open a step to review time and evidence.
@@ -662,6 +696,26 @@ export function SubtaskPanel({
 
       {usesPlanFlow && (planDraft || planPending || planLocked) && (
         <DocAttach taskId={taskId} projectId={projectId} orgId={orgId} docs={planDocs} canEdit={isAssignee} />
+      )}
+
+      {/* ── Commenced work: submit for sign-off / raise a blocker ── */}
+      {canWorkflow && (
+        <div className="mt-4 grid gap-4 border-t border-zinc-100 pt-4 dark:border-zinc-800 sm:grid-cols-2">
+          <div>
+            <p className="text-[13px] font-semibold text-zinc-800 dark:text-zinc-100">Submit for sign-off</p>
+            {planComplete ? (
+              <SubmitTaskForm taskId={taskId} />
+            ) : (
+              <p className="mt-2 text-[12.5px] text-zinc-500 dark:text-zinc-400">
+                Complete every step above before submitting for sign-off.
+              </p>
+            )}
+          </div>
+          <div>
+            <p className="text-[13px] font-semibold text-zinc-800 dark:text-zinc-100">Raise a blocker</p>
+            <BlockerForm taskId={taskId} />
+          </div>
+        </div>
       )}
 
       {canHandBack && (
