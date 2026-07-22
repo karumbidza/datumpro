@@ -20,6 +20,7 @@ export function MediaUploader({
   label = 'Upload photo / video',
   accept = 'image/*,video/*',
   compact = false,
+  glyph = '＋',
 }: {
   taskId: string;
   projectId: string;
@@ -29,6 +30,8 @@ export function MediaUploader({
   label?: string;
   accept?: string;
   compact?: boolean;
+  /** Icon shown in compact mode (e.g. a paperclip). */
+  glyph?: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -71,12 +74,12 @@ export function MediaUploader({
     return (
       <label
         title={label}
-        className={`flex h-11 w-11 cursor-pointer items-center justify-center rounded-md border border-dashed border-zinc-300 text-zinc-400 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800 ${
+        className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-[15px] text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 ${
           busy ? 'pointer-events-none opacity-60' : ''
         }`}
       >
         <input type="file" accept={accept} className="hidden" onChange={onChange} disabled={busy} />
-        {busy ? '…' : '＋'}
+        {busy ? '…' : glyph}
       </label>
     );
   }

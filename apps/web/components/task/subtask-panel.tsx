@@ -17,10 +17,15 @@ import {
   startTask,
   submitTask,
   raiseBlocker,
+  requestExtension,
+  removeTaskMedia,
 } from '@/app/(app)/projects/[projectId]/tasks/actions';
 import type { Subtask } from '@/lib/data/subtasks';
 import type { ApprovalStep } from '@/lib/data/approvals';
 import type { TaskDoc } from '@/lib/data/tenders';
+import type { ExtensionRequestRow } from '@/lib/data/tasks';
+import type { TaskMediaRow } from '@/lib/data/quotes';
+import { Badge } from '@/components/ui/badge';
 import { DocAttach } from '@/components/task/doc-attach';
 import { formatUsd } from '@datumpro/shared/domain';
 import { MediaUploader } from '@/components/task/media-uploader';
@@ -44,6 +49,8 @@ const selectStyle = {
   backgroundPosition: 'right 12px center',
 } as const;
 
+const EXT_TONE = { pending: 'neutral', approved: 'green', rejected: 'amber', cancelled: 'neutral' } as const;
+
 /** Counted scope = baseline lines + approved variations (mirrors the DB). */
 function isCounted(s: Subtask): boolean {
   return !s.isVariation || s.variationStatus === 'approved';
@@ -65,6 +72,7 @@ export function SubtaskPanel({
   mediaBySubtask,
   acceptanceStatus,
   isAssignee,
+  canManage,
   assigneeName,
   taskStart,
   taskEnd,
@@ -77,6 +85,11 @@ export function SubtaskPanel({
   viewerRole,
   planDocs,
   blockedByDeps = false,
+  extensionRequests = [],
+  extensionSteps = {},
+  canRequestExtension = false,
+  extensionPreStart = false,
+  completionMedia = [],
 }: {
   taskId: string;
   projectId: string;
@@ -100,14 +113,26 @@ export function SubtaskPanel({
   planDocs: TaskDoc[];
   /** Predecessors not yet done — can't start the task while true. */
   blockedByDeps?: boolean;
+  /** Extension-of-time requests raised on this task (assignee → PM/admin). */
+  extensionRequests?: ExtensionRequestRow[];
+  /** Approval chains keyed by extension request id. */
+  extensionSteps?: Record<string, ApprovalStep[]>;
+  /** Assignee may raise an extension (task in progress / blocked). */
+  canRequestExtension?: boolean;
+  /** Assignee, but the task hasn't started — explain why they can't yet. */
+  extensionPreStart?: boolean;
+  /** Files attached at submit / blocker time (photos, PDFs, etc.). */
+  completionMedia?: TaskMediaRow[];
 }) {
   const [declineOpen, setDeclineOpen] = useState(false);
   const [handBackOpen, setHandBackOpen] = useState(false);
   const [submitOpen, setSubmitOpen] = useState(false); // submit-for-sign-off modal
   const [blockerOpen, setBlockerOpen] = useState(false); // raise-blocker modal
+  const [extensionOpen, setExtensionOpen] = useState(false); // extension request form
   const [planErr, submitPlanAction] = useActionState(submitPlan, {} as FormState);
   const [submitState, submitTaskAction] = useActionState(submitTask, {} as FormState);
   const [blockerState, raiseBlockerAction] = useActionState(raiseBlocker, {} as FormState);
+  const [extErr, requestExtensionAction] = useActionState(requestExtension, {} as FormState);
 
   const baseline = subtasks.filter((s) => !s.isVariation);
   const counted = subtasks.filter(isCounted);
@@ -151,6 +176,7 @@ export function SubtaskPanel({
   // Submit / raise-blocker live at the foot of the plan once work has commenced.
   const canWorkflow = isAssignee && started;
   const planComplete = counted.length === 0 || counted.every((s) => s.isDone);
+  const hasPendingExt = extensionRequests.some((r) => r.status === 'pending');
 
   const path = `/projects/${projectId}/tasks/${taskId}`;
 
@@ -695,11 +721,110 @@ export function SubtaskPanel({
                 ))}
             </div>
           )}
+
+          {/* ── EXTENSION OF TIME (raised by the assignee, approved by PM/admin) ── */}
+          {(extensionRequests.length > 0 || canRequestExtension || extensionPreStart) && (
+            <div className="mt-4 border-t border-zinc-100 pt-3 dark:border-zinc-800">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">Extension of time</p>
+
+              {extensionRequests.map((r) => (
+                <div key={r.id} className="mt-2 rounded-md border border-zinc-100 p-2 dark:border-zinc-800">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm text-zinc-800 dark:text-zinc-200">New due: {r.proposedDueDate}</span>
+                    <Badge tone={EXT_TONE[r.status]}>{r.status}</Badge>
+                  </div>
+                  {r.reason && <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{r.reason}</p>}
+                  {r.status === 'pending' && (
+                    <ApprovalChain steps={extensionSteps[r.id] ?? []} viewerRole={viewerRole} path={path} />
+                  )}
+                </div>
+              ))}
+
+              {canRequestExtension && !hasPendingExt &&
+                (!extensionOpen ? (
+                  <button
+                    type="button"
+                    onClick={() => setExtensionOpen(true)}
+                    className="mt-2 text-[11px] font-medium text-brand-600 hover:underline"
+                  >
+                    + Request an extension (needs approval)
+                  </button>
+                ) : (
+                  <form
+                    action={requestExtensionAction}
+                    className="mt-2 flex flex-wrap items-end gap-2 rounded-md border border-brand-500/30 bg-brand-50 p-2 dark:bg-brand-500/10"
+                  >
+                    <input type="hidden" name="taskId" value={taskId} />
+                    <div>
+                      <label className="mb-1 block text-[11px] font-medium text-zinc-500">Proposed new due date</label>
+                      <input name="proposedDueDate" type="date" required min={taskEnd ?? undefined} className={inputClass} />
+                    </div>
+                    <div className="min-w-40 flex-1">
+                      <label className="mb-1 block text-[11px] font-medium text-zinc-500">Reason</label>
+                      <input name="reason" placeholder="e.g. rain delays, material lead-time" className={`${inputClass} w-full`} />
+                    </div>
+                    <SubmitButton variant="secondary" pendingText="Sending…">
+                      Request
+                    </SubmitButton>
+                    <button type="button" onClick={() => setExtensionOpen(false)} className="pb-1 text-sm text-zinc-500 hover:underline">
+                      Cancel
+                    </button>
+                    <div className="w-full"><FormError error={extErr.error} /></div>
+                  </form>
+                ))}
+
+              {extensionPreStart && extensionRequests.length === 0 && (
+                <p className="mt-2 text-[11px] text-zinc-400">You can request an extension once the task is underway.</p>
+              )}
+            </div>
+          )}
         </>
       )}
 
       {usesPlanFlow && (planDraft || planPending || planLocked) && (
         <DocAttach taskId={taskId} projectId={projectId} orgId={orgId} docs={planDocs} canEdit={isAssignee} />
+      )}
+
+      {/* Files attached at submit / blocker time — kept visible here now that the
+          Evidence tab is gone. Retrievable by the assignee and the PM/admin. */}
+      {completionMedia.length > 0 && (
+        <div className="mt-4 border-t border-zinc-100 pt-3 dark:border-zinc-800">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">Attachments</p>
+          <ul className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {completionMedia.map((m) => (
+              <li key={m.id} className="relative overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800">
+                {m.kind === 'photo' && m.url ? (
+                  <a href={m.url} target="_blank" rel="noreferrer">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={m.url} alt={m.caption ?? 'Attachment'} className="h-20 w-full object-cover" />
+                  </a>
+                ) : (
+                  <a
+                    href={m.url ?? '#'}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex h-20 w-full items-center justify-center bg-zinc-50 px-1 text-center text-[11px] text-brand-500 underline dark:bg-zinc-900"
+                  >
+                    {m.kind === 'video' ? '▶ Video' : 'View file'}
+                  </a>
+                )}
+                {(isAssignee || canManage) && (
+                  <form action={removeTaskMedia} className="absolute right-1 top-1">
+                    <input type="hidden" name="taskId" value={taskId} />
+                    <input type="hidden" name="mediaId" value={m.id} />
+                    <button
+                      type="submit"
+                      title="Remove"
+                      className="flex h-5 w-5 items-center justify-center rounded-full bg-black/50 text-[10px] text-white hover:bg-black/70"
+                    >
+                      ✕
+                    </button>
+                  </form>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {/* ── Commenced work: submit for sign-off / raise a blocker ── */}
@@ -818,16 +943,18 @@ export function SubtaskPanel({
                 placeholder="What was completed?"
                 className="w-full resize-none rounded-t-lg bg-transparent px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-zinc-100"
               />
-              <div className="flex items-center gap-2 border-t border-zinc-100 px-2 py-1.5 dark:border-zinc-800">
+              <div className="flex items-center justify-between border-t border-zinc-100 px-1.5 py-1 dark:border-zinc-800">
                 <MediaUploader
                   taskId={taskId}
                   projectId={projectId}
                   orgId={orgId}
                   purpose="completion"
                   accept="image/*,video/*,.pdf,.xls,.xlsx,.csv"
-                  label="📎 Attach (optional)"
+                  compact
+                  glyph="📎"
+                  label="Attach a photo, PDF or Excel (optional)"
                 />
-                <span className="text-[11px] text-zinc-400">Photo, PDF or Excel — shows in Evidence</span>
+                <span className="pr-1 text-[10.5px] text-zinc-400">optional</span>
               </div>
             </div>
             <label className="flex items-center gap-2 text-[13.5px] text-zinc-700 dark:text-zinc-200">
@@ -870,16 +997,17 @@ export function SubtaskPanel({
                 placeholder="What's blocking you?"
                 className="w-full resize-none rounded-t-lg bg-transparent px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-zinc-100"
               />
-              <div className="flex items-center gap-2 border-t border-zinc-100 px-2 py-1.5 dark:border-zinc-800">
+              <div className="flex items-center border-t border-zinc-100 px-1.5 py-1 dark:border-zinc-800">
                 <MediaUploader
                   taskId={taskId}
                   projectId={projectId}
                   orgId={orgId}
                   purpose="completion"
                   accept="image/*,video/*,.pdf,.xls,.xlsx,.csv"
-                  label="📎 Attach (optional)"
+                  compact
+                  glyph="📎"
+                  label="Attach a photo, PDF or Excel (optional)"
                 />
-                <span className="text-[11px] text-zinc-400">Photo, PDF or Excel — shows in Evidence</span>
               </div>
             </div>
             <div className="flex justify-end gap-2.5 pt-1">

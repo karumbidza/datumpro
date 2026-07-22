@@ -23,8 +23,6 @@ import { SubtaskPanel } from '@/components/task/subtask-panel';
 import { listSubtasks } from '@/lib/data/subtasks';
 import { PaymentsPanel } from '@/components/task/payments-panel';
 import { ChatPanel } from '@/components/chat/chat-panel';
-import { CompletionEvidence } from '@/components/task/completion-evidence';
-import { ExtensionPanel } from '@/components/task/extension-panel';
 import { stepsByEntity } from '@/lib/data/approvals';
 import { LiveRefresh } from '@/components/live-refresh';
 import { TaskTabs, type TaskTab } from '@/components/task/task-tabs';
@@ -152,8 +150,6 @@ export default async function TaskDetailPage({
   const myInvite = tenderInvites.find((i) => i.contractorId === user.id);
   const isBidder =
     !canManage && task.assignee_id !== user.id && !!myInvite && (myInvite.status === 'invited' || myInvite.status === 'submitted');
-  // Completion evidence is the assignee's to upload, at completion time only.
-  const canUpload = isAssignee && task.status !== 'done';
   // Out to tender: no assignee yet, bids still open. Drives the "Open for bidding"
   // labelling so contractors know it's a tender, not an idle unassigned task.
   const isTendering = !task.assignee_id && tenderInvites.some((i) => i.status === 'invited' || i.status === 'submitted');
@@ -362,42 +358,8 @@ export default async function TaskDetailPage({
     });
   }
 
-  // Evidence is the assignee's to upload at completion. Managers only see the tab
-  // once there's evidence to review at sign-off — never during tender/planning.
-  if (isAssignee || (canManage && completionMedia.length > 0)) {
-    tabs.push({
-      key: 'evidence',
-      label: 'Evidence',
-      count: completionMedia.length,
-      content: (
-        <CompletionEvidence
-          taskId={taskId}
-          projectId={projectId}
-          orgId={task.org_id}
-          media={completionMedia}
-          canUpload={canUpload}
-          canManage={canManage}
-        />
-      ),
-    });
-  }
-
-  tabs.push({
-    key: 'extensions',
-    label: 'Extensions',
-    count: extensions.length,
-    content: (
-      <ExtensionPanel
-        taskId={taskId}
-        projectId={projectId}
-        canRequest={canRequestExtension}
-        preStart={extensionPreStart}
-        requests={extensions}
-        stepsByExt={Object.fromEntries(extSteps)}
-        viewerRole={orgRole ?? ''}
-      />
-    ),
-  });
+  // Extensions and completion attachments now live inside the task plan panel
+  // (next to variations), so there are no separate Extensions / Evidence tabs.
 
   if (activity.length > 0) {
     tabs.push({
@@ -521,6 +483,11 @@ export default async function TaskDetailPage({
             viewerRole={orgRole ?? ''}
             planDocs={planDocs}
             blockedByDeps={blockedByDeps}
+            extensionRequests={extensions}
+            extensionSteps={Object.fromEntries(extSteps)}
+            canRequestExtension={canRequestExtension}
+            extensionPreStart={extensionPreStart}
+            completionMedia={completionMedia}
           />
         </div>
       )}
