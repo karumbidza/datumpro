@@ -39,9 +39,10 @@ export async function uploadTaskDocument(params: {
 }): Promise<void> {
   const user = await currentUser();
   if (!user) throw new Error('Not signed in');
-  const path = `${params.orgId}/${params.projectId}/tasks/${params.taskId}/docs/${Date.now()}-${Math.random().toString(36).slice(2)}.pdf`;
+  const ext = (params.filename.includes('.') ? params.filename.split('.').pop() : 'bin')!.toLowerCase().slice(0, 8);
+  const path = `${params.orgId}/${params.projectId}/tasks/${params.taskId}/docs/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
   const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, decode(params.base64), {
-    contentType: params.mime || 'application/pdf',
+    contentType: params.mime || 'application/octet-stream',
     upsert: false,
   });
   if (upErr) throw new Error(upErr.message);

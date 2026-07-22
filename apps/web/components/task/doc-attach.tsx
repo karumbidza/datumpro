@@ -38,10 +38,11 @@ export function DocAttach({
     setError(null);
     try {
       const supabase = createClient();
-      const path = `${orgId}/${projectId}/tasks/${taskId}/docs/${crypto.randomUUID()}.pdf`;
+      const ext = (file.name.includes('.') ? file.name.split('.').pop() : 'bin')!.toLowerCase().slice(0, 8);
+      const path = `${orgId}/${projectId}/tasks/${taskId}/docs/${crypto.randomUUID()}.${ext}`;
       const { error: upErr } = await supabase.storage
         .from(BUCKET)
-        .upload(path, file, { upsert: false, contentType: file.type || 'application/pdf' });
+        .upload(path, file, { upsert: false, contentType: file.type || 'application/octet-stream' });
       if (upErr) throw upErr;
       const fd = new FormData();
       fd.set('taskId', taskId);
@@ -61,7 +62,7 @@ export function DocAttach({
 
   return (
     <div className="mt-3 border-t border-zinc-100 pt-3 dark:border-zinc-800">
-      <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-zinc-400">BoQ / invoice (PDF)</p>
+      <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-zinc-400">BoQ / invoice (PDF, Excel, CSV)</p>
       {docs.length > 0 && (
         <ul className="mb-2 space-y-1">
           {docs.map((d) => (
@@ -95,8 +96,14 @@ export function DocAttach({
             busy ? 'pointer-events-none opacity-60' : ''
           }`}
         >
-          <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={onChange} disabled={busy} />
-          {busy ? 'Uploading…' : docs.length > 0 ? 'Attach another PDF' : 'Attach BoQ / invoice PDF'}
+          <input
+            type="file"
+            accept=".pdf,.xls,.xlsx,.csv,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+            className="hidden"
+            onChange={onChange}
+            disabled={busy}
+          />
+          {busy ? 'Uploading…' : docs.length > 0 ? 'Attach another file' : 'Attach BoQ / invoice'}
         </label>
       )}
       {!canEdit && docs.length === 0 && <p className="text-sm text-zinc-400">No documents attached.</p>}

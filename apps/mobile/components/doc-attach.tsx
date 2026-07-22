@@ -30,7 +30,16 @@ export function DocAttach({
   const [busy, setBusy] = useState(false);
 
   async function pick() {
-    const res = await DocumentPicker.getDocumentAsync({ type: ['application/pdf'], copyToCacheDirectory: true });
+    const res = await DocumentPicker.getDocumentAsync({
+      type: [
+        'application/pdf',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'text/csv',
+        'text/comma-separated-values',
+      ],
+      copyToCacheDirectory: true,
+    });
     const a = res.canceled ? null : res.assets[0];
     if (!a) return;
     setBusy(true);
@@ -42,7 +51,7 @@ export function DocAttach({
         projectId,
         base64,
         filename: a.name,
-        mime: a.mimeType ?? 'application/pdf',
+        mime: a.mimeType ?? 'application/octet-stream',
         bid,
       });
       onChanged();
@@ -67,7 +76,7 @@ export function DocAttach({
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.label}>BoQ / invoice (PDF)</Text>
+      <Text style={styles.label}>BoQ / invoice (PDF, Excel, CSV)</Text>
       {docs.map((d) => (
         <View key={d.id} style={styles.row}>
           <Pressable style={styles.docLink} onPress={() => d.url && Linking.openURL(d.url)}>
@@ -88,7 +97,7 @@ export function DocAttach({
           ) : (
             <>
               <Ionicons name="attach-outline" size={16} color={colors.brand} />
-              <Text style={styles.attachText}>{docs.length > 0 ? 'Attach another PDF' : 'Attach BoQ / invoice PDF'}</Text>
+              <Text style={styles.attachText}>{docs.length > 0 ? 'Attach another file' : 'Attach BoQ / invoice'}</Text>
             </>
           )}
         </Pressable>
