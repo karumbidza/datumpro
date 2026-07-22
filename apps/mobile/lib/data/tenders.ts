@@ -39,7 +39,7 @@ export async function uploadTaskDocument(params: {
 }): Promise<void> {
   const user = await currentUser();
   if (!user) throw new Error('Not signed in');
-  const path = `${params.orgId}/${params.projectId}/tasks/${params.taskId}/${Date.now()}-${Math.random().toString(36).slice(2)}.pdf`;
+  const path = `${params.orgId}/${params.projectId}/tasks/${params.taskId}/docs/${Date.now()}-${Math.random().toString(36).slice(2)}.pdf`;
   const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, decode(params.base64), {
     contentType: params.mime || 'application/pdf',
     upsert: false,
@@ -59,8 +59,11 @@ export async function uploadTaskDocument(params: {
 }
 
 export async function removeTaskDocument(id: string): Promise<void> {
+  const { data: doc } = await supabase.from('task_documents').select('path').eq('id', id).maybeSingle();
   const { error } = await supabase.from('task_documents').delete().eq('id', id);
   if (error) throw new Error(error.message);
+  const path = (doc as { path: string } | null)?.path;
+  if (path) await supabase.storage.from(BUCKET).remove([path]); // drop the object too
 }
 
 export interface MyTenderInvite {

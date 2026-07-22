@@ -38,7 +38,7 @@ export function DocAttach({
     setError(null);
     try {
       const supabase = createClient();
-      const path = `${orgId}/${projectId}/tasks/${taskId}/${crypto.randomUUID()}.pdf`;
+      const path = `${orgId}/${projectId}/tasks/${taskId}/docs/${crypto.randomUUID()}.pdf`;
       const { error: upErr } = await supabase.storage
         .from(BUCKET)
         .upload(path, file, { upsert: false, contentType: file.type || 'application/pdf' });

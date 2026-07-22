@@ -534,7 +534,10 @@ export async function removeTaskDocument(formData: FormData) {
   const id = String(formData.get('id') ?? '');
   const taskId = String(formData.get('taskId') ?? '');
   const projectId = String(formData.get('projectId') ?? '');
+  const { data: doc } = await supabase.from('task_documents').select('path').eq('id', id).maybeSingle();
   await supabase.from('task_documents').delete().eq('id', id);
+  const path = (doc as { path: string } | null)?.path;
+  if (path) await supabase.storage.from('project-media').remove([path]); // drop the object too
   revalidatePath(`/projects/${projectId}/tasks/${taskId}`);
 }
 
@@ -1080,7 +1083,18 @@ export async function withdrawTenderInvite(formData: FormData) {
     .maybeSingle();
   const cid = (inv as { contractor_id: string } | null)?.contractor_id;
   await supabase.from('task_tender_invites').delete().eq('id', inviteId);
-  if (cid) await supabase.from('task_subtasks').delete().eq('task_id', taskId).eq('bid_contractor_id', cid);
+  if (cid) {
+    await supabase.from('task_subtasks').delete().eq('task_id', taskId).eq('bid_contractor_id', cid);
+    // Drop the withdrawn bidder's BoQ objects, then their rows.
+    const { data: docs } = await supabase
+      .from('task_documents')
+      .select('path')
+      .eq('task_id', taskId)
+      .eq('bid_contractor_id', cid);
+    const paths = ((docs ?? []) as { path: string }[]).map((d) => d.path);
+    if (paths.length > 0) await supabase.storage.from('project-media').remove(paths);
+    await supabase.from('task_documents').delete().eq('task_id', taskId).eq('bid_contractor_id', cid);
+  }
   revalidatePath(`/projects/${projectId}/tasks/${taskId}`);
 }
 
@@ -1095,6 +1109,16 @@ export async function awardTender(formData: FormData) {
   // Enrol the winner (assignee-is-a-member rule) before the atomic DB award.
   const enrolErr = await ensureProjectMember(supabase, task.org_id, task.project_id, winnerId);
   if (enrolErr) throw new Error(enrolErr);
+  // Drop losing bidders' BoQ objects before the RPC clears their rows (else the
+  // storage files are orphaned). The PM can delete them (project manager).
+  const { data: loserDocs } = await supabase
+    .from('task_documents')
+    .select('path')
+    .eq('task_id', taskId)
+    .not('bid_contractor_id', 'is', null)
+    .neq('bid_contractor_id', winnerId);
+  const loserPaths = ((loserDocs ?? []) as { path: string }[]).map((d) => d.path);
+  if (loserPaths.length > 0) await supabase.storage.from('project-media').remove(loserPaths);
   const { error } = await supabase.rpc('award_tender', { p_task_id: taskId, p_winner: winnerId });
   if (error) throw new Error(error.message);
   await logActivity(supabase, task, user.id, 'tender', 'Awarded the tender');
