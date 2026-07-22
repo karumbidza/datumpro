@@ -40,30 +40,44 @@ export interface PortfolioData {
 const ALL_STATUSES: ProjectStatus[] = ['planning', 'active', 'on_hold', 'completed', 'archived'];
 
 /** Portfolio-level aggregates for the company home. RLS scopes everything to what
- *  the viewer may see; no task cost is read, so it's confidentiality-safe. */
-export async function getPortfolioData(orgId: string): Promise<PortfolioData> {
+ *  the viewer may see; no task cost is read, so it's confidentiality-safe.
+ *
+ *  Pass `scopeIds` to narrow every aggregate to a specific set of projects — the
+ *  delivery (PM) home reuses this scoped to the projects that PM runs. Omit it (or
+ *  pass null) for the whole org. An empty array yields all-zero KPIs. */
+export async function getPortfolioData(
+  orgId: string,
+  scopeIds?: string[] | null,
+): Promise<PortfolioData> {
   const supabase = await createClient();
 
-  const [projectsRes, reportsRes, tasksRes] = await Promise.all([
-    supabase
-      .from('projects')
-      .select('id, name, client_name, status, type, created_at')
-      .eq('org_id', orgId)
-      .order('created_at', { ascending: false }),
-    supabase
-      .from('site_reports')
-      .select('project_id, report_date, progress_pct')
-      .eq('org_id', orgId)
-      .order('report_date', { ascending: true }),
-    supabase
-      .from('tasks')
-      .select('id, title, project_id, priority, due_date, assignee_id, status')
-      .eq('org_id', orgId)
-      .not('due_date', 'is', null)
-      .neq('status', 'done')
-      .order('due_date', { ascending: true })
-      .limit(8),
-  ]);
+  let projectsQ = supabase
+    .from('projects')
+    .select('id, name, client_name, status, type, created_at')
+    .eq('org_id', orgId)
+    .order('created_at', { ascending: false });
+  let reportsQ = supabase
+    .from('site_reports')
+    .select('project_id, report_date, progress_pct')
+    .eq('org_id', orgId)
+    .order('report_date', { ascending: true });
+  let tasksQ = supabase
+    .from('tasks')
+    .select('id, title, project_id, priority, due_date, assignee_id, status')
+    .eq('org_id', orgId)
+    .not('due_date', 'is', null)
+    .neq('status', 'done')
+    .order('due_date', { ascending: true })
+    .limit(8);
+
+  // Scoped delivery home: constrain to the caller's managed projects.
+  if (scopeIds) {
+    projectsQ = projectsQ.in('id', scopeIds);
+    reportsQ = reportsQ.in('project_id', scopeIds);
+    tasksQ = tasksQ.in('project_id', scopeIds);
+  }
+
+  const [projectsRes, reportsRes, tasksRes] = await Promise.all([projectsQ, reportsQ, tasksQ]);
 
   const projects = (projectsRes.data ?? []) as {
     id: string;

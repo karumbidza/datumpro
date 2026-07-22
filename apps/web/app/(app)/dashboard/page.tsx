@@ -11,6 +11,7 @@ import {
   listPendingApprovals,
   listMyOpenTasks,
   listManagedProjects,
+  getDeliveryData,
 } from '@/lib/data/home';
 import { listMyPayments } from '@/lib/data/payments';
 import { TimelineOverview } from '@/components/dashboard/timeline-overview';
@@ -99,9 +100,10 @@ export default async function DashboardPage() {
 
   // ── Delivery cockpit — PM ─────────────────────────────────────────────────
   if (persona === 'delivery') {
-    const [managed, myTasks] = await Promise.all([
+    const [managed, myTasks, delivery] = await Promise.all([
       listManagedProjects(active.orgId, ctx.userId, active.role),
       listMyOpenTasks(ctx.userId),
+      getDeliveryData(active.orgId, ctx.userId, active.role),
     ]);
     return (
       <PageContainer width="5xl" className="space-y-6">
@@ -111,11 +113,13 @@ export default async function DashboardPage() {
           subtitle={`Your delivery overview · ${formatLongDate(new Date())}`}
           action={newProject}
         />
+        <KpiRow kpis={delivery.kpis} />
         {approvals.length > 0 && <ApprovalsInbox items={approvals} />}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <ManagedProjectsCard projects={managed} />
           <MyTasksCard tasks={myTasks} />
         </div>
+        <UpcomingTasksTable tasks={delivery.upcomingTasks} />
       </PageContainer>
     );
   }
