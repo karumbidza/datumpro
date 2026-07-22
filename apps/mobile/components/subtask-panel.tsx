@@ -126,7 +126,9 @@ export function SubtaskPanel({
   const canAddVariation = isAssignee && planLocked && taskStatus !== 'submitted' && taskStatus !== 'done';
   const [variationOpen, setVariationOpen] = useState(false);
 
-  const canTick = isAssignee && (planLocked || !usesPlanFlow);
+  // Start is the gate: steps become tickable only once the task is under way
+  // (mirrors web — press "Start task" in Actions to move todo → in_progress).
+  const canTick = isAssignee && taskStatus === 'in_progress' && (planLocked || !usesPlanFlow);
   const canHandBack =
     isAssignee && acceptanceStatus === 'accepted' && taskStatus !== 'submitted' && taskStatus !== 'done';
 

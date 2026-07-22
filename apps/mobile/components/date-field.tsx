@@ -37,7 +37,11 @@ export function DateField({
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
-  const minimumDate = min ? parseISO(min) : undefined;
+  // No backdating: the earliest selectable day is the later of `min` and today,
+  // so a start/end can't be set in the past (the DB enforces this too).
+  const today = toISO(new Date());
+  const effMin = min && min > today ? min : today;
+  const minimumDate = parseISO(effMin);
   const maximumDate = max ? parseISO(max) : undefined;
   // Seed the picker at the current value, else clamp today into the allowed window.
   const seed = value ? parseISO(value) : clampSeed(new Date(), minimumDate, maximumDate);

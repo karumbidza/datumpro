@@ -40,22 +40,11 @@ export async function startTask(taskId: string, orgId: string) {
 }
 
 /** in_progress → submitted (assignee). Evidence-gated when the task requires it. */
-export async function submitTask(params: {
-  taskId: string;
-  orgId: string;
-  notes: string;
-  requiresPhoto: boolean;
-}) {
+export async function submitTask(params: { taskId: string; orgId: string; notes: string }) {
   const notes = params.notes.trim();
   if (notes.length < 10) throw new Error('Describe what was completed (min 10 characters).');
-  if (params.requiresPhoto) {
-    const { count } = await supabase
-      .from('task_media')
-      .select('id', { count: 'exact', head: true })
-      .eq('task_id', params.taskId)
-      .eq('purpose', 'completion');
-    if ((count ?? 0) === 0) throw new Error('Attach at least one completion photo before submitting.');
-  }
+  // Evidence is optional — attaching a photo/doc is encouraged but never blocks
+  // submitting (some tasks are document deliverables, e.g. licences).
   // Plan gate: every item in the agreed scope (baseline + approved variations)
   // must be ticked first. Pending/rejected variations don't block completion.
   const { data: subs } = await supabase

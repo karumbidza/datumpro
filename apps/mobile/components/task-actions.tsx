@@ -95,9 +95,7 @@ export function TaskActions({
             onChangeText={setNotes}
             multiline
           />
-          {task.requiresPhoto && (
-            <Text style={styles.hint}>A completion photo is required — add one above before submitting.</Text>
-          )}
+          <Text style={styles.hint}>Attach a photo or document above if you have one — it&apos;s optional.</Text>
           <Pressable style={styles.check} onPress={() => setDeclared((d) => !d)}>
             <Ionicons
               name={declared ? 'checkbox' : 'square-outline'}
@@ -113,9 +111,7 @@ export function TaskActions({
             <Pressable
               style={[styles.btn, styles.primary, (!declared || notes.trim().length < 10) && styles.disabled]}
               disabled={busy || !declared || notes.trim().length < 10}
-              onPress={() =>
-                run(() => submitTask({ taskId: task.id, orgId: task.orgId, notes, requiresPhoto: task.requiresPhoto }))
-              }
+              onPress={() => run(() => submitTask({ taskId: task.id, orgId: task.orgId, notes }))}
             >
               {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.primaryText}>Submit</Text>}
             </Pressable>
