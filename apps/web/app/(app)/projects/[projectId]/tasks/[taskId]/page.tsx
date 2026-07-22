@@ -29,13 +29,8 @@ import { TaskTabs, type TaskTab } from '@/components/task/task-tabs';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  approveTask,
-  rejectTask,
-  resolveBlocker,
-  addDependency,
-  removeDependency,
-} from '../actions';
+import { resolveBlocker, addDependency, removeDependency } from '../actions';
+import { ReviewSubmission } from '@/components/task/review-submission';
 
 const inputClass =
   'w-full rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
@@ -171,20 +166,7 @@ export default async function TaskDetailPage({
     !isBidder &&
     (task.status === 'submitted' || task.status === 'blocked') ? (
       <div className="mt-4 space-y-4">
-        {task.status === 'submitted' && (
-          <Card>
-            <CardTitle>Review submission</CardTitle>
-            <form action={approveTask} className="mt-3">
-              <input type="hidden" name="taskId" value={taskId} />
-              <Button type="submit">Approve (mark done)</Button>
-            </form>
-            <form action={rejectTask} className="mt-3 space-y-2 border-t border-zinc-100 pt-3 dark:border-zinc-800">
-              <input type="hidden" name="taskId" value={taskId} />
-              <textarea name="reason" rows={2} required placeholder="Reason for sending back" className={inputClass} />
-              <Button type="submit" variant="secondary">Reject</Button>
-            </form>
-          </Card>
-        )}
+        {task.status === 'submitted' && <ReviewSubmission taskId={taskId} />}
 
         {task.status === 'blocked' && (
           <form action={resolveBlocker}>
