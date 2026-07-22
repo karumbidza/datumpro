@@ -4,19 +4,19 @@ import type { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveContext } from '@/lib/data/org';
-import { getPortfolioTimeline } from '@/lib/data/dashboard';
+import { getPortfolioTimeline, getDashboardData } from '@/lib/data/dashboard';
 import { getPortfolioData } from '@/lib/data/portfolio';
 import {
   homePersona,
   listPendingApprovals,
   listMyOpenTasks,
   listManagedProjects,
-  getDeliveryData,
 } from '@/lib/data/home';
 import { listMyPayments } from '@/lib/data/payments';
 import { TimelineOverview } from '@/components/dashboard/timeline-overview';
 import { KpiRow } from '@/components/dashboard/kpi-row';
 import { UpcomingTasksTable } from '@/components/dashboard/portfolio-tables';
+import { DeliveryFocus } from '@/components/dashboard/delivery-focus';
 import { ApprovalsInbox } from '@/components/dashboard/approvals-inbox';
 import { MyTasksCard } from '@/components/dashboard/my-tasks-card';
 import { ManagedProjectsCard } from '@/components/dashboard/managed-projects-card';
@@ -100,11 +100,21 @@ export default async function DashboardPage() {
 
   // ── Delivery cockpit — PM ─────────────────────────────────────────────────
   if (persona === 'delivery') {
-    const [managed, myTasks, delivery] = await Promise.all([
+    const [managed, myTasks, dash] = await Promise.all([
       listManagedProjects(active.orgId, ctx.userId, active.role),
       listMyOpenTasks(ctx.userId),
-      getDeliveryData(active.orgId, ctx.userId, active.role),
+      getDashboardData(active.orgId),
     ]);
+    // Task-level timeline + action counts, scoped to the projects this PM runs.
+    const managedIds = new Set(managed.map((m) => m.id));
+    const timelineTasks = dash.tasks.filter((t) => managedIds.has(t.project_id));
+    const now = Date.now();
+    const blockers = timelineTasks.filter((t) => t.status === 'blocked' || t.sla_status === 'blocked').length;
+    const overdue = timelineTasks.filter(
+      (t) =>
+        t.status !== 'done' &&
+        ((t.due_date && new Date(t.due_date).getTime() < now) || t.sla_status === 'breached'),
+    ).length;
     return (
       <PageContainer width="5xl" className="space-y-6">
         {live}
@@ -113,13 +123,18 @@ export default async function DashboardPage() {
           subtitle={`Your delivery overview · ${formatLongDate(new Date())}`}
           action={newProject}
         />
-        <KpiRow kpis={delivery.kpis} />
-        {approvals.length > 0 && <ApprovalsInbox items={approvals} />}
+        <DeliveryFocus
+          awaitingApproval={approvals.length}
+          blockers={blockers}
+          overdue={overdue}
+          openRequests={dash.counts.openRequests}
+        />
+        <ApprovalsInbox items={approvals} />
+        <TimelineOverview tasks={timelineTasks} unit="task" />
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <ManagedProjectsCard projects={managed} />
           <MyTasksCard tasks={myTasks} />
         </div>
-        <UpcomingTasksTable tasks={delivery.upcomingTasks} />
       </PageContainer>
     );
   }

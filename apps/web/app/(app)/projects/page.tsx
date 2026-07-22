@@ -4,10 +4,8 @@ import { redirect } from 'next/navigation';
 import { can } from '@datumpro/shared/access';
 import { listProjectsOverview } from '@/lib/data/projects-overview';
 import { getActiveContext, getAuthUser } from '@/lib/data/org';
-import { getPortfolioTimeline } from '@/lib/data/dashboard';
 import { Button } from '@/components/ui/button';
 import { ProjectOverviewCard } from '@/components/projects/project-overview-card';
-import { TimelineOverview } from '@/components/dashboard/timeline-overview';
 
 export default async function ProjectsPage() {
   const user = await getAuthUser();
@@ -15,7 +13,6 @@ export default async function ProjectsPage() {
 
   const [projects, ctx] = await Promise.all([listProjectsOverview(), getActiveContext()]);
   const canCreate = ctx?.active ? can(ctx.active.role, 'project:create') : false;
-  const projectTimeline = ctx?.active ? await getPortfolioTimeline(ctx.active.orgId) : [];
 
   const totalTasks = projects.reduce((s, p) => s + p.totalTasks, 0);
   const doneTasks = projects.reduce((s, p) => s + p.doneTasks, 0);
@@ -44,16 +41,11 @@ export default async function ProjectsPage() {
           No projects yet — create your first one.
         </p>
       ) : (
-        <>
-          <div className="mt-6">
-            <TimelineOverview tasks={projectTimeline} unit="project" />
-          </div>
-          <div className="mt-6 flex flex-col gap-2">
-            {projects.map((p) => (
-              <ProjectOverviewCard key={p.id} project={p} />
-            ))}
-          </div>
-        </>
+        <div className="mt-6 flex flex-col gap-2">
+          {projects.map((p) => (
+            <ProjectOverviewCard key={p.id} project={p} />
+          ))}
+        </div>
       )}
     </PageContainer>
   );

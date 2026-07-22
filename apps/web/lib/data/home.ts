@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import type { OrgRole } from '@datumpro/shared/access';
 import { formatUsd } from '@datumpro/shared/domain';
-import { getPortfolioData, type PortfolioData } from '@/lib/data/portfolio';
 
 /** Which home a role lands on. Money/company roles get the portfolio; a PM gets
  *  a delivery cockpit; everyone else gets their own work. The approvals inbox is
@@ -211,30 +210,6 @@ export async function listMyOpenTasks(userId: string): Promise<MyTaskItem[]> {
     dueDate: r.due_date,
     slaStatus: r.sla_status,
   }));
-}
-
-/** Portfolio-style aggregates (KPIs + upcoming tasks) for the delivery home,
- *  scoped to the projects the caller runs. Owner/admin get the whole org (same
- *  numbers as the portfolio home); a PM gets just their projects; a PM with no
- *  projects gets zeros. Reuses getPortfolioData so the two homes stay in sync. */
-export async function getDeliveryData(
-  orgId: string,
-  userId: string,
-  role: OrgRole,
-): Promise<PortfolioData> {
-  const supabase = await createClient();
-  const managed = await managedProjectIds(supabase, userId, role);
-  if (managed === 'all') return getPortfolioData(orgId);
-  if (managed.length === 0) {
-    return {
-      kpis: { total: 0, active: 0, onHold: 0, completed: 0, planning: 0, overallProgressPct: 0 },
-      statusDistribution: [],
-      recentProjects: [],
-      upcomingTasks: [],
-      progressSeries: [],
-    };
-  }
-  return getPortfolioData(orgId, managed);
 }
 
 export interface ManagedProject {

@@ -43,6 +43,17 @@ function href(item: PendingApproval): string {
 export function ApprovalsInbox({ items }: { items: PendingApproval[] }) {
   const [expanded, setExpanded] = useState<number | null>(0);
 
+  if (items.length === 0) {
+    return (
+      <Card>
+        <CardTitle>Awaiting your approval</CardTitle>
+        <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+          You&apos;re all caught up — nothing needs your approval right now.
+        </p>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <div className="flex items-center justify-between gap-3">
