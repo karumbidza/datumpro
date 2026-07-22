@@ -19,7 +19,6 @@ import { UpcomingTasksTable } from '@/components/dashboard/portfolio-tables';
 import { DeliveryFocus } from '@/components/dashboard/delivery-focus';
 import { ApprovalsInbox } from '@/components/dashboard/approvals-inbox';
 import { MyTasksCard } from '@/components/dashboard/my-tasks-card';
-import { ManagedProjectsCard } from '@/components/dashboard/managed-projects-card';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LiveRefresh } from '@/components/live-refresh';
@@ -100,9 +99,8 @@ export default async function DashboardPage() {
 
   // ── Delivery cockpit — PM ─────────────────────────────────────────────────
   if (persona === 'delivery') {
-    const [managed, myTasks, dash] = await Promise.all([
+    const [managed, dash] = await Promise.all([
       listManagedProjects(active.orgId, ctx.userId, active.role),
-      listMyOpenTasks(ctx.userId),
       getDashboardData(active.orgId),
     ]);
     // Task-level timeline + action counts, scoped to the projects this PM runs.
@@ -124,17 +122,12 @@ export default async function DashboardPage() {
           action={newProject}
         />
         <DeliveryFocus
-          awaitingApproval={approvals.length}
+          approvals={approvals}
           blockers={blockers}
           overdue={overdue}
           openRequests={dash.counts.openRequests}
         />
-        <ApprovalsInbox items={approvals} />
         <TimelineOverview tasks={timelineTasks} unit="task" />
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <ManagedProjectsCard projects={managed} />
-          <MyTasksCard tasks={myTasks} />
-        </div>
       </PageContainer>
     );
   }

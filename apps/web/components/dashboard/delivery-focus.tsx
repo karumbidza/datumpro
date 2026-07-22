@@ -1,67 +1,88 @@
+'use client';
+
+import { useState } from 'react';
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
-
-interface Cell {
-  label: string;
-  value: number;
-  tone: 'amber' | 'red' | 'zinc';
-  href?: string;
-}
+import { ChevronRight } from '@/components/icons';
+import { ApprovalsInbox } from './approvals-inbox';
+import type { PendingApproval } from '@/lib/data/home';
 
 const cellCls =
-  'block px-5 py-4 [&:not(:last-child)]:border-r [&:not(:last-child)]:border-zinc-100 dark:[&:not(:last-child)]:border-zinc-800';
+  'block px-5 py-4 text-left [&:not(:last-child)]:border-r [&:not(:last-child)]:border-zinc-100 dark:[&:not(:last-child)]:border-zinc-800';
 
-function color(tone: Cell['tone']): string {
+function color(tone: 'amber' | 'red' | 'zinc'): string {
   if (tone === 'red') return 'text-red-600 dark:text-red-400';
   if (tone === 'amber') return 'text-amber-600 dark:text-amber-400';
   return 'text-zinc-900 dark:text-white';
 }
 
-/** The project manager's action focus — what needs a decision now, distinct from
- *  the portfolio's neutral project counts. Zero counts fade to neutral so a live
- *  number stands out. Open requests links straight to the requests queue. */
+/** The PM's action focus in one strip. "Awaiting approval" is the live control:
+ *  click it to expand the approvals queue inline — the count and the list are the
+ *  same thing, so there's no separate always-on card. Open requests deep-links to
+ *  the requests queue. */
 export function DeliveryFocus({
-  awaitingApproval,
+  approvals,
   blockers,
   overdue,
   openRequests,
 }: {
-  awaitingApproval: number;
+  approvals: PendingApproval[];
   blockers: number;
   overdue: number;
   openRequests: number;
 }) {
-  const cells: Cell[] = [
-    { label: 'Awaiting approval', value: awaitingApproval, tone: awaitingApproval > 0 ? 'amber' : 'zinc' },
-    { label: 'Blockers', value: blockers, tone: blockers > 0 ? 'red' : 'zinc' },
-    { label: 'Overdue', value: overdue, tone: overdue > 0 ? 'red' : 'zinc' },
-    { label: 'Open requests', value: openRequests, tone: openRequests > 0 ? 'amber' : 'zinc', href: '/requests' },
-  ];
+  const [open, setOpen] = useState(false);
+  const awaiting = approvals.length;
+
   return (
-    <Card className="p-0">
-      <div className="grid grid-cols-2 sm:grid-cols-4">
-        {cells.map((c) => {
-          const body = (
-            <>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">{c.label}</p>
-              <p className={`mt-1 text-2xl font-semibold tabular-nums ${color(c.tone)}`}>{c.value}</p>
-            </>
-          );
-          return c.href ? (
-            <Link
-              key={c.label}
-              href={c.href}
-              className={`${cellCls} transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900`}
-            >
-              {body}
-            </Link>
-          ) : (
-            <div key={c.label} className={cellCls}>
-              {body}
-            </div>
-          );
-        })}
-      </div>
-    </Card>
+    <div>
+      <Card className="p-0">
+        <div className="grid grid-cols-2 sm:grid-cols-4">
+          {/* Awaiting approval — toggles the queue below */}
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            className={`${cellCls} transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900 ${
+              open ? 'bg-zinc-50 dark:bg-zinc-900' : ''
+            }`}
+          >
+            <span className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+              Awaiting approval
+              <ChevronRight
+                size={13}
+                className={`text-zinc-400 transition-transform ${open ? 'rotate-90' : ''}`}
+              />
+            </span>
+            <span className={`mt-1 block text-2xl font-semibold tabular-nums ${color(awaiting > 0 ? 'amber' : 'zinc')}`}>
+              {awaiting}
+            </span>
+          </button>
+
+          <div className={cellCls}>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">Blockers</p>
+            <p className={`mt-1 text-2xl font-semibold tabular-nums ${color(blockers > 0 ? 'red' : 'zinc')}`}>{blockers}</p>
+          </div>
+
+          <div className={cellCls}>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">Overdue</p>
+            <p className={`mt-1 text-2xl font-semibold tabular-nums ${color(overdue > 0 ? 'red' : 'zinc')}`}>{overdue}</p>
+          </div>
+
+          <Link href="/requests" className={`${cellCls} transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900`}>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">Open requests</p>
+            <p className={`mt-1 text-2xl font-semibold tabular-nums ${color(openRequests > 0 ? 'amber' : 'zinc')}`}>
+              {openRequests}
+            </p>
+          </Link>
+        </div>
+      </Card>
+
+      {open && (
+        <div className="mt-4">
+          <ApprovalsInbox items={approvals} />
+        </div>
+      )}
+    </div>
   );
 }
