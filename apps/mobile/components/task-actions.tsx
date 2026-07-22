@@ -2,11 +2,11 @@ import { useMemo, useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { TaskDetail, TaskPermissions } from '../lib/data/tasks';
-import { startTask, submitTask, approveTask, rejectTask } from '../lib/data/task-actions';
+import { startTask, submitTask, approveTask, rejectTask, raiseBlocker } from '../lib/data/task-actions';
 import { radius, font, type Colors } from '../lib/theme';
 import { useTheme } from '../lib/theme-context';
 
-type Mode = 'none' | 'submit' | 'reject';
+type Mode = 'none' | 'submit' | 'reject' | 'blocker';
 
 export function TaskActions({
   task,
@@ -77,13 +77,42 @@ export function TaskActions({
         <Text style={styles.hint}>Add at least one step to your task plan before starting.</Text>
       )}
 
-      {canSubmit && mode !== 'submit' && planComplete && (
+      {canSubmit && mode === 'none' && planComplete && (
         <Pressable style={[styles.btn, styles.primary]} onPress={() => setMode('submit')}>
           <Text style={styles.primaryText}>Submit for review</Text>
         </Pressable>
       )}
-      {canSubmit && mode !== 'submit' && !planComplete && (
+      {canSubmit && mode === 'none' && !planComplete && (
         <Text style={styles.hint}>Complete every step in your task plan to submit for review.</Text>
+      )}
+      {canSubmit && mode === 'none' && (
+        <Pressable style={[styles.btn, styles.danger]} onPress={() => setMode('blocker')}>
+          <Text style={styles.primaryText}>Raise a blocker</Text>
+        </Pressable>
+      )}
+      {canSubmit && mode === 'blocker' && (
+        <View style={styles.form}>
+          <TextInput
+            style={styles.input}
+            placeholder="What's blocking you?"
+            placeholderTextColor={colors.subtle}
+            value={reason}
+            onChangeText={setReason}
+            multiline
+          />
+          <View style={styles.row}>
+            <Pressable style={[styles.btn, styles.ghost]} onPress={() => setMode('none')}>
+              <Text style={styles.ghostText}>Cancel</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.btn, styles.danger, !reason.trim() && styles.disabled]}
+              disabled={busy || !reason.trim()}
+              onPress={() => run(() => raiseBlocker(task.id, task.orgId, reason))}
+            >
+              {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.primaryText}>Raise blocker</Text>}
+            </Pressable>
+          </View>
+        </View>
       )}
       {canSubmit && mode === 'submit' && (
         <View style={styles.form}>

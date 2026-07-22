@@ -244,26 +244,8 @@ export default function TaskDetailScreen() {
         />
       )}
 
-      <Card>
-        <Field label="Priority" value={task.priority} />
-        <Field label="Due" value={formatDate(task.dueDate)} />
-        <Field label="Planned" value={`${formatDate(task.plannedStartDate)} → ${formatDate(task.plannedEndDate)}`} last />
-      </Card>
-
-      {task.description ? (
-        <Card>
-          <Text style={styles.blockLabel}>Description</Text>
-          <Text style={styles.body}>{task.description}</Text>
-        </Card>
-      ) : null}
-
-      {/* Evidence + extensions are for the assignee/managers, not tender bidders. */}
-      {!isBidder && (
-        <Card>
-          <TaskPhotos orgId={task.orgId} projectId={task.projectId} taskId={task.id} />
-        </Card>
-      )}
-
+      {/* Extensions + attachments sit with the work, mirroring web; details drop
+          to the bottom. All three are for the assignee/managers, not bidders. */}
       {!isBidder && perms && (
         <Card>
           <TaskExtensions
@@ -276,6 +258,25 @@ export default function TaskDetailScreen() {
           />
         </Card>
       )}
+
+      {!isBidder && (
+        <Card>
+          <TaskPhotos orgId={task.orgId} projectId={task.projectId} taskId={task.id} />
+        </Card>
+      )}
+
+      <Card>
+        <Field label="Priority" value={task.priority} />
+        <Field label="Due" value={formatDate(task.dueDate)} />
+        <Field label="Planned" value={`${formatDate(task.plannedStartDate)} → ${formatDate(task.plannedEndDate)}`} last />
+      </Card>
+
+      {task.description ? (
+        <Card>
+          <Text style={styles.blockLabel}>Description</Text>
+          <Text style={styles.body}>{task.description}</Text>
+        </Card>
+      ) : null}
     </ScrollView>
   );
 }

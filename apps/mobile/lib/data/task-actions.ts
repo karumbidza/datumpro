@@ -73,6 +73,28 @@ export async function submitTask(params: { taskId: string; orgId: string; notes:
   await logActivity(params.orgId, params.taskId, 'status', 'Submitted for sign-off');
 }
 
+/** in_progress → blocked (assignee). Pauses the SLA clock until a lead resolves
+ *  it; mirrors the web raiseBlocker. */
+export async function raiseBlocker(taskId: string, orgId: string, description: string) {
+  const desc = description.trim();
+  if (!desc) throw new Error('Describe the blocker.');
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from('tasks')
+    .update({
+      status: 'blocked',
+      sla_status: 'blocked',
+      blocker_raised_at: now,
+      blocker_raised_by: await meId(),
+      blocker_description: desc,
+      blocker_resolved_at: null,
+      sla_clock_paused_at: now,
+    })
+    .eq('id', taskId);
+  if (error) throw new Error(error.message);
+  await logActivity(orgId, taskId, 'blocker', `Blocker raised: ${desc}`);
+}
+
 /** submitted → done (project lead only; the DB guard enforces it). */
 export async function approveTask(params: { taskId: string; orgId: string; dueDate: string | null }) {
   const now = new Date();
