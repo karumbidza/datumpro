@@ -40,7 +40,12 @@ export default async function NewTaskPage({
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">New task</h1>
 
       <Card className="mt-6">
-        <NewTaskForm projectId={projectId} members={members} taskOptions={taskOptions} />
+        <NewTaskForm
+          projectId={projectId}
+          members={members}
+          taskOptions={taskOptions}
+          todayIso={new Date().toISOString().slice(0, 10)}
+        />
       </Card>
     </PageContainer>
   );

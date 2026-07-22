@@ -90,6 +90,7 @@ export function SubtaskPanel({
   canRequestExtension = false,
   extensionPreStart = false,
   completionMedia = [],
+  todayIso = '',
 }: {
   taskId: string;
   projectId: string;
@@ -123,6 +124,9 @@ export function SubtaskPanel({
   extensionPreStart?: boolean;
   /** Files attached at submit / blocker time (photos, PDFs, etc.). */
   completionMedia?: TaskMediaRow[];
+  /** Today (YYYY-MM-DD) from the server — floor for start-date pickers so a
+   *  start can't be backdated. */
+  todayIso?: string;
 }) {
   const [declineOpen, setDeclineOpen] = useState(false);
   const [handBackOpen, setHandBackOpen] = useState(false);
@@ -179,6 +183,9 @@ export function SubtaskPanel({
   const hasPendingExt = extensionRequests.some((r) => r.status === 'pending');
 
   const path = `/projects/${projectId}/tasks/${taskId}`;
+  // Earliest selectable start date: the later of today and the task's own start —
+  // a step can't begin before the task window and can't be backdated.
+  const startMin = [taskStart, todayIso].filter((d): d is string => !!d).sort().at(-1);
 
   // ── Acceptance decision — shown to the assignee while pending ──
   if (acceptanceStatus === 'pending' && isAssignee) {
@@ -321,7 +328,7 @@ export function SubtaskPanel({
               </div>
               <div>
                 <label className={stepLabel}>Start</label>
-                <input type="date" name="plannedStartDate" min={taskStart ?? undefined} max={taskEnd ?? undefined} className={`${field} w-full`} />
+                <input type="date" name="plannedStartDate" min={startMin} max={taskEnd ?? undefined} className={`${field} w-full`} />
               </div>
               <div>
                 <label className={stepLabel}>Cost ($)</label>
@@ -366,7 +373,7 @@ export function SubtaskPanel({
                       </div>
                       <div>
                         <label className={stepLabel}>Start</label>
-                        <input type="date" name="plannedStartDate" defaultValue={s.plannedStartDate ?? ''} min={taskStart ?? undefined} max={taskEnd ?? undefined} className={`${field} w-full`} />
+                        <input type="date" name="plannedStartDate" defaultValue={s.plannedStartDate ?? ''} min={startMin} max={taskEnd ?? undefined} className={`${field} w-full`} />
                       </div>
                       <div>
                         <label className={stepLabel}>Cost ($)</label>
@@ -505,10 +512,23 @@ export function SubtaskPanel({
                     >
                       ▶
                     </button>
-                    {s.isDone && (
-                      <span className="flex h-4 w-4 flex-none items-center justify-center rounded-full bg-green-500 text-[10px] text-white shadow-[0_0_0_3px_rgba(34,197,94,.18)]">
+                    {s.isDone ? (
+                      <span
+                        title="Completed"
+                        className="flex h-[18px] w-[18px] flex-none items-center justify-center rounded-full bg-green-500 text-[10px] text-white shadow-[0_0_0_3px_rgba(34,197,94,.18)]"
+                      >
                         ✓
                       </span>
+                    ) : canTick ? (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmStep(s)}
+                        title="Mark complete"
+                        aria-label={`Mark “${s.title}” complete`}
+                        className="flex h-[18px] w-[18px] flex-none rounded-full border-2 border-zinc-300 transition-colors hover:border-green-500 hover:bg-green-50 dark:border-zinc-600 dark:hover:bg-green-500/10"
+                      />
+                    ) : (
+                      <span className="h-[18px] w-[18px] flex-none rounded-full border-2 border-zinc-200 dark:border-zinc-700" />
                     )}
                     <span className={`flex-1 text-sm font-medium ${s.isDone ? 'text-zinc-500 line-through' : 'text-zinc-800 dark:text-zinc-100'}`}>
                       {s.title}
@@ -524,46 +544,39 @@ export function SubtaskPanel({
                   {open && (
                     <div className="border-t border-dashed border-zinc-200 py-3 pr-4 pl-11 dark:border-zinc-700">
                       {canTick ? (
-                        <div className="flex flex-col gap-3">
-                          <label
-                            className={`flex items-center gap-2.5 text-[13.5px] ${
-                              s.isDone ? 'cursor-default font-medium text-green-600 dark:text-green-400' : 'cursor-pointer text-zinc-700 dark:text-zinc-200'
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={s.isDone}
-                              disabled={s.isDone}
-                              onChange={() => {
-                                if (!s.isDone) setConfirmStep(s);
-                              }}
-                              className="h-[17px] w-[17px] accent-brand-600"
-                            />
-                            {s.isDone ? 'Completed' : 'Mark this step complete'}
-                          </label>
-                          <div>
-                            <div className={`${capsCls} mb-1.5`}>Proof of work</div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              {photos.map((m) =>
-                                m.url ? (
-                                  <a key={m.id} href={m.url} target="_blank" rel="noreferrer" title="Open photo">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={m.url} alt="Step evidence" className="h-[46px] w-[46px] rounded-md border border-zinc-200 object-cover dark:border-zinc-800" />
-                                  </a>
-                                ) : null,
-                              )}
-                              {!s.isDone && (
-                                <MediaUploader
-                                  taskId={taskId}
-                                  projectId={projectId}
-                                  orgId={orgId}
-                                  purpose="subtask"
-                                  subtaskId={s.id}
-                                  accept="image/*"
-                                  label="Attach proof"
-                                />
-                              )}
-                            </div>
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <div className={capsCls}>Proof of work</div>
+                            {!s.isDone && (
+                              <button
+                                type="button"
+                                onClick={() => setConfirmStep(s)}
+                                className="text-[12px] font-medium text-brand-600 hover:underline"
+                              >
+                                Mark complete
+                              </button>
+                            )}
+                          </div>
+                          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                            {photos.map((m) =>
+                              m.url ? (
+                                <a key={m.id} href={m.url} target="_blank" rel="noreferrer" title="Open photo">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={m.url} alt="Step evidence" className="h-[46px] w-[46px] rounded-md border border-zinc-200 object-cover dark:border-zinc-800" />
+                                </a>
+                              ) : null,
+                            )}
+                            {!s.isDone && (
+                              <MediaUploader
+                                taskId={taskId}
+                                projectId={projectId}
+                                orgId={orgId}
+                                purpose="subtask"
+                                subtaskId={s.id}
+                                accept="image/*"
+                                label="Attach proof"
+                              />
+                            )}
                           </div>
                         </div>
                       ) : (
@@ -618,11 +631,11 @@ export function SubtaskPanel({
               </div>
               <div>
                 <label className="mb-1 block text-[11px] font-medium text-zinc-500">Start</label>
-                <input type="date" name="plannedStartDate" min={taskStart ?? undefined} max={taskEnd ?? undefined} className={inputClass} />
+                <input type="date" name="plannedStartDate" min={startMin} max={taskEnd ?? undefined} className={inputClass} />
               </div>
               <div>
                 <label className="mb-1 block text-[11px] font-medium text-zinc-500">End</label>
-                <input type="date" name="plannedEndDate" min={taskStart ?? undefined} max={taskEnd ?? undefined} className={inputClass} />
+                <input type="date" name="plannedEndDate" min={startMin} max={taskEnd ?? undefined} className={inputClass} />
               </div>
               <SubmitButton variant="secondary" pendingText="Adding…">
                 Add step
@@ -789,7 +802,7 @@ export function SubtaskPanel({
                       </div>
                       <div>
                         <label className="mb-1 block text-[11px] font-medium text-zinc-500">Start</label>
-                        <input type="date" name="plannedStartDate" min={taskStart ?? undefined} max={taskEnd ?? undefined} className={`${inputClass} w-full`} />
+                        <input type="date" name="plannedStartDate" min={startMin} max={taskEnd ?? undefined} className={`${inputClass} w-full`} />
                       </div>
                       <div>
                         <label className="mb-1 block text-[11px] font-medium text-zinc-500">Cost ($)</label>

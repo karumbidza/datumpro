@@ -470,6 +470,7 @@ export default async function TaskDetailPage({
             canRequestExtension={canRequestExtension}
             extensionPreStart={extensionPreStart}
             completionMedia={completionMedia}
+            todayIso={new Date().toISOString().slice(0, 10)}
           />
         </div>
       )}

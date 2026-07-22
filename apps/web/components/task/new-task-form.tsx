@@ -21,10 +21,13 @@ export function NewTaskForm({
   projectId,
   members,
   taskOptions,
+  todayIso = '',
 }: {
   projectId: string;
   members: { userId: string; name: string; role: string }[];
   taskOptions: { id: string; title: string }[];
+  /** Today (YYYY-MM-DD) — floor for the start/end pickers (no backdating). */
+  todayIso?: string;
 }) {
   const [state, formAction] = useActionState(createTask, {});
   const [mode, setMode] = useState<Mode>('direct');
@@ -135,13 +138,13 @@ export function NewTaskForm({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="mb-1 block text-sm font-medium">Start</label>
-          <input type="date" name="plannedStartDate" className={inputClass} />
+          <input type="date" name="plannedStartDate" min={todayIso || undefined} className={inputClass} />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">
             End <span className="font-normal text-zinc-400">· due date</span>
           </label>
-          <input type="date" name="plannedEndDate" className={inputClass} />
+          <input type="date" name="plannedEndDate" min={todayIso || undefined} className={inputClass} />
         </div>
       </div>
 
