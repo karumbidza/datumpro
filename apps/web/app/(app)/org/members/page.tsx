@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { PageContainer } from '@/components/shell/page-container';
 import { redirect } from 'next/navigation';
 import { getActiveContext } from '@/lib/data/org';
 import { listProjects } from '@/lib/data/projects';
@@ -48,7 +49,7 @@ export default async function OrgMembersPage({
   const projects = projectRows.map((p) => ({ id: p.id, name: p.name }));
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-10">
+    <PageContainer width="3xl">
       <Link href="/org" className="text-xs text-zinc-500 hover:underline">
         ← Organization
       </Link>
@@ -141,6 +142,6 @@ export default async function OrgMembersPage({
         </h2>
         <MembersRoster orgId={orgId} members={members} projects={projects} meId={ctx.userId} isAdmin={isAdmin} />
       </section>
-    </main>
+    </PageContainer>
   );
 }

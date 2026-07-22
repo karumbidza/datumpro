@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { PageContainer } from '@/components/shell/page-container';
 import { redirect, notFound } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import {
@@ -436,7 +437,7 @@ export default async function TaskDetailPage({
   }
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-7">
+    <PageContainer width="4xl">
       <LiveRefresh
         subscriptions={[
           { table: 'task_subtasks', filter: `task_id=eq.${taskId}` },
@@ -554,7 +555,7 @@ export default async function TaskDetailPage({
       {workflowActions}
 
       <TaskTabs tabs={tabs} initialKey={initialTab} />
-    </main>
+    </PageContainer>
   );
 }
 

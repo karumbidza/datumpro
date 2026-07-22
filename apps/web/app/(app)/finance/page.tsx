@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { PageContainer } from '@/components/shell/page-container';
 import { redirect } from 'next/navigation';
 import { getActiveContext } from '@/lib/data/org';
 import { can } from '@datumpro/shared/access';
@@ -32,7 +33,7 @@ export default async function OrgFinancePage() {
   );
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
+    <PageContainer width="6xl">
       <Link href="/dashboard" className="text-xs text-zinc-500 hover:underline">
         ← Dashboard
       </Link>
@@ -162,6 +163,6 @@ export default async function OrgFinancePage() {
           </div>
         )}
       </section>
-    </main>
+    </PageContainer>
   );
 }

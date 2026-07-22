@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { PageContainer } from '@/components/shell/page-container';
 import { redirect, notFound } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { getTask } from '@/lib/data/tasks';
@@ -25,7 +26,7 @@ export default async function EditTaskPage({
   const members = await listProjectMembers(projectId);
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-10">
+    <PageContainer width="xl">
       <Link href={`/projects/${projectId}/tasks/${taskId}`} className="text-xs text-zinc-500 hover:underline">
         ← {task.title}
       </Link>
@@ -87,6 +88,6 @@ export default async function EditTaskPage({
           </div>
         </form>
       </Card>
-    </main>
+    </PageContainer>
   );
 }

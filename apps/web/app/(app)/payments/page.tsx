@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { PageContainer } from '@/components/shell/page-container';
 import { redirect } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { listMyPayments, type MyPaymentLine } from '@/lib/data/payments';
@@ -70,7 +71,7 @@ export default async function MyPaymentsPage() {
   }
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-10">
+    <PageContainer width="4xl">
       <LiveRefresh
         subscriptions={[{ table: 'contractor_payment_requests', filter: `contractor_id=eq.${user.id}` }]}
       />
@@ -284,6 +285,6 @@ export default async function MyPaymentsPage() {
           ))}
         </div>
       )}
-    </main>
+    </PageContainer>
   );
 }

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { PageContainer } from '@/components/shell/page-container';
 import { redirect } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { NewReportForm } from './new-report-form';
@@ -17,7 +18,7 @@ export default async function NewReportPage({
   const today = new Date().toISOString().slice(0, 10);
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-10">
+    <PageContainer width="xl">
       <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 hover:underline">
         ← Back to project
       </Link>
@@ -26,6 +27,6 @@ export default async function NewReportPage({
       <Card className="mt-6">
         <NewReportForm projectId={projectId} today={today} />
       </Card>
-    </main>
+    </PageContainer>
   );
 }

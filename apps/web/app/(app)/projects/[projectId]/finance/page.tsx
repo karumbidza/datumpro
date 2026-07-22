@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { PageContainer } from '@/components/shell/page-container';
 import { redirect, notFound } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { getProject } from '@/lib/data/projects';
@@ -52,7 +53,7 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
   const canManagePayments = can(role, 'payment:record') || projectRole === 'pm';
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-10">
+    <PageContainer width="5xl">
       <LiveRefresh
         subscriptions={[
           { table: 'contractor_payment_requests', filter: `project_id=eq.${projectId}` },
@@ -197,6 +198,6 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
           )}
         </Card>
       </section>
-    </main>
+    </PageContainer>
   );
 }

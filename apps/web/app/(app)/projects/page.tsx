@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { PageContainer } from '@/components/shell/page-container';
 import { redirect } from 'next/navigation';
 import { can } from '@datumpro/shared/access';
 import { listProjectsOverview } from '@/lib/data/projects-overview';
@@ -21,7 +22,7 @@ export default async function ProjectsPage() {
   const portfolioPct = totalTasks === 0 ? 0 : Math.round((doneTasks / totalTasks) * 100);
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-10">
+    <PageContainer width="5xl">
       <header className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
@@ -54,6 +55,6 @@ export default async function ProjectsPage() {
           </div>
         </>
       )}
-    </main>
+    </PageContainer>
   );
 }

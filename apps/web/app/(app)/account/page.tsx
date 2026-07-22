@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { PageContainer } from '@/components/shell/page-container';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveContext, getAuthUser } from '@/lib/data/org';
@@ -27,7 +28,7 @@ export default async function AccountPage() {
   } | null;
 
   return (
-    <main className="mx-auto max-w-lg px-6 py-10">
+    <PageContainer width="lg">
       <Link href="/dashboard" className="text-xs text-zinc-500 hover:underline">
         ← Dashboard
       </Link>
@@ -94,6 +95,6 @@ export default async function AccountPage() {
           Sign out
         </Button>
       </form>
-    </main>
+    </PageContainer>
   );
 }

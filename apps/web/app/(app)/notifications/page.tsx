@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { PageContainer } from '@/components/shell/page-container';
 import { redirect } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { listNotifications } from '@/lib/data/notifications';
@@ -24,7 +25,7 @@ export default async function NotificationsPage() {
   const items = await listNotifications(50);
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-10">
+    <PageContainer width="2xl">
       <LiveRefresh subscriptions={[{ table: 'notifications', filter: `user_id=eq.${user.id}` }]} />
       <MarkReadOnMount />
       <h1 className="text-2xl font-semibold tracking-tight">Notifications</h1>
@@ -66,6 +67,6 @@ export default async function NotificationsPage() {
           })}
         </ul>
       )}
-    </main>
+    </PageContainer>
   );
 }

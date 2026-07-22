@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { PageContainer } from '@/components/shell/page-container';
 import { redirect } from 'next/navigation';
 import { can } from '@datumpro/shared/access';
 import {
@@ -38,7 +39,7 @@ export default async function OrgDocumentsPage() {
   const pending = docs.filter((d) => d.status === 'submitted').length;
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-10">
+    <PageContainer width="3xl">
       <Link href="/org" className="text-xs text-zinc-500 hover:underline">
         ← Organization
       </Link>
@@ -90,6 +91,6 @@ export default async function OrgDocumentsPage() {
           ))}
         </div>
       )}
-    </main>
+    </PageContainer>
   );
 }

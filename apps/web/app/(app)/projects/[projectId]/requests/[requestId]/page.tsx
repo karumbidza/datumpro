@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { PageContainer } from '@/components/shell/page-container';
 import { redirect, notFound } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { getRequestDetail } from '@/lib/data/requests';
@@ -36,7 +37,7 @@ export default async function RequestDetailPage({
     !!role && (role === approverRole || role === 'owner' || role === 'admin');
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-10">
+    <PageContainer width="2xl">
       <LiveRefresh
         subscriptions={[
           { table: 'requests', filter: `id=eq.${requestId}` },
@@ -110,6 +111,6 @@ export default async function RequestDetailPage({
           </ol>
         </section>
       )}
-    </main>
+    </PageContainer>
   );
 }

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { PageContainer } from '@/components/shell/page-container';
 import { redirect } from 'next/navigation';
 import { getActiveContext, getAuthUser } from '@/lib/data/org';
 import { listClients } from '@/lib/data/clients';
@@ -29,7 +30,7 @@ export default async function NewProjectPage() {
   const defaultCalendarId = calendars.find((c) => c.isDefault)?.id ?? calendars[0]?.id ?? '';
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-10">
+    <PageContainer width="xl">
       <Link href="/projects" className="text-xs text-zinc-500 hover:underline">
         ← Projects
       </Link>
@@ -44,6 +45,6 @@ export default async function NewProjectPage() {
           defaultCalendarId={defaultCalendarId}
         />
       </Card>
-    </main>
+    </PageContainer>
   );
 }

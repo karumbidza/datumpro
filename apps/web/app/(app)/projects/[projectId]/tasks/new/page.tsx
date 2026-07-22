@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { PageContainer } from '@/components/shell/page-container';
 import { redirect, notFound } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { getProject } from '@/lib/data/projects';
@@ -32,7 +33,7 @@ export default async function NewTaskPage({
   ]);
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-10">
+    <PageContainer width="xl">
       <Link href={`/projects/${projectId}/tasks`} className="text-xs text-zinc-500 hover:underline">
         ← Tasks
       </Link>
@@ -41,6 +42,6 @@ export default async function NewTaskPage({
       <Card className="mt-6">
         <NewTaskForm projectId={projectId} members={members} taskOptions={taskOptions} />
       </Card>
-    </main>
+    </PageContainer>
   );
 }

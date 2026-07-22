@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { PageContainer } from '@/components/shell/page-container';
 import { redirect } from 'next/navigation';
 import { can } from '@datumpro/shared/access';
 import { getActiveContext } from '@/lib/data/org';
@@ -28,7 +29,7 @@ export default async function OrgPage() {
   ]);
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-10">
+    <PageContainer width="3xl">
       <Link href="/dashboard" className="text-xs text-zinc-500 hover:underline">
         ← Dashboard
       </Link>
@@ -110,6 +111,6 @@ export default async function OrgPage() {
           </Link>
         )}
       </section>
-    </main>
+    </PageContainer>
   );
 }

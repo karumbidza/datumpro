@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { PageContainer } from '@/components/shell/page-container';
 import type { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
@@ -103,7 +104,7 @@ export default async function DashboardPage() {
       listMyOpenTasks(ctx.userId),
     ]);
     return (
-      <div className="mx-auto max-w-5xl space-y-6 px-6 py-8">
+      <PageContainer width="5xl" className="space-y-6">
         {live}
         <Greeting
           name={displayName}
@@ -115,7 +116,7 @@ export default async function DashboardPage() {
           <ManagedProjectsCard projects={managed} />
           <MyTasksCard tasks={myTasks} />
         </div>
-      </div>
+      </PageContainer>
     );
   }
 
@@ -126,7 +127,7 @@ export default async function DashboardPage() {
   ]);
   const hasPay = myPay.summary.earnedCents > 0;
   return (
-    <div className="mx-auto max-w-3xl space-y-6 px-6 py-8">
+    <PageContainer width="3xl" className="space-y-6">
       {live}
       <Greeting name={displayName} subtitle={`Here's your work today · ${formatLongDate(new Date())}`} />
       {approvals.length > 0 && <ApprovalsInbox items={approvals} />}
@@ -146,7 +147,7 @@ export default async function DashboardPage() {
           </div>
         </Card>
       )}
-    </div>
+    </PageContainer>
   );
 }
 

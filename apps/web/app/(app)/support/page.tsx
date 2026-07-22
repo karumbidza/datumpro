@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { PageContainer } from '@/components/shell/page-container';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { getAuthUser } from '@/lib/data/org';
@@ -36,7 +37,7 @@ export default async function SupportPage({
   const active = orgs.find((o) => o.id === org) ?? orgs[0];
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-10">
+    <PageContainer width="2xl">
       <h1 className="text-2xl font-semibold tracking-tight">Support</h1>
       <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
         Message the DatumPro team. We&apos;ll reply right here.
@@ -72,6 +73,6 @@ export default async function SupportPage({
           </div>
         </>
       )}
-    </main>
+    </PageContainer>
   );
 }

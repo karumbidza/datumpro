@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { PageContainer } from '@/components/shell/page-container';
 import { redirect, notFound } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { getProject } from '@/lib/data/projects';
@@ -27,7 +28,7 @@ export default async function RequestsPage({ params }: { params: Promise<{ proje
   const requests = await listRequestsByProject(projectId);
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-10">
+    <PageContainer width="3xl">
       <LiveRefresh
         subscriptions={[
           { table: 'requests', filter: `project_id=eq.${projectId}` },
@@ -72,6 +73,6 @@ export default async function RequestsPage({ params }: { params: Promise<{ proje
           ))}
         </ul>
       )}
-    </main>
+    </PageContainer>
   );
 }

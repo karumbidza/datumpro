@@ -174,7 +174,7 @@ export default async function TaskBoardPage({
   );
 
   return (
-    <main className="mx-auto flex max-w-[1152px] flex-col gap-8 px-10 py-8">
+    <div className="mx-auto flex max-w-[1152px] flex-col gap-8 px-10 py-8">
       <LiveRefresh
         subscriptions={[
           { table: 'tasks', filter: `project_id=eq.${projectId}` },
@@ -311,6 +311,6 @@ export default async function TaskBoardPage({
           </div>
         </div>
       )}
-    </main>
+    </div>
   );
 }

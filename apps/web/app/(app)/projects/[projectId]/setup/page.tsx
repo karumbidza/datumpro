@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { PageContainer } from '@/components/shell/page-container';
 import { redirect, notFound } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { getProject } from '@/lib/data/projects';
@@ -21,7 +22,7 @@ export default async function ProjectSetupPage({
   const outstanding = total - done;
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-10">
+    <PageContainer width="2xl">
       <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 hover:underline">
         ← {project.name}
       </Link>
@@ -93,6 +94,6 @@ export default async function ProjectSetupPage({
           <Button variant="secondary">Continue to project →</Button>
         </Link>
       </div>
-    </main>
+    </PageContainer>
   );
 }
