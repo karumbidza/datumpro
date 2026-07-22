@@ -645,139 +645,7 @@ export function SubtaskPanel({
               </p>
             ) : null)}
 
-          {/* ── VARIATIONS (extra scope raised after the baseline was locked) ── */}
-          {planLocked && (openVariations.length > 0 || canAddVariation) && (
-            <div className="mt-4 border-t border-zinc-100 pt-3 dark:border-zinc-800">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">Variations</p>
-
-              {openVariations.map((v) => (
-                <div key={v.id} className="mt-2 rounded-md border border-zinc-100 p-2 dark:border-zinc-800">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm text-zinc-800 dark:text-zinc-200">{v.title}</span>
-                    <span className="flex items-center gap-2">
-                      <span className="text-[11px] tabular-nums text-zinc-400">{formatUsd(v.costCents)}</span>
-                      <span
-                        className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                          v.variationStatus === 'rejected'
-                            ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300'
-                            : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
-                        }`}
-                      >
-                        {v.variationStatus === 'rejected' ? 'Declined' : 'Pending'}
-                      </span>
-                    </span>
-                  </div>
-                  {v.variationStatus === 'pending' && (
-                    <ApprovalChain steps={variationSteps[v.id] ?? []} viewerRole={viewerRole} path={path} />
-                  )}
-                </div>
-              ))}
-
-              {canAddVariation &&
-                (!variationOpen ? (
-                  <button
-                    type="button"
-                    onClick={() => setVariationOpen(true)}
-                    className="mt-2 text-[11px] font-medium text-brand-600 hover:underline"
-                  >
-                    + Add a variation (needs approval)
-                  </button>
-                ) : (
-                  <form
-                    action={addSubtask}
-                    className="mt-2 flex flex-wrap items-end gap-2 rounded-md border border-brand-500/30 bg-brand-50 p-2 dark:bg-brand-500/10"
-                  >
-                    <input type="hidden" name="taskId" value={taskId} />
-                    <div className="min-w-40 flex-1">
-                      <label className="mb-1 block text-[11px] font-medium text-zinc-500">Extra step</label>
-                      <input name="title" required placeholder="e.g. Additional rockbreaking" className={`${inputClass} w-full`} />
-                    </div>
-                    <div className="w-16">
-                      <label className="mb-1 block text-[11px] font-medium text-zinc-500">Duration</label>
-                      <input name="estQty" type="number" min="0" step="0.5" className={`${inputClass} w-full`} />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-[11px] font-medium text-zinc-500">Unit</label>
-                      <select name="estUnit" defaultValue="days" className={inputClass}>
-                        <option value="hours">hours</option>
-                        <option value="days">day(s)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-[11px] font-medium text-zinc-500">Start</label>
-                      <input type="date" name="plannedStartDate" min={taskStart ?? undefined} max={taskEnd ?? undefined} className={inputClass} />
-                    </div>
-                    <div className="w-24">
-                      <label className="mb-1 block text-[11px] font-medium text-zinc-500">Cost ($)</label>
-                      <input name="cost" type="number" min="0" step="0.01" className={`${inputClass} w-full`} />
-                    </div>
-                    <SubmitButton variant="secondary" pendingText="Sending…">
-                      Submit variation
-                    </SubmitButton>
-                    <button type="button" onClick={() => setVariationOpen(false)} className="pb-1 text-sm text-zinc-500 hover:underline">
-                      Cancel
-                    </button>
-                  </form>
-                ))}
-            </div>
-          )}
-
-          {/* ── EXTENSION OF TIME (raised by the assignee, approved by PM/admin) ── */}
-          {(extensionRequests.length > 0 || canRequestExtension || extensionPreStart) && (
-            <div className="mt-4 border-t border-zinc-100 pt-3 dark:border-zinc-800">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">Extension of time</p>
-
-              {extensionRequests.map((r) => (
-                <div key={r.id} className="mt-2 rounded-md border border-zinc-100 p-2 dark:border-zinc-800">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm text-zinc-800 dark:text-zinc-200">New due: {r.proposedDueDate}</span>
-                    <Badge tone={EXT_TONE[r.status]}>{r.status}</Badge>
-                  </div>
-                  {r.reason && <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{r.reason}</p>}
-                  {r.status === 'pending' && (
-                    <ApprovalChain steps={extensionSteps[r.id] ?? []} viewerRole={viewerRole} path={path} />
-                  )}
-                </div>
-              ))}
-
-              {canRequestExtension && !hasPendingExt &&
-                (!extensionOpen ? (
-                  <button
-                    type="button"
-                    onClick={() => setExtensionOpen(true)}
-                    className="mt-2 text-[11px] font-medium text-brand-600 hover:underline"
-                  >
-                    + Request an extension (needs approval)
-                  </button>
-                ) : (
-                  <form
-                    action={requestExtensionAction}
-                    className="mt-2 flex flex-wrap items-end gap-2 rounded-md border border-brand-500/30 bg-brand-50 p-2 dark:bg-brand-500/10"
-                  >
-                    <input type="hidden" name="taskId" value={taskId} />
-                    <div>
-                      <label className="mb-1 block text-[11px] font-medium text-zinc-500">Proposed new due date</label>
-                      <input name="proposedDueDate" type="date" required min={taskEnd ?? undefined} className={inputClass} />
-                    </div>
-                    <div className="min-w-40 flex-1">
-                      <label className="mb-1 block text-[11px] font-medium text-zinc-500">Reason</label>
-                      <input name="reason" placeholder="e.g. rain delays, material lead-time" className={`${inputClass} w-full`} />
-                    </div>
-                    <SubmitButton variant="secondary" pendingText="Sending…">
-                      Request
-                    </SubmitButton>
-                    <button type="button" onClick={() => setExtensionOpen(false)} className="pb-1 text-sm text-zinc-500 hover:underline">
-                      Cancel
-                    </button>
-                    <div className="w-full"><FormError error={extErr.error} /></div>
-                  </form>
-                ))}
-
-              {extensionPreStart && extensionRequests.length === 0 && (
-                <p className="mt-2 text-[11px] text-zinc-400">You can request an extension once the task is underway.</p>
-              )}
-            </div>
-          )}
+          {/* Variations & Extension-of-time render below the workflow buttons. */}
         </>
       )}
 
@@ -852,6 +720,154 @@ export function SubtaskPanel({
         <p className="mt-2 text-[11.5px] text-zinc-400">
           Complete every step above to submit for sign-off.
         </p>
+      )}
+
+      {/* ── Variations + Extension of time — side by side, below the actions ── */}
+      {((planLocked && (openVariations.length > 0 || canAddVariation)) ||
+        extensionRequests.length > 0 ||
+        canRequestExtension ||
+        extensionPreStart) && (
+        <div className="mt-4 grid gap-x-6 gap-y-4 border-t border-zinc-100 pt-4 dark:border-zinc-800 sm:grid-cols-2">
+          {/* Variations column */}
+          {planLocked && (openVariations.length > 0 || canAddVariation) && (
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">Variations</p>
+
+              {openVariations.map((v) => (
+                <div key={v.id} className="mt-2 rounded-md border border-zinc-100 p-2 dark:border-zinc-800">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm text-zinc-800 dark:text-zinc-200">{v.title}</span>
+                    <span className="flex items-center gap-2">
+                      <span className="text-[11px] tabular-nums text-zinc-400">{formatUsd(v.costCents)}</span>
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                          v.variationStatus === 'rejected'
+                            ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300'
+                            : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
+                        }`}
+                      >
+                        {v.variationStatus === 'rejected' ? 'Declined' : 'Pending'}
+                      </span>
+                    </span>
+                  </div>
+                  {v.variationStatus === 'pending' && (
+                    <ApprovalChain steps={variationSteps[v.id] ?? []} viewerRole={viewerRole} path={path} />
+                  )}
+                </div>
+              ))}
+
+              {canAddVariation &&
+                (!variationOpen ? (
+                  <button
+                    type="button"
+                    onClick={() => setVariationOpen(true)}
+                    className="mt-2 text-[11px] font-medium text-brand-600 hover:underline"
+                  >
+                    + Add a variation (needs approval)
+                  </button>
+                ) : (
+                  <form
+                    action={addSubtask}
+                    className="mt-2 space-y-2 rounded-md border border-brand-500/30 bg-brand-50 p-2 dark:bg-brand-500/10"
+                  >
+                    <input type="hidden" name="taskId" value={taskId} />
+                    <div>
+                      <label className="mb-1 block text-[11px] font-medium text-zinc-500">Extra step</label>
+                      <input name="title" required placeholder="e.g. Additional rockbreaking" className={`${inputClass} w-full`} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="mb-1 block text-[11px] font-medium text-zinc-500">Duration</label>
+                        <input name="estQty" type="number" min="0" step="0.5" className={`${inputClass} w-full`} />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-[11px] font-medium text-zinc-500">Unit</label>
+                        <select name="estUnit" defaultValue="days" className={`${inputClass} w-full`}>
+                          <option value="hours">hours</option>
+                          <option value="days">day(s)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-[11px] font-medium text-zinc-500">Start</label>
+                        <input type="date" name="plannedStartDate" min={taskStart ?? undefined} max={taskEnd ?? undefined} className={`${inputClass} w-full`} />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-[11px] font-medium text-zinc-500">Cost ($)</label>
+                        <input name="cost" type="number" min="0" step="0.01" className={`${inputClass} w-full`} />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <SubmitButton variant="secondary" pendingText="Sending…">
+                        Submit variation
+                      </SubmitButton>
+                      <button type="button" onClick={() => setVariationOpen(false)} className="text-sm text-zinc-500 hover:underline">
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                ))}
+            </div>
+          )}
+
+          {/* Extension-of-time column */}
+          {(extensionRequests.length > 0 || canRequestExtension || extensionPreStart) && (
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">Extension of time</p>
+
+              {extensionRequests.map((r) => (
+                <div key={r.id} className="mt-2 rounded-md border border-zinc-100 p-2 dark:border-zinc-800">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm text-zinc-800 dark:text-zinc-200">New due: {r.proposedDueDate}</span>
+                    <Badge tone={EXT_TONE[r.status]}>{r.status}</Badge>
+                  </div>
+                  {r.reason && <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{r.reason}</p>}
+                  {r.status === 'pending' && (
+                    <ApprovalChain steps={extensionSteps[r.id] ?? []} viewerRole={viewerRole} path={path} />
+                  )}
+                </div>
+              ))}
+
+              {canRequestExtension && !hasPendingExt &&
+                (!extensionOpen ? (
+                  <button
+                    type="button"
+                    onClick={() => setExtensionOpen(true)}
+                    className="mt-2 text-[11px] font-medium text-brand-600 hover:underline"
+                  >
+                    + Request an extension (needs approval)
+                  </button>
+                ) : (
+                  <form
+                    action={requestExtensionAction}
+                    className="mt-2 space-y-2 rounded-md border border-brand-500/30 bg-brand-50 p-2 dark:bg-brand-500/10"
+                  >
+                    <input type="hidden" name="taskId" value={taskId} />
+                    <div>
+                      <label className="mb-1 block text-[11px] font-medium text-zinc-500">Proposed new due date</label>
+                      <input name="proposedDueDate" type="date" required min={taskEnd ?? undefined} className={`${inputClass} w-full`} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-[11px] font-medium text-zinc-500">Reason</label>
+                      <input name="reason" placeholder="e.g. rain delays, material lead-time" className={`${inputClass} w-full`} />
+                    </div>
+                    <div className="flex gap-2">
+                      <SubmitButton variant="secondary" pendingText="Sending…">
+                        Request
+                      </SubmitButton>
+                      <button type="button" onClick={() => setExtensionOpen(false)} className="text-sm text-zinc-500 hover:underline">
+                        Cancel
+                      </button>
+                    </div>
+                    <FormError error={extErr.error} />
+                  </form>
+                ))}
+
+              {extensionPreStart && extensionRequests.length === 0 && (
+                <p className="mt-2 text-[11px] text-zinc-400">You can request an extension once the task is underway.</p>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {canHandBack && (
