@@ -811,12 +811,25 @@ export function SubtaskPanel({
           <form action={submitTaskAction} className="mt-4 space-y-3">
             <input type="hidden" name="taskId" value={taskId} />
             <FormError error={submitState.error} />
-            <textarea
-              name="notes"
-              rows={3}
-              placeholder="What was completed?"
-              className={`${inputClass} w-full text-sm`}
-            />
+            <div className="rounded-lg border border-zinc-200 transition focus-within:border-brand-500 dark:border-zinc-800">
+              <textarea
+                name="notes"
+                rows={3}
+                placeholder="What was completed?"
+                className="w-full resize-none rounded-t-lg bg-transparent px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-zinc-100"
+              />
+              <div className="flex items-center gap-2 border-t border-zinc-100 px-2 py-1.5 dark:border-zinc-800">
+                <MediaUploader
+                  taskId={taskId}
+                  projectId={projectId}
+                  orgId={orgId}
+                  purpose="completion"
+                  accept="image/*,video/*,.pdf,.xls,.xlsx,.csv"
+                  label="📎 Attach (optional)"
+                />
+                <span className="text-[11px] text-zinc-400">Photo, PDF or Excel — shows in Evidence</span>
+              </div>
+            </div>
             <label className="flex items-center gap-2 text-[13.5px] text-zinc-700 dark:text-zinc-200">
               <input type="checkbox" name="declaration" className="h-[16px] w-[16px] accent-brand-600" />
               I confirm this work is complete and accurate.
@@ -849,13 +862,26 @@ export function SubtaskPanel({
           <form action={raiseBlockerAction} className="mt-4 space-y-3">
             <input type="hidden" name="taskId" value={taskId} />
             <FormError error={blockerState.error} />
-            <textarea
-              name="description"
-              rows={3}
-              required
-              placeholder="What's blocking you?"
-              className={`${inputClass} w-full text-sm`}
-            />
+            <div className="rounded-lg border border-zinc-200 transition focus-within:border-brand-500 dark:border-zinc-800">
+              <textarea
+                name="description"
+                rows={3}
+                required
+                placeholder="What's blocking you?"
+                className="w-full resize-none rounded-t-lg bg-transparent px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-zinc-100"
+              />
+              <div className="flex items-center gap-2 border-t border-zinc-100 px-2 py-1.5 dark:border-zinc-800">
+                <MediaUploader
+                  taskId={taskId}
+                  projectId={projectId}
+                  orgId={orgId}
+                  purpose="completion"
+                  accept="image/*,video/*,.pdf,.xls,.xlsx,.csv"
+                  label="📎 Attach (optional)"
+                />
+                <span className="text-[11px] text-zinc-400">Photo, PDF or Excel — shows in Evidence</span>
+              </div>
+            </div>
             <div className="flex justify-end gap-2.5 pt-1">
               <button
                 type="button"

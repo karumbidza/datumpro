@@ -5,7 +5,6 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { createTaskSchema } from '@datumpro/shared/validation';
 import { parsePaymentTerms } from '@datumpro/shared/domain';
-import { completionMediaCount } from '@/lib/data/quotes';
 import { notifyUser, notifyProjectManagers } from '@/lib/data/notifications';
 import type { FormState } from '@/components/ui/form-error';
 import { emailUser } from '@/lib/email/notify';
@@ -338,10 +337,8 @@ export async function submitTask(_prev: FormState, formData: FormData): Promise<
   const task = await loadTask(supabase, taskId);
   if (!task) return { error: 'Task not found.' };
 
-  // Evidence gate: photo/video proof is mandatory unless the task opts out.
-  if (task.requires_photo_on_complete && (await completionMediaCount(taskId)) === 0) {
-    return { error: 'Attach at least one completion photo or video before submitting.' };
-  }
+  // Evidence is optional — attaching a photo/PDF/Excel is encouraged but never
+  // blocks submitting (some tasks are document deliverables, e.g. licences).
 
   // Plan gate: if a subtask plan exists, every item must be ticked off first.
   const { data: subs } = await supabase.from('task_subtasks').select('is_done').eq('task_id', taskId);

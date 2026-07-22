@@ -18,7 +18,7 @@ export function CompletionEvidence({ taskId, projectId, orgId, media, canUpload,
     <Card className="mt-6">
       <CardTitle>Completion evidence</CardTitle>
       <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-        Photos and videos of the finished work. Required before a task can be submitted for sign-off.
+        Photos, videos or documents (PDF, Excel) of the work — e.g. a licence or certificate. Optional.
       </p>
 
       {media.length === 0 ? (
@@ -72,7 +72,14 @@ export function CompletionEvidence({ taskId, projectId, orgId, media, canUpload,
 
       {canUpload && (
         <div className="mt-4">
-          <MediaUploader taskId={taskId} projectId={projectId} orgId={orgId} purpose="completion" />
+          <MediaUploader
+            taskId={taskId}
+            projectId={projectId}
+            orgId={orgId}
+            purpose="completion"
+            accept="image/*,video/*,.pdf,.xls,.xlsx,.csv"
+            label="Attach photo, video or document"
+          />
         </div>
       )}
     </Card>
