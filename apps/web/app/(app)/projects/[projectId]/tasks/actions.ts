@@ -629,6 +629,15 @@ export async function toggleSubtask(formData: FormData) {
   const done = formData.get('done') === 'true';
   const taskId = String(formData.get('taskId') ?? '');
   const projectId = String(formData.get('projectId') ?? '');
+  // Completion is final: an already-done step can't be un-ticked (defence beyond
+  // the disabled checkbox). Only the done→true transition is allowed here.
+  if (!done) {
+    const { data } = await supabase.from('task_subtasks').select('is_done').eq('id', id).maybeSingle();
+    if ((data as { is_done: boolean } | null)?.is_done) {
+      revalidatePath(`/projects/${projectId}/tasks/${taskId}`);
+      return;
+    }
+  }
   const { error } = await supabase.from('task_subtasks').update({ is_done: done }).eq('id', id);
   if (error) throw new Error(error.message);
   revalidatePath(`/projects/${projectId}/tasks/${taskId}`);

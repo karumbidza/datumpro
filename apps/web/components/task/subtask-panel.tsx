@@ -33,6 +33,7 @@ const field =
 const numField = `${field} tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`;
 const selectField = `${field} cursor-pointer appearance-none pr-8`;
 const stepLabel = 'mb-1.5 block text-[11.5px] font-semibold text-zinc-500 dark:text-zinc-400';
+const capsCls = 'text-[10.5px] font-semibold uppercase tracking-[.05em] text-zinc-400';
 const selectStyle = {
   backgroundImage:
     "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E\")",
@@ -116,6 +117,15 @@ export function SubtaskPanel({
   const canAddVariation = isAssignee && planLocked && taskStatus !== 'submitted' && taskStatus !== 'done';
   const [variationOpen, setVariationOpen] = useState(false);
   const [editing, setEditing] = useState<string | null>(null); // plan step being edited
+  const [openSteps, setOpenSteps] = useState<Set<string>>(new Set()); // expanded checklist rows
+  const [confirmStep, setConfirmStep] = useState<Subtask | null>(null); // step awaiting complete-confirm
+  const toggleOpen = (id: string) =>
+    setOpenSteps((cur) => {
+      const n = new Set(cur);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
 
   const canHandBack =
     isAssignee && acceptanceStatus === 'accepted' && taskStatus !== 'submitted' && taskStatus !== 'done';
@@ -177,6 +187,7 @@ export function SubtaskPanel({
   }
 
   return (
+    <>
     <Card>
       <div className="flex items-center justify-between gap-3">
         <CardTitle>{planDraft || planPending ? 'Plan & cost' : 'Task plan'}</CardTitle>
@@ -405,82 +416,128 @@ export function SubtaskPanel({
             );
           })()}
 
-          <ul className="mt-3 space-y-1.5">
-            {counted.map((s) => (
-              <li key={s.id} className="rounded-md px-1 py-1 hover:bg-zinc-50 dark:hover:bg-zinc-900">
-                <div className="flex items-center gap-2">
-                  <form action={toggleSubtask} className="flex items-center">
-                    <input type="hidden" name="id" value={s.id} />
-                    <input type="hidden" name="taskId" value={taskId} />
-                    <input type="hidden" name="projectId" value={projectId} />
-                    <input type="hidden" name="done" value={s.isDone ? 'false' : 'true'} />
-                    <input
-                      type="checkbox"
-                      checked={s.isDone}
-                      disabled={!canTick}
-                      onChange={(e) => e.currentTarget.form?.requestSubmit()}
-                      className="h-4 w-4 accent-brand-600"
-                    />
-                  </form>
-                  <span className={`flex-1 text-sm ${s.isDone ? 'text-zinc-400 line-through' : 'text-zinc-800 dark:text-zinc-200'}`}>
-                    {s.title}
-                    {s.isVariation && (
-                      <span className="ml-1.5 rounded bg-brand-100 px-1 text-[10px] font-medium text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">
-                        variation
+          <ul className="mt-3 space-y-2">
+            {counted.map((s) => {
+              const open = openSteps.has(s.id);
+              const meta = [
+                usesPlanFlow && s.costCents > 0 ? formatUsd(s.costCents) : null,
+                s.estQty ? `${s.estQty}${s.estUnit === 'hours' ? 'h' : 'd'}` : null,
+                s.plannedStartDate,
+              ]
+                .filter(Boolean)
+                .join(' · ');
+              const photos = mediaBySubtask[s.id] ?? [];
+              return (
+                <li
+                  key={s.id}
+                  className={`overflow-hidden rounded-[9px] border ${
+                    s.isDone
+                      ? 'border-green-100 bg-green-50/40 dark:border-green-500/20 dark:bg-green-500/5'
+                      : 'border-zinc-100 dark:border-zinc-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 px-3 py-2.5">
+                    <button
+                      type="button"
+                      onClick={() => toggleOpen(s.id)}
+                      aria-label={open ? 'Collapse step' : 'Expand step'}
+                      className={`flex h-[22px] w-[22px] flex-none items-center justify-center rounded-md text-[11px] text-zinc-400 transition-transform hover:bg-zinc-100 dark:hover:bg-zinc-800 ${open ? 'rotate-90' : ''}`}
+                    >
+                      ▶
+                    </button>
+                    {s.isDone && (
+                      <span className="flex h-4 w-4 flex-none items-center justify-center rounded-full bg-green-500 text-[10px] text-white shadow-[0_0_0_3px_rgba(34,197,94,.18)]">
+                        ✓
                       </span>
                     )}
-                  </span>
-                  {usesPlanFlow && s.costCents > 0 && (
-                    <span className="text-[11px] tabular-nums text-zinc-400">{formatUsd(s.costCents)}</span>
-                  )}
-                  {(s.plannedStartDate || s.estQty) && (
-                    <span className="text-[11px] tabular-nums text-zinc-400">
-                      {s.estQty ? `${s.estQty}${s.estUnit === 'hours' ? 'h' : 'd'}` : ''}
-                      {s.plannedStartDate ? ` · ${s.plannedStartDate}` : ''}
+                    <span className={`flex-1 text-sm font-medium ${s.isDone ? 'text-zinc-500 line-through' : 'text-zinc-800 dark:text-zinc-100'}`}>
+                      {s.title}
+                      {s.isVariation && (
+                        <span className="ml-1.5 rounded bg-brand-100 px-1 text-[10px] font-medium text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">
+                          variation
+                        </span>
+                      )}
                     </span>
-                  )}
-                  {!usesPlanFlow && canTick && (
-                    <form action={removeSubtask}>
-                      <input type="hidden" name="id" value={s.id} />
-                      <input type="hidden" name="taskId" value={taskId} />
-                      <input type="hidden" name="projectId" value={projectId} />
-                      <button type="submit" className="text-[11px] text-zinc-400 hover:text-red-500" title="Remove">
-                        ✕
-                      </button>
-                    </form>
-                  )}
-                </div>
-
-                {((s.plannedStartDate || (mediaBySubtask[s.id]?.length ?? 0) > 0) || canTick) && (
-                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-6">
-                    {(mediaBySubtask[s.id] ?? []).map((m) =>
-                      m.url ? (
-                        <a key={m.id} href={m.url} target="_blank" rel="noreferrer" title="Open photo">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={m.url}
-                            alt="Step evidence"
-                            className="h-11 w-11 rounded-md border border-zinc-200 object-cover dark:border-zinc-800"
-                          />
-                        </a>
-                      ) : null,
-                    )}
-                    {canTick && (
-                      <MediaUploader
-                        taskId={taskId}
-                        projectId={projectId}
-                        orgId={orgId}
-                        purpose="subtask"
-                        subtaskId={s.id}
-                        accept="image/*"
-                        label="Add step photo"
-                        compact
-                      />
-                    )}
+                    {meta && <span className="text-[12.5px] tabular-nums text-zinc-400">{meta}</span>}
                   </div>
-                )}
-              </li>
-            ))}
+
+                  {open && (
+                    <div className="border-t border-dashed border-zinc-200 py-3 pr-4 pl-11 dark:border-zinc-700">
+                      {canTick ? (
+                        <div className="flex flex-col gap-3">
+                          <label
+                            className={`flex items-center gap-2.5 text-[13.5px] ${
+                              s.isDone ? 'cursor-default font-medium text-green-600 dark:text-green-400' : 'cursor-pointer text-zinc-700 dark:text-zinc-200'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={s.isDone}
+                              disabled={s.isDone}
+                              onChange={() => {
+                                if (!s.isDone) setConfirmStep(s);
+                              }}
+                              className="h-[17px] w-[17px] accent-brand-600"
+                            />
+                            {s.isDone ? 'Completed' : 'Mark this step complete'}
+                          </label>
+                          <div>
+                            <div className={`${capsCls} mb-1.5`}>Proof of work</div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              {photos.map((m) =>
+                                m.url ? (
+                                  <a key={m.id} href={m.url} target="_blank" rel="noreferrer" title="Open photo">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={m.url} alt="Step evidence" className="h-[46px] w-[46px] rounded-md border border-zinc-200 object-cover dark:border-zinc-800" />
+                                  </a>
+                                ) : null,
+                              )}
+                              {!s.isDone && (
+                                <MediaUploader
+                                  taskId={taskId}
+                                  projectId={projectId}
+                                  orgId={orgId}
+                                  purpose="subtask"
+                                  subtaskId={s.id}
+                                  accept="image/*"
+                                  label="Attach proof"
+                                />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-[auto_1fr] items-center gap-x-5 gap-y-2 text-[13px]">
+                          <span className={capsCls}>Duration</span>
+                          <span className="text-zinc-600 dark:text-zinc-300">{s.estQty ? `${s.estQty} ${s.estUnit}` : '—'}</span>
+                          <span className={capsCls}>Start</span>
+                          <span className="text-zinc-600 dark:text-zinc-300">{s.plannedStartDate ?? '—'}</span>
+                          <span className={capsCls}>Status</span>
+                          <span className={s.isDone ? 'font-semibold text-green-600 dark:text-green-400' : 'text-zinc-500'}>
+                            {s.isDone ? `Completed${s.doneAt ? ` · ${s.doneAt.slice(0, 10)}` : ''}` : 'Pending'}
+                          </span>
+                          {photos.length > 0 && (
+                            <>
+                              <span className={`${capsCls} self-start pt-1`}>Proof</span>
+                              <div className="flex flex-wrap gap-2">
+                                {photos.map((m) =>
+                                  m.url ? (
+                                    <a key={m.id} href={m.url} target="_blank" rel="noreferrer" title="Open photo">
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img src={m.url} alt="Step evidence" className="h-[46px] w-[46px] rounded-md border border-zinc-200 object-cover dark:border-zinc-800" />
+                                    </a>
+                                  ) : null,
+                                )}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
             {counted.length === 0 && (
               <li className="py-2 text-sm text-zinc-400">
                 {!usesPlanFlow && canTick ? 'Break the task into steps below.' : 'No plan steps.'}
@@ -513,9 +570,16 @@ export function SubtaskPanel({
             </form>
           )}
 
-          {canTick && counted.length > 0 && doneCount < counted.length && (
-            <p className="mt-2 text-[11px] text-zinc-400">Tick off every step to unlock “Submit for sign-off”.</p>
-          )}
+          {counted.length > 0 &&
+            (canTick ? (
+              <p className="mt-2.5 text-[11.5px] text-zinc-400">
+                Open a step to tick it off and attach proof. Marking complete is final.
+              </p>
+            ) : usesPlanFlow ? (
+              <p className="mt-2.5 text-[11.5px] text-zinc-400">
+                Read-only — the assignee ticks steps and attaches proof. Open a step to review time and evidence.
+              </p>
+            ) : null)}
 
           {/* ── VARIATIONS (extra scope raised after the baseline was locked) ── */}
           {planLocked && (openVariations.length > 0 || canAddVariation) && (
@@ -636,5 +700,40 @@ export function SubtaskPanel({
         </div>
       )}
     </Card>
+
+    {/* Confirm + lock completion — completing a step is final. */}
+    {confirmStep && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-6">
+        <div className="w-[360px] rounded-2xl bg-white p-[22px] shadow-2xl dark:bg-zinc-900">
+          <h4 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">Mark step complete?</h4>
+          <p className="mt-2 text-[13.5px] leading-[1.55] text-zinc-500 dark:text-zinc-400">
+            You’re marking <b className="text-zinc-900 dark:text-zinc-100">“{confirmStep.title}”</b> as complete. This
+            can’t be undone — it locks the step and counts toward sign-off.
+          </p>
+          <div className="mt-[18px] flex justify-end gap-2.5">
+            <button
+              type="button"
+              onClick={() => setConfirmStep(null)}
+              className="h-[38px] rounded-lg border border-zinc-200 px-4 text-[13.5px] font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300"
+            >
+              Cancel
+            </button>
+            <form action={toggleSubtask} onSubmit={() => setConfirmStep(null)}>
+              <input type="hidden" name="id" value={confirmStep.id} />
+              <input type="hidden" name="taskId" value={taskId} />
+              <input type="hidden" name="projectId" value={projectId} />
+              <input type="hidden" name="done" value="true" />
+              <button
+                type="submit"
+                className="h-[38px] rounded-lg bg-green-600 px-[18px] text-[13.5px] font-semibold text-white hover:bg-green-700"
+              >
+                Yes, mark complete
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

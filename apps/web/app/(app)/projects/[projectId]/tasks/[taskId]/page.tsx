@@ -179,13 +179,10 @@ export default async function TaskDetailPage({
   // rules (e.g. only a lead can approve to DONE) regardless of what's shown.
   const workflowActions =
     task.status !== 'done' && canAct && !acceptancePending && !isBidder ? (
-      <div className="mt-6 space-y-4">
+      <div className="mt-4 space-y-4">
         {task.status === 'todo' &&
-          (blockedByDeps ? (
-            <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
-              🔒 Blocked — waiting on {waitingOn.join(', ')} to be completed before this can start.
-            </p>
-          ) : planNotApproved ? (
+          !blockedByDeps &&
+          (planNotApproved ? (
             <p className="text-sm text-zinc-500 dark:text-zinc-400">
               {task.plan_submitted_at
                 ? 'Your plan is awaiting approval — you can start once it’s approved.'
@@ -439,7 +436,7 @@ export default async function TaskDetailPage({
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-10">
+    <main className="mx-auto max-w-4xl px-6 py-7">
       <LiveRefresh
         subscriptions={[
           { table: 'task_subtasks', filter: `task_id=eq.${taskId}` },
@@ -471,7 +468,7 @@ export default async function TaskDetailPage({
       </div>
 
       {/* Overview — at a glance + act. Everything else is tabbed below. */}
-      <Card className="mt-6 space-y-2 text-sm">
+      <Card className="mt-4 space-y-2 text-sm">
         <Row
           label="Assignee"
           value={isTendering ? (isBidder ? 'You’re bidding on this' : 'Open for bidding') : assigneeName}
@@ -494,8 +491,8 @@ export default async function TaskDetailPage({
         {task.due_date && <Row label="Due" value={task.due_date} />}
         {task.description && <p className="pt-2 text-zinc-600 dark:text-zinc-300">{task.description}</p>}
         {blockedByDeps && (
-          <p className="rounded-md bg-amber-50 p-2 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
-            🔒 Blocked — waiting on {waitingOn.join(', ')}. Can’t start until done; you can still assign or tender it.
+          <p className="mt-1 flex items-center gap-2 text-sm font-semibold text-red-600 dark:text-red-400">
+            <span className="text-[13px]">🔒</span> Blocked: {waitingOn.join(', ')}
           </p>
         )}
         {task.status === 'blocked' && task.blocker_description && (
@@ -514,7 +511,7 @@ export default async function TaskDetailPage({
       </Card>
 
       {isBidder && (
-        <div className="mt-6">
+        <div className="mt-4">
           <BidPanel
             taskId={taskId}
             projectId={projectId}
@@ -529,7 +526,7 @@ export default async function TaskDetailPage({
       )}
 
       {!isBidder && (task.assignee_id || subtasks.length > 0) && (
-        <div className="mt-6">
+        <div className="mt-4">
           <SubtaskPanel
             taskId={taskId}
             projectId={projectId}
