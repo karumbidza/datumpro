@@ -86,6 +86,14 @@ export function SubtaskPanel({
   // Editing an existing plan step — one local buffer, saved on Done (no
   // save-on-every-keystroke churn).
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [openSteps, setOpenSteps] = useState<Set<string>>(new Set()); // expanded checklist rows
+  const toggleOpen = (id: string) =>
+    setOpenSteps((cur) => {
+      const n = new Set(cur);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
   const [eTitle, setETitle] = useState('');
   const [eQty, setEQty] = useState('');
   const [eUnit, setEUnit] = useState<'hours' | 'days'>('days');
@@ -132,6 +140,19 @@ export function SubtaskPanel({
     } finally {
       setBusy(false);
     }
+  }
+
+  // Completing a step is final — confirm, then it locks (can't be un-ticked).
+  function confirmComplete(s: Subtask) {
+    if (s.isDone || busy) return;
+    Alert.alert(
+      'Mark step complete?',
+      `You're marking "${s.title}" as complete. This can't be undone — it locks the step and counts toward sign-off.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Yes, mark complete', onPress: () => run(() => toggleSubtask(s.id, true)) },
+      ],
+    );
   }
 
   function attachPhoto(subtaskId: string) {
@@ -418,50 +439,84 @@ export function SubtaskPanel({
           </View>
 
           <View style={styles.list}>
-            {counted.map((s) => (
-              <View key={s.id} style={styles.itemWrap}>
-                <View style={styles.item}>
-                  <Pressable disabled={!canTick || busy} onPress={() => run(() => toggleSubtask(s.id, !s.isDone))} hitSlop={8}>
-                    <Ionicons
-                      name={s.isDone ? 'checkmark-circle' : 'ellipse-outline'}
-                      size={22}
-                      color={s.isDone ? colors.success : colors.subtle}
-                    />
-                  </Pressable>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.itemText, s.isDone && styles.itemDone]}>
+            {counted.map((s) => {
+              const open = openSteps.has(s.id);
+              const photos = mediaBySubtask[s.id] ?? [];
+              const meta = [
+                s.costCents > 0 ? formatUsd(s.costCents) : null,
+                s.estQty ? `${s.estQty}${s.estUnit === 'hours' ? 'h' : 'd'}` : null,
+                s.plannedStartDate,
+              ]
+                .filter(Boolean)
+                .join(' · ');
+              return (
+                <View key={s.id} style={[styles.discl, s.isDone && styles.disclDone]}>
+                  <Pressable style={styles.disclHead} onPress={() => toggleOpen(s.id)}>
+                    <Ionicons name={open ? 'chevron-down' : 'chevron-forward'} size={15} color={colors.subtle} />
+                    {s.isDone && <Ionicons name="checkmark-circle" size={16} color={colors.success} />}
+                    <Text style={[styles.disclTitle, s.isDone && styles.itemDone]} numberOfLines={1}>
                       {s.title}
                       {s.isVariation ? '  ·  variation' : ''}
                     </Text>
-                    {(s.plannedStartDate || s.estQty || s.costCents > 0) && (
-                      <Text style={styles.itemDates}>
-                        {s.estQty ? `${s.estQty}${s.estUnit === 'hours' ? 'h' : 'd'}` : ''}
-                        {s.plannedStartDate ? ` · ${s.plannedStartDate}` : ''}
-                        {s.costCents > 0 ? ` · ${formatUsd(s.costCents)}` : ''}
-                      </Text>
-                    )}
-                  </View>
-                  {!usesPlanFlow && canTick && (
-                    <Pressable disabled={busy} onPress={() => run(() => removeSubtask(s.id))} hitSlop={8}>
-                      <Ionicons name="close" size={18} color={colors.subtle} />
-                    </Pressable>
+                    {meta ? <Text style={styles.disclMeta}>{meta}</Text> : null}
+                  </Pressable>
+
+                  {open && (
+                    <View style={styles.disclBody}>
+                      {canTick ? (
+                        <>
+                          <Pressable
+                            style={styles.markRow}
+                            disabled={s.isDone || busy}
+                            onPress={() => confirmComplete(s)}
+                          >
+                            <Ionicons
+                              name={s.isDone ? 'checkmark-circle' : 'ellipse-outline'}
+                              size={20}
+                              color={s.isDone ? colors.success : colors.subtle}
+                            />
+                            <Text style={[styles.markText, s.isDone && styles.markDone]}>
+                              {s.isDone ? 'Completed' : 'Mark this step complete'}
+                            </Text>
+                          </Pressable>
+                          <View>
+                            <Text style={styles.proofLabel}>Proof of work</Text>
+                            <View style={styles.photoRow}>
+                              {photos.map((p) => (p.url ? <Image key={p.id} source={{ uri: p.url }} style={styles.thumb} /> : null))}
+                              {!s.isDone && (
+                                <Pressable style={styles.addPhoto} disabled={busy} onPress={() => attachPhoto(s.id)}>
+                                  <Ionicons name="camera-outline" size={16} color={colors.brand} />
+                                </Pressable>
+                              )}
+                            </View>
+                          </View>
+                        </>
+                      ) : (
+                        <View style={{ gap: 7 }}>
+                          <View style={styles.detailRow}>
+                            <Text style={styles.detailKey}>Duration</Text>
+                            <Text style={styles.detailVal}>{s.estQty ? `${s.estQty} ${s.estUnit}` : '—'}</Text>
+                          </View>
+                          <View style={styles.detailRow}>
+                            <Text style={styles.detailKey}>Start</Text>
+                            <Text style={styles.detailVal}>{s.plannedStartDate ?? '—'}</Text>
+                          </View>
+                          <View style={styles.detailRow}>
+                            <Text style={styles.detailKey}>Status</Text>
+                            <Text style={[styles.detailVal, s.isDone && styles.markDone]}>{s.isDone ? 'Completed' : 'Pending'}</Text>
+                          </View>
+                          {photos.length > 0 && (
+                            <View style={styles.photoRow}>
+                              {photos.map((p) => (p.url ? <Image key={p.id} source={{ uri: p.url }} style={styles.thumb} /> : null))}
+                            </View>
+                          )}
+                        </View>
+                      )}
+                    </View>
                   )}
                 </View>
-
-                {(canTick || (mediaBySubtask[s.id]?.length ?? 0) > 0) && (
-                  <View style={styles.photoRow}>
-                    {(mediaBySubtask[s.id] ?? []).map((p) =>
-                      p.url ? <Image key={p.id} source={{ uri: p.url }} style={styles.thumb} /> : null,
-                    )}
-                    {canTick && (
-                      <Pressable style={styles.addPhoto} disabled={busy} onPress={() => attachPhoto(s.id)}>
-                        <Ionicons name="camera-outline" size={16} color={colors.brand} />
-                      </Pressable>
-                    )}
-                  </View>
-                )}
-              </View>
-            ))}
+              );
+            })}
             {counted.length === 0 && (
               <Text style={styles.empty}>{!usesPlanFlow && canTick ? 'Break the task into steps below.' : 'No plan steps.'}</Text>
             )}
@@ -501,9 +556,12 @@ export function SubtaskPanel({
             </View>
           )}
 
-          {canTick && counted.length > 0 && done < counted.length && (
-            <Text style={styles.gateHint}>Tick every step to unlock Submit for sign-off.</Text>
-          )}
+          {counted.length > 0 &&
+            (canTick ? (
+              <Text style={styles.gateHint}>Open a step to tick it off and attach proof. Marking complete is final.</Text>
+            ) : usesPlanFlow ? (
+              <Text style={styles.gateHint}>Read-only — the assignee ticks steps and attaches proof. Open a step to review.</Text>
+            ) : null)}
 
           {/* Variations — extra scope raised after the baseline was locked */}
           {planLocked && (openVariations.length > 0 || canAddVariation) && (
@@ -675,7 +733,20 @@ const makeStyles = (c: Colors) =>
     list: { marginTop: 10, gap: 12 },
     itemWrap: { gap: 6 },
     item: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    photoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginLeft: 32 },
+    photoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    discl: { borderWidth: 1, borderColor: c.border, borderRadius: radius.md, overflow: 'hidden' },
+    disclDone: { borderColor: c.success, backgroundColor: c.successSoft },
+    disclHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 11 },
+    disclTitle: { flex: 1, fontSize: 14, fontFamily: font.bodySemi, color: c.text },
+    disclMeta: { fontSize: 11, fontFamily: font.body, color: c.subtle },
+    disclBody: { borderTopWidth: 1, borderTopColor: c.border, paddingHorizontal: 14, paddingVertical: 12, paddingLeft: 34, gap: 11 },
+    markRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+    markText: { fontSize: 14, fontFamily: font.body, color: c.muted },
+    markDone: { color: c.success, fontFamily: font.bodySemi },
+    proofLabel: { fontSize: 10.5, fontFamily: font.bodyBold, color: c.subtle, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
+    detailRow: { flexDirection: 'row', gap: 12 },
+    detailKey: { width: 74, fontSize: 10.5, fontFamily: font.bodyBold, color: c.subtle, textTransform: 'uppercase', letterSpacing: 0.5 },
+    detailVal: { flex: 1, fontSize: 13, fontFamily: font.body, color: c.text },
     thumb: { width: 44, height: 44, borderRadius: 8, backgroundColor: c.border },
     addPhoto: {
       width: 44,
