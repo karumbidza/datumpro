@@ -83,7 +83,6 @@ export function SubtaskPanel({
   const [newStart, setNewStart] = useState<string | null>(null);
   const [newEnd, setNewEnd] = useState<string | null>(null);
   const [newCost, setNewCost] = useState('');
-  const [addOpen, setAddOpen] = useState(false);
   // Editing an existing plan step — one local buffer, saved on Done (no
   // save-on-every-keystroke churn).
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -276,6 +275,47 @@ export function SubtaskPanel({
             your quote; it goes to the PM &amp; admin for approval.
           </Text>
 
+          {/* Add a step — a labeled sub-card, first (matches the web layout) */}
+          <View style={styles.addBlock}>
+            <Text style={styles.addLabel}>Add a step</Text>
+            <TextInput value={newTitle} onChangeText={setNewTitle} placeholder="e.g. Excavate footing" placeholderTextColor={colors.subtle} style={styles.input} />
+            <View style={styles.editGrid}>
+              <TextInput value={newQty} onChangeText={setNewQty} keyboardType="numeric" placeholder="Duration" placeholderTextColor={colors.subtle} style={[styles.input, styles.qty]} />
+              <View style={styles.unitToggle}>
+                {(['hours', 'days'] as const).map((u) => (
+                  <Pressable key={u} style={[styles.unitBtn, newUnit === u && styles.unitBtnOn]} onPress={() => setNewUnit(u)}>
+                    <Text style={[styles.unitText, newUnit === u && styles.unitTextOn]}>{u === 'hours' ? 'hrs' : 'days'}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <TextInput value={newCost} onChangeText={setNewCost} keyboardType="numeric" placeholder="Cost $" placeholderTextColor={colors.subtle} style={[styles.input, styles.cost]} />
+            </View>
+            <DateField label="Start" value={newStart} onChange={setNewStart} min={taskStart} max={taskEnd} />
+            <Pressable
+              style={[styles.btn, styles.btnPrimary, (!newTitle.trim() || busy) && { opacity: 0.5 }]}
+              disabled={!newTitle.trim() || busy}
+              onPress={() =>
+                run(async () => {
+                  await addSubtask({
+                    taskId,
+                    orgId,
+                    title: newTitle.trim(),
+                    costCents: Math.round((Number(newCost) || 0) * 100),
+                    estQty: Number(newQty) || null,
+                    estUnit: newUnit,
+                    plannedStartDate: newStart,
+                  });
+                  setNewTitle('');
+                  setNewQty('');
+                  setNewCost('');
+                  setNewStart(null);
+                })
+              }
+            >
+              {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.btnPrimaryText}>Add step</Text>}
+            </Pressable>
+          </View>
+
           {baseline.map((s) =>
             editingId === s.id ? (
               <View key={s.id} style={styles.editRow}>
@@ -340,65 +380,6 @@ export function SubtaskPanel({
                 </Pressable>
               </View>
             ),
-          )}
-
-          {/* Add a step */}
-          {!addOpen ? (
-            <Pressable style={styles.addStepBtn} onPress={() => setAddOpen(true)}>
-              <Ionicons name="add-circle-outline" size={18} color={colors.brand} />
-              <Text style={styles.addStepText}>Add a step</Text>
-            </Pressable>
-          ) : (
-            <View style={styles.addBlock}>
-              <TextInput
-                value={newTitle}
-                onChangeText={setNewTitle}
-                placeholder="What's the step?"
-                placeholderTextColor={colors.subtle}
-                style={styles.input}
-              />
-              <View style={styles.editGrid}>
-                <TextInput value={newQty} onChangeText={setNewQty} keyboardType="numeric" placeholder="Duration" placeholderTextColor={colors.subtle} style={[styles.input, styles.qty]} />
-                <View style={styles.unitToggle}>
-                  {(['hours', 'days'] as const).map((u) => (
-                    <Pressable key={u} style={[styles.unitBtn, newUnit === u && styles.unitBtnOn]} onPress={() => setNewUnit(u)}>
-                      <Text style={[styles.unitText, newUnit === u && styles.unitTextOn]}>{u === 'hours' ? 'hrs' : 'days'}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-                <TextInput value={newCost} onChangeText={setNewCost} keyboardType="numeric" placeholder="Cost $" placeholderTextColor={colors.subtle} style={[styles.input, styles.cost]} />
-              </View>
-              <DateField label="Start" value={newStart} onChange={setNewStart} min={taskStart} max={taskEnd} />
-              <View style={styles.row}>
-                <Pressable
-                  style={[styles.btn, styles.btnPrimary, (!newTitle.trim() || busy) && { opacity: 0.5 }]}
-                  disabled={!newTitle.trim() || busy}
-                  onPress={() =>
-                    run(async () => {
-                      await addSubtask({
-                        taskId,
-                        orgId,
-                        title: newTitle.trim(),
-                        costCents: Math.round((Number(newCost) || 0) * 100),
-                        estQty: Number(newQty) || null,
-                        estUnit: newUnit,
-                        plannedStartDate: newStart,
-                      });
-                      setNewTitle('');
-                      setNewQty('');
-                      setNewCost('');
-                      setNewStart(null);
-                      setAddOpen(false);
-                    })
-                  }
-                >
-                  {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.btnPrimaryText}>Add step</Text>}
-                </Pressable>
-                <Pressable style={[styles.btn, styles.btnOutline]} onPress={() => setAddOpen(false)}>
-                  <Text style={styles.btnOutlineText}>Cancel</Text>
-                </Pressable>
-              </View>
-            </View>
           )}
 
           {/* Total + submit */}
@@ -743,14 +724,15 @@ const makeStyles = (c: Colors) =>
     stepMeta: { fontSize: 11, fontFamily: font.body, color: c.subtle, marginTop: 2 },
     stepWarn: { color: c.accent, fontFamily: font.bodySemi },
     editGrid: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-    qty: { width: 64, textAlign: 'center' },
+    qty: { flex: 1, textAlign: 'center' },
     cost: { flex: 1, textAlign: 'right' },
     unitToggle: { flexDirection: 'row', borderWidth: 1, borderColor: c.border, borderRadius: radius.md, overflow: 'hidden' },
     unitBtn: { paddingHorizontal: 10, paddingVertical: 9 },
     unitBtnOn: { backgroundColor: c.brand },
     unitText: { fontSize: 12, fontFamily: font.bodySemi, color: c.muted },
     unitTextOn: { color: c.onBrand },
-    addBlock: { gap: 8, borderWidth: 1, borderColor: c.border, borderRadius: radius.md, padding: 10 },
+    addBlock: { gap: 8, borderWidth: 1, borderColor: c.border, borderRadius: radius.md, padding: 12 },
+    addLabel: { fontSize: 11, fontFamily: font.bodyBold, color: c.subtle, textTransform: 'uppercase', letterSpacing: 0.5 },
     addRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
     addBtnInline: { backgroundColor: c.brand, borderRadius: radius.md, paddingHorizontal: 18, paddingVertical: 11 },
     addBtnText: { color: c.onBrand, fontFamily: font.bodyBold },
