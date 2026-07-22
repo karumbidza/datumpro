@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<style>
+  body{margin:0;background:#f4f4f5;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;color:#18181b;padding:40px;display:flex;justify-content:center}
+  input.f,select.f{box-sizing:border-box;height:40px;border:1px solid #e4e4e7;border-radius:8px;background:#fff;padding:0 12px;font-size:14px;color:#18181b;outline:none;width:100%;transition:border-color .12s,box-shadow .12s;font-family:inherit}
+  input.f::placeholder{color:#a1a1aa}
+  input.f:focus,select.f:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+  input.f::-webkit-outer-spin-button,input.f::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  input.f[type=number]{-moz-appearance:textfield;appearance:textfield}
+  select.f{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;cursor:pointer}
+</style>
+</helmet>
+
+<div style="width:640px;height:max-content;background:#fff;border:1px solid #e4e4e7;border-radius:14px;padding:28px;box-shadow:0 1px 2px rgba(0,0,0,.04)">
+
+  <h3 style="margin:0;font-size:17px;font-weight:600">Your bid</h3>
+  <p style="margin:8px 0 0;font-size:13.5px;line-height:1.55;color:#71717a;text-wrap:pretty">Break the work into the steps you'd do, each with a duration, a start date and a cost. This is your sealed bid — the PM compares it against others and awards the winner. You can edit until they decide.</p>
+
+  <!-- add form -->
+  <div style="margin-top:22px;border:1px solid #e4e4e7;border-radius:12px;padding:18px;background:#fbfbfc">
+    <div>
+      <label style="display:block;font-size:11.5px;font-weight:600;color:#71717a;margin-bottom:6px">Step</label>
+      <input class="f" placeholder="e.g. Excavate footing">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 16px;align-items:end;margin-top:14px">
+      <div>
+        <label style="display:block;font-size:11.5px;font-weight:600;color:#71717a;margin-bottom:6px">Duration</label>
+        <div style="display:flex;gap:8px">
+          <input class="f" type="number" min="0" step="0.5" value="{{ dur }}" onInput="{{ setDur }}" style="flex:1;font-variant-numeric:tabular-nums;box-sizing:border-box;height:40px;border:1px solid #e4e4e7;border-radius:8px;background:#fff;font-size:14px;color:#18181b;outline:none;padding:0 12px">
+          <select class="f" style="width:104px"><option>day(s)</option><option>hours</option></select>
+        </div>
+      </div>
+      <div>
+        <label style="display:block;font-size:11.5px;font-weight:600;color:#71717a;margin-bottom:6px">Start</label>
+        <input class="f" type="date" value="2026-07-22">
+      </div>
+      <div>
+        <label style="display:block;font-size:11.5px;font-weight:600;color:#71717a;margin-bottom:6px">Cost ($)</label>
+        <input class="f" type="number" min="0" step="0.01" placeholder="0.00" style="text-align:right;box-sizing:border-box;height:40px;border:1px solid #e4e4e7;border-radius:8px;background:#fff;font-size:14px;color:#18181b;outline:none;width:100%;padding:0 12px;font-variant-numeric:tabular-nums">
+      </div>
+      <div style="display:flex;align-items:flex-end">
+        <button onClick="{{ noop }}" style="width:100%;height:40px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-size:14px;font-weight:600;cursor:pointer" style-hover="width:100%;height:40px;border:none;border-radius:8px;background:#1d4ed8;color:#fff;font-size:14px;font-weight:600;cursor:pointer">Add step</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- existing step cards -->
+  <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
+    <sc-for list="{{ rows }}" as="r" hint-placeholder-count="2">
+      <div style="display:flex;align-items:center;gap:14px;border:1px solid #e4e4e7;border-radius:10px;padding:13px 16px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:600;color:#18181b">{{ r.title }}</div>
+          <div style="font-size:12.5px;color:#a1a1aa;margin-top:2px">{{ r.meta }}</div>
+        </div>
+        <div style="font-size:15px;font-weight:700;color:#18181b;font-variant-numeric:tabular-nums">{{ r.cost }}</div>
+        <button onClick="{{ noop }}" title="Remove" style="width:28px;height:28px;border:none;background:none;color:#a1a1aa;border-radius:6px;cursor:pointer;font-size:14px" style-hover="width:28px;height:28px;border:none;background:#fef2f2;color:#ef4444;border-radius:6px;cursor:pointer;font-size:14px">✕</button>
+      </div>
+    </sc-for>
+  </div>
+
+  <!-- total + submit -->
+  <div style="margin-top:22px;padding-top:20px;border-top:1px solid #f0f0f1;display:flex;align-items:center;justify-content:space-between">
+    <div style="font-size:14px;color:#71717a">Your total &nbsp;<span style="font-size:20px;font-weight:700;color:#18181b;font-variant-numeric:tabular-nums">{{ total }}</span></div>
+    <button onClick="{{ noop }}" style="height:42px;padding:0 26px;border:none;border-radius:9px;background:#2563eb;color:#fff;font-size:14.5px;font-weight:600;cursor:pointer" style-hover="height:42px;padding:0 26px;border:none;border-radius:9px;background:#1d4ed8;color:#fff;font-size:14.5px;font-weight:600;cursor:pointer">Submit bid</button>
+  </div>
+
+  <!-- doc attach -->
+  <div style="margin-top:20px;padding-top:18px;border-top:1px solid #f0f0f1">
+    <p style="margin:0 0 10px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#a1a1aa">BoQ / invoice (PDF, Excel, CSV)</p>
+    <button onClick="{{ noop }}" style="display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 16px;border:1px dashed #d4d4d8;border-radius:8px;background:#fff;color:#3f3f46;font-size:13.5px;font-weight:500;cursor:pointer" style-hover="display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 16px;border:1px dashed #2563eb;border-radius:8px;background:#eff6ff;color:#1d4ed8;font-size:13.5px;font-weight:500;cursor:pointer"><span aria-hidden style="opacity:.6">📎</span> Attach BoQ / invoice</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { dur: 1 };
+  renderVals() {
+    const rows = [
+      { title: 'Excavate footing', meta: '2 day(s) · starts 24/07/2026', cost: '$1,800.00' },
+      { title: 'Pour & cure concrete', meta: '3 day(s) · starts 26/07/2026', cost: '$4,250.00' },
+    ];
+    return {
+      rows,
+      total: '$6,050.00',
+      dur: this.state.dur,
+      setDur: (e) => { const v = parseFloat(e.target.value); this.setState({ dur: isNaN(v) ? 0 : v }); },
+      noop: () => {},
+    };
+  }
+}
+</script>
+</body>
+</html>

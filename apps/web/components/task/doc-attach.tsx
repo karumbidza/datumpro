@@ -92,10 +92,11 @@ export function DocAttach({
       )}
       {canEdit && (
         <label
-          className={`inline-flex cursor-pointer items-center gap-2 rounded-md border border-zinc-200 px-3 py-1.5 text-xs font-medium hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800 ${
+          className={`inline-flex h-[38px] cursor-pointer items-center gap-2 rounded-lg border border-dashed border-zinc-300 px-4 text-[13.5px] font-medium text-zinc-700 transition-colors hover:border-brand-500 hover:bg-brand-50 hover:text-brand-600 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-brand-500/10 ${
             busy ? 'pointer-events-none opacity-60' : ''
           }`}
         >
+          <span aria-hidden className="opacity-60">📎</span>
           <input
             type="file"
             accept=".pdf,.xls,.xlsx,.csv,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
