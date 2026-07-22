@@ -19,6 +19,14 @@ async function requireUser() {
   return { supabase, user };
 }
 
+/** No backdating: a start date can't be earlier than today (server floor that
+ *  mirrors the pickers' `min`). Compares YYYY-MM-DD strings; empty is allowed. */
+function isBackdated(startDate: string | null | undefined): boolean {
+  if (!startDate) return false;
+  return startDate < new Date().toISOString().slice(0, 10);
+}
+const NO_BACKDATE = 'The start date can’t be in the past.';
+
 /** The project role to enrol a task assignee at, from their org member type —
  *  mirrors enforce_project_role_for_type so the insert is always accepted. A
  *  contractor stays a contractor (never a PM); clients/viewers stay read-only. */
@@ -135,6 +143,7 @@ export async function createTask(_prev: FormState, formData: FormData): Promise<
     plannedEndDate: (formData.get('plannedEndDate') as string) || undefined,
   });
   if (!parsed.success) return { error: parsed.error.issues.map((i) => i.message).join(', ') };
+  if (isBackdated(parsed.data.plannedStartDate)) return { error: NO_BACKDATE };
 
   const { data: project } = await supabase
     .from('projects')
@@ -484,6 +493,8 @@ export async function addSubtask(formData: FormData) {
   const estUnit = estUnitRaw === 'hours' || estUnitRaw === 'days' ? estUnitRaw : null;
   const estQtyRaw = Number(formData.get('estQty'));
   const costRaw = Number(formData.get('cost')); // dollars from the form
+  const startDate = (formData.get('plannedStartDate') as string) || null;
+  if (isBackdated(startDate)) throw new Error(NO_BACKDATE);
   // is_variation / variation_status are set by the DB from the task's plan state.
   const { error } = await supabase.from('task_subtasks').insert({
     org_id: info.org_id,
@@ -492,7 +503,7 @@ export async function addSubtask(formData: FormData) {
     cost_cents: Number.isFinite(costRaw) ? Math.max(0, Math.round(costRaw * 100)) : 0,
     est_qty: Number.isFinite(estQtyRaw) && estQtyRaw > 0 ? estQtyRaw : null,
     est_unit: estUnit,
-    planned_start_date: (formData.get('plannedStartDate') as string) || null,
+    planned_start_date: startDate,
     planned_end_date: (formData.get('plannedEndDate') as string) || null,
     bid_contractor_id: bidContractorId,
     position,
@@ -563,7 +574,11 @@ export async function updateSubtask(formData: FormData) {
   const unit = formData.get('estUnit');
   if (unit !== null) row.est_unit = unit === 'hours' || unit === 'days' ? unit : null;
   const start = formData.get('plannedStartDate');
-  if (start !== null) row.planned_start_date = String(start) || null;
+  if (start !== null) {
+    const s = String(start) || null;
+    if (isBackdated(s)) throw new Error(NO_BACKDATE);
+    row.planned_start_date = s;
+  }
   if (Object.keys(row).length > 0) {
     const { error } = await supabase.from('task_subtasks').update(row).eq('id', id);
     if (error) throw new Error(error.message);
