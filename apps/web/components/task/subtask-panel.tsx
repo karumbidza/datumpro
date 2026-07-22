@@ -15,6 +15,8 @@ import {
   toggleSubtask,
   submitPlan,
   startTask,
+  submitTask,
+  raiseBlocker,
 } from '@/app/(app)/projects/[projectId]/tasks/actions';
 import type { Subtask } from '@/lib/data/subtasks';
 import type { ApprovalStep } from '@/lib/data/approvals';
@@ -22,8 +24,6 @@ import type { TaskDoc } from '@/lib/data/tenders';
 import { DocAttach } from '@/components/task/doc-attach';
 import { formatUsd } from '@datumpro/shared/domain';
 import { MediaUploader } from '@/components/task/media-uploader';
-import { SubmitTaskForm } from '@/components/task/submit-task-form';
-import { BlockerForm } from '@/components/task/blocker-form';
 
 const inputClass =
   'rounded-md border border-zinc-200 bg-transparent px-2 py-1 text-xs outline-none focus:border-brand-500 dark:border-zinc-800';
@@ -103,7 +103,11 @@ export function SubtaskPanel({
 }) {
   const [declineOpen, setDeclineOpen] = useState(false);
   const [handBackOpen, setHandBackOpen] = useState(false);
+  const [submitOpen, setSubmitOpen] = useState(false); // submit-for-sign-off modal
+  const [blockerOpen, setBlockerOpen] = useState(false); // raise-blocker modal
   const [planErr, submitPlanAction] = useActionState(submitPlan, {} as FormState);
+  const [submitState, submitTaskAction] = useActionState(submitTask, {} as FormState);
+  const [blockerState, raiseBlockerAction] = useActionState(raiseBlocker, {} as FormState);
 
   const baseline = subtasks.filter((s) => !s.isVariation);
   const counted = subtasks.filter(isCounted);
@@ -700,22 +704,29 @@ export function SubtaskPanel({
 
       {/* ── Commenced work: submit for sign-off / raise a blocker ── */}
       {canWorkflow && (
-        <div className="mt-4 grid gap-4 border-t border-zinc-100 pt-4 dark:border-zinc-800 sm:grid-cols-2">
-          <div>
-            <p className="text-[13px] font-semibold text-zinc-800 dark:text-zinc-100">Submit for sign-off</p>
-            {planComplete ? (
-              <SubmitTaskForm taskId={taskId} />
-            ) : (
-              <p className="mt-2 text-[12.5px] text-zinc-500 dark:text-zinc-400">
-                Complete every step above before submitting for sign-off.
-              </p>
-            )}
-          </div>
-          <div>
-            <p className="text-[13px] font-semibold text-zinc-800 dark:text-zinc-100">Raise a blocker</p>
-            <BlockerForm taskId={taskId} />
-          </div>
+        <div className="mt-4 flex items-center gap-3 border-t border-zinc-100 pt-4 dark:border-zinc-800">
+          <button
+            type="button"
+            onClick={() => setSubmitOpen(true)}
+            disabled={!planComplete}
+            title={planComplete ? undefined : 'Complete every step above first'}
+            className="inline-flex h-[44px] flex-1 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Submit for sign-off
+          </button>
+          <button
+            type="button"
+            onClick={() => setBlockerOpen(true)}
+            className="inline-flex h-[44px] flex-1 items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-red-700"
+          >
+            Raise a blocker
+          </button>
         </div>
+      )}
+      {canWorkflow && !planComplete && (
+        <p className="mt-2 text-[11.5px] text-zinc-400">
+          Complete every step above to submit for sign-off.
+        </p>
       )}
 
       {canHandBack && (
@@ -785,6 +796,82 @@ export function SubtaskPanel({
               </button>
             </form>
           </div>
+        </div>
+      </div>
+    )}
+
+    {/* Submit for sign-off — popup */}
+    {submitOpen && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-6">
+        <div className="w-[420px] rounded-2xl bg-white p-[22px] shadow-2xl dark:bg-zinc-900">
+          <h4 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">Submit for sign-off</h4>
+          <p className="mt-1 text-[13px] leading-[1.55] text-zinc-500 dark:text-zinc-400">
+            This sends the completed task to the project manager for approval.
+          </p>
+          <form action={submitTaskAction} className="mt-4 space-y-3">
+            <input type="hidden" name="taskId" value={taskId} />
+            <FormError error={submitState.error} />
+            <textarea
+              name="notes"
+              rows={3}
+              placeholder="What was completed?"
+              className={`${inputClass} w-full text-sm`}
+            />
+            <label className="flex items-center gap-2 text-[13.5px] text-zinc-700 dark:text-zinc-200">
+              <input type="checkbox" name="declaration" className="h-[16px] w-[16px] accent-brand-600" />
+              I confirm this work is complete and accurate.
+            </label>
+            <div className="flex justify-end gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => setSubmitOpen(false)}
+                className="h-[38px] rounded-lg border border-zinc-200 px-4 text-[13.5px] font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300"
+              >
+                Cancel
+              </button>
+              <SubmitButton className="h-[38px]" pendingText="Submitting…">
+                Submit
+              </SubmitButton>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
+
+    {/* Raise a blocker — popup */}
+    {blockerOpen && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-6">
+        <div className="w-[420px] rounded-2xl bg-white p-[22px] shadow-2xl dark:bg-zinc-900">
+          <h4 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">Raise a blocker</h4>
+          <p className="mt-1 text-[13px] leading-[1.55] text-zinc-500 dark:text-zinc-400">
+            Pauses the task and flags it to the project manager. The deadline clock stops until it’s resolved.
+          </p>
+          <form action={raiseBlockerAction} className="mt-4 space-y-3">
+            <input type="hidden" name="taskId" value={taskId} />
+            <FormError error={blockerState.error} />
+            <textarea
+              name="description"
+              rows={3}
+              required
+              placeholder="What's blocking you?"
+              className={`${inputClass} w-full text-sm`}
+            />
+            <div className="flex justify-end gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => setBlockerOpen(false)}
+                className="h-[38px] rounded-lg border border-zinc-200 px-4 text-[13.5px] font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="inline-flex h-[38px] items-center justify-center rounded-lg bg-red-600 px-[18px] text-[13.5px] font-semibold text-white hover:bg-red-700"
+              >
+                Raise blocker
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     )}
