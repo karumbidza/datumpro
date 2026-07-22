@@ -11,8 +11,10 @@ import { formatUsd } from '@datumpro/shared/domain';
 
 // Shared field styling — one height (40px) + radius everywhere, brand focus ring,
 // no native number spinners.
+// No width here — each field sets its own so the explicit widths below don't
+// fight w-full (there's no tailwind-merge to resolve the conflict).
 const field =
-  'h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100';
+  'h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100';
 const numField = `${field} tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`;
 const selectField = `${field} cursor-pointer appearance-none pr-8`;
 const labelCls = 'mb-1.5 block text-[11.5px] font-semibold text-zinc-500 dark:text-zinc-400';
@@ -81,14 +83,14 @@ export function BidPanel({
         <input type="hidden" name="bid" value="1" />
         <div>
           <label className={labelCls}>Step</label>
-          <input name="title" required placeholder="e.g. Excavate footing" className={field} />
+          <input name="title" required placeholder="e.g. Excavate footing" className={`${field} w-full`} />
         </div>
         <div className="mt-3.5 grid grid-cols-2 items-end gap-x-4 gap-y-3.5">
           <div>
             <label className={labelCls}>Duration</label>
             <div className="flex gap-2">
-              <input name="estQty" type="number" min="0" step="0.5" placeholder="1" className={`${numField} flex-1`} />
-              <select name="estUnit" defaultValue="days" className={`${selectField} w-[104px]`} style={selectStyle}>
+              <input name="estQty" type="number" min="0" step="0.5" placeholder="1" className={`${numField} min-w-0 flex-1`} />
+              <select name="estUnit" defaultValue="days" className={`${selectField} w-[104px] shrink-0`} style={selectStyle}>
                 <option value="days">day(s)</option>
                 <option value="hours">hours</option>
               </select>
@@ -96,11 +98,11 @@ export function BidPanel({
           </div>
           <div>
             <label className={labelCls}>Start</label>
-            <input type="date" name="plannedStartDate" min={taskStart ?? undefined} max={taskEnd ?? undefined} className={field} />
+            <input type="date" name="plannedStartDate" min={taskStart ?? undefined} max={taskEnd ?? undefined} className={`${field} w-full`} />
           </div>
           <div>
             <label className={labelCls}>Cost ($)</label>
-            <input name="cost" type="number" min="0" step="0.01" placeholder="0.00" className={`${numField} text-right`} />
+            <input name="cost" type="number" min="0" step="0.01" placeholder="0.00" className={`${numField} w-full text-right`} />
           </div>
           <div className="flex items-end">
             <SubmitButton className="h-10 w-full" pendingText="Adding…">
@@ -126,14 +128,14 @@ export function BidPanel({
                 <input type="hidden" name="projectId" value={projectId} />
                 <div>
                   <label className={labelCls}>Step</label>
-                  <input name="title" defaultValue={l.title} required className={field} />
+                  <input name="title" defaultValue={l.title} required className={`${field} w-full`} />
                 </div>
                 <div className="mt-3.5 grid grid-cols-2 items-end gap-x-4 gap-y-3.5">
                   <div>
                     <label className={labelCls}>Duration</label>
                     <div className="flex gap-2">
-                      <input name="estQty" type="number" min="0" step="0.5" defaultValue={l.estQty ?? ''} className={`${numField} flex-1`} />
-                      <select name="estUnit" defaultValue={l.estUnit ?? 'days'} className={`${selectField} w-[104px]`} style={selectStyle}>
+                      <input name="estQty" type="number" min="0" step="0.5" defaultValue={l.estQty ?? ''} className={`${numField} min-w-0 flex-1`} />
+                      <select name="estUnit" defaultValue={l.estUnit ?? 'days'} className={`${selectField} w-[104px] shrink-0`} style={selectStyle}>
                         <option value="days">day(s)</option>
                         <option value="hours">hours</option>
                       </select>
@@ -141,11 +143,11 @@ export function BidPanel({
                   </div>
                   <div>
                     <label className={labelCls}>Start</label>
-                    <input type="date" name="plannedStartDate" defaultValue={l.plannedStartDate ?? ''} min={taskStart ?? undefined} max={taskEnd ?? undefined} className={field} />
+                    <input type="date" name="plannedStartDate" defaultValue={l.plannedStartDate ?? ''} min={taskStart ?? undefined} max={taskEnd ?? undefined} className={`${field} w-full`} />
                   </div>
                   <div>
                     <label className={labelCls}>Cost ($)</label>
-                    <input name="cost" type="number" min="0" step="0.01" defaultValue={dollars(l.costCents)} className={`${numField} text-right`} />
+                    <input name="cost" type="number" min="0" step="0.01" defaultValue={dollars(l.costCents)} className={`${numField} w-full text-right`} />
                   </div>
                   <div className="flex items-end gap-2">
                     <SubmitButton className="h-10 flex-1" pendingText="Saving…">

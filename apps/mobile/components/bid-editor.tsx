@@ -237,7 +237,7 @@ const makeStyles = (c: Colors) =>
     stepMeta: { fontSize: 11, fontFamily: font.body, color: c.subtle, marginTop: 2 },
     stepWarn: { color: c.accent, fontFamily: font.bodySemi },
     grid: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-    qty: { width: 64, textAlign: 'center' },
+    qty: { flex: 1, textAlign: 'center' },
     cost: { flex: 1, textAlign: 'right' },
     unitToggle: { flexDirection: 'row', borderWidth: 1, borderColor: c.border, borderRadius: radius.md, overflow: 'hidden' },
     unitBtn: { paddingHorizontal: 10, paddingVertical: 9 },
