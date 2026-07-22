@@ -203,6 +203,34 @@ export default async function TaskDetailPage({
   // scroll. Tabs only appear when they have something to show.
   const tabs: TaskTab[] = [];
 
+  // Details tab — the at-a-glance reference (assignee, priority, dates, notes).
+  // Kept out of the main window to keep it clean; urgent state stays up top.
+  tabs.push({
+    key: 'details',
+    label: 'Details',
+    content: (
+      <Card className="space-y-2 text-sm">
+        <Row
+          label="Assignee"
+          value={isTendering ? (isBidder ? 'You’re bidding on this' : 'Open for bidding') : assigneeName}
+        />
+        <Row label="Priority" value={task.priority} />
+        <Row label="SLA" value={task.sla_status.replace('_', ' ')} />
+        {task.status !== 'done' && sched && (
+          <Row label="Schedule" value={sched.critical ? 'On critical path' : `${sched.floatDays}d slack`} />
+        )}
+        {task.planned_start_date && <Row label="Start" value={task.planned_start_date} />}
+        {task.due_date && <Row label="Due" value={task.due_date} />}
+        {task.description && (
+          <p className="pt-2 text-zinc-600 dark:text-zinc-300">{task.description}</p>
+        )}
+        {task.completion_notes && (
+          <p className="text-zinc-600 dark:text-zinc-300">📝 {task.completion_notes}</p>
+        )}
+      </Card>
+    ),
+  });
+
   if (dm) {
     tabs.push({
       key: 'discussion',
@@ -416,7 +444,7 @@ export default async function TaskDetailPage({
           ) : (
             <Badge tone={STATUS_TONE[task.status]}>{task.status.replace('_', ' ')}</Badge>
           )}
-          {canManage && task.status !== 'done' && (
+          {canManage && !isAssignee && task.status !== 'done' && (
             <Link href={`/projects/${projectId}/tasks/${taskId}/edit`}>
               <Button variant="secondary">Edit</Button>
             </Link>
@@ -424,48 +452,36 @@ export default async function TaskDetailPage({
         </div>
       </div>
 
-      {/* Overview — at a glance + act. Everything else is tabbed below. */}
-      <Card className="mt-4 space-y-2 text-sm">
-        <Row
-          label="Assignee"
-          value={isTendering ? (isBidder ? 'You’re bidding on this' : 'Open for bidding') : assigneeName}
-        />
-        {isTendering && canManage && (
-          <p className="rounded-md bg-amber-50 p-2 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
-            📣 Out to tender — {tenderInvites.filter((i) => i.status === 'submitted').length}/{tenderInvites.length} bid(s)
-            in. Compare and award in the Tender tab.
-          </p>
-        )}
-        <Row label="Priority" value={task.priority} />
-        <Row label="SLA" value={task.sla_status.replace('_', ' ')} />
-        {task.status !== 'done' && sched && (
-          <Row
-            label="Schedule"
-            value={sched.critical ? 'On critical path' : `${sched.floatDays}d slack`}
-          />
-        )}
-        {task.planned_start_date && <Row label="Start" value={task.planned_start_date} />}
-        {task.due_date && <Row label="Due" value={task.due_date} />}
-        {task.description && <p className="pt-2 text-zinc-600 dark:text-zinc-300">{task.description}</p>}
-        {blockedByDeps && (
-          <p className="mt-1 flex items-center gap-2 text-sm font-semibold text-red-600 dark:text-red-400">
-            <span className="text-[13px]">🔒</span> Blocked: {waitingOn.join(', ')}
-          </p>
-        )}
-        {task.status === 'blocked' && task.blocker_description && (
-          <p className="rounded-md bg-amber-50 p-2 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
-            🚧 {task.blocker_description}
-          </p>
-        )}
-        {task.rejection_reason && task.status === 'in_progress' && (
-          <p className="rounded-md bg-red-50 p-2 text-red-700 dark:bg-red-500/10 dark:text-red-400">
-            ✗ Sent back: {task.rejection_reason}
-          </p>
-        )}
-        {task.completion_notes && (
-          <p className="text-zinc-600 dark:text-zinc-300">📝 {task.completion_notes}</p>
-        )}
-      </Card>
+      {/* Urgent, actionable state stays visible here; the at-a-glance reference
+          (assignee, priority, dates, description) lives in the Details tab. */}
+      {((isTendering && canManage) ||
+        blockedByDeps ||
+        (task.status === 'blocked' && task.blocker_description) ||
+        (task.rejection_reason && task.status === 'in_progress')) && (
+        <div className="mt-4 space-y-2 text-sm">
+          {isTendering && canManage && (
+            <p className="rounded-md bg-amber-50 p-2 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
+              📣 Out to tender — {tenderInvites.filter((i) => i.status === 'submitted').length}/{tenderInvites.length}{' '}
+              bid(s) in. Compare and award in the Tender tab.
+            </p>
+          )}
+          {blockedByDeps && (
+            <p className="flex items-center gap-2 font-semibold text-red-600 dark:text-red-400">
+              <span className="text-[13px]">🔒</span> Blocked: {waitingOn.join(', ')}
+            </p>
+          )}
+          {task.status === 'blocked' && task.blocker_description && (
+            <p className="rounded-md bg-amber-50 p-2 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
+              🚧 {task.blocker_description}
+            </p>
+          )}
+          {task.rejection_reason && task.status === 'in_progress' && (
+            <p className="rounded-md bg-red-50 p-2 text-red-700 dark:bg-red-500/10 dark:text-red-400">
+              ✗ Sent back: {task.rejection_reason}
+            </p>
+          )}
+        </div>
+      )}
 
       {isBidder && (
         <div className="mt-4">
