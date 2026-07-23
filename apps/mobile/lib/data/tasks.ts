@@ -31,6 +31,7 @@ export interface TaskDetail extends MyTask {
 export interface TaskPermissions {
   isAssignee: boolean;
   canManage: boolean; // org owner/admin, or the project's PM
+  canReview: boolean; // the assigned project PM only — reviews submitted tasks
 }
 
 /** Can the current user manage (create/assign/approve) in this project? */
@@ -70,6 +71,7 @@ export async function getTaskPermissions(
   return {
     isAssignee: !!me && assigneeId === me,
     canManage: orgRole === 'owner' || orgRole === 'admin' || projectRole === 'pm',
+    canReview: projectRole === 'pm',
   };
 }
 

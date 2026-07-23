@@ -57,7 +57,8 @@ export function TaskActions({
   // Start moved into the plan panel (top, under the progress bar). Actions now
   // covers only submit / raise-blocker (assignee) and review (manager).
   const canSubmit = perms.isAssignee && task.status === 'in_progress' && !acceptancePending;
-  const canDecide = perms.canManage && task.status === 'submitted';
+  // Reviewing a submitted task is the assigned project PM's call only.
+  const canDecide = perms.canReview && task.status === 'submitted';
 
   if (!canSubmit && !canDecide) return null;
 

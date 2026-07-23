@@ -157,18 +157,22 @@ export default async function TaskDetailPage({
   const usedPredecessors = new Set(dependencies.map((d) => d.predecessorId));
   const addable = taskOptions.filter((t) => !usedPredecessors.has(t.id));
 
+  // Reviewing a submitted task (approve / send back) is the assigned project
+  // manager's call only — not org owners/admins — for now. The DB sign-off guard
+  // enforces the same rule.
+  const canReviewTask = projectRole === 'pm';
+
   // Status-aware workflow actions stay in the always-visible overview zone so
   // the primary CTA is never buried behind a tab. The DB enforces the real
-  // rules (e.g. only a lead can approve to DONE) regardless of what's shown.
+  // rules regardless of what's shown.
   const workflowActions =
-    canManage &&
     !acceptancePending &&
     !isBidder &&
-    (task.status === 'submitted' || task.status === 'blocked') ? (
+    ((task.status === 'submitted' && canReviewTask) || (task.status === 'blocked' && canManage)) ? (
       <div className="mt-4 space-y-4">
-        {task.status === 'submitted' && <ReviewSubmission taskId={taskId} />}
+        {task.status === 'submitted' && canReviewTask && <ReviewSubmission taskId={taskId} />}
 
-        {task.status === 'blocked' && (
+        {task.status === 'blocked' && canManage && (
           <form action={resolveBlocker}>
             <input type="hidden" name="taskId" value={taskId} />
             <Button type="submit">Resolve blocker (resume, credit deadline)</Button>
