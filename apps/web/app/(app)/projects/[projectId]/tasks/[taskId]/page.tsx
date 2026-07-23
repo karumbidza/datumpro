@@ -20,6 +20,8 @@ import { TenderPanel } from '@/components/task/tender-panel';
 import { BidPanel } from '@/components/task/bid-panel';
 import { SubtaskPanel } from '@/components/task/subtask-panel';
 import { listSubtasks } from '@/lib/data/subtasks';
+import { getTaskPaymentInfo } from '@/lib/data/owed';
+import { TaskPaymentPanel } from '@/components/task/task-payment-panel';
 import { ChatPanel } from '@/components/chat/chat-panel';
 import { stepsByEntity } from '@/lib/data/approvals';
 import { LiveRefresh } from '@/components/live-refresh';
@@ -65,6 +67,7 @@ export default async function TaskDetailPage({
     subtasks,
     subtaskMedia,
     dmConversationId,
+    taskPayment,
   ] = await Promise.all([
     listProjectMembers(projectId),
     myOrgRole(task.org_id),
@@ -80,6 +83,7 @@ export default async function TaskDetailPage({
     listSubtasks(taskId),
     listSubtaskMedia(taskId),
     getTaskConversationId(taskId),
+    getTaskPaymentInfo(taskId),
   ]);
   const sched = schedule?.meta[taskId];
   const variationIds = subtasks.filter((s) => s.isVariation).map((s) => s.id);
@@ -331,6 +335,23 @@ export default async function TaskDetailPage({
 
   // Extensions and completion attachments now live inside the task plan panel
   // (next to variations), so there are no separate Extensions / Evidence tabs.
+
+  // Payment — the assignee (contractor, PM or admin) sees this task's balance and
+  // invoices against it here; managers see it read-only. Only once a plan is
+  // approved (there's an awarded amount to claim).
+  if (taskPayment && (isAssignee || canManage)) {
+    tabs.push({
+      key: 'payment',
+      label: 'Payment',
+      content: (
+        <TaskPaymentPanel
+          info={taskPayment}
+          task={{ taskId, title: task.title, projectId, orgId: task.org_id }}
+          isAssignee={isAssignee}
+        />
+      ),
+    });
+  }
 
   if (activity.length > 0) {
     tabs.push({

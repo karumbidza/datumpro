@@ -58,10 +58,10 @@ export default async function MyPaymentsPage() {
       <Link href="/dashboard" className="text-xs text-zinc-500 hover:underline">
         ← Dashboard
       </Link>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight">Payments &amp; documents</h1>
+      <h1 className="mt-1 text-2xl font-semibold tracking-tight">Finance</h1>
       <p className="text-sm text-zinc-500 dark:text-zinc-400">
-        What you&apos;re owed on your approved plans. Raise a payment request against a task, attach your
-        invoice, and track it through to payment.
+        Your overall statement — what you&apos;re owed across your approved plans. You can also raise a
+        payment request from each task&apos;s Payment tab.
       </p>
 
       <section className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">

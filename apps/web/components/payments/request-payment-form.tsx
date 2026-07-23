@@ -104,16 +104,18 @@ export function RequestPaymentForm({ tasks, taskId }: { tasks: RequestTask[]; ta
         </button>
       </div>
 
-      <label className="block text-xs font-medium text-zinc-500">
-        Task (approved plan)
-        <select value={selId} onChange={(e) => pickTask(e.target.value)} className={inputClass}>
-          {claimable.map((t) => (
-            <option key={t.taskId} value={t.taskId}>
-              {t.projectName} · {t.title} — {formatUsd(t.requestableCents)} left
-            </option>
-          ))}
-        </select>
-      </label>
+      {claimable.length > 1 ? (
+        <label className="block text-xs font-medium text-zinc-500">
+          Task (approved plan)
+          <select value={selId} onChange={(e) => pickTask(e.target.value)} className={inputClass}>
+            {claimable.map((t) => (
+              <option key={t.taskId} value={t.taskId}>
+                {t.projectName} · {t.title} — {formatUsd(t.requestableCents)} left
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
 
       <label className="block text-xs font-medium text-zinc-500">
         Amount (USD) <span className="text-zinc-400">· up to {formatUsd(task?.requestableCents ?? 0)}</span>

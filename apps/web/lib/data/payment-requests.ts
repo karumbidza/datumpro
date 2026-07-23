@@ -10,7 +10,6 @@ export type PaymentRequestRow = {
   projectId: string;
   projectName: string;
   taskId: string | null;
-  scheduleId: string | null;
   contractorId: string;
   contractorName: string | null;
   title: string;
@@ -49,7 +48,6 @@ type RawRow = {
   org_id: string;
   project_id: string;
   task_id: string | null;
-  schedule_id: string | null;
   contractor_id: string;
   title: string;
   amount_cents: number;
@@ -76,7 +74,6 @@ async function hydrate(rows: RawRow[], names: Map<string, string>): Promise<Paym
       projectId: r.project_id,
       projectName: proj?.name ?? 'Project',
       taskId: r.task_id,
-      scheduleId: r.schedule_id,
       contractorId: r.contractor_id,
       contractorName: names.get(r.contractor_id) ?? null,
       title: r.title,
@@ -96,7 +93,7 @@ async function hydrate(rows: RawRow[], names: Map<string, string>): Promise<Paym
 }
 
 const SELECT =
-  'id, org_id, project_id, task_id, schedule_id, contractor_id, title, amount_cents, status, note, review_note, invoice_path, invoice_name, pop_path, pop_name, paid_at, paid_reference, created_at, projects(name)';
+  'id, org_id, project_id, task_id, contractor_id, title, amount_cents, status, note, review_note, invoice_path, invoice_name, pop_path, pop_name, paid_at, paid_reference, created_at, projects(name)';
 
 /** The signed-in contractor's own requests (RLS also scopes to them). */
 export async function listMyPaymentRequests(

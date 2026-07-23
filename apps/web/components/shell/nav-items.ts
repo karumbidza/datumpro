@@ -57,10 +57,13 @@ export function computeNav(
   return [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'All projects', href: '/projects', icon: FolderOpen },
-    ...(showMyPayments
-      ? [{ name: 'Payments & documents', href: '/payments', icon: Wallet }]
-      : []),
-    ...(canViewFinance ? [{ name: 'Finance', href: '/finance', icon: DollarSign }] : []),
+    // One "Finance" item: managers → the org finance hub; an assignee without
+    // finance access → their own statement. Same label, role-appropriate target.
+    ...(canViewFinance
+      ? [{ name: 'Finance', href: '/finance', icon: DollarSign }]
+      : showMyPayments
+        ? [{ name: 'Finance', href: '/payments', icon: Wallet }]
+        : []),
     ...(canManageMembers
       ? [
           { name: 'Organization', href: '/org', icon: Building },
