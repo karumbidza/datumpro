@@ -13,9 +13,24 @@ const ROLE_LABEL: Record<string, string> = {
   viewer: 'Viewer',
 };
 
-/** The shared two-step chain — the RN twin of the web ApprovalChain. Shows
- *  "✓ PM · ⌛ Admin" and the decide buttons to whoever's step is current
- *  (owners/admins can act on any step). */
+/** Which step roles a viewer can act on — owner covers the management slots
+ *  (admin/finance) but never the PM's own step, so a later approver can't jump
+ *  the earlier one. */
+const COVERS: Record<string, string[]> = {
+  owner: ['owner', 'admin', 'finance'],
+  admin: ['admin', 'finance'],
+  finance: ['finance'],
+  pm: ['pm'],
+  member: ['member'],
+  viewer: ['viewer'],
+};
+function canFulfill(viewerRole: string, stepRole: string): boolean {
+  return (COVERS[viewerRole] ?? [viewerRole]).includes(stepRole);
+}
+
+/** The RN twin of the web ApprovalChain. Approval is SEQUENTIAL: only the
+ *  earliest pending step is actionable; a later approver sees a greyed
+ *  "Pending … approval" until it's their turn. */
 export function ApprovalChain({
   steps,
   viewerRole,
@@ -31,8 +46,9 @@ export function ApprovalChain({
   if (steps.length === 0) return null;
 
   const active = currentStep(steps);
-  const canDecide =
-    !!active && (viewerRole === active.approverRole || viewerRole === 'owner' || viewerRole === 'admin');
+  const myStep = steps.find((s) => s.decision === 'pending' && canFulfill(viewerRole, s.approverRole));
+  const canDecide = !!active && !!myStep && myStep.id === active.id;
+  const waitingForEarlier = !!myStep && !!active && myStep.id !== active.id;
 
   function decide(decision: 'approved' | 'rejected') {
     if (!active) return;
@@ -81,13 +97,23 @@ export function ApprovalChain({
                 },
               ]}
             >
-              {s.decision === 'approved' ? '✓' : s.decision === 'rejected' ? '✕' : '⌛'}{' '}
+              {s.decision === 'approved' ? '✓' : s.decision === 'rejected' ? '✕' : '○'}{' '}
               {ROLE_LABEL[s.approverRole] ?? s.approverRole}
               {s.approverName ? ` · ${s.approverName}` : ''}
             </Text>
           </View>
         ))}
       </View>
+      {waitingForEarlier && active && (
+        <View>
+          <View style={[styles.btn, styles.btnDisabled]}>
+            <Text style={styles.btnDisabledText}>Approve</Text>
+          </View>
+          <Text style={styles.pendingHint}>
+            Pending {ROLE_LABEL[active.approverRole] ?? active.approverRole} approval
+          </Text>
+        </View>
+      )}
       {canDecide && active && (
         <View style={styles.actions}>
           <Pressable
@@ -123,4 +149,7 @@ const makeStyles = (c: Colors) =>
     btnPrimaryText: { color: c.onBrand, fontFamily: font.bodyBold, fontSize: 13 },
     btnOutline: { borderWidth: 1, borderColor: c.border },
     btnOutlineText: { color: c.text, fontFamily: font.bodyBold, fontSize: 13 },
+    btnDisabled: { backgroundColor: c.sunk, alignSelf: 'flex-start', paddingHorizontal: 18 },
+    btnDisabledText: { color: c.subtle, fontFamily: font.bodyBold, fontSize: 13 },
+    pendingHint: { marginTop: 4, fontSize: 11, fontFamily: font.body, color: c.subtle },
   });
