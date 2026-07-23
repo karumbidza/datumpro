@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Modal,
   View,
@@ -13,37 +13,40 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
-import {
-  requestPayment,
-  uploadPaymentDoc,
-  type RequestProject,
-} from '../lib/data/payment-requests';
+import { formatUsd } from '@datumpro/shared/domain';
+import { requestPayment, uploadPaymentDoc } from '../lib/data/payment-requests';
+import type { OwedTask } from '../lib/data/owed';
 import { radius, font, type Colors } from '../lib/theme';
 import { useTheme } from '../lib/theme-context';
 
-/** Contractor's "Request payment" modal — pick a project, enter amount + title,
- *  optionally attach an invoice photo, submit. */
+/** "Request payment" modal — invoice against an approved task. Amount is capped
+ *  at what's still claimable; an invoice is mandatory. */
 export function RequestPaymentModal({
   visible,
-  projects,
+  tasks,
   onClose,
   onDone,
 }: {
   visible: boolean;
-  projects: RequestProject[];
+  tasks: OwedTask[];
   onClose: () => void;
   onDone: () => void;
 }) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [projectId, setProjectId] = useState(projects[0]?.id ?? '');
-  const [title, setTitle] = useState('');
+  const claimable = useMemo(() => tasks.filter((t) => t.requestableCents > 0), [tasks]);
+  const [taskId, setTaskId] = useState(claimable[0]?.taskId ?? '');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [doc, setDoc] = useState<{ base64: string; ext: string; mime: string; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const project = projects.find((p) => p.id === projectId) ?? projects[0];
+  const task = claimable.find((t) => t.taskId === taskId) ?? claimable[0];
+
+  // Default the amount to the picked task's full outstanding.
+  useEffect(() => {
+    if (task) setAmount((task.requestableCents / 100).toFixed(2));
+  }, [task?.taskId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fromImage(fromCamera: boolean) {
     const perm = fromCamera
@@ -64,7 +67,7 @@ export function RequestPaymentModal({
 
   async function fromDocument() {
     const res = await DocumentPicker.getDocumentAsync({
-      type: ['application/pdf', 'image/*'],
+      type: ['application/pdf', 'image/*', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv'],
       copyToCacheDirectory: true,
     });
     const a = res.canceled ? null : res.assets[0];
@@ -82,36 +85,32 @@ export function RequestPaymentModal({
     Alert.alert('Attach invoice', undefined, [
       { text: 'Take photo', onPress: () => void fromImage(true) },
       { text: 'Photo library', onPress: () => void fromImage(false) },
-      { text: 'Document (PDF)', onPress: () => void fromDocument() },
+      { text: 'Document (PDF / Excel)', onPress: () => void fromDocument() },
       { text: 'Cancel', style: 'cancel' },
     ]);
   }
 
   async function submit() {
     const cents = Math.round(parseFloat(amount) * 100);
-    if (!project || !title.trim() || !Number.isFinite(cents) || cents <= 0) {
-      Alert.alert('Missing details', 'Pick a project, a description, and a valid amount.');
-      return;
-    }
+    if (!task) return Alert.alert('Pick a task', 'Choose an approved task to invoice.');
+    if (!Number.isFinite(cents) || cents <= 0) return Alert.alert('Amount', 'Enter a valid amount.');
+    if (cents > task.requestableCents)
+      return Alert.alert('Too much', `You can request up to ${formatUsd(task.requestableCents)}.`);
+    if (!doc) return Alert.alert('Invoice required', 'Attach your invoice to proceed.');
+
     setBusy(true);
     try {
-      let invoicePath: string | null = null;
-      let invoiceName: string | null = null;
-      if (doc) {
-        const up = await uploadPaymentDoc({ orgId: project.orgId, projectId: project.id, base64: doc.base64, ext: doc.ext, mime: doc.mime });
-        invoicePath = up.path;
-        invoiceName = up.name;
-      }
+      const up = await uploadPaymentDoc({ orgId: task.orgId, projectId: task.projectId, base64: doc.base64, ext: doc.ext, mime: doc.mime });
       await requestPayment({
-        projectId: project.id,
-        title: title.trim(),
+        taskId: task.taskId,
+        orgId: task.orgId,
+        projectId: task.projectId,
+        title: task.title,
         amountCents: cents,
         note: note.trim() || null,
-        invoicePath,
-        invoiceName,
+        invoicePath: up.path,
+        invoiceName: doc.name,
       });
-      setTitle('');
-      setAmount('');
       setNote('');
       setDoc(null);
       onDone();
@@ -133,41 +132,44 @@ export function RequestPaymentModal({
         </View>
 
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-          {projects.length > 1 && (
+          {claimable.length === 0 ? (
+            <Text style={styles.hint}>
+              Nothing to invoice yet. When a plan you priced is approved, its amount shows here to claim against.
+            </Text>
+          ) : (
             <>
-              <Text style={styles.label}>Project</Text>
+              <Text style={styles.label}>Task (approved plan)</Text>
               <View style={styles.chips}>
-                {projects.map((p) => (
+                {claimable.map((t) => (
                   <Pressable
-                    key={p.id}
-                    onPress={() => setProjectId(p.id)}
-                    style={[styles.chip, p.id === project?.id && styles.chipOn]}
+                    key={t.taskId}
+                    onPress={() => setTaskId(t.taskId)}
+                    style={[styles.chip, t.taskId === task?.taskId && styles.chipOn]}
                   >
-                    <Text style={[styles.chipText, p.id === project?.id && styles.chipTextOn]}>{p.name}</Text>
+                    <Text style={[styles.chipText, t.taskId === task?.taskId && styles.chipTextOn]} numberOfLines={1}>
+                      {t.title} · {formatUsd(t.requestableCents)}
+                    </Text>
                   </Pressable>
                 ))}
               </View>
+
+              <Text style={styles.label}>Amount (USD) · up to {formatUsd(task?.requestableCents ?? 0)}</Text>
+              <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={colors.subtle} style={styles.input} />
+
+              <Text style={styles.label}>Note (optional)</Text>
+              <TextInput value={note} onChangeText={setNote} placeholder="Anything the reviewer should know" placeholderTextColor={colors.subtle} style={styles.input} />
+
+              <Pressable onPress={attach} style={({ pressed }) => [styles.attach, doc && styles.attachOn, pressed && styles.pressed]}>
+                <Text style={[styles.attachText, doc && styles.attachTextOn]} numberOfLines={1}>
+                  {doc ? `✓ ${doc.name} — replace` : 'Attach invoice — photo, PDF or Excel (required)'}
+                </Text>
+              </Pressable>
+
+              <Pressable onPress={submit} disabled={busy} style={({ pressed }) => [styles.submit, busy && styles.busy, pressed && styles.pressed]}>
+                {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.submitText}>Submit request</Text>}
+              </Pressable>
             </>
           )}
-
-          <Text style={styles.label}>Description</Text>
-          <TextInput value={title} onChangeText={setTitle} placeholder="e.g. Foundations — 40%" placeholderTextColor={colors.subtle} style={styles.input} />
-
-          <Text style={styles.label}>Amount (USD)</Text>
-          <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={colors.subtle} style={styles.input} />
-
-          <Text style={styles.label}>Note (optional)</Text>
-          <TextInput value={note} onChangeText={setNote} placeholder="Anything the reviewer should know" placeholderTextColor={colors.subtle} style={styles.input} />
-
-          <Pressable onPress={attach} style={({ pressed }) => [styles.attach, pressed && styles.pressed]}>
-            <Text style={styles.attachText} numberOfLines={1}>
-              {doc ? `✓ ${doc.name} — replace` : 'Attach invoice — photo or PDF (optional)'}
-            </Text>
-          </Pressable>
-
-          <Pressable onPress={submit} disabled={busy} style={({ pressed }) => [styles.submit, busy && styles.busy, pressed && styles.pressed]}>
-            {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.submitText}>Submit request</Text>}
-          </Pressable>
         </ScrollView>
       </View>
     </Modal>
@@ -182,6 +184,7 @@ const makeStyles = (c: Colors) =>
     cancel: { fontSize: 15, fontFamily: font.body, color: c.muted },
     body: { padding: 16, gap: 8 },
     pressed: { opacity: 0.85 },
+    hint: { fontSize: 14, fontFamily: font.body, color: c.subtle, paddingVertical: 24, textAlign: 'center' },
     label: { fontSize: 12, fontFamily: font.bodyBold, color: c.subtle, marginTop: 8 },
     input: {
       backgroundColor: c.surface,
@@ -195,12 +198,14 @@ const makeStyles = (c: Colors) =>
       color: c.text,
     },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.pill, borderWidth: 1, borderColor: c.border },
+    chip: { maxWidth: '100%', paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.pill, borderWidth: 1, borderColor: c.border },
     chipOn: { backgroundColor: c.text, borderColor: c.text },
     chipText: { fontSize: 13, fontFamily: font.body, color: c.text },
     chipTextOn: { color: c.bg, fontFamily: font.bodyBold },
     attach: { marginTop: 12, borderRadius: radius.md, borderWidth: 1, borderColor: c.border, paddingVertical: 12, alignItems: 'center' },
+    attachOn: { borderColor: c.brand, backgroundColor: c.brandSoft },
     attachText: { fontSize: 14, fontFamily: font.bodySemi, color: c.brand },
+    attachTextOn: { color: c.brandDeep },
     submit: { marginTop: 16, backgroundColor: c.brand, borderRadius: radius.pill, paddingVertical: 14, alignItems: 'center' },
     busy: { opacity: 0.6 },
     submitText: { color: c.onBrand, fontFamily: font.bodyBold, fontSize: 15 },

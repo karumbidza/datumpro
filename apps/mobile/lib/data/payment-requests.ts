@@ -100,34 +100,32 @@ export async function uploadPaymentDoc(params: {
   return { path, name: `invoice.${params.ext}` };
 }
 
-/** Contractor raises a payment request (org id derived from the project). */
+/** The assignee raises a payment request against an approved task, with a
+ *  mandatory invoice. The DB (enforce_payment_request_insert) validates the
+ *  assignee, approved plan, amount cap and invoice — org/project come from the
+ *  owed task the caller picked. */
 export async function requestPayment(input: {
+  taskId: string;
+  orgId: string;
   projectId: string;
-  scheduleId?: string | null;
   title: string;
   amountCents: number;
   note?: string | null;
-  invoicePath?: string | null;
-  invoiceName?: string | null;
+  invoicePath: string;
+  invoiceName: string;
 }): Promise<void> {
   const user = await currentUser();
   if (!user) throw new Error('Not signed in');
-  const { data: project } = await supabase
-    .from('projects')
-    .select('org_id')
-    .eq('id', input.projectId)
-    .single();
-  if (!project) throw new Error('Project not found');
   const { error } = await supabase.from('contractor_payment_requests').insert({
-    org_id: project.org_id,
+    org_id: input.orgId,
     project_id: input.projectId,
-    schedule_id: input.scheduleId ?? null,
+    task_id: input.taskId,
     contractor_id: user.id,
     title: input.title,
     amount_cents: input.amountCents,
     note: input.note ?? null,
-    invoice_path: input.invoicePath ?? null,
-    invoice_name: input.invoiceName ?? null,
+    invoice_path: input.invoicePath,
+    invoice_name: input.invoiceName,
     status: 'requested',
   });
   if (error) throw error;
