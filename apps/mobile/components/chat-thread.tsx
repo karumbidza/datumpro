@@ -77,14 +77,21 @@ export function ChatThread({
   // by exactly that much. Works in Android edge-to-edge/immersive where the
   // window doesn't resize and KeyboardAvoidingView fails.
   useEffect(() => {
-    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const s = Keyboard.addListener(showEvt, (e) => setKbHeight(e.endCoordinates?.height ?? 0));
-    const h = Keyboard.addListener(hideEvt, () => setKbHeight(0));
-    return () => {
-      s.remove();
-      h.remove();
-    };
+    const ios = Platform.OS === 'ios';
+    const subs = [
+      Keyboard.addListener(ios ? 'keyboardWillShow' : 'keyboardDidShow', (e) =>
+        setKbHeight(e.endCoordinates?.height ?? 0),
+      ),
+      Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', () => setKbHeight(0)),
+      // Re-focusing the input while the keyboard is already up doesn't re-fire
+      // didShow on Android — the frame change does. Only ever raise the composer
+      // here (never zero it), so this can't flicker mid-animation.
+      Keyboard.addListener(ios ? 'keyboardWillChangeFrame' : 'keyboardDidChangeFrame', (e) => {
+        const h = e.endCoordinates?.height ?? 0;
+        if (h > 0) setKbHeight(h);
+      }),
+    ];
+    return () => subs.forEach((s) => s.remove());
   }, []);
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const onlineCount = members.filter((m) => onlineIds.has(m.userId)).length;

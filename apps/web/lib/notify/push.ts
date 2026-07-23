@@ -26,7 +26,7 @@ export async function sendExpoPushToUsers(
       body: payload.body,
       sound: 'default',
       // Android: route to our HIGH-importance channel so it's a heads-up with sound.
-      channelId: 'messages',
+      channelId: 'messages_v2',
       priority: 'high',
       data: payload.url ? { url: payload.url } : {},
     }));

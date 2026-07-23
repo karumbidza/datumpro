@@ -20,6 +20,7 @@ import {
   type Subtask,
 } from '../lib/data/subtasks';
 import { ApprovalChain } from './approval-chain';
+import { startTask } from '../lib/data/task-actions';
 import type { ApprovalStep } from '../lib/data/approvals';
 import { DocAttach } from './doc-attach';
 import type { TaskDoc } from '../lib/data/tenders';
@@ -129,6 +130,9 @@ export function SubtaskPanel({
   // Start is the gate: steps become tickable only once the task is under way
   // (mirrors web — press "Start task" in Actions to move todo → in_progress).
   const canTick = isAssignee && taskStatus === 'in_progress' && (planLocked || !usesPlanFlow);
+  // Start the task from the plan panel (top, under the progress bar). Available
+  // once the plan is approved (or non-plan) and there's at least one step.
+  const canStart = isAssignee && taskStatus === 'todo' && (planLocked || !usesPlanFlow) && subtasks.length > 0;
   const canHandBack =
     isAssignee && acceptanceStatus === 'accepted' && taskStatus !== 'submitted' && taskStatus !== 'done';
 
@@ -440,6 +444,20 @@ export function SubtaskPanel({
             <ProgressBar value={pct} color={colors.brand} />
           </View>
 
+          {canStart && (
+            <Pressable
+              style={[styles.startBtn, busy && { opacity: 0.5 }]}
+              disabled={busy}
+              onPress={() => run(() => startTask(taskId, orgId))}
+            >
+              {busy ? (
+                <ActivityIndicator color={colors.onBrand} />
+              ) : (
+                <Text style={styles.startBtnText}>Start task</Text>
+              )}
+            </Pressable>
+          )}
+
           <View style={styles.list}>
             {counted.map((s) => {
               const open = openSteps.has(s.id);
@@ -732,6 +750,15 @@ const makeStyles = (c: Colors) =>
     pendRowTitle: { flex: 1, fontSize: 14, fontFamily: font.body, color: c.text },
     pendRowMeta: { fontSize: 11, fontFamily: font.body, color: c.subtle },
     progressRow: { marginTop: 10 },
+    startBtn: {
+      marginTop: 12,
+      backgroundColor: c.brand,
+      borderRadius: radius.md,
+      paddingVertical: 13,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    startBtnText: { color: c.onBrand, fontFamily: font.bodyBold, fontSize: 14.5 },
     list: { marginTop: 10, gap: 12 },
     itemWrap: { gap: 6 },
     item: { flexDirection: 'row', alignItems: 'center', gap: 10 },

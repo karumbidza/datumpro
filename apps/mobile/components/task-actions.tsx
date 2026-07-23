@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { TaskDetail, TaskPermissions } from '../lib/data/tasks';
-import { startTask, submitTask, approveTask, rejectTask, raiseBlocker } from '../lib/data/task-actions';
+import { submitTask, approveTask, rejectTask, raiseBlocker } from '../lib/data/task-actions';
 import { radius, font, type Colors } from '../lib/theme';
 import { useTheme } from '../lib/theme-context';
 
@@ -54,28 +54,16 @@ export function TaskActions({
     }
   };
 
-  // When the plan isn't approved yet, the plan panel drives the messaging (submit
-  // / awaiting approval), so Actions stays quiet on the start CTA.
-  const startBlockedNoPlan =
-    perms.isAssignee && task.status === 'todo' && !acceptancePending && planApproved && !hasPlan;
-  const canStart = perms.isAssignee && task.status === 'todo' && !acceptancePending && planApproved && hasPlan;
+  // Start moved into the plan panel (top, under the progress bar). Actions now
+  // covers only submit / raise-blocker (assignee) and review (manager).
   const canSubmit = perms.isAssignee && task.status === 'in_progress' && !acceptancePending;
   const canDecide = perms.canManage && task.status === 'submitted';
 
-  if (!canStart && !canSubmit && !canDecide && !startBlockedNoPlan) return null;
+  if (!canSubmit && !canDecide) return null;
 
   return (
     <View style={styles.card}>
       <Text style={styles.label}>Actions</Text>
-
-      {canStart && (
-        <Pressable style={[styles.btn, styles.primary]} disabled={busy} onPress={() => run(() => startTask(task.id, task.orgId))}>
-          {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.primaryText}>Start task</Text>}
-        </Pressable>
-      )}
-      {startBlockedNoPlan && (
-        <Text style={styles.hint}>Add at least one step to your task plan before starting.</Text>
-      )}
 
       {canSubmit && mode === 'none' && planComplete && (
         <Pressable style={[styles.btn, styles.primary]} onPress={() => setMode('submit')}>

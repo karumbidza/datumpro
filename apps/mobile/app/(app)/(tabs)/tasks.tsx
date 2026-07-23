@@ -75,7 +75,16 @@ export default function Tasks() {
     if (q) {
       list = list.filter((x) => x.title.toLowerCase().includes(q) || x.projectName.toLowerCase().includes(q));
     }
-    return list;
+    // Open tasks stay on top (soonest due first — the query's order); completed
+    // tasks sink to the bottom, most recently completed first. Sort is stable, so
+    // the open block keeps its incoming due-date order.
+    return [...list].sort((a, b) => {
+      const ad = a.status === 'done' ? 1 : 0;
+      const bd = b.status === 'done' ? 1 : 0;
+      if (ad !== bd) return ad - bd;
+      if (ad === 1) return (b.completedAt ?? '').localeCompare(a.completedAt ?? '');
+      return 0;
+    });
   }, [tasks, filter, query]);
 
   return (

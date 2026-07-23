@@ -12,6 +12,8 @@ export interface MyTask {
   acceptanceStatus: 'pending' | 'accepted' | 'rejected' | null;
   plannedStartDate: string | null;
   plannedEndDate: string | null;
+  /** When the task was signed off (null unless done) — sorts completed tasks. */
+  completedAt: string | null;
 }
 
 export interface TaskDetail extends MyTask {
@@ -86,7 +88,7 @@ export async function listMyTasks(): Promise<MyTask[]> {
   const { data } = await supabase
     .from('tasks')
     .select(
-      'id, title, status, sla_status, due_date, priority, project_id, acceptance_status, planned_start_date, planned_end_date, projects(name)',
+      'id, title, status, sla_status, due_date, priority, project_id, acceptance_status, planned_start_date, planned_end_date, actual_end_date, projects(name)',
     )
     .eq('assignee_id', user.id)
     .order('due_date', { ascending: true, nullsFirst: false });
@@ -106,6 +108,7 @@ type TaskRow = {
   acceptance_status: 'pending' | 'accepted' | 'rejected' | null;
   planned_start_date: string | null;
   planned_end_date: string | null;
+  actual_end_date: string | null;
   projects: ProjectJoin;
 };
 function mapTaskRow(t: TaskRow): MyTask {
@@ -121,6 +124,7 @@ function mapTaskRow(t: TaskRow): MyTask {
     acceptanceStatus: t.acceptance_status,
     plannedStartDate: t.planned_start_date,
     plannedEndDate: t.planned_end_date,
+    completedAt: t.actual_end_date,
   };
 }
 
@@ -130,7 +134,7 @@ export async function listProjectTasks(projectId: string): Promise<MyTask[]> {
   const { data } = await supabase
     .from('tasks')
     .select(
-      'id, title, status, sla_status, due_date, priority, project_id, acceptance_status, planned_start_date, planned_end_date, projects(name)',
+      'id, title, status, sla_status, due_date, priority, project_id, acceptance_status, planned_start_date, planned_end_date, actual_end_date, projects(name)',
     )
     .eq('project_id', projectId)
     .order('due_date', { ascending: true, nullsFirst: false });
@@ -143,7 +147,7 @@ export async function getTask(id: string): Promise<TaskDetail | null> {
   const { data } = await supabase
     .from('tasks')
     .select(
-      'id, org_id, title, description, status, sla_status, due_date, priority, project_id, assignee_id, requires_photo_on_complete, planned_start_date, planned_end_date, acceptance_status, plan_submitted_at, plan_approved_at, awarded_cost_cents, projects(name)',
+      'id, org_id, title, description, status, sla_status, due_date, priority, project_id, assignee_id, requires_photo_on_complete, planned_start_date, planned_end_date, actual_end_date, acceptance_status, plan_submitted_at, plan_approved_at, awarded_cost_cents, projects(name)',
     )
     .eq('id', id)
     .maybeSingle();
@@ -162,6 +166,7 @@ export async function getTask(id: string): Promise<TaskDetail | null> {
     requires_photo_on_complete: boolean | null;
     planned_start_date: string | null;
     planned_end_date: string | null;
+    actual_end_date: string | null;
     acceptance_status: 'pending' | 'accepted' | 'rejected' | null;
     plan_submitted_at: string | null;
     plan_approved_at: string | null;
@@ -183,6 +188,7 @@ export async function getTask(id: string): Promise<TaskDetail | null> {
     projectName: projectName(t.projects),
     plannedStartDate: t.planned_start_date,
     plannedEndDate: t.planned_end_date,
+    completedAt: t.actual_end_date,
     acceptanceStatus: t.acceptance_status,
     planSubmittedAt: t.plan_submitted_at,
     planApprovedAt: t.plan_approved_at,

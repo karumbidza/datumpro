@@ -39,10 +39,11 @@ export async function registerForPush(): Promise<void> {
       // + vibration are bound to the channel at creation, so this must match what
       // we want before the first notification arrives.
       // NOTE: Android freezes a channel's importance/sound at creation time — you
-      // can't upgrade an existing channel from code. Existing installs already have
-      // a low-importance 'default' channel, so we create a *new* id ('messages')
-      // that server pushes target via `channelId`.
-      await Notifications.setNotificationChannelAsync('messages', {
+      // can't upgrade an existing channel from code. An earlier 'messages' channel
+      // may have been created without a working sound, so we bump the id to
+      // 'messages_v2' to force a fresh channel. Server pushes must target the same
+      // id via `channelId` (chat-push edge fn + web lib/notify/push.ts).
+      await Notifications.setNotificationChannelAsync('messages_v2', {
         name: 'Messages & reminders',
         importance: Notifications.AndroidImportance.HIGH,
         sound: 'default',
