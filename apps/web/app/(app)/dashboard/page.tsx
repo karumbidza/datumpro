@@ -68,7 +68,6 @@ export default async function DashboardPage() {
         { table: 'tasks', filter: `org_id=eq.${active.orgId}` },
         { table: 'site_reports', filter: `org_id=eq.${active.orgId}` },
         { table: 'contractor_payment_requests', filter: `org_id=eq.${active.orgId}` },
-        { table: 'requests', filter: `org_id=eq.${active.orgId}` },
         { table: 'projects', filter: `org_id=eq.${active.orgId}` },
         { table: 'approvals', filter: `org_id=eq.${active.orgId}` },
       ]}
@@ -121,12 +120,7 @@ export default async function DashboardPage() {
           subtitle={`Your delivery overview · ${formatLongDate(new Date())}`}
           action={newProject}
         />
-        <DeliveryFocus
-          approvals={approvals}
-          blockers={blockers}
-          overdue={overdue}
-          openRequests={dash.counts.openRequests}
-        />
+        <DeliveryFocus approvals={approvals} blockers={blockers} overdue={overdue} />
         <TimelineOverview tasks={timelineTasks} unit="task" />
       </PageContainer>
     );

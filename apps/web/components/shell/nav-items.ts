@@ -5,7 +5,6 @@ import {
   CheckSquare,
   DollarSign,
   Wallet,
-  FileText,
   MessageSquare,
   MessageCircle,
   Settings,
@@ -47,10 +46,7 @@ export function computeNav(
       { name: 'Tasks', href: `/projects/${id}/tasks`, icon: CheckSquare },
     ];
     if (manages) {
-      items.push(
-        { name: 'Finance', href: `/projects/${id}/finance`, icon: DollarSign },
-        { name: 'Requests', href: `/projects/${id}/requests`, icon: FileText },
-      );
+      items.push({ name: 'Finance', href: `/projects/${id}/finance`, icon: DollarSign });
     }
     items.push({ name: 'Chat', href: `/projects/${id}/chat`, icon: MessageSquare });
     if (manages) {

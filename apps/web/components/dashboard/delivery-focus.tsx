@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { ChevronRight } from '@/components/icons';
 import { ApprovalsInbox } from './approvals-inbox';
@@ -18,18 +17,15 @@ function color(tone: 'amber' | 'red' | 'zinc'): string {
 
 /** The PM's action focus in one strip. "Awaiting approval" is the live control:
  *  click it to expand the approvals queue inline — the count and the list are the
- *  same thing, so there's no separate always-on card. Open requests deep-links to
- *  the requests queue. */
+ *  same thing, so there's no separate always-on card. */
 export function DeliveryFocus({
   approvals,
   blockers,
   overdue,
-  openRequests,
 }: {
   approvals: PendingApproval[];
   blockers: number;
   overdue: number;
-  openRequests: number;
 }) {
   const [open, setOpen] = useState(false);
   const awaiting = approvals.length;
@@ -37,7 +33,7 @@ export function DeliveryFocus({
   return (
     <div>
       <Card className="p-0">
-        <div className="grid grid-cols-2 sm:grid-cols-4">
+        <div className="grid grid-cols-3">
           {/* Awaiting approval — toggles the queue below */}
           <button
             type="button"
@@ -68,13 +64,6 @@ export function DeliveryFocus({
             <p className="text-xs text-zinc-500 dark:text-zinc-400">Overdue</p>
             <p className={`mt-1 text-2xl font-semibold tabular-nums ${color(overdue > 0 ? 'red' : 'zinc')}`}>{overdue}</p>
           </div>
-
-          <Link href="/requests" className={`${cellCls} transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900`}>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">Open requests</p>
-            <p className={`mt-1 text-2xl font-semibold tabular-nums ${color(openRequests > 0 ? 'amber' : 'zinc')}`}>
-              {openRequests}
-            </p>
-          </Link>
         </div>
       </Card>
 

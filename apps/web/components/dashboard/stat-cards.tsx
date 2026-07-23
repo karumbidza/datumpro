@@ -1,4 +1,4 @@
-import { Clock, ShieldAlert, AlertTriangle, CalendarClock, type IconComponent } from '@/components/icons';
+import { Clock, ShieldAlert, AlertTriangle, type IconComponent } from '@/components/icons';
 import type { DashboardCounts } from '@/lib/data/dashboard';
 
 interface CardConfig {
@@ -54,24 +54,11 @@ const CARDS: CardConfig[] = [
     labelColor: 'text-red-600 dark:text-red-400',
     subColor: 'text-red-500/70 dark:text-red-500/50',
   },
-  {
-    key: 'openRequests',
-    label: 'Open Requests',
-    icon: CalendarClock,
-    subtitle: (n) => `${n} awaiting approval`,
-    container:
-      'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20',
-    iconWrap: 'bg-amber-100 dark:bg-amber-900/40',
-    iconColor: 'text-amber-600 dark:text-amber-400',
-    value: 'text-amber-700 dark:text-amber-300',
-    labelColor: 'text-amber-600 dark:text-amber-400',
-    subColor: 'text-amber-500/70 dark:text-amber-500/50',
-  },
 ];
 
 export function StatCards({ counts }: { counts: DashboardCounts }) {
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="grid grid-cols-3 gap-3">
       {CARDS.map((card) => {
         const n = counts[card.key];
         return (

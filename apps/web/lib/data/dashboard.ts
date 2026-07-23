@@ -19,7 +19,6 @@ export interface DashboardCounts {
   pendingSignoff: number;
   blockers: number;
   breaches: number;
-  openRequests: number;
 }
 
 export interface DashboardData {
@@ -49,22 +48,15 @@ export async function getDashboardData(orgId: string, projectId?: string): Promi
     )
     .eq('org_id', orgId);
   let projectsQuery = supabase.from('projects').select('id, name').eq('org_id', orgId);
-  let requestsQuery = supabase
-    .from('requests')
-    .select('id', { count: 'exact', head: true })
-    .eq('org_id', orgId)
-    .eq('status', 'submitted');
 
   if (projectId) {
     tasksQuery = tasksQuery.eq('project_id', projectId);
     projectsQuery = projectsQuery.eq('id', projectId);
-    requestsQuery = requestsQuery.eq('project_id', projectId);
   }
 
-  const [tasksRes, projectsRes, openRequestsRes] = await Promise.all([
+  const [tasksRes, projectsRes] = await Promise.all([
     tasksQuery.order('created_at', { ascending: true }),
     projectsQuery,
-    requestsQuery,
   ]);
 
   type RawTask = {
@@ -117,7 +109,6 @@ export async function getDashboardData(orgId: string, projectId?: string): Promi
       .length,
     blockers: tasks.filter((t) => t.status === 'blocked' || t.sla_status === 'blocked').length,
     breaches: tasks.filter((t) => t.sla_status === 'breached' || isOverdue(t)).length,
-    openRequests: openRequestsRes.count ?? 0,
   };
 
   return { counts, tasks };
