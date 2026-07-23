@@ -4,7 +4,8 @@ import { redirect } from 'next/navigation';
 import { can } from '@datumpro/shared/access';
 import { getActiveContext } from '@/lib/data/org';
 import { listOrgMembers, listPendingInvitations } from '@/lib/data/org-members';
-import { renameOrganization } from './actions';
+import { getOrgSecondApprover } from '@/lib/data/approvals';
+import { renameOrganization, setApprovalPolicy } from './actions';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Users, DollarSign, FileText, ChevronRight } from '@/components/icons';
@@ -23,9 +24,10 @@ export default async function OrgPage() {
   const canViewFinance = can(ctx.active.role, 'finance:view');
   // Reviewing contractor compliance docs is a staff (owner/admin/finance) concern.
   const canReviewDocs = can(ctx.active.role, 'payment:record');
-  const [members, invitations] = await Promise.all([
+  const [members, invitations, secondApprover] = await Promise.all([
     listOrgMembers(orgId),
     listPendingInvitations(orgId),
+    getOrgSecondApprover(orgId),
   ]);
 
   return (
@@ -47,6 +49,30 @@ export default async function OrgPage() {
             <div className="min-w-56 flex-1">
               <label className="mb-1 block text-xs font-medium">Organisation name</label>
               <input name="name" required defaultValue={ctx.active.name} maxLength={120} className={inputClass} />
+            </div>
+            <Button type="submit">Save</Button>
+          </form>
+        </Card>
+
+        {/* Approval policy */}
+        <Card>
+          <CardTitle>Approval policy</CardTitle>
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            Everything that needs sign-off (task plans, variations, extensions, payments, requests) goes to the{' '}
+            <span className="font-medium text-zinc-700 dark:text-zinc-300">project manager first</span>, then to a second
+            approver — set that here, or make it a single PM-only approval.
+          </p>
+          <form action={setApprovalPolicy} className="mt-3 flex flex-wrap items-end gap-3">
+            <input type="hidden" name="orgId" value={orgId} />
+            <div className="min-w-56 flex-1">
+              <label className="mb-1 block text-xs font-medium">Second approver</label>
+              <select name="secondApprover" defaultValue={secondApprover} className={inputClass}>
+                <option value="admin">Admin (default)</option>
+                <option value="finance">Finance</option>
+                <option value="viewer">Viewer</option>
+                <option value="pm">Another PM</option>
+                <option value="none">None — PM approves alone</option>
+              </select>
             </div>
             <Button type="submit">Save</Button>
           </form>

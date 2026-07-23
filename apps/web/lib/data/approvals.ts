@@ -68,3 +68,18 @@ export async function stepsByEntity(
 export function currentStep(steps: ApprovalStep[]): ApprovalStep | null {
   return steps.find((s) => s.decision === 'pending') ?? null;
 }
+
+/** The org's configured second approver role, or 'none' when the chain is a
+ *  single PM-only approval. Step 1 is always the PM. Assumes the uniform chain
+ *  the settings UI writes (same across every approvable type). */
+export async function getOrgSecondApprover(orgId: string): Promise<string> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('approval_policies')
+    .select('approver_role')
+    .eq('org_id', orgId)
+    .eq('entity_type', 'task_plan')
+    .eq('step_order', 2)
+    .maybeSingle();
+  return (data as { approver_role: string } | null)?.approver_role ?? 'none';
+}
