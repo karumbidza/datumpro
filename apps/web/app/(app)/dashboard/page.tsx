@@ -12,7 +12,7 @@ import {
   listMyOpenTasks,
   listManagedProjects,
 } from '@/lib/data/home';
-import { listMyPayments } from '@/lib/data/payments';
+import { listMyOwed } from '@/lib/data/owed';
 import { TimelineOverview } from '@/components/dashboard/timeline-overview';
 import { KpiRow } from '@/components/dashboard/kpi-row';
 import { UpcomingTasksTable } from '@/components/dashboard/portfolio-tables';
@@ -129,7 +129,7 @@ export default async function DashboardPage() {
   // ── Personal home — member / contractor / viewer ──────────────────────────
   const [myTasks, myPay] = await Promise.all([
     listMyOpenTasks(ctx.userId),
-    listMyPayments(ctx.userId),
+    listMyOwed(ctx.userId),
   ]);
   const hasPay = myPay.summary.earnedCents > 0;
   return (
@@ -148,7 +148,7 @@ export default async function DashboardPage() {
           </div>
           <div className="mt-3 grid grid-cols-3 gap-3 text-sm">
             <Stat label="Earned" value={formatUsd(myPay.summary.earnedCents)} />
-            <Stat label="Awaiting" value={formatUsd(myPay.summary.claimedCents)} tone="amber" />
+            <Stat label="Awaiting" value={formatUsd(myPay.summary.awaitingCents)} tone="amber" />
             <Stat label="Paid" value={formatUsd(myPay.summary.paidCents)} tone="green" />
           </div>
         </Card>

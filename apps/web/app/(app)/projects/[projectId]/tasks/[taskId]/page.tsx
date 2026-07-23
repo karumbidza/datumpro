@@ -15,13 +15,11 @@ import { listChatRoster } from '@/lib/data/chat-roster';
 import { getProjectSchedule } from '@/lib/data/scheduling';
 import { listTaskMedia, listSubtaskMedia } from '@/lib/data/quotes';
 import { listTenderInvites, listBidLinesByContractor, listTaskDocuments } from '@/lib/data/tenders';
-import { listTaskPayments } from '@/lib/data/payments';
 import { getTaskConversationId, listMessages, othersMaxReadSeq } from '@/lib/data/chat';
 import { TenderPanel } from '@/components/task/tender-panel';
 import { BidPanel } from '@/components/task/bid-panel';
 import { SubtaskPanel } from '@/components/task/subtask-panel';
 import { listSubtasks } from '@/lib/data/subtasks';
-import { PaymentsPanel } from '@/components/task/payments-panel';
 import { ChatPanel } from '@/components/chat/chat-panel';
 import { stepsByEntity } from '@/lib/data/approvals';
 import { LiveRefresh } from '@/components/live-refresh';
@@ -64,7 +62,6 @@ export default async function TaskDetailPage({
     bidLinesMap,
     completionMedia,
     extensions,
-    payments,
     subtasks,
     subtaskMedia,
     dmConversationId,
@@ -80,7 +77,6 @@ export default async function TaskDetailPage({
     listBidLinesByContractor(taskId),
     listTaskMedia(taskId, 'completion'),
     listExtensionRequests(taskId),
-    listTaskPayments(taskId),
     listSubtasks(taskId),
     listSubtaskMedia(taskId),
     getTaskConversationId(taskId),
@@ -329,17 +325,6 @@ export default async function TaskDetailPage({
           canManage={canManage}
           decided={tenderDecided}
         />
-      ),
-    });
-  }
-
-  if (payments.length > 0) {
-    tabs.push({
-      key: 'payments',
-      label: 'Payments',
-      count: payments.length,
-      content: (
-        <PaymentsPanel taskId={taskId} lines={payments} canManage={canManage} isAssignee={isAssignee} />
       ),
     });
   }

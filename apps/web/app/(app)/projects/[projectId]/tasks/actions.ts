@@ -4,7 +4,6 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { createTaskSchema } from '@datumpro/shared/validation';
-import { parsePaymentTerms } from '@datumpro/shared/domain';
 import { notifyUser, notifyProjectManagers } from '@/lib/data/notifications';
 import type { FormState } from '@/components/ui/form-error';
 import { emailUser } from '@/lib/email/notify';
@@ -882,30 +881,7 @@ export async function awardQuote(formData: FormData) {
     entityId: taskId,
   });
 
-  // Generate the contractor payment schedule from the awarded terms (once).
-  const cost = winner.cost_cents ?? 0;
-  if (cost > 0) {
-    const { count: existing } = await supabase
-      .from('payment_schedule')
-      .select('id', { count: 'exact', head: true })
-      .eq('task_id', taskId);
-    if (!existing) {
-      const terms = parsePaymentTerms(winner.payment_terms);
-      const advance = terms.advancePct ? Math.round((cost * terms.advancePct) / 100) : 0;
-      const retention = terms.retentionPct ? Math.round((cost * terms.retentionPct) / 100) : 0;
-      const balance = cost - advance - retention;
-      const base = { org_id: task.org_id, project_id: task.project_id, task_id: taskId, status: 'pending' as const };
-      const draws: { name: string; amount_cents: number; kind: string }[] = [];
-      if (advance > 0) draws.push({ name: `Advance (${terms.advancePct}%)`, amount_cents: advance, kind: 'advance' });
-      if (balance > 0) draws.push({ name: 'On completion', amount_cents: balance, kind: 'completion' });
-      if (retention > 0) draws.push({ name: `Retention (${terms.retentionPct}%)`, amount_cents: retention, kind: 'retention' });
-      if (draws.length > 0) {
-        await supabase.from('payment_schedule').insert(draws.map((d) => ({ ...base, ...d })));
-      }
-    }
-  }
-
-  await logActivity(supabase, task, user.id, 'quote', 'Awarded the quote — payment schedule generated');
+  await logActivity(supabase, task, user.id, 'quote', 'Awarded the quote');
   const { data: org } = await supabase
     .from('organizations')
     .select('name')
@@ -920,71 +896,6 @@ export async function awardQuote(formData: FormData) {
     }),
   );
   revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
-}
-
-/* ── Contractor payments ─────────────────────────────────────────────────── */
-
-/** Mark a scheduled draw as paid (finance/PM). Optional payment reference. */
-export async function markPaymentPaid(formData: FormData) {
-  const { supabase, user } = await requireUser();
-  const taskId = String(formData.get('taskId') ?? '');
-  const scheduleId = String(formData.get('scheduleId') ?? '');
-  const reference = (formData.get('reference') as string)?.trim() || null;
-  const task = await loadTask(supabase, taskId);
-  if (!task) throw new Error('Task not found');
-
-  const { error } = await supabase
-    .from('payment_schedule')
-    .update({ status: 'paid', paid_at: new Date().toISOString(), paid_reference: reference })
-    .eq('id', scheduleId)
-    .eq('task_id', taskId);
-  if (error) throw new Error(error.message);
-  await logActivity(supabase, task, user.id, 'payment', 'Recorded a contractor payment');
-  revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
-  revalidatePath('/payments');
-}
-
-/** Contractor raises a progress claim against their own pending draw
- *  ('pending' → 'invoiced'). The DB function enforces that only the assignee
- *  can claim, and only a pending draw. */
-export async function submitPaymentClaim(formData: FormData) {
-  const { supabase, user } = await requireUser();
-  const scheduleId = String(formData.get('scheduleId') ?? '');
-  const taskId = String(formData.get('taskId') ?? '');
-  const note = (formData.get('note') as string)?.trim() || '';
-  if (!scheduleId) throw new Error('Missing draw');
-
-  const { error } = await supabase.rpc('submit_payment_claim', {
-    p_schedule_id: scheduleId,
-    p_note: note,
-  });
-  if (error) throw new Error(error.message);
-
-  const task = taskId ? await loadTask(supabase, taskId) : null;
-  if (task) {
-    await logActivity(supabase, task, user.id, 'payment', 'Submitted a payment claim');
-    revalidatePath(`/projects/${task.project_id}/tasks/${task.id}`);
-  }
-  revalidatePath('/payments');
-}
-
-/** Finance/PM sends a claim back ('invoiced' → 'pending'). The DB function
- *  enforces that only finance or the project PM may reject. */
-export async function rejectPaymentClaim(formData: FormData) {
-  const { supabase, user } = await requireUser();
-  const scheduleId = String(formData.get('scheduleId') ?? '');
-  const taskId = String(formData.get('taskId') ?? '');
-  if (!scheduleId) throw new Error('Missing draw');
-
-  const { error } = await supabase.rpc('reject_payment_claim', { p_schedule_id: scheduleId });
-  if (error) throw new Error(error.message);
-
-  const task = taskId ? await loadTask(supabase, taskId) : null;
-  if (task) {
-    await logActivity(supabase, task, user.id, 'payment', 'Rejected a payment claim');
-    revalidatePath(`/projects/${task.project_id}/tasks/${task.id}`);
-  }
-  revalidatePath('/payments');
 }
 
 /* ── Task media (evidence, quotes) ───────────────────────────────────────── */

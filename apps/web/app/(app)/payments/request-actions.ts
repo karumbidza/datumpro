@@ -136,20 +136,5 @@ export async function markPaymentRequestPaid(formData: FormData): Promise<Result
     },
     projectId,
   );
-  if (!res.ok) return res;
-
-  // If this request covers a scheduled draw, mark that draw paid too so the
-  // contractor's "My payments" totals stay consistent.
-  const { data: row } = await supabase
-    .from('contractor_payment_requests')
-    .select('schedule_id')
-    .eq('id', id)
-    .single();
-  if (row?.schedule_id) {
-    await supabase
-      .from('payment_schedule')
-      .update({ status: 'paid', paid_at: paidAt, paid_reference: reference })
-      .eq('id', row.schedule_id);
-  }
-  return { ok: true };
+  return res;
 }
