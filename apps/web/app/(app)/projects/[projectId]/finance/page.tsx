@@ -6,7 +6,6 @@ import { getProject } from '@/lib/data/projects';
 import { myOrgRole } from '@/lib/data/tasks';
 import { myProjectRole } from '@/lib/data/members';
 import { financeSummary } from '@/lib/data/finance';
-import { listProjectPayments } from '@/lib/data/payments';
 import { listProjectPaymentRequests } from '@/lib/data/payment-requests';
 import { BudgetVsCost } from '@/components/finance/budget-vs-cost';
 import { ManageRequest } from '@/components/payments/manage-request';
@@ -24,12 +23,6 @@ const REQ_TONE: Record<PaymentRequestStatus, 'neutral' | 'blue' | 'green' | 'amb
   rejected: 'neutral',
 };
 
-const PAY_STATUS = {
-  pending: { tone: 'neutral', label: 'not claimed' },
-  invoiced: { tone: 'blue', label: 'awaiting payment' },
-  paid: { tone: 'green', label: 'paid' },
-} as const;
-
 export default async function FinancePage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
   const user = await getAuthUser();
@@ -37,9 +30,8 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
 
   const project = await getProject(projectId);
   if (!project) notFound();
-  const [summary, payments, orgRole, projectRole, paymentRequests] = await Promise.all([
+  const [summary, orgRole, projectRole, paymentRequests] = await Promise.all([
     financeSummary(projectId),
-    listProjectPayments(projectId),
     myOrgRole(project.org_id),
     myProjectRole(projectId),
     listProjectPaymentRequests(projectId),
@@ -152,52 +144,6 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
         </section>
       )}
 
-      {/* Contractor payments (buy-side; RLS shows only what the viewer may see) */}
-      <section className="mt-8">
-        <h2 className="mb-3 text-sm font-semibold">Contractor payments</h2>
-        <Card>
-          <div className="grid grid-cols-3 gap-4 border-b border-zinc-100 pb-4 dark:border-zinc-800">
-            <div>
-              <p className="text-xs text-zinc-500">Committed</p>
-              <p className="text-lg font-semibold tabular-nums">{formatUsd(payments.summary.committedCents)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-zinc-500">Paid</p>
-              <p className="text-lg font-semibold tabular-nums">{formatUsd(payments.summary.paidCents)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-zinc-500">Outstanding</p>
-              <p className="text-lg font-semibold tabular-nums">{formatUsd(payments.summary.outstandingCents)}</p>
-            </div>
-          </div>
-          {payments.lines.length === 0 ? (
-            <p className="pt-4 text-sm text-zinc-500 dark:text-zinc-400">
-              No contractor draws yet — they&apos;re generated when a quote is awarded.
-            </p>
-          ) : (
-            <ul className="divide-y divide-zinc-100 pt-2 dark:divide-zinc-800">
-              {payments.lines.map((l) => (
-                <li key={l.id} className="flex items-center justify-between gap-3 py-2 text-sm">
-                  <div className="min-w-0">
-                    {l.taskId ? (
-                      <Link href={`/projects/${projectId}/tasks/${l.taskId}`} className="font-medium hover:underline">
-                        {l.taskTitle ?? 'Task'}
-                      </Link>
-                    ) : (
-                      <span className="font-medium">{l.name}</span>
-                    )}
-                    <span className="ml-2 text-xs text-zinc-400">{l.name}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="tabular-nums">{formatUsd(l.amountCents)}</span>
-                    <Badge tone={PAY_STATUS[l.status].tone}>{PAY_STATUS[l.status].label}</Badge>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      </section>
     </PageContainer>
   );
 }
