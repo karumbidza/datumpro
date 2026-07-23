@@ -5,83 +5,76 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { requestPayment } from '@/app/(app)/payments/request-actions';
 import { Button } from '@/components/ui/button';
+import { formatUsd } from '@datumpro/shared/domain';
 
 const BUCKET = 'project-media';
 
-export type RequestProject = { id: string; name: string; orgId: string };
-export type RequestDraw = { id: string; projectId: string; name: string; amountCents: number };
+/** A task the caller can invoice against — approved plan, with room left to claim. */
+export type RequestTask = {
+  taskId: string;
+  title: string;
+  projectId: string;
+  orgId: string;
+  projectName: string;
+  requestableCents: number;
+};
 
 const inputClass =
   'w-full rounded-md border border-zinc-200 bg-transparent px-2.5 py-1.5 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
 
-/** Contractor's "Request payment" form — links to a scheduled draw or raises an
- *  ad-hoc invoice, with an optional uploaded invoice document. */
-export function RequestPaymentForm({
-  projects,
-  draws,
-}: {
-  projects: RequestProject[];
-  draws: RequestDraw[];
-}) {
+/** The assignee's "Request payment" form — invoice a task with an approved plan.
+ *  Amount is capped at what's still claimable; an invoice is mandatory. */
+export function RequestPaymentForm({ tasks, taskId }: { tasks: RequestTask[]; taskId?: string }) {
   const router = useRouter();
+  const claimable = tasks.filter((t) => t.requestableCents > 0);
   const [open, setOpen] = useState(false);
-  const [projectId, setProjectId] = useState(projects[0]?.id ?? '');
-  const [drawId, setDrawId] = useState('');
-  const [title, setTitle] = useState('');
+  const preselect = taskId && claimable.some((t) => t.taskId === taskId) ? taskId : claimable[0]?.taskId ?? '';
+  const [selId, setSelId] = useState(preselect);
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const project = projects.find((p) => p.id === projectId);
+  const task = claimable.find((t) => t.taskId === selId);
+  const maxDollars = task ? task.requestableCents / 100 : 0;
 
-  function onPickDraw(id: string) {
-    setDrawId(id);
-    const d = draws.find((x) => x.id === id);
-    if (d) {
-      setProjectId(d.projectId);
-      setTitle(d.name);
-      setAmount((d.amountCents / 100).toFixed(2));
-    }
+  function pickTask(id: string) {
+    setSelId(id);
+    const t = claimable.find((x) => x.taskId === id);
+    if (t) setAmount((t.requestableCents / 100).toFixed(2)); // default to the full outstanding
   }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     const cents = Math.round(parseFloat(amount) * 100);
-    if (!project || !title.trim() || !Number.isFinite(cents) || cents <= 0) {
-      setError('Pick a project, a title, and a valid amount.');
-      return;
-    }
+    if (!task) return setError('Pick a task to invoice.');
+    if (!Number.isFinite(cents) || cents <= 0) return setError('Enter a valid amount.');
+    if (cents > task.requestableCents) return setError(`You can request up to ${formatUsd(task.requestableCents)}.`);
+    if (!file) return setError('Attach your invoice to proceed.');
+
     setBusy(true);
     try {
-      let invoicePath: string | null = null;
-      let invoiceName: string | null = null;
-      if (file) {
-        const supabase = createClient();
-        const ext = file.name.includes('.') ? file.name.split('.').pop() : 'bin';
-        const path = `${project.orgId}/${project.id}/payment-requests/${crypto.randomUUID()}.${ext}`;
-        const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: false });
-        if (upErr) throw upErr;
-        invoicePath = path;
-        invoiceName = file.name;
-      }
+      const supabase = createClient();
+      const ext = file.name.includes('.') ? file.name.split('.').pop() : 'bin';
+      const path = `${task.orgId}/${task.projectId}/payment-requests/${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: false });
+      if (upErr) throw upErr;
+
       const fd = new FormData();
-      fd.set('projectId', project.id);
-      if (drawId) fd.set('scheduleId', drawId);
-      fd.set('title', title.trim());
+      fd.set('projectId', task.projectId);
+      fd.set('taskId', task.taskId);
+      fd.set('title', task.title);
       fd.set('amountCents', String(cents));
       if (note.trim()) fd.set('note', note.trim());
-      if (invoicePath) fd.set('invoicePath', invoicePath);
-      if (invoiceName) fd.set('invoiceName', invoiceName);
+      fd.set('invoicePath', path);
+      fd.set('invoiceName', file.name);
 
       const res = await requestPayment(fd);
       if (!res.ok) throw new Error(res.error ?? 'Could not submit');
 
       setOpen(false);
-      setDrawId('');
-      setTitle('');
       setAmount('');
       setNote('');
       setFile(null);
@@ -93,12 +86,10 @@ export function RequestPaymentForm({
     }
   }
 
-  if (projects.length === 0) return null;
+  if (claimable.length === 0) return null;
 
   if (!open) {
-    return (
-      <Button onClick={() => setOpen(true)}>Request payment</Button>
-    );
+    return <Button onClick={() => setOpen(true)}>Request payment</Button>;
   }
 
   return (
@@ -113,46 +104,30 @@ export function RequestPaymentForm({
         </button>
       </div>
 
-      {draws.length > 0 && (
-        <label className="block text-xs font-medium text-zinc-500">
-          Against a scheduled draw (optional)
-          <select value={drawId} onChange={(e) => onPickDraw(e.target.value)} className={inputClass}>
-            <option value="">— Ad-hoc invoice —</option>
-            {draws.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name} · ${(d.amountCents / 100).toFixed(2)}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-
       <label className="block text-xs font-medium text-zinc-500">
-        Project
-        <select
-          value={projectId}
-          onChange={(e) => setProjectId(e.target.value)}
-          disabled={!!drawId}
-          className={inputClass}
-        >
-          {projects.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
+        Task (approved plan)
+        <select value={selId} onChange={(e) => pickTask(e.target.value)} className={inputClass}>
+          {claimable.map((t) => (
+            <option key={t.taskId} value={t.taskId}>
+              {t.projectName} · {t.title} — {formatUsd(t.requestableCents)} left
             </option>
           ))}
         </select>
       </label>
 
-      <div className="flex gap-2">
-        <label className="block flex-1 text-xs font-medium text-zinc-500">
-          Description
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Foundations — 40%" className={inputClass} />
-        </label>
-        <label className="block w-32 text-xs font-medium text-zinc-500">
-          Amount (USD)
-          <input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" step="0.01" min="0" placeholder="0.00" className={inputClass} />
-        </label>
-      </div>
+      <label className="block text-xs font-medium text-zinc-500">
+        Amount (USD) <span className="text-zinc-400">· up to {formatUsd(task?.requestableCents ?? 0)}</span>
+        <input
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          type="number"
+          step="0.01"
+          min="0"
+          max={maxDollars}
+          placeholder={maxDollars.toFixed(2)}
+          className={inputClass}
+        />
+      </label>
 
       <label className="block text-xs font-medium text-zinc-500">
         Note (optional)
@@ -160,8 +135,13 @@ export function RequestPaymentForm({
       </label>
 
       <label className="block text-xs font-medium text-zinc-500">
-        Invoice (optional — PDF or image)
-        <input type="file" accept="application/pdf,image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="mt-1 block w-full text-sm" />
+        Invoice <span className="text-red-500">*</span> <span className="text-zinc-400">· PDF, image or Excel — required</span>
+        <input
+          type="file"
+          accept="application/pdf,image/*,.xls,.xlsx,.csv"
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          className="mt-1 block w-full text-sm"
+        />
       </label>
 
       {error && <p className="text-xs text-red-500">{error}</p>}

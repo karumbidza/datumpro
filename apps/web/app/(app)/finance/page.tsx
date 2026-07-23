@@ -85,8 +85,8 @@ export default async function OrgFinancePage() {
         {withMoney.length === 0 ? (
           <Card>
             <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              No contractor commitments yet. When a quote is awarded, its draws appear here; open a
-              project&apos;s Finance tab to track and pay them.
+              No contractor commitments yet. When a task plan is approved, its agreed amount is committed
+              here; contractors then invoice against it and you pay and attach a proof of payment.
             </p>
           </Card>
         ) : (

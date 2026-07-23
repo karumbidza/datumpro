@@ -24,12 +24,14 @@ export type InviteMemberInput = z.infer<typeof inviteMemberSchema>;
  *  draw; carries an optional uploaded invoice document. */
 export const paymentRequestSchema = z.object({
   projectId: z.string().uuid(),
-  scheduleId: z.string().uuid().optional().nullable(),
+  // A payment request is always against an approved task/plan the caller is
+  // assigned to, and must carry an invoice.
+  taskId: z.string().uuid(),
   title: z.string().trim().min(2).max(160),
   amountCents: z.number().int().positive(),
   note: z.string().trim().max(1000).optional().nullable(),
-  invoicePath: z.string().trim().max(500).optional().nullable(),
-  invoiceName: z.string().trim().max(255).optional().nullable(),
+  invoicePath: z.string().trim().min(1).max(500),
+  invoiceName: z.string().trim().min(1).max(255),
 });
 export type PaymentRequestInput = z.infer<typeof paymentRequestSchema>;
 

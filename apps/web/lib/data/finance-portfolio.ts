@@ -7,9 +7,9 @@ export interface ProjectContractorFinance {
   status: string;
   /** Project budget = its contract value. */
   budgetCents: number;
-  /** Committed to contractors — sum of scheduled draws. */
+  /** Committed to contractors — the agreed price of approved plans. */
   committedCents: number;
-  /** Paid to contractors — draws marked paid. */
+  /** Paid to contractors — settled payment requests. */
   paidCents: number;
   /** Still owed — committed minus paid. */
   outstandingCents: number;
@@ -38,13 +38,18 @@ export interface OrgContractorFinance {
 export async function orgContractorFinance(orgId: string): Promise<OrgContractorFinance> {
   const supabase = await createClient();
 
-  const [projectsRes, drawsRes, requestsRes] = await Promise.all([
+  const [projectsRes, tasksRes, requestsRes] = await Promise.all([
     supabase
       .from('projects')
       .select('id, name, status, contract_value_cents')
       .eq('org_id', orgId)
       .order('created_at', { ascending: false }),
-    supabase.from('payment_schedule').select('project_id, amount_cents, status').eq('org_id', orgId),
+    // Committed = the agreed price of approved plans (awarded to contractors).
+    supabase
+      .from('tasks')
+      .select('project_id, awarded_cost_cents, plan_approved_at')
+      .eq('org_id', orgId)
+      .not('plan_approved_at', 'is', null),
     supabase
       .from('contractor_payment_requests')
       .select('project_id, amount_cents, status')
@@ -57,7 +62,7 @@ export async function orgContractorFinance(orgId: string): Promise<OrgContractor
     status: string;
     contract_value_cents: number;
   }[];
-  const draws = (drawsRes.data ?? []) as { project_id: string; amount_cents: number; status: string }[];
+  const awardedTasks = (tasksRes.data ?? []) as { project_id: string; awarded_cost_cents: number | null }[];
   const requests = (requestsRes.data ?? []) as {
     project_id: string;
     amount_cents: number;
@@ -80,19 +85,22 @@ export async function orgContractorFinance(orgId: string): Promise<OrgContractor
     });
   }
 
-  for (const d of draws) {
-    const row = rows.get(d.project_id);
+  // Committed = approved plan amounts; paid = settled payment requests.
+  for (const t of awardedTasks) {
+    const row = rows.get(t.project_id);
     if (!row) continue;
-    row.committedCents += d.amount_cents ?? 0;
-    if (d.status === 'paid') row.paidCents += d.amount_cents ?? 0;
+    row.committedCents += t.awarded_cost_cents ?? 0;
   }
 
   for (const r of requests) {
-    if (r.status !== 'requested' && r.status !== 'approved') continue;
     const row = rows.get(r.project_id);
     if (!row) continue;
-    row.pendingRequestsCount += 1;
-    row.pendingRequestsCents += r.amount_cents ?? 0;
+    if (r.status === 'paid') {
+      row.paidCents += r.amount_cents ?? 0;
+    } else if (r.status === 'requested' || r.status === 'approved') {
+      row.pendingRequestsCount += 1;
+      row.pendingRequestsCents += r.amount_cents ?? 0;
+    }
   }
 
   const projectRows = [...rows.values()];

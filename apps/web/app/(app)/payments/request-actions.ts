@@ -6,7 +6,9 @@ import { paymentRequestSchema } from '@datumpro/shared/validation';
 
 type Result = { ok: boolean; error?: string };
 
-/** Contractor raises a payment request (against a draw or ad-hoc). */
+/** The assigned contractor raises a payment request against an approved task/
+ *  plan, with a mandatory invoice. The amount is capped at what's still
+ *  claimable (awarded − paid − pending). Only the task's assignee may do this. */
 export async function requestPayment(formData: FormData): Promise<Result> {
   const supabase = await createClient();
   const {
@@ -16,28 +18,47 @@ export async function requestPayment(formData: FormData): Promise<Result> {
 
   const parsed = paymentRequestSchema.safeParse({
     projectId: formData.get('projectId'),
-    scheduleId: (formData.get('scheduleId') as string) || null,
+    taskId: formData.get('taskId'),
     title: formData.get('title'),
     amountCents: Number(formData.get('amountCents')),
     note: (formData.get('note') as string) || null,
     invoicePath: (formData.get('invoicePath') as string) || null,
     invoiceName: (formData.get('invoiceName') as string) || null,
   });
-  if (!parsed.success) return { ok: false, error: 'Please check the amount and title.' };
+  if (!parsed.success) return { ok: false, error: 'Pick a task, attach an invoice, and enter a valid amount.' };
   const input = parsed.data;
 
-  // org_id comes from the project — never trusted from the client.
-  const { data: project } = await supabase
-    .from('projects')
-    .select('org_id')
-    .eq('id', input.projectId)
+  // The task is the source of truth — org/project/assignee/amount all come from
+  // it, never trusted from the client.
+  const { data: task } = await supabase
+    .from('tasks')
+    .select('org_id, project_id, assignee_id, awarded_cost_cents, plan_approved_at')
+    .eq('id', input.taskId)
     .single();
-  if (!project) return { ok: false, error: 'Project not found.' };
+  if (!task) return { ok: false, error: 'Task not found.' };
+  if (task.assignee_id !== user.id) return { ok: false, error: 'Only the task assignee can request payment for it.' };
+  if (!task.plan_approved_at || (task.awarded_cost_cents ?? 0) <= 0) {
+    return { ok: false, error: 'This task has no approved plan amount to invoice yet.' };
+  }
+
+  // Cap at what's still claimable: awarded − everything not rejected.
+  const { data: reqs } = await supabase
+    .from('contractor_payment_requests')
+    .select('amount_cents, status')
+    .eq('task_id', input.taskId)
+    .eq('contractor_id', user.id);
+  const used = ((reqs ?? []) as { amount_cents: number; status: string }[])
+    .filter((r) => r.status !== 'rejected')
+    .reduce((s, r) => s + r.amount_cents, 0);
+  const requestable = (task.awarded_cost_cents ?? 0) - used;
+  if (input.amountCents > requestable) {
+    return { ok: false, error: `You can request up to $${(requestable / 100).toFixed(2)} more on this task.` };
+  }
 
   const { error } = await supabase.from('contractor_payment_requests').insert({
-    org_id: project.org_id,
-    project_id: input.projectId,
-    schedule_id: input.scheduleId,
+    org_id: task.org_id,
+    project_id: task.project_id,
+    task_id: input.taskId,
     contractor_id: user.id,
     title: input.title,
     amount_cents: input.amountCents,
