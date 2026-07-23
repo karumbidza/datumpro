@@ -1,7 +1,6 @@
 import {
   LayoutDashboard,
   FolderOpen,
-  Users,
   Building,
   CheckSquare,
   DollarSign,
@@ -9,6 +8,7 @@ import {
   FileText,
   MessageSquare,
   MessageCircle,
+  Settings,
   type IconComponent,
 } from '@/components/icons';
 import type { SidebarProject } from '@/lib/data/org';
@@ -34,16 +34,29 @@ export function computeNav(
   canManageMembers: boolean,
   canViewFinance = false,
   showMyPayments = true,
+  managedProjectIds: string[] = [],
 ): NavItem[] {
   if (activeProject) {
-    return [
-      { name: 'Overview', href: `/projects/${activeProject.id}`, icon: LayoutDashboard },
-      { name: 'Tasks', href: `/projects/${activeProject.id}/tasks`, icon: CheckSquare },
-      { name: 'Finance', href: `/projects/${activeProject.id}/finance`, icon: DollarSign },
-      { name: 'Requests', href: `/projects/${activeProject.id}/requests`, icon: FileText },
-      { name: 'Chat', href: `/projects/${activeProject.id}/chat`, icon: MessageSquare },
-      { name: 'Team', href: `/projects/${activeProject.id}/team`, icon: Users },
+    const id = activeProject.id;
+    // Manager of this project = org admin/owner, or its PM. Finance, Requests and
+    // Settings (team + setup) are management surfaces — hidden from a contractor
+    // whose only role here is doing the assigned work.
+    const manages = canManageMembers || managedProjectIds.includes(id);
+    const items: NavItem[] = [
+      { name: 'Overview', href: `/projects/${id}`, icon: LayoutDashboard },
+      { name: 'Tasks', href: `/projects/${id}/tasks`, icon: CheckSquare },
     ];
+    if (manages) {
+      items.push(
+        { name: 'Finance', href: `/projects/${id}/finance`, icon: DollarSign },
+        { name: 'Requests', href: `/projects/${id}/requests`, icon: FileText },
+      );
+    }
+    items.push({ name: 'Chat', href: `/projects/${id}/chat`, icon: MessageSquare });
+    if (manages) {
+      items.push({ name: 'Settings', href: `/projects/${id}/settings`, icon: Settings });
+    }
+    return items;
   }
   return [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },

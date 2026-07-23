@@ -82,13 +82,16 @@ export interface SidebarData {
   /** Whether the user has any contractor activity — drives the personal
    *  "Payments & documents" nav item (hidden for pure admins/PMs). */
   isContractor: boolean;
+  /** Project ids where the user is the PM — drives which projects show the
+   *  management nav (Finance / Requests / Settings). Org admins manage all. */
+  managedProjectIds: string[];
 }
 
 /** Lightweight data for the sidebar: the active org's projects, the count of the
  *  user's open (not-done) assigned tasks, and whether they're a contractor. */
 export async function getSidebarData(orgId: string, userId: string): Promise<SidebarData> {
   const supabase = await createClient();
-  const [projectsRes, taskCountRes, assignedRes, reqRes, docRes] = await Promise.all([
+  const [projectsRes, taskCountRes, assignedRes, reqRes, docRes, pmRes] = await Promise.all([
     supabase
       .from('projects')
       .select('id, name')
@@ -105,6 +108,8 @@ export async function getSidebarData(orgId: string, userId: string): Promise<Sid
     supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('assignee_id', userId),
     supabase.from('contractor_payment_requests').select('id', { count: 'exact', head: true }).eq('contractor_id', userId),
     supabase.from('contractor_documents').select('id', { count: 'exact', head: true }).eq('contractor_id', userId),
+    // Projects this user is the PM of (managed nav surfaces).
+    supabase.from('project_members').select('project_id').eq('user_id', userId).eq('role', 'pm'),
   ]);
 
   return {
@@ -112,5 +117,6 @@ export async function getSidebarData(orgId: string, userId: string): Promise<Sid
     myTaskCount: taskCountRes.count ?? 0,
     isContractor:
       (assignedRes.count ?? 0) > 0 || (reqRes.count ?? 0) > 0 || (docRes.count ?? 0) > 0,
+    managedProjectIds: ((pmRes.data ?? []) as { project_id: string }[]).map((r) => r.project_id),
   };
 }

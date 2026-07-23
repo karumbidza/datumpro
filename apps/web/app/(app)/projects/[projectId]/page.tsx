@@ -5,7 +5,6 @@ import { LiveRefresh } from '@/components/live-refresh';
 import { getProject } from '@/lib/data/projects';
 import { getDashboardData } from '@/lib/data/dashboard';
 import { getProjectProgress, getProgressHistory } from '@/lib/data/subtasks';
-import { getProjectSetup } from '@/lib/data/project-setup';
 import { StatCards } from '@/components/dashboard/stat-cards';
 import { TimelineOverview } from '@/components/dashboard/timeline-overview';
 import { ProgressTrend } from '@/components/dashboard/progress-trend';
@@ -24,11 +23,10 @@ export default async function ProjectOverviewPage({
   const project = await getProject(projectId);
   if (!project) notFound();
 
-  const [{ counts, tasks }, projectPct, history, setup] = await Promise.all([
+  const [{ counts, tasks }, projectPct, history] = await Promise.all([
     getDashboardData(project.org_id, projectId),
     getProjectProgress(projectId),
     getProgressHistory(projectId),
-    getProjectSetup(projectId),
   ]);
 
   return (
@@ -69,21 +67,6 @@ export default async function ProjectOverviewPage({
           </Link>
         </div>
       </header>
-
-      {setup.pct < 100 && (
-        <Link
-          href={`/projects/${projectId}/setup`}
-          className="flex items-center justify-between gap-3 rounded-lg border border-brand-500/30 bg-brand-50 px-4 py-3 hover:border-brand-500/60 dark:bg-brand-500/10"
-        >
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-brand-600">Project setup — {setup.pct}% complete</p>
-            <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
-              {setup.total - setup.done} item{setup.total - setup.done === 1 ? '' : 's'} outstanding · finish setting up this project
-            </p>
-          </div>
-          <span className="shrink-0 text-sm font-medium text-brand-600">Open →</span>
-        </Link>
-      )}
 
       <StatCards counts={counts} />
 

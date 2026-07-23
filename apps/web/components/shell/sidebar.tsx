@@ -27,15 +27,16 @@ interface SidebarProps {
   canCreateProject: boolean;
   canViewFinance: boolean;
   showMyPayments?: boolean;
+  managedProjectIds?: string[];
   myTaskCount: number;
 }
 
-export function Sidebar({ projects, orgs, activeOrgId, email, canManageMembers, canCreateProject, canViewFinance, showMyPayments = true, myTaskCount }: SidebarProps) {
+export function Sidebar({ projects, orgs, activeOrgId, email, canManageMembers, canCreateProject, canViewFinance, showMyPayments = true, managedProjectIds = [], myTaskCount }: SidebarProps) {
   const pathname = usePathname();
   const activeId = activeProjectId(pathname);
   const activeProject = projects.find((p) => p.id === activeId) ?? null;
 
-  const nav = computeNav(activeProject, canManageMembers, canViewFinance, showMyPayments);
+  const nav = computeNav(activeProject, canManageMembers, canViewFinance, showMyPayments, managedProjectIds);
   const isActive = (href: string) => isNavActive(href, pathname, activeProject);
 
   return (
