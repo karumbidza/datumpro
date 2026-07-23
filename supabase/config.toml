@@ -24,6 +24,13 @@ site_url = "http://localhost:3000"
 [auth.email]
 enable_signup = true
 
+# The magic-link template is also what `signInWithOtp` emails. Mobile signs in
+# with the 6-digit {{ .Token }}, web clicks {{ .ConfirmationURL }} — the template
+# carries both. Apply to the hosted project with `supabase config push`.
+[auth.email.template.magic_link]
+subject = "Your DatumPro sign-in code"
+content_path = "./supabase/templates/magic_link.html"
+
 # chat-push is invoked by a Database Webhook, not an end-user JWT. It authorizes
 # itself with the CHAT_PUSH_SECRET shared-secret header, so skip JWT verification.
 [functions.chat-push]
