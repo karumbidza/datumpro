@@ -8,7 +8,7 @@ import { getOrgSecondApprover } from '@/lib/data/approvals';
 import { renameOrganization, setApprovalPolicy } from './actions';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, DollarSign, FileText, ChevronRight } from '@/components/icons';
+import { Users, DollarSign, FileText, ChevronRight, ShieldAlert } from '@/components/icons';
 
 const inputClass =
   'w-full rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
@@ -77,6 +77,24 @@ export default async function OrgPage() {
             <Button type="submit">Save</Button>
           </form>
         </Card>
+
+        {/* Audit log */}
+        <Link href="/org/audit" className="block">
+          <Card className="transition-colors hover:border-zinc-300 dark:hover:border-zinc-700">
+            <div className="flex items-center gap-4">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+                <ShieldAlert size={20} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">Audit log</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Who did what — a read-only record of consequential actions
+                </p>
+              </div>
+              <ChevronRight size={18} className="shrink-0 text-zinc-400" />
+            </div>
+          </Card>
+        </Link>
 
         {/* Team */}
         <Link href="/org/members" className="block">

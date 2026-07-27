@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { createOrgSchema } from '@datumpro/shared/validation';
+import { logAudit } from '@/lib/audit';
 
 /** Creates an organisation from the setup-wizard profile form. A DB trigger makes
  *  the creator its `owner`, so no separate membership insert is needed here.
@@ -42,6 +43,9 @@ export async function createOrg(formData: FormData) {
     .single();
   if (error) redirect(`/orgs/new?error=${encodeURIComponent(error.message)}`);
 
+  const orgId = (org as { id: string }).id;
+  await logAudit({ orgId, actorId: user.id, entityType: 'organization', entityId: orgId, action: 'organization.created', after: { name } });
+
   revalidatePath('/dashboard');
-  redirect(`/orgs/new/done?org=${(org as { id: string }).id}`);
+  redirect(`/orgs/new/done?org=${orgId}`);
 }

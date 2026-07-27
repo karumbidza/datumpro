@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { logAudit } from '@/lib/audit';
 
 /** Rename the organisation. RLS restricts organizations UPDATE to owner/admin,
  *  so a non-admin's write is rejected at the database regardless of the UI. */
@@ -21,6 +22,8 @@ export async function renameOrganization(formData: FormData) {
 
   const { error } = await supabase.from('organizations').update({ name }).eq('id', orgId);
   if (error) throw new Error(error.message);
+
+  await logAudit({ orgId, actorId: user.id, entityType: 'organization', entityId: orgId, action: 'organization.renamed', after: { name } });
 
   // The name shows in the sidebar switcher too — refresh the whole shell.
   revalidatePath('/', 'layout');
@@ -48,5 +51,6 @@ export async function setApprovalPolicy(formData: FormData) {
     p_second_role: second,
   });
   if (error) throw new Error(error.message);
+  await logAudit({ orgId, actorId: user.id, entityType: 'organization', entityId: orgId, action: 'approval_policy.set', after: { secondApprover: second } });
   revalidatePath('/org');
 }

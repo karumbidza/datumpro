@@ -277,38 +277,18 @@ and **`setApprovalPolicy`**, after `if (error) …`:
   await logAudit({ orgId, actorId: user.id, entityType: 'organization', entityId: orgId, action: 'approval_policy.set', after: { secondApprover: second } });
 ```
 
-- [ ] **Step 3: `lib/actions/approvals.ts` — `decideApprovalStep`.** Read the file first (lines 10-39) to confirm the variable names for the org id, approvable id, actor, and decision. Add, after the decision write succeeds:
-```typescript
-  await logAudit({ orgId, actorId: userId, entityType: 'approval', entityId: approvableId, action: `approval.${decision}` });
-```
-Map `orgId`, `userId`, `approvableId`, `decision` to the actual identifiers in that function (adjust names to match; if the org id isn't in scope, select it from the approvable's row before logging).
+**Deferred (fast-follow):** `decideApprovalStep` (approvals.ts), `rejectPaymentRequest`/`markPaymentRequestPaid` (payments), and `verifyContractorDocument`/`rejectContractorDocument` (documents) do NOT have `org_id` in local scope — each shared helper (`managerUpdate`, `review`) works by row id only. Auditing them cleanly needs an extra `select org_id` on each money/document path. To avoid adding queries to finance code that can't be smoke-tested in this pass, these are deferred. The `logAudit(...)` pattern is identical; wiring them is a follow-up once the org_id lookup is added to each helper.
 
-- [ ] **Step 4: `payments/request-actions.ts`** — in `rejectPaymentRequest` and `markPaymentRequestPaid`, after each succeeds. Read the file (lines 92-140) for the exact org id / request id variables, then add:
-```typescript
-  await logAudit({ orgId, actorId: user.id, entityType: 'contractor_payment_request', entityId: requestId, action: 'payment.rejected' });
-```
-```typescript
-  await logAudit({ orgId, actorId: user.id, entityType: 'contractor_payment_request', entityId: requestId, action: 'payment.marked_paid' });
-```
-
-- [ ] **Step 5: `documents/actions.ts`** — in `verifyContractorDocument` and `rejectContractorDocument`, after each succeeds. Read the file (lines 55-64) for the org id / doc id variables, then add:
-```typescript
-  await logAudit({ orgId, actorId: user.id, entityType: 'contractor_document', entityId: documentId, action: 'document.verified' });
-```
-```typescript
-  await logAudit({ orgId, actorId: user.id, entityType: 'contractor_document', entityId: documentId, action: 'document.rejected' });
-```
-
-- [ ] **Step 6: Type-check & lint**
+- [ ] **Step 3: Type-check & lint**
 
 Run: `pnpm typecheck && pnpm lint`
-Expected: PASS. Fix any variable-name mismatches surfaced by the compiler (the identifiers above are the intended shape; match them to each file's locals).
+Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add apps/web/app/orgs/actions.ts "apps/web/app/(app)/org/actions.ts" apps/web/lib/actions/approvals.ts "apps/web/app/(app)/payments/request-actions.ts" "apps/web/app/(app)/documents/actions.ts"
-git commit -m "feat(audit): log org, approval, payment, and document actions"
+git add apps/web/app/orgs/actions.ts "apps/web/app/(app)/org/actions.ts"
+git commit -m "feat(audit): log org creation, rename, and approval-policy changes"
 ```
 
 ---
