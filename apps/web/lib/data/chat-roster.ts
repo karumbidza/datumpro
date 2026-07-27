@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { listProjectMembers } from '@/lib/data/members';
 import type { ProjectRole, MemberType } from '@datumpro/shared/access';
 
@@ -122,7 +123,10 @@ export async function listMemberActivity(
     projectId,
   ];
 
-  const { data } = await supabase
+  // audit_logs is owner/admin-only under RLS; this narrow, pre-scoped projection
+  // (one project's tasks, one actor, no before/after) is served via the service
+  // role so the roster activity feed keeps working for non-admin viewers.
+  const { data } = await createAdminClient()
     .from('audit_logs')
     .select('id, action, entity_type, created_at')
     .eq('org_id', orgId)
