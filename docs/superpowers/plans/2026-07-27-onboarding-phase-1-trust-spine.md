@@ -8,6 +8,8 @@
 
 **Tech Stack:** Next.js 15 (App Router, Server Components + Server Actions), Supabase (Postgres + RLS), Zod validation in `@datumpro/shared`, Vitest, TailwindCSS v4 (custom components, no shadcn).
 
+**Package manager:** pnpm (workspace). Command mapping used below: shared tests = `pnpm -F @datumpro/shared test [-- <pattern>]`; full test = `pnpm test`; typecheck = `pnpm typecheck`; lint = `pnpm lint`; dev = `pnpm dev`; type gen = `pnpm gen:types`. (Where a step reads `npm …`, run the pnpm equivalent.)
+
 **Scope note:** This is Phase 1 of the spec `docs/superpowers/specs/2026-07-27-access-onboarding-design.md`. Phases 2 (MFA + audit), 3 (enterprise lane), and 4 (SSO/domain verification) get their own plans. Email verification "ON" is a Supabase project config toggle (Auth → confirm email), documented in Task 7 — not code.
 
 ---
@@ -297,23 +299,18 @@ Replace the body of `apps/web/app/orgs/actions.ts` with:
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { createOrgSchema, isBusinessEmail } from '@datumpro/shared/validation';
+import { createOrgSchema } from '@datumpro/shared/validation';
 
 /** Creates an organisation from the setup-wizard profile form. A DB trigger makes
  *  the creator its `owner`, so no separate membership insert is needed here.
- *  Work-email gate: org creation requires a company email — invited members are
- *  unaffected (they never hit this path). */
+ *  Note: the work-email check is a NON-blocking nudge rendered on the /orgs/new
+ *  screen (see Task 5); org creation itself never blocks on it. */
 export async function createOrg(formData: FormData) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect('/sign-in');
-
-  // Work-email gate — only on org creation.
-  if (user.email && !isBusinessEmail(user.email)) {
-    redirect('/orgs/new?error=work-email');
-  }
 
   const parsed = createOrgSchema.safeParse({
     name: String(formData.get('name') ?? ''),
@@ -376,14 +373,10 @@ import { getAuthUser } from '@/lib/data/org';
 import { createOrg } from '../actions';
 import { Card } from '@/components/ui/card';
 import { SubmitButton } from '@/components/ui/submit-button';
+import { isBusinessEmail } from '@datumpro/shared/validation';
 
 const inputClass =
   'w-full rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
-
-const ERRORS: Record<string, string> = {
-  'work-email':
-    'Please create your company with a work email. Personal addresses (gmail, outlook, …) can be invited to a company, but not start one. Government or enterprise buyer? Use “For government & enterprise” on the sign-in page.',
-};
 
 export default async function NewOrgPage({
   searchParams,
@@ -393,7 +386,9 @@ export default async function NewOrgPage({
   const user = await getAuthUser();
   if (!user) redirect('/sign-in');
   const { error } = await searchParams;
-  const message = error ? (ERRORS[error] ?? decodeURIComponent(error)) : null;
+  const message = error ? decodeURIComponent(error) : null;
+  // Non-blocking nudge only — the org is created regardless (see spec §0/§7).
+  const personalEmail = !!user.email && !isBusinessEmail(user.email);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-6 py-10">
@@ -404,6 +399,13 @@ export default async function NewOrgPage({
           This is your tenant — you’ll be the owner. A short profile keeps your workspace on record and
           credible for the teams and clients you invite.
         </p>
+
+        {personalEmail && (
+          <p className="mt-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+            You’re signed in with a personal email. A work address (you@yourcompany.com) looks more credible to
+            the teams and clients you’ll invite — but you can continue either way.
+          </p>
+        )}
 
         {message && (
           <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-400">
@@ -501,8 +503,8 @@ Expected: PASS. If `/projects/new` does not exist in this codebase, change that 
 
 - [ ] **Step 4: Manual smoke test**
 
-Run: `npm run dev`. As a signed-in user with a **work email** and no org, visit `/orgs/new`.
-Expected: the profile form renders; submitting creates the org and lands on `/orgs/new/done`. Then sign in as a **gmail** user and submit — expect the red work-email banner and no org created.
+Run: `pnpm dev`. As a signed-in user with a **work email** and no org, visit `/orgs/new`.
+Expected: the profile form renders (no warning); submitting creates the org and lands on `/orgs/new/done`. Then sign in as a **gmail** user and visit `/orgs/new` — expect the amber non-blocking nudge above the form, and submitting still creates the org and reaches the done screen.
 
 - [ ] **Step 5: Commit**
 
@@ -629,7 +631,7 @@ Expected: PASS.
 - [ ] **Step 4: End-to-end smoke of the whole Phase 1 flow**
 
 Run: `npm run dev`. Walk the flow: sign up with a work email → (if confirmation on, confirm) → `/orgs/new` profile form → create → `/orgs/new/done` → invite a teammate from `/org/members` and confirm the invite email sends (or logs `[email] RESEND_API_KEY unset — skipping send` locally).
-Expected: complete self-serve path works end to end; gmail user is blocked at org creation with a helpful message.
+Expected: complete self-serve path works end to end; a gmail user sees the amber nudge but can still create the org.
 
 - [ ] **Step 5: Commit any config**
 
@@ -643,7 +645,7 @@ git commit -m "chore(auth): enable email confirmation for signups" --allow-empty
 ## Self-Review (against the spec)
 
 - **Trust-forward login + /security** → Task 6. ✅
-- **Work-email gate on org creation only** → Task 2 (blocklist) + Task 4 (enforced in `createOrg`, invited members untouched). ✅
+- **Work-email nudge on org creation only** → Task 2 (blocklist util) + Task 5 (non-blocking amber warning on `/orgs/new`; org always created; invited members never nudged). ✅
 - **Email verification ON** → Task 7 Step 1. ✅
 - **Setup wizard + company-profile columns** → Task 1 (columns) + Task 3 (schema) + Task 5 (two-screen wizard). ✅
 - **Invite email delivery** → already exists (Resend); no task needed, confirmed in Task 7 smoke. ✅

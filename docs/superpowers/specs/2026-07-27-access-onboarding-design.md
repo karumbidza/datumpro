@@ -17,8 +17,17 @@ This spec defines the end-to-end access and onboarding experience — how people
 - **Scope:** Spec the entire flow as one blueprint with clear internal phases; build order decided at planning.
 
 ### Two baked-in judgment calls
-- **Work-email gate applies to org creation only**, never to invited members (external contractors/clients on personal email must not be locked out).
+- **Work-email is a soft nudge, not a gate.** On org creation, a personal-domain email (gmail, outlook, …) shows a non-blocking warning encouraging a work address, but the org is always created. This protects the many legitimate Gmail-based SMEs in the target market (see Reconciliation §0). Invited members are never nudged.
 - **Enterprise approval is manual** (DatumPro provisions), not automated — appropriate for the stage and for government procurement.
+
+## 0. Reconciliation with the existing identity/access roadmap
+
+This spec was cross-checked against the repo's existing roadmap: `handover-a-identity-access-blockers.md`, `handover-b-tasks-alerts-tendering.md`, `datumpro-snag-spec-02.md`, and `docs/FUNCTIONAL_SPEC.md`.
+
+- **Scope boundary — this spec vs Handover A.** This onboarding work operates on the **`organizations`** table (company profile) and the **public login surface**. Handover A / snag-spec §1 own the invitee's **personal profile setup** (`profiles.username`, `avatar_url`, national-ID handling) and the richer **`invitations`** table (hashed `token_hash`, `phone`/WhatsApp fallback, `expires_at`, `intended_party`, resend rate-limiting). **This onboarding work must not modify invitations or personal profiles** — those changes belong to Handover A. Two different "setup" flows: the owner's *company* setup (here) and each invitee's *personal* setup (there).
+- **Market context.** DatumPro targets Zimbabwe / Southern Africa. Two consequences carried into this design: (1) **email is unreliable for site contractors — WhatsApp/phone is the real channel** (snag-spec §1.2 gives invitations a `phone` column), which is why the work-email nudge applies to org creation only, never to invited members; (2) national ID numbers are identity-theft-sensitive and must never be rendered — not touched here, but noted so the company profile never conflates registration number with personal ID.
+- **Repo pattern wins.** Per the handover working rules, established repo patterns override the spec where they differ; this plan follows existing migration, server-action, and UI conventions.
+- **Dependency to flag, not build:** invite delivery is email-only today (Resend). For site-contractor adoption, a WhatsApp/SMS channel may be needed later — an open question in snag-spec §5, owned by the notification work, out of scope here.
 
 ## 2. Current State (what exists today)
 
@@ -45,7 +54,7 @@ This spec defines the end-to-end access and onboarding experience — how people
 - Retain all four existing auth methods.
 
 ### 3.2 Self-serve lane
-1. Sign up with **work email** (personal domains blocked on the org-creation path) or Google/LinkedIn.
+1. Sign up with any email or Google/LinkedIn. On **org creation**, a personal-domain email shows a **non-blocking work-email nudge** (never blocks; never shown to invited members).
 2. **Email verification ON** (Supabase confirmation).
 3. **Setup wizard** replaces the one-field `/orgs/new`:
    - **Company profile** — legal name, country, sector, registration number (optional), slug.
@@ -112,7 +121,7 @@ All new tables/columns follow existing conventions: RLS enabled, `org_id` scopin
 - `/security` page: data-isolation statement, data-residency commitment, security practices, contact for security questions. Linked from login/signup footer.
 
 ## 7. Access Control Notes
-- **Work-email gate:** personal-domain blocklist (gmail, yahoo, outlook.com, hotmail, icloud, …) checked in the org-creation server action only. Invited-member and invite-accept paths are unaffected.
+- **Work-email nudge:** personal-domain blocklist (gmail, yahoo, outlook.com, hotmail, icloud, …) used only to render a **non-blocking warning** on the org-creation screen. The org is always created regardless. Invited-member and invite-accept paths are unaffected and show no nudge.
 - RLS remains the true security boundary; new tables get policies consistent with existing helpers (`is_org_member`, `is_org_admin`, `is_org_staff`).
 - App derives UI from the shared permission map; no new hard-coded route guards beyond MFA enforcement.
 
