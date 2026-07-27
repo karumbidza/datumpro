@@ -30,7 +30,7 @@ This spec defines the end-to-end access and onboarding experience — how people
 | Role model (7 org roles, 4 project roles, 8 member types) | ✅ `packages/shared/src/access/` |
 | Org creation (`/orgs/new` → `createOrg()`) | ⚠️ Single field (name only) |
 | Invite → accept flow | ✅ Logic exists — `apps/web/app/invite/[token]/` |
-| **Invite email delivery** | ❌ Table exists, no sender wired — **hard blocker** |
+| **Invite email delivery** | ✅ **Already wired** — Resend via `apps/web/lib/email/resend.ts`; `inviteMember`/`resendInvitation` send accept links (`apps/web/app/(app)/org/members/actions.ts`). Env: `RESEND_API_KEY`, `RESEND_FROM_EMAIL`. |
 | Email verification | ⚠️ Not enforced |
 | MFA / 2FA | ❌ Not surfaced |
 | Audit log | ❌ Absent |
