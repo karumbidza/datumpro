@@ -76,6 +76,19 @@ export default async function AccountPage() {
         </form>
       </Card>
 
+      <Card className="mt-4">
+        <CardTitle>Two-factor authentication</CardTitle>
+        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+          Add an authenticator app for an extra layer of security. Some organisations require it.
+        </p>
+        <Link
+          href="/mfa"
+          className="mt-3 inline-block rounded-md border border-zinc-200 px-3 py-1.5 text-sm hover:border-brand-500 dark:border-zinc-800"
+        >
+          Manage 2FA →
+        </Link>
+      </Card>
+
       {ctx?.memberships && ctx.memberships.length > 0 && (
         <Card className="mt-4">
           <CardTitle>Organisations</CardTitle>

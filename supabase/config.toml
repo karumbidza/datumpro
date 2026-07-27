@@ -21,6 +21,13 @@ enabled = true
 site_url = "http://localhost:3000"
 # Email OTP / magic link is the default sign-in for v1. SMS OTP (Africa's Talking)
 # is wired at the app layer.
+[auth.mfa]
+max_enrolled_factors = 10
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
 [auth.email]
 enable_signup = true
 # Onboarding Phase 1: require email confirmation for password signups before a

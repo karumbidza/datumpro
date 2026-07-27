@@ -6,8 +6,11 @@ import { getActiveContext } from '@/lib/data/org';
 import { listOrgMembers, listPendingInvitations } from '@/lib/data/org-members';
 import { getOrgSecondApprover } from '@/lib/data/approvals';
 import { renameOrganization, setApprovalPolicy } from './actions';
+import { setOrgMfaRequirement } from './mfa-actions';
+import { createClient } from '@/lib/supabase/server';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { SubmitButton } from '@/components/ui/submit-button';
 import { Users, DollarSign, FileText, ChevronRight, ShieldAlert } from '@/components/icons';
 
 const inputClass =
@@ -24,11 +27,14 @@ export default async function OrgPage() {
   const canViewFinance = can(ctx.active.role, 'finance:view');
   // Reviewing contractor compliance docs is a staff (owner/admin/finance) concern.
   const canReviewDocs = can(ctx.active.role, 'payment:record');
-  const [members, invitations, secondApprover] = await Promise.all([
+  const supabase = await createClient();
+  const [members, invitations, secondApprover, { data: orgRow }] = await Promise.all([
     listOrgMembers(orgId),
     listPendingInvitations(orgId),
     getOrgSecondApprover(orgId),
+    supabase.from('organizations').select('require_mfa').eq('id', orgId).single(),
   ]);
+  const requireMfa = (orgRow as { require_mfa?: boolean } | null)?.require_mfa ?? false;
 
   return (
     <PageContainer width="3xl">
@@ -75,6 +81,23 @@ export default async function OrgPage() {
               </select>
             </div>
             <Button type="submit">Save</Button>
+          </form>
+        </Card>
+
+        {/* Security — org-enforced 2FA */}
+        <Card>
+          <CardTitle>Security</CardTitle>
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            Require every member of this organisation to sign in with two-factor authentication. They&apos;ll be
+            prompted to set up an authenticator app the next time they open the app.
+          </p>
+          <form action={setOrgMfaRequirement} className="mt-3 flex items-center gap-3">
+            <input type="hidden" name="orgId" value={orgId} />
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="requireMfa" defaultChecked={requireMfa} />
+              Require two-factor authentication (2FA)
+            </label>
+            <SubmitButton pendingText="Saving…">Save</SubmitButton>
           </form>
         </Card>
 
