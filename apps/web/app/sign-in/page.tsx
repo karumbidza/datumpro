@@ -210,6 +210,20 @@ export default function SignInPage({
           </p>
         )}
       </Card>
+
+      {/* Trust surface — reassures corporate / government visitors before they sign in */}
+      <div className="mx-auto mt-6 max-w-sm text-center text-xs text-zinc-500 dark:text-zinc-400">
+        <p>🔒 Your data is isolated per organization and protected by row-level security.</p>
+        <p className="mt-2">
+          <a href="/security" className="underline">
+            How we protect your data
+          </a>
+          <span className="mx-2">·</span>
+          <a href="/security#residency" className="underline">
+            For government &amp; enterprise
+          </a>
+        </p>
+      </div>
     </main>
   );
 }
