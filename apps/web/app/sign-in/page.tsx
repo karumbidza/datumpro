@@ -219,7 +219,7 @@ export default function SignInPage({
             How we protect your data
           </a>
           <span className="mx-2">·</span>
-          <a href="/security#residency" className="underline">
+          <a href="/enterprise" className="underline">
             For government &amp; enterprise
           </a>
         </p>
