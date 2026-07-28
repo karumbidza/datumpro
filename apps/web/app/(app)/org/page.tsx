@@ -7,6 +7,7 @@ import { listOrgMembers, listPendingInvitations } from '@/lib/data/org-members';
 import { getOrgSecondApprover } from '@/lib/data/approvals';
 import { renameOrganization, setApprovalPolicy } from './actions';
 import { setOrgMfaRequirement } from './mfa-actions';
+import { addOrgDomain, verifyOrgDomain, removeOrgDomain } from './domain-actions';
 import { createClient } from '@/lib/supabase/server';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,7 +17,11 @@ import { Users, DollarSign, FileText, ChevronRight, ShieldAlert } from '@/compon
 const inputClass =
   'w-full rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
 
-export default async function OrgPage() {
+export default async function OrgPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ derror?: string; dok?: string }>;
+}) {
   const ctx = await getActiveContext();
   if (!ctx) redirect('/sign-in');
   if (!ctx.active) redirect('/orgs/new');
@@ -24,17 +29,29 @@ export default async function OrgPage() {
   if (!can(ctx.active.role, 'member:manage')) redirect('/dashboard');
 
   const orgId = ctx.active.orgId;
+  const { derror, dok } = await searchParams;
   const canViewFinance = can(ctx.active.role, 'finance:view');
   // Reviewing contractor compliance docs is a staff (owner/admin/finance) concern.
   const canReviewDocs = can(ctx.active.role, 'payment:record');
   const supabase = await createClient();
-  const [members, invitations, secondApprover, { data: orgRow }] = await Promise.all([
+  const [members, invitations, secondApprover, { data: orgRow }, { data: domains }] = await Promise.all([
     listOrgMembers(orgId),
     listPendingInvitations(orgId),
     getOrgSecondApprover(orgId),
     supabase.from('organizations').select('require_mfa').eq('id', orgId).single(),
+    supabase
+      .from('org_domains')
+      .select('id, domain, verified_at, verification_token')
+      .eq('org_id', orgId)
+      .order('created_at', { ascending: true }),
   ]);
   const requireMfa = (orgRow as { require_mfa?: boolean } | null)?.require_mfa ?? false;
+  const domainRows = (domains ?? []) as {
+    id: string;
+    domain: string;
+    verified_at: string | null;
+    verification_token: string;
+  }[];
 
   return (
     <PageContainer width="3xl">
@@ -98,6 +115,79 @@ export default async function OrgPage() {
               Require two-factor authentication (2FA)
             </label>
             <SubmitButton pendingText="Saving…">Save</SubmitButton>
+          </form>
+        </Card>
+
+        {/* Verified domains */}
+        <Card>
+          <CardTitle>Verified domains</CardTitle>
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            Verify a domain you own (e.g. acme.com) so teammates who sign up with that email address can join
+            this organisation directly instead of creating a duplicate.
+          </p>
+
+          {derror && (
+            <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-400">
+              {decodeURIComponent(derror)}
+            </p>
+          )}
+          {dok && (
+            <p className="mt-3 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700 dark:bg-green-500/10 dark:text-green-400">
+              Domain verified. Teammates on that domain can now join.
+            </p>
+          )}
+
+          {domainRows.length > 0 && (
+            <ul className="mt-3 space-y-3">
+              {domainRows.map((d) => (
+                <li key={d.id} className="rounded-md border border-zinc-200 p-3 dark:border-zinc-800">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{d.domain}</span>
+                    {d.verified_at ? (
+                      <span className="rounded bg-green-50 px-1.5 py-0.5 text-xs text-green-700 dark:bg-green-500/10 dark:text-green-400">
+                        Verified
+                      </span>
+                    ) : (
+                      <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+                        Pending
+                      </span>
+                    )}
+                    <span className="ml-auto flex gap-2">
+                      {!d.verified_at && (
+                        <form action={verifyOrgDomain}>
+                          <input type="hidden" name="orgId" value={orgId} />
+                          <input type="hidden" name="id" value={d.id} />
+                          <SubmitButton pendingText="Checking…">Verify</SubmitButton>
+                        </form>
+                      )}
+                      <form action={removeOrgDomain}>
+                        <input type="hidden" name="orgId" value={orgId} />
+                        <input type="hidden" name="id" value={d.id} />
+                        <button type="submit" className="text-sm text-zinc-500 underline hover:text-red-600">
+                          Remove
+                        </button>
+                      </form>
+                    </span>
+                  </div>
+                  {!d.verified_at && (
+                    <p className="mt-2 break-all text-xs text-zinc-500 dark:text-zinc-400">
+                      Add a DNS <span className="font-medium">TXT</span> record on{' '}
+                      <span className="font-medium">{d.domain}</span> with value:{' '}
+                      <code className="rounded bg-zinc-100 px-1 py-0.5 dark:bg-zinc-800">{d.verification_token}</code>
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <form action={addOrgDomain} className="mt-3 flex flex-wrap items-end gap-3">
+            <input type="hidden" name="orgId" value={orgId} />
+            <div className="min-w-56 flex-1">
+              <label className="mb-1 block text-xs font-medium">Add a domain</label>
+              <input name="domain" required placeholder="acme.com" className={inputClass} />
+            </div>
+            <SubmitButton pendingText="Adding…">Add domain</SubmitButton>
           </form>
         </Card>
 
