@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState, type ReactNode } from 'react';
+import { use, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { env } from '@/lib/env';
 
@@ -332,7 +332,7 @@ export default function SignInPage({
       </div>
 
       {/* ── Poster column (50%, hidden < lg) ───────────────────────────────── */}
-      <div className="relative hidden min-w-0 flex-1 flex-col overflow-hidden bg-brand-600 px-12 pt-12 lg:flex">
+      <div className="relative hidden min-w-0 flex-1 flex-col overflow-hidden bg-brand-600 p-12 lg:flex">
         {/* Decorative rings, top-right */}
         <div className="pointer-events-none absolute -right-[80px] -top-[80px] h-[300px] w-[300px] rounded-full border border-white/[.12]" />
         <div className="pointer-events-none absolute -right-[30px] -top-[30px] h-[200px] w-[200px] rounded-full border border-white/[.09]" />
@@ -353,185 +353,78 @@ export default function SignInPage({
           is in.
         </p>
 
-        {/* Compact trust strip */}
-        <div className="relative mt-5 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+        {/* Single task snapshot, centered with breathing room */}
+        <div className="relative flex flex-1 items-center py-8">
+          <TaskSnapshotCard />
+        </div>
+
+        {/* Trust statements */}
+        <div className="relative flex flex-wrap items-center gap-x-5 gap-y-2">
           {['Transparent by design', 'Secure & role-based', 'Real progress tracking'].map((t) => (
-            <span key={t} className="flex items-center gap-2 text-[12px] text-white/[.9]">
+            <span key={t} className="flex items-center gap-2 text-[13px] text-white/[.92]">
               <span className="h-1.5 w-1.5 flex-none rounded-full bg-[#93c5fd]" />
               {t}
             </span>
           ))}
-          <span className="flex items-center gap-2 text-[12px] text-white/[.9]">
+          <span className="flex items-center gap-2 text-[13px] text-white/[.92]">
             <PhoneIcon />
-            iOS &amp; Android
+            Available on mobile — iOS &amp; Android
           </span>
-        </div>
-
-        {/* Three real app screens on phones, bleeding off the bottom edge */}
-        <div className="relative mt-6 flex-1">
-          <div className="absolute inset-x-0 bottom-[-46px] flex items-end justify-center gap-[10px]">
-            <PhoneMock>
-              <HomeScreen />
-            </PhoneMock>
-            <PhoneMock className="mb-8">
-              <TaskScreen />
-            </PhoneMock>
-            <PhoneMock>
-              <FinanceScreen />
-            </PhoneMock>
-          </div>
         </div>
       </div>
     </main>
   );
 }
 
-/* ── Phone mockups showing real app screens (static sample data) ───────────── */
+/* ── Task snapshot card (static sample; mirrors the real task plan) ────────── */
 
-function PhoneMock({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return (
-    <div className={`w-[168px] flex-none ${className}`}>
-      <div className="rounded-[26px] bg-zinc-900 p-[6px] shadow-[0_26px_60px_rgba(8,20,60,.5)] ring-1 ring-white/10">
-        <div className="relative h-[428px] overflow-hidden rounded-[20px] bg-white">
-          <div className="absolute left-1/2 top-[7px] z-10 h-[5px] w-11 -translate-x-1/2 rounded-full bg-zinc-200" />
-          <div className="h-full px-3 pt-[26px]">{children}</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Tile({ v, l, bg, vc, lc }: { v: string; l: string; bg: string; vc: string; lc: string }) {
-  return (
-    <div className={`rounded-lg px-2 py-1.5 ${bg}`}>
-      <div className={`text-[15px] font-bold leading-none tabular-nums ${vc}`}>{v}</div>
-      <div className={`mt-1 text-[8px] leading-tight ${lc}`}>{l}</div>
-    </div>
-  );
-}
-
-function TaskRow({ dot, title, sub, right }: { dot: string; title: string; sub: string; right: string }) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className={`h-1 w-1 flex-none rounded-full ${dot}`} />
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-[9.5px] font-medium text-zinc-800">{title}</div>
-        <div className="text-[8px] text-zinc-400">{sub}</div>
-      </div>
-      <span className="text-[8px] tabular-nums text-zinc-500">{right}</span>
-    </div>
-  );
-}
-
-function HomeScreen() {
-  return (
-    <div className="flex h-full flex-col">
-      <div className="text-[13px] font-bold leading-tight text-zinc-900">Welcome back, Allen</div>
-      <div className="text-[8.5px] text-zinc-400">Datumpro Construction</div>
-      <div className="mt-2.5 grid grid-cols-2 gap-1.5">
-        <Tile v="6" l="Total projects" bg="bg-zinc-100" vc="text-zinc-900" lc="text-zinc-500" />
-        <Tile v="3" l="In progress" bg="bg-brand-50" vc="text-brand-600" lc="text-brand-800" />
-        <Tile v="1" l="On hold" bg="bg-[#fdf3e3]" vc="text-[#c9740b]" lc="text-[#c9740b]" />
-        <Tile v="2" l="Complete" bg="bg-[#e9f9ee]" vc="text-green-600" lc="text-[#15803d]" />
-      </div>
-      <div className="mt-2.5 flex items-center justify-between">
-        <span className="text-[9px] text-zinc-500">Overall progress</span>
-        <span className="text-[11px] font-bold tabular-nums text-zinc-900">64%</span>
-      </div>
-      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-zinc-200">
-        <div className="h-full bg-brand-500" style={{ width: '64%' }} />
-      </div>
-      <div className="mt-3 text-[7.5px] font-semibold uppercase tracking-wider text-zinc-400">Upcoming tasks</div>
-      <div className="mt-1.5 space-y-2">
-        <TaskRow dot="bg-red-500" title="Pour Ground slabs" sub="Riverside Depot" right="17 Aug" />
-        <TaskRow dot="bg-[#ef8f14]" title="Strike formwork" sub="Riverside Depot" right="21 Aug" />
-        <TaskRow dot="bg-zinc-300" title="Install rebar" sub="Hillside Block B" right="24 Aug" />
-      </div>
-    </div>
-  );
-}
-
-function TaskScreen() {
+function TaskSnapshotCard() {
   const steps = [
     { title: 'Excavate footing', cost: '$1,800', done: true },
     { title: 'Pour & cure concrete', cost: '$4,250', done: true },
     { title: 'Strike formwork', cost: '$560', done: false },
   ];
   return (
-    <div className="flex h-full flex-col">
-      <div className="text-[13px] font-bold leading-tight text-zinc-900">Ground floor slab</div>
-      <div className="text-[8.5px] text-zinc-400">Task plan · 2 of 3 done</div>
-      <div className="mt-2.5 flex items-center justify-between rounded-lg bg-brand-50 px-2.5 py-2">
-        <span className="text-[9px] text-zinc-600">Awarded value</span>
-        <span className="text-[12px] font-bold tabular-nums text-brand-800">$6,610</span>
+    <div className="w-full max-w-[380px] rounded-2xl bg-white p-6 shadow-[0_24px_60px_rgba(8,20,60,.32)]">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-[15px] font-semibold text-zinc-900">Ground floor slab</div>
+          <div className="mt-0.5 text-xs text-zinc-500">Riverside Depot · Task plan</div>
+        </div>
+        <span className="shrink-0 rounded-full bg-green-50 px-2.5 py-1 text-[11px] font-semibold text-green-700">
+          On track
+        </span>
       </div>
-      <div className="mt-2 flex items-center justify-between">
-        <span className="text-[9px] text-zinc-500">Progress</span>
-        <span className="text-[10px] font-semibold tabular-nums text-zinc-900">66%</span>
+
+      <div className="mt-5 flex items-center justify-between rounded-xl bg-brand-50 px-4 py-3">
+        <span className="text-[13px] text-zinc-600">Awarded value</span>
+        <span className="text-base font-bold tabular-nums text-brand-800">$6,610.00</span>
       </div>
-      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-zinc-200">
+
+      <div className="mt-5 flex items-center justify-between text-[13px]">
+        <span className="text-zinc-500">Progress</span>
+        <span className="font-semibold tabular-nums text-zinc-900">2 of 3 done · 66%</span>
+      </div>
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-100">
         <div className="h-full bg-green-500" style={{ width: '66%' }} />
       </div>
-      <div className="mt-3 space-y-2.5">
+
+      <div className="mt-5 flex flex-col gap-3.5">
         {steps.map((s) => (
-          <div key={s.title} className="flex items-center gap-2">
+          <div key={s.title} className="flex items-center gap-3">
             {s.done ? (
-              <span className="flex h-3.5 w-3.5 flex-none items-center justify-center rounded-md bg-green-500 text-[8px] text-white">
+              <span className="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-green-500 text-[11px] text-white">
                 ✓
               </span>
             ) : (
-              <span className="h-3.5 w-3.5 flex-none rounded-md border-2 border-zinc-300" />
+              <span className="h-5 w-5 flex-none rounded-full border-2 border-zinc-300" />
             )}
-            <span className={`flex-1 text-[9.5px] ${s.done ? 'text-zinc-400 line-through' : 'font-medium text-zinc-800'}`}>
+            <span className={`flex-1 text-sm ${s.done ? 'text-zinc-400 line-through' : 'font-medium text-zinc-900'}`}>
               {s.title}
             </span>
-            <span className="text-[8.5px] tabular-nums text-zinc-400">{s.cost}</span>
+            <span className="text-[13px] tabular-nums text-zinc-400">{s.cost}</span>
           </div>
         ))}
-      </div>
-    </div>
-  );
-}
-
-function Stat({ v, l, c }: { v: string; l: string; c: string }) {
-  return (
-    <div className="rounded-lg bg-zinc-100 px-1.5 py-1.5">
-      <div className={`text-[11px] font-bold tabular-nums ${c}`}>{v}</div>
-      <div className="text-[7.5px] text-zinc-500">{l}</div>
-    </div>
-  );
-}
-
-function PayRow({ title, amount, status, tone }: { title: string; amount: string; status: string; tone: string }) {
-  return (
-    <div className="flex items-center justify-between">
-      <div className="min-w-0">
-        <div className="truncate text-[9.5px] font-medium text-zinc-800">{title}</div>
-        <div className="text-[8px] text-zinc-400">Riverside Depot</div>
-      </div>
-      <div className="text-right">
-        <div className="text-[9.5px] font-semibold tabular-nums text-zinc-900">{amount}</div>
-        <div className={`text-[7.5px] ${tone}`}>{status}</div>
-      </div>
-    </div>
-  );
-}
-
-function FinanceScreen() {
-  return (
-    <div className="flex h-full flex-col">
-      <div className="text-[13px] font-bold leading-tight text-zinc-900">Payments</div>
-      <div className="text-[8.5px] text-zinc-400">What you&apos;re owed</div>
-      <div className="mt-2.5 grid grid-cols-3 gap-1.5">
-        <Stat v="$12.4k" l="Earned" c="text-zinc-900" />
-        <Stat v="$3.2k" l="Awaiting" c="text-[#c9740b]" />
-        <Stat v="$9.2k" l="Paid" c="text-green-600" />
-      </div>
-      <div className="mt-3 text-[7.5px] font-semibold uppercase tracking-wider text-zinc-400">Recent</div>
-      <div className="mt-1.5 space-y-2.5">
-        <PayRow title="Ground slab pour" amount="$4,250" status="Paid" tone="text-green-600" />
-        <PayRow title="Formwork strike" amount="$1,800" status="Awaiting" tone="text-[#c9740b]" />
-        <PayRow title="Rebar fixing" amount="$2,400" status="Paid" tone="text-green-600" />
       </div>
     </div>
   );
