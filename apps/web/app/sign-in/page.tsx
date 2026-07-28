@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState } from 'react';
+import { use, useState, type ReactNode } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { env } from '@/lib/env';
 
@@ -353,9 +353,12 @@ export default function SignInPage({
           is in.
         </p>
 
-        {/* Single task snapshot, centered with breathing room */}
+        {/* Two app snapshots, equal size, centered with breathing room */}
         <div className="relative flex flex-1 items-center py-8">
-          <TaskSnapshotCard />
+          <div className="mx-auto flex w-full max-w-[700px] items-stretch gap-4">
+            <TaskSnapshotCard />
+            <TasksViewCard />
+          </div>
         </div>
 
         {/* Trust statements */}
@@ -378,6 +381,15 @@ export default function SignInPage({
 
 /* ── Task snapshot card (static sample; mirrors the real task plan) ────────── */
 
+function CardShell({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-1 flex-col rounded-2xl bg-white p-5 shadow-[0_24px_60px_rgba(8,20,60,.32)]">
+      {children}
+    </div>
+  );
+}
+
+/** Task plan — one task's awarded value, progress and step checklist. */
 function TaskSnapshotCard() {
   const steps = [
     { title: 'Excavate footing', cost: '$1,800', done: true },
@@ -385,48 +397,84 @@ function TaskSnapshotCard() {
     { title: 'Strike formwork', cost: '$560', done: false },
   ];
   return (
-    <div className="w-full max-w-[380px] rounded-2xl bg-white p-6 shadow-[0_24px_60px_rgba(8,20,60,.32)]">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-[15px] font-semibold text-zinc-900">Ground floor slab</div>
-          <div className="mt-0.5 text-xs text-zinc-500">Riverside Depot · Task plan</div>
+    <CardShell>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate text-[14px] font-semibold text-zinc-900">Ground floor slab</div>
+          <div className="mt-0.5 truncate text-[11px] text-zinc-500">Riverside Depot · Task plan</div>
         </div>
-        <span className="shrink-0 rounded-full bg-green-50 px-2.5 py-1 text-[11px] font-semibold text-green-700">
+        <span className="shrink-0 rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-semibold text-green-700">
           On track
         </span>
       </div>
 
-      <div className="mt-5 flex items-center justify-between rounded-xl bg-brand-50 px-4 py-3">
-        <span className="text-[13px] text-zinc-600">Awarded value</span>
-        <span className="text-base font-bold tabular-nums text-brand-800">$6,610.00</span>
+      <div className="mt-4 flex items-center justify-between gap-2 rounded-xl bg-brand-50 px-3 py-2.5">
+        <span className="text-[12px] text-zinc-600">Awarded value</span>
+        <span className="text-[15px] font-bold tabular-nums text-brand-800">$6,610</span>
       </div>
 
-      <div className="mt-5 flex items-center justify-between text-[13px]">
+      <div className="mt-4 flex items-center justify-between text-[12px]">
         <span className="text-zinc-500">Progress</span>
-        <span className="font-semibold tabular-nums text-zinc-900">2 of 3 done · 66%</span>
+        <span className="font-semibold tabular-nums text-zinc-900">2 of 3 · 66%</span>
       </div>
       <div className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-100">
         <div className="h-full bg-green-500" style={{ width: '66%' }} />
       </div>
 
-      <div className="mt-5 flex flex-col gap-3.5">
+      <div className="mt-4 flex flex-col gap-3">
         {steps.map((s) => (
-          <div key={s.title} className="flex items-center gap-3">
+          <div key={s.title} className="flex items-center gap-2.5">
             {s.done ? (
-              <span className="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-green-500 text-[11px] text-white">
+              <span className="flex h-[18px] w-[18px] flex-none items-center justify-center rounded-full bg-green-500 text-[10px] text-white">
                 ✓
               </span>
             ) : (
-              <span className="h-5 w-5 flex-none rounded-full border-2 border-zinc-300" />
+              <span className="h-[18px] w-[18px] flex-none rounded-full border-2 border-zinc-300" />
             )}
-            <span className={`flex-1 text-sm ${s.done ? 'text-zinc-400 line-through' : 'font-medium text-zinc-900'}`}>
+            <span className={`flex-1 truncate text-[13px] ${s.done ? 'text-zinc-400 line-through' : 'font-medium text-zinc-900'}`}>
               {s.title}
             </span>
-            <span className="text-[13px] tabular-nums text-zinc-400">{s.cost}</span>
+            <span className="text-[12px] tabular-nums text-zinc-400">{s.cost}</span>
           </div>
         ))}
       </div>
-    </div>
+    </CardShell>
+  );
+}
+
+/** Task view — a dummy project's task board with per-task status. */
+function TasksViewCard() {
+  const tasks = [
+    { name: 'Site clearance', status: 'Done', dot: 'bg-green-500', pill: 'bg-green-50 text-green-700' },
+    { name: 'Ground floor slab', status: 'In progress', dot: 'bg-brand-500', pill: 'bg-brand-50 text-brand-700' },
+    { name: 'Steel fixing', status: 'In progress', dot: 'bg-brand-500', pill: 'bg-brand-50 text-brand-700' },
+    { name: 'First-floor slab', status: 'Blocked', dot: 'bg-red-500', pill: 'bg-red-50 text-red-600' },
+    { name: 'Roof trusses', status: 'To do', dot: 'bg-zinc-300', pill: 'bg-zinc-100 text-zinc-500' },
+  ];
+  return (
+    <CardShell>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate text-[14px] font-semibold text-zinc-900">Riverside Depot</div>
+          <div className="mt-0.5 truncate text-[11px] text-zinc-500">Task board · 8 tasks</div>
+        </div>
+        <span className="shrink-0 rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-semibold text-brand-700">
+          62% done
+        </span>
+      </div>
+
+      <div className="mt-4 flex flex-col gap-3">
+        {tasks.map((t) => (
+          <div key={t.name} className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className={`h-1.5 w-1.5 flex-none rounded-full ${t.dot}`} />
+              <span className="truncate text-[13px] text-zinc-800">{t.name}</span>
+            </div>
+            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9.5px] font-semibold ${t.pill}`}>{t.status}</span>
+          </div>
+        ))}
+      </div>
+    </CardShell>
   );
 }
 
