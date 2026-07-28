@@ -1,5 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { isBusinessEmail, PERSONAL_EMAIL_DOMAINS } from './email';
+import { isBusinessEmail, isPersonalEmailDomain, PERSONAL_EMAIL_DOMAINS } from './email';
+
+describe('isPersonalEmailDomain — block personal domains from being claimed', () => {
+  it('flags free providers', () => {
+    expect(isPersonalEmailDomain('gmail.com')).toBe(true);
+    expect(isPersonalEmailDomain('GMAIL.COM')).toBe(true);
+    expect(isPersonalEmailDomain('  outlook.com ')).toBe(true);
+  });
+  it('passes company domains', () => {
+    expect(isPersonalEmailDomain('acme.com')).toBe(false);
+    expect(isPersonalEmailDomain('grafaid.co.ke')).toBe(false);
+  });
+});
 
 describe('isBusinessEmail — work-email nudge for org creation', () => {
   it('accepts company domains', () => {

@@ -26,6 +26,12 @@ export const PERSONAL_EMAIL_DOMAINS: ReadonlySet<string> = new Set([
   'mail.com',
 ]);
 
+/** True when `domain` (a bare domain, not an email) is a known free/personal
+ *  provider — used to refuse verifying it as an org domain. */
+export function isPersonalEmailDomain(domain: string): boolean {
+  return PERSONAL_EMAIL_DOMAINS.has(domain.trim().toLowerCase());
+}
+
 /** True when `email` looks like a real company address (not a free provider). */
 export function isBusinessEmail(email: string): boolean {
   const normalized = email.trim().toLowerCase();
