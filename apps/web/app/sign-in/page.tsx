@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState, type ReactNode } from 'react';
+import { use, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { env } from '@/lib/env';
 
@@ -130,6 +130,8 @@ export default function SignInPage({
       {/* ── Form column (50%) ───────────────────────────────────────────────── */}
       <div className="flex w-full flex-col px-6 py-10 sm:px-[52px] sm:py-11 lg:w-1/2 lg:flex-none">
         <div className="mx-auto my-auto w-full max-w-[400px] py-8">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.svg" alt="DatumPro" className="mb-7 h-11 w-11 rounded-xl shadow-sm" />
           <h1 className="font-display text-[26px] font-semibold leading-[1.2] tracking-[-0.02em] text-zinc-900 dark:text-white">
             {fromInvite ? 'Accept your invitation' : 'Welcome back'}
           </h1>
@@ -309,6 +311,22 @@ export default function SignInPage({
               {message.text}
             </p>
           )}
+
+          {/* What you get */}
+          <ul className="mt-7 space-y-2.5">
+            <li className="flex items-center gap-2.5 text-[13px] text-zinc-600 dark:text-zinc-400">
+              <FeatureClock />
+              Track every task’s progress and SLA
+            </li>
+            <li className="flex items-center gap-2.5 text-[13px] text-zinc-600 dark:text-zinc-400">
+              <FeatureBids />
+              Compare sealed bids before you award
+            </li>
+            <li className="flex items-center gap-2.5 text-[13px] text-zinc-600 dark:text-zinc-400">
+              <FeatureProof />
+              Release payment only on verified proof
+            </li>
+          </ul>
         </div>
 
         {/* Legal + enterprise entry point (pinned to column bottom) */}
@@ -331,150 +349,118 @@ export default function SignInPage({
         </div>
       </div>
 
-      {/* ── Poster column (50%, hidden < lg) ───────────────────────────────── */}
-      <div className="relative hidden min-w-0 flex-1 flex-col overflow-hidden bg-brand-600 p-12 lg:flex">
-        {/* Decorative rings, top-right */}
-        <div className="pointer-events-none absolute -right-[80px] -top-[80px] h-[300px] w-[300px] rounded-full border border-white/[.12]" />
-        <div className="pointer-events-none absolute -right-[30px] -top-[30px] h-[200px] w-[200px] rounded-full border border-white/[.09]" />
-        {/* Blended logo — extreme top-right corner */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/logo.svg"
-          alt=""
-          aria-hidden="true"
-          className="pointer-events-none absolute right-[-26px] top-[-32px] h-[200px] w-[172px] object-contain opacity-80 [mix-blend-mode:soft-light]"
-        />
-
-        <h2 className="relative max-w-[460px] font-display text-[29px] font-semibold leading-[1.2] tracking-[-0.02em] text-white [text-wrap:balance]">
+      {/* ── Poster column (50%, hidden < lg) — geometric, Keyhub-style ──────── */}
+      <div className="relative hidden min-w-0 flex-1 flex-col justify-center overflow-hidden bg-brand-600 px-14 lg:flex">
+        <PosterDecor />
+        <h2 className="relative z-10 max-w-[420px] font-display text-[38px] font-bold leading-[1.14] tracking-[-0.02em] text-white [text-wrap:balance]">
           Every task priced, tracked and paid — in one place.
         </h2>
-        <p className="mt-3 max-w-[440px] text-[14px] leading-[1.55] text-white/[.78]">
-          Tender work out, compare sealed bids, watch progress against the plan, and release payment when the proof
-          is in.
+        <p className="relative z-10 mt-5 max-w-[400px] text-[15px] leading-[1.6] text-white/[.8]">
+          DatumPro helps construction and project teams tender work, compare sealed bids, track progress against the
+          plan, and release payment when the proof is in.
         </p>
-
-        {/* Two app snapshots, equal size, centered with breathing room */}
-        <div className="relative flex flex-1 items-center py-8">
-          <div className="mx-auto flex w-full max-w-[700px] items-stretch gap-4">
-            <TaskSnapshotCard />
-            <TasksViewCard />
-          </div>
-        </div>
-
-        {/* Trust statements */}
-        <div className="relative flex flex-wrap items-center gap-x-5 gap-y-2">
-          {['Transparent by design', 'Secure & role-based', 'Real progress tracking'].map((t) => (
-            <span key={t} className="flex items-center gap-2 text-[13px] text-white/[.92]">
-              <span className="h-1.5 w-1.5 flex-none rounded-full bg-[#93c5fd]" />
-              {t}
-            </span>
-          ))}
-          <span className="flex items-center gap-2 text-[13px] text-white/[.92]">
-            <PhoneIcon />
-            Available on mobile — iOS &amp; Android
-          </span>
-        </div>
       </div>
     </main>
   );
 }
 
-/* ── Task snapshot card (static sample; mirrors the real task plan) ────────── */
+/* ── Poster decoration — geometric "pixel confetti" (Keyhub-style) ─────────── */
 
-function CardShell({ children }: { children: ReactNode }) {
+function Sq({ c, s, className = '', rot = 0, r = 4 }: { c: string; s: number; className?: string; rot?: number; r?: number }) {
   return (
-    <div className="flex min-w-0 flex-1 flex-col rounded-2xl bg-white p-5 shadow-[0_24px_60px_rgba(8,20,60,.32)]">
-      {children}
+    <div className={`absolute ${className}`} style={{ width: s, height: s, background: c, borderRadius: r, transform: `rotate(${rot}deg)` }} />
+  );
+}
+
+function Plus({ c, s, className = '', rot = 0 }: { c: string; s: number; className?: string; rot?: number }) {
+  return (
+    <svg className={`absolute ${className}`} width={s} height={s} viewBox="0 0 24 24" fill={c} style={{ transform: `rotate(${rot}deg)` }} aria-hidden="true">
+      <path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z" />
+    </svg>
+  );
+}
+
+function Spark({ c, s, className = '' }: { c: string; s: number; className?: string }) {
+  return (
+    <svg className={`absolute ${className}`} width={s} height={s} viewBox="0 0 24 24" fill={c} aria-hidden="true">
+      <path d="M12 0c1 6 5 10 12 12-7 2-11 6-12 12-1-6-5-10-12-12 7-2 11-6 12-12z" />
+    </svg>
+  );
+}
+
+function Tri({ c, s, className = '', rot = 0 }: { c: string; s: number; className?: string; rot?: number }) {
+  return (
+    <svg className={`absolute ${className}`} width={s} height={s} viewBox="0 0 24 24" fill={c} style={{ transform: `rotate(${rot}deg)` }} aria-hidden="true">
+      <path d="M12 4l9 16H3z" />
+    </svg>
+  );
+}
+
+/** Scattered geometric shapes layered behind the poster headline. */
+function PosterDecor() {
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+      {/* faint large squares */}
+      <div className="absolute right-16 top-16 h-44 w-44 rounded bg-white/[.05]" />
+      <div className="absolute -left-12 bottom-12 h-40 w-40 rounded bg-white/[.04]" />
+
+      {/* cyan cluster, top-left */}
+      <Sq c="#22d3ee" s={24} className="left-10 top-24" />
+      <Sq c="#38bdf8" s={24} className="left-10 top-[124px]" />
+      <Sq c="#38bdf8" s={24} className="left-[64px] top-24" />
+
+      {/* pixel plus signs */}
+      <Plus c="#7dd3fc" s={32} className="right-24 top-16" />
+      <Plus c="#bfdbfe" s={42} className="right-16 bottom-28" rot={12} />
+      <Plus c="#3b82f6" s={22} className="left-1/2 top-10" />
+      <Plus c="#60a5fa" s={26} className="left-16 bottom-1/3" rot={-8} />
+
+      {/* solid squares */}
+      <Sq c="#1e40af" s={30} className="right-12 top-1/3" rot={12} />
+      <Sq c="#93c5fd" s={20} className="right-1/3 bottom-16" rot={8} />
+      <Sq c="#22d3ee" s={16} className="right-28 top-1/2" rot={20} />
+
+      {/* sparkles */}
+      <Spark c="rgba(255,255,255,.92)" s={26} className="left-20 bottom-[24%]" />
+      <Spark c="#a5f3fc" s={18} className="right-24 top-[22%]" />
+
+      {/* pencil pill + triangle */}
+      <div className="absolute left-24 top-32 h-2.5 w-14 rotate-45 rounded-full bg-white/90" />
+      <Tri c="#2563eb" s={22} className="bottom-20 left-1/3" rot={-15} />
+
+      {/* dots */}
+      <div className="absolute left-1/3 top-20 h-2.5 w-2.5 rounded-full bg-blue-300/80" />
+      <div className="absolute right-1/4 bottom-1/4 h-2 w-2 rounded-full bg-cyan-300/80" />
     </div>
   );
 }
 
-/** Task plan — one task's awarded value, progress and step checklist. */
-function TaskSnapshotCard() {
-  const steps = [
-    { title: 'Excavate footing', cost: '$1,800', done: true },
-    { title: 'Pour & cure concrete', cost: '$4,250', done: true },
-    { title: 'Strike formwork', cost: '$560', done: false },
-  ];
+/* ── Feature-bullet icons ──────────────────────────────────────────────────── */
+
+function FeatureClock() {
   return (
-    <CardShell>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="truncate text-[14px] font-semibold text-zinc-900">Ground floor slab</div>
-          <div className="mt-0.5 truncate text-[11px] text-zinc-500">Riverside Depot · Task plan</div>
-        </div>
-        <span className="shrink-0 rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-semibold text-green-700">
-          On track
-        </span>
-      </div>
-
-      <div className="mt-4 flex items-center justify-between gap-2 rounded-xl bg-brand-50 px-3 py-2.5">
-        <span className="text-[12px] text-zinc-600">Awarded value</span>
-        <span className="text-[15px] font-bold tabular-nums text-brand-800">$6,610</span>
-      </div>
-
-      <div className="mt-4 flex items-center justify-between text-[12px]">
-        <span className="text-zinc-500">Progress</span>
-        <span className="font-semibold tabular-nums text-zinc-900">2 of 3 · 66%</span>
-      </div>
-      <div className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-100">
-        <div className="h-full bg-green-500" style={{ width: '66%' }} />
-      </div>
-
-      <div className="mt-4 flex flex-col gap-3">
-        {steps.map((s) => (
-          <div key={s.title} className="flex items-center gap-2.5">
-            {s.done ? (
-              <span className="flex h-[18px] w-[18px] flex-none items-center justify-center rounded-full bg-green-500 text-[10px] text-white">
-                ✓
-              </span>
-            ) : (
-              <span className="h-[18px] w-[18px] flex-none rounded-full border-2 border-zinc-300" />
-            )}
-            <span className={`flex-1 truncate text-[13px] ${s.done ? 'text-zinc-400 line-through' : 'font-medium text-zinc-900'}`}>
-              {s.title}
-            </span>
-            <span className="text-[12px] tabular-nums text-zinc-400">{s.cost}</span>
-          </div>
-        ))}
-      </div>
-    </CardShell>
+    <svg className="h-4 w-4 flex-none text-brand-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
   );
 }
 
-/** Task view — a dummy project's task board with per-task status. */
-function TasksViewCard() {
-  const tasks = [
-    { name: 'Site clearance', status: 'Done', dot: 'bg-green-500', pill: 'bg-green-50 text-green-700' },
-    { name: 'Ground floor slab', status: 'In progress', dot: 'bg-brand-500', pill: 'bg-brand-50 text-brand-700' },
-    { name: 'Steel fixing', status: 'In progress', dot: 'bg-brand-500', pill: 'bg-brand-50 text-brand-700' },
-    { name: 'First-floor slab', status: 'Blocked', dot: 'bg-red-500', pill: 'bg-red-50 text-red-600' },
-    { name: 'Roof trusses', status: 'To do', dot: 'bg-zinc-300', pill: 'bg-zinc-100 text-zinc-500' },
-  ];
+function FeatureBids() {
   return (
-    <CardShell>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="truncate text-[14px] font-semibold text-zinc-900">Riverside Depot</div>
-          <div className="mt-0.5 truncate text-[11px] text-zinc-500">Task board · 8 tasks</div>
-        </div>
-        <span className="shrink-0 rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-semibold text-brand-700">
-          62% done
-        </span>
-      </div>
+    <svg className="h-4 w-4 flex-none text-brand-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path d="m12 3 9 5-9 5-9-5 9-5Z" />
+      <path d="m3 13 9 5 9-5" />
+    </svg>
+  );
+}
 
-      <div className="mt-4 flex flex-col gap-3">
-        {tasks.map((t) => (
-          <div key={t.name} className="flex items-center justify-between gap-2">
-            <div className="flex min-w-0 items-center gap-2">
-              <span className={`h-1.5 w-1.5 flex-none rounded-full ${t.dot}`} />
-              <span className="truncate text-[13px] text-zinc-800">{t.name}</span>
-            </div>
-            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9.5px] font-semibold ${t.pill}`}>{t.status}</span>
-          </div>
-        ))}
-      </div>
-    </CardShell>
+function FeatureProof() {
+  return (
+    <svg className="h-4 w-4 flex-none text-brand-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path d="M12 3 4 6v6c0 5 3.5 7.5 8 9 4.5-1.5 8-4 8-9V6l-8-3Z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
   );
 }
 
@@ -523,15 +509,6 @@ function EyeOffIcon() {
     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
       <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6 0 10 7 10 7a13.2 13.2 0 0 1-1.67 2.26M6.6 6.6A13.2 13.2 0 0 0 2 12s4 7 10 7a9.12 9.12 0 0 0 2.1-.24" />
       <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M1 1l22 22" />
-    </svg>
-  );
-}
-
-function PhoneIcon() {
-  return (
-    <svg className="h-[13px] w-[13px] flex-none" viewBox="0 0 24 24" fill="none" stroke="#93c5fd" strokeWidth="2" aria-hidden="true">
-      <rect x="6" y="2" width="12" height="20" rx="2.5" />
-      <path d="M11 18.5h2" />
     </svg>
   );
 }
