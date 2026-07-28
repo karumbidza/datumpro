@@ -1,8 +1,18 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
+import { Space_Grotesk } from 'next/font/google';
 import './globals.css';
 import { ServiceWorkerRegister } from '@/components/pwa/sw-register';
 import { ThemeProvider } from '@/components/theme-provider';
+
+// Distinctive display face for headings (sign-in and marketing surfaces). Body
+// stays on the app's system --font-sans; this only drives `font-display`.
+const spaceGrotesk = Space_Grotesk({
+  subsets: ['latin'],
+  weight: ['500', '600', '700'],
+  variable: '--font-space-grotesk',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
@@ -37,7 +47,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={spaceGrotesk.variable}>
       <body className="min-h-screen">
         <ThemeProvider>
           {children}

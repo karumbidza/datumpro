@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
 import { can } from '@datumpro/shared/access';
 import { getActiveContext, getSidebarData } from '@/lib/data/org';
+import { createClient } from '@/lib/supabase/server';
 import { Sidebar } from '@/components/shell/sidebar';
 import { MobileNav } from '@/components/shell/mobile-nav';
 
@@ -14,6 +15,22 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   if (!ctx.active) {
     return <div className="min-h-screen">{children}</div>;
+  }
+
+  // Org-enforced MFA: if this org requires 2FA and the session hasn't reached
+  // AAL2, send the user to enrol/verify. /mfa lives outside this route group, so
+  // there's no redirect loop.
+  {
+    const supabase = await createClient();
+    const { data: orgRow } = await supabase
+      .from('organizations')
+      .select('require_mfa')
+      .eq('id', ctx.active.orgId)
+      .single();
+    if ((orgRow as { require_mfa?: boolean } | null)?.require_mfa) {
+      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (aal && aal.currentLevel !== 'aal2') redirect('/mfa');
+    }
   }
 
   const { projects, myTaskCount, isContractor, managedProjectIds } = await getSidebarData(

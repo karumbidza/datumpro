@@ -9,8 +9,26 @@ import { REPORT_STATUSES, WEATHER_OPTIONS } from '../domain/monitoring';
 import { PAYMENT_METHODS } from '../domain/finance';
 import { TASK_PRIORITIES } from '../domain/tasks';
 
+export * from './email';
+
+/** Empty/whitespace optional strings become `undefined` so blank form fields
+ *  don't write empty strings into the DB. */
+const optionalText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined));
+
+/** Company profile captured by the onboarding setup wizard. `name` is the only
+ *  required field; the rest are an on-record profile that adds credibility. */
 export const createOrgSchema = z.object({
   name: z.string().trim().min(2).max(120),
+  legalName: optionalText(160),
+  country: optionalText(64), // ISO-2 or free text (e.g. "KE" or "Kenya")
+  sector: optionalText(64),
+  registrationNumber: optionalText(64),
 });
 export type CreateOrgInput = z.infer<typeof createOrgSchema>;
 

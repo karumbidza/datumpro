@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { paymentRequestSchema } from '@datumpro/shared/validation';
+import { logAudit } from '@/lib/audit';
 
 type Result = { ok: boolean; error?: string };
 
@@ -77,13 +78,18 @@ async function managerUpdate(
   id: string,
   patch: Record<string, unknown>,
   projectId: string,
-): Promise<Result> {
+): Promise<Result & { orgId?: string }> {
   const supabase = await createClient();
-  const { error } = await supabase.from('contractor_payment_requests').update(patch).eq('id', id);
+  const { data, error } = await supabase
+    .from('contractor_payment_requests')
+    .update(patch)
+    .eq('id', id)
+    .select('org_id')
+    .single();
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/projects/${projectId}/finance`);
   revalidatePath('/payments');
-  return { ok: true };
+  return { ok: true, orgId: (data as { org_id: string } | null)?.org_id };
 }
 
 // approvePaymentRequest retired — payment approval now runs through the shared
@@ -97,7 +103,7 @@ export async function rejectPaymentRequest(formData: FormData): Promise<Result> 
   if (!user) return { ok: false, error: 'Not signed in.' };
   const id = String(formData.get('id') ?? '');
   const projectId = String(formData.get('projectId') ?? '');
-  return managerUpdate(
+  const res = await managerUpdate(
     id,
     {
       status: 'rejected',
@@ -107,6 +113,10 @@ export async function rejectPaymentRequest(formData: FormData): Promise<Result> 
     },
     projectId,
   );
+  if (res.ok && res.orgId) {
+    await logAudit({ orgId: res.orgId, actorId: user.id, entityType: 'contractor_payment_request', entityId: id, action: 'payment.rejected' });
+  }
+  return res;
 }
 
 /** Mark a request paid, attach a POP, and sync a linked draw to paid. */
@@ -136,5 +146,8 @@ export async function markPaymentRequestPaid(formData: FormData): Promise<Result
     },
     projectId,
   );
+  if (res.ok && res.orgId) {
+    await logAudit({ orgId: res.orgId, actorId: user.id, entityType: 'contractor_payment_request', entityId: id, action: 'payment.marked_paid' });
+  }
   return res;
 }

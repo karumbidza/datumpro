@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { logAudit } from '@/lib/audit';
 
 /** Decide one step of an approval chain (any entity type — extension, payment,
  *  variation, request). The DB finalizes the entity + applies its effect once
@@ -19,7 +20,7 @@ export async function decideApprovalStep(formData: FormData) {
   const path = String(formData.get('path') ?? '');
   if (decision !== 'approved' && decision !== 'rejected') return;
 
-  const { error } = await supabase
+  const { data: row, error } = await supabase
     .from('approvals')
     .update({
       decision,
@@ -27,7 +28,9 @@ export async function decideApprovalStep(formData: FormData) {
       comment: (formData.get('comment') as string) || null,
       decided_at: new Date().toISOString(),
     })
-    .eq('id', approvalId);
+    .eq('id', approvalId)
+    .select('org_id')
+    .single();
   if (error) {
     throw new Error(
       error.message.includes('segregation of duties')
@@ -35,5 +38,12 @@ export async function decideApprovalStep(formData: FormData) {
         : error.message,
     );
   }
+  await logAudit({
+    orgId: (row as { org_id: string } | null)?.org_id ?? '',
+    actorId: user.id,
+    entityType: 'approval',
+    entityId: approvalId,
+    action: `approval.${decision}`,
+  });
   if (path) revalidatePath(path);
 }

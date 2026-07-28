@@ -167,4 +167,33 @@ export function digestEmail(opts: {
   };
 }
 
+export function enterpriseRequestEmail(opts: {
+  orgName: string;
+  buyerType?: string | null;
+  country?: string | null;
+  contactName?: string | null;
+  contactEmail: string;
+  teamSize?: string | null;
+  needs?: string | null;
+}) {
+  const row = (label: string, value?: string | null) =>
+    value ? `<p style="margin:0 0 4px"><strong>${label}:</strong> ${value}</p>` : '';
+  return {
+    subject: `Enterprise request: ${opts.orgName}`,
+    html: layout({
+      heading: 'New government / enterprise request',
+      intro: `<strong>${opts.orgName}</strong> requested access via the enterprise lane.`,
+      bodyHtml: `<div style="font-size:13px;color:#3f3f46;line-height:1.6;background:#f4f4f5;border-radius:8px;padding:12px">
+        ${row('Contact', opts.contactName)}
+        ${row('Email', opts.contactEmail)}
+        ${row('Buyer type', opts.buyerType)}
+        ${row('Country', opts.country)}
+        ${row('Team size', opts.teamSize)}
+        ${row('Needs', opts.needs)}
+      </div>`,
+      footnote: 'DatumPro enterprise request — review and provision the org manually.',
+    }),
+  };
+}
+
 export { appUrl };

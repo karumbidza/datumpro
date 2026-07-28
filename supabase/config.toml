@@ -21,8 +21,21 @@ enabled = true
 site_url = "http://localhost:3000"
 # Email OTP / magic link is the default sign-in for v1. SMS OTP (Africa's Talking)
 # is wired at the app layer.
+[auth.mfa]
+max_enrolled_factors = 10
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
 [auth.email]
 enable_signup = true
+# Onboarding Phase 1: require email confirmation for password signups before a
+# session is issued. OAuth and magic-link are already verified, so this mainly
+# affects password-based org creators (not invited site contractors, who arrive
+# via magic link / OAuth). Takes effect locally on `db reset` and on the hosted
+# project via `supabase config push`.
+enable_confirmations = true
 
 # The magic-link template is also what `signInWithOtp` emails. Mobile signs in
 # with the 6-digit {{ .Token }}, web clicks {{ .ConfirmationURL }} — the template

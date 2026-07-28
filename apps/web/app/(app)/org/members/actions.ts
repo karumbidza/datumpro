@@ -9,6 +9,7 @@ import {
 } from '@datumpro/shared/access';
 import { sendEmail } from '@/lib/email/resend';
 import { inviteEmail, appUrl } from '@/lib/email/templates';
+import { logAudit } from '@/lib/audit';
 
 const MEMBERS = '/org/members';
 
@@ -60,6 +61,8 @@ export async function inviteMember(formData: FormData) {
       fail(error.message);
     }
 
+    await logAudit({ orgId, actorId: user?.id ?? null, entityType: 'org_invitation', entityId: null, action: 'invitation.sent', after: { email, memberType } });
+
     // Best-effort email — never let a mail hiccup fail the invite.
     try {
       const [{ data: org }, { data: inviter }] = await Promise.all([
@@ -109,6 +112,7 @@ export async function updateOrgMemberRole(formData: FormData) {
     .eq('org_id', orgId)
     .eq('user_id', userId);
   if (error) fail(error.message);
+  await logAudit({ orgId, actorId: user.id, entityType: 'org_member', entityId: userId, action: 'member.role_changed', after: { memberType } });
   done();
 }
 
@@ -125,6 +129,7 @@ export async function removeOrgMember(formData: FormData) {
     .eq('org_id', orgId)
     .eq('user_id', userId);
   if (error) fail(error.message);
+  await logAudit({ orgId, actorId: user.id, entityType: 'org_member', entityId: userId, action: 'member.removed' });
   done();
 }
 
@@ -151,6 +156,7 @@ export async function deactivateOrgMember(formData: FormData) {
     .eq('org_id', orgId)
     .eq('user_id', userId);
   if (error) fail(error.message);
+  await logAudit({ orgId, actorId: user.id, entityType: 'org_member', entityId: userId, action: 'member.deactivated' });
   done();
 }
 
@@ -158,13 +164,14 @@ export async function deactivateOrgMember(formData: FormData) {
 export async function reactivateOrgMember(formData: FormData) {
   const orgId = String(formData.get('orgId') ?? '');
   const userId = String(formData.get('userId') ?? '');
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   const { error } = await supabase
     .from('org_members')
     .update({ status: 'active' })
     .eq('org_id', orgId)
     .eq('user_id', userId);
   if (error) fail(error.message);
+  await logAudit({ orgId, actorId: user.id, entityType: 'org_member', entityId: userId, action: 'member.reactivated' });
   done();
 }
 
@@ -209,11 +216,21 @@ export async function revokeInvitation(formData: FormData) {
   const invitationId = String(formData.get('invitationId') ?? '');
   if (!invitationId) fail('Missing invitation.');
   const supabase = await createClient();
+  const { data: inv, error: readErr } = await supabase
+    .from('org_invitations')
+    .select('org_id')
+    .eq('id', invitationId)
+    .maybeSingle();
+  if (readErr) fail(readErr.message);
   const { error } = await supabase
     .from('org_invitations')
     .update({ status: 'revoked' })
     .eq('id', invitationId);
   if (error) fail(error.message);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  await logAudit({ orgId: (inv as { org_id: string } | null)?.org_id ?? '', actorId: user?.id ?? null, entityType: 'org_invitation', entityId: invitationId, action: 'invitation.revoked' });
   done();
 }
 

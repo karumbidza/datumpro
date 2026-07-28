@@ -21,6 +21,8 @@ import { ApprovalsInbox } from '@/components/dashboard/approvals-inbox';
 import { MyTasksCard } from '@/components/dashboard/my-tasks-card';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { SubmitButton } from '@/components/ui/submit-button';
+import { joinOrgByDomain } from './join-actions';
 import { LiveRefresh } from '@/components/live-refresh';
 import { formatLongDate } from '@/lib/date';
 import { can } from '@datumpro/shared/access';
@@ -32,16 +34,38 @@ export default async function DashboardPage() {
 
   // No organisation yet → onboarding (rendered without the sidebar by the layout).
   if (!ctx.active) {
+    const supabase = await createClient();
+    const { data: joinable } = await supabase.rpc('find_joinable_org');
+    const offer = ((joinable ?? []) as { org_id: string; org_name: string }[])[0] ?? null;
+
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Welcome to DatumPro</h1>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Create your company to get started.
+            {offer ? 'Your company is already on DatumPro.' : 'Create your company to get started.'}
           </p>
         </div>
+
+        {offer && (
+          <Card className="w-full text-left">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">{offer.org_name}</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">Join as a member</p>
+              </div>
+              <form action={joinOrgByDomain}>
+                <input type="hidden" name="orgId" value={offer.org_id} />
+                <SubmitButton pendingText="Joining…">Join</SubmitButton>
+              </form>
+            </div>
+          </Card>
+        )}
+
+        {offer && <div className="text-xs text-zinc-400">or</div>}
+
         <Link href="/orgs/new">
-          <Button>Create company</Button>
+          <Button variant={offer ? 'secondary' : undefined}>Create a new company</Button>
         </Link>
       </main>
     );
