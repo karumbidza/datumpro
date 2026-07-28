@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { CONTRACTOR_DOC_TYPES, type ContractorDocType } from '@datumpro/shared/domain';
+import { logAudit } from '@/lib/audit';
 
 type Result = { ok: boolean; error?: string };
 
@@ -37,28 +38,38 @@ export async function uploadContractorDocument(formData: FormData): Promise<Resu
   return { ok: true };
 }
 
-async function review(id: string, patch: Record<string, unknown>): Promise<Result> {
+async function review(id: string, patch: Record<string, unknown>, action: string): Promise<Result> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: 'Not signed in.' };
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('contractor_documents')
     .update({ ...patch, reviewed_by: user.id, reviewed_at: new Date().toISOString() })
-    .eq('id', id);
+    .eq('id', id)
+    .select('org_id')
+    .single();
   if (error) return { ok: false, error: error.message };
+  await logAudit({
+    orgId: (data as { org_id: string } | null)?.org_id ?? '',
+    actorId: user.id,
+    entityType: 'contractor_document',
+    entityId: id,
+    action,
+  });
   revalidatePath('/org/documents');
   return { ok: true };
 }
 
 export async function verifyContractorDocument(formData: FormData): Promise<Result> {
-  return review(String(formData.get('id') ?? ''), { status: 'verified', review_note: null });
+  return review(String(formData.get('id') ?? ''), { status: 'verified', review_note: null }, 'document.verified');
 }
 
 export async function rejectContractorDocument(formData: FormData): Promise<Result> {
-  return review(String(formData.get('id') ?? ''), {
-    status: 'rejected',
-    review_note: (formData.get('reviewNote') as string) || null,
-  });
+  return review(
+    String(formData.get('id') ?? ''),
+    { status: 'rejected', review_note: (formData.get('reviewNote') as string) || null },
+    'document.rejected',
+  );
 }
