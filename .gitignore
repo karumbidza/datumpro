@@ -31,3 +31,7 @@ apps/web/next-env.d.ts
 design_handoff_datumpro_ui/
 bid panel redesign/
 .superpowers/
+
+# Downloaded OAuth / service-account credential files — never commit
+client_secret*.json
+*-credentials.json

@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveContext, getAuthUser } from '@/lib/data/org';
 import { updateDisplayName } from './actions';
+import { ChangePasswordForm } from './change-password-form';
 import { signOut } from '@/app/(app)/actions';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,6 +27,10 @@ export default async function AccountPage() {
     company: string | null;
     phone: string | null;
   } | null;
+
+  // Only users with an email/password identity can change a password; Google-only
+  // accounts have none, so the reauth step (verify current password) can't apply.
+  const hasPasswordLogin = (user.identities ?? []).some((i) => i.provider === 'email');
 
   return (
     <PageContainer width="lg">
@@ -75,6 +80,16 @@ export default async function AccountPage() {
           <Button type="submit">Save</Button>
         </form>
       </Card>
+
+      {hasPasswordLogin && (
+        <Card className="mt-4">
+          <CardTitle>Password</CardTitle>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            Change the password you use to sign in. You&apos;ll need your current one.
+          </p>
+          <ChangePasswordForm email={p?.email ?? user.email ?? ''} />
+        </Card>
+      )}
 
       <Card className="mt-4">
         <CardTitle>Two-factor authentication</CardTitle>

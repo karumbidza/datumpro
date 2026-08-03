@@ -21,6 +21,20 @@ const optionalText = (max: number) =>
     .optional()
     .transform((v) => (v && v.length > 0 ? v : undefined));
 
+/** Minimum password length, enforced identically on sign-up, password reset, and
+ *  change-password. 8 is the NIST-800-63B floor; Supabase's leaked-password check
+ *  (enabled on the dashboard) layers on top of this. */
+export const PASSWORD_MIN_LENGTH = 8;
+
+/** Returns a human-readable problem with a password, or null if it's acceptable.
+ *  Deliberately length-only beyond the floor — composition rules (mixed case,
+ *  symbols) push users toward shorter, more patterned passwords without adding
+ *  real entropy, so we lean on length + the leaked-password check instead. */
+export function passwordIssue(password: string): string | null {
+  if (password.length < PASSWORD_MIN_LENGTH) return `Use at least ${PASSWORD_MIN_LENGTH} characters.`;
+  return null;
+}
+
 /** Company profile captured by the onboarding setup wizard. `name` is the only
  *  required field; the rest are an on-record profile that adds credibility. */
 export const createOrgSchema = z.object({

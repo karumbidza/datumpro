@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { passwordIssue } from '@datumpro/shared/validation';
 
 const fieldClass =
   'flex h-11 w-full items-center gap-2.5 rounded-lg border border-zinc-200 bg-white px-[13px] text-sm text-zinc-900 transition focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/15 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100';
@@ -18,7 +19,8 @@ export default function ResetPasswordPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (password.length < 6) return setMessage({ kind: 'error', text: 'Use at least 6 characters.' });
+    const pwIssue = passwordIssue(password);
+    if (pwIssue) return setMessage({ kind: 'error', text: pwIssue });
     if (password !== confirm) return setMessage({ kind: 'error', text: 'The two passwords don’t match.' });
     setBusy(true);
     setMessage(null);
