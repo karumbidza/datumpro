@@ -23,7 +23,7 @@ export interface InvitationPreview {
   orgName: string;
   email: string;
   role: OrgRole;
-  status: 'pending' | 'accepted' | 'revoked';
+  status: 'pending' | 'accepted' | 'revoked' | 'expired';
 }
 
 /** Active + disabled members of an org, with display name/email. RLS scopes to

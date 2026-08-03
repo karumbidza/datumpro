@@ -3,10 +3,17 @@
 import { use, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { env } from '@/lib/env';
+import { passwordIssue } from '@datumpro/shared/validation';
+import { ForgotPasswordFlow } from './forgot-password-flow';
 
 const fieldClass =
   'flex h-11 w-full items-center gap-2.5 rounded-lg border border-zinc-200 bg-white px-[13px] text-sm text-zinc-900 transition focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/15 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100';
 const inputClass = 'flex-1 bg-transparent outline-none placeholder:text-zinc-400';
+
+/** Shown when someone tries to "Create account" with an email that already
+ *  exists — the #1 real-world signup confusion (see auth debug 2026-08-03). */
+const alreadyRegistered =
+  'This email already has an account. Sign in with your password below, or tap “Forgot?” to reset it.';
 
 type Method = 'password' | 'magiclink';
 
@@ -26,6 +33,7 @@ export default function SignInPage({
   // Email carried over from an invite link (?email=), read from searchParams so
   // it's identical on server and client (no hydration mismatch).
   const invited = (use(searchParams).email ?? '').trim();
+  const [view, setView] = useState<'signin' | 'forgot'>('signin');
   const [method, setMethod] = useState<Method>('password');
   const [email, setEmail] = useState(invited);
   const fromInvite = invited !== '';
@@ -56,8 +64,9 @@ export default function SignInPage({
   }
 
   async function signUp() {
-    if (!email.trim() || password.length < 6) {
-      return setMessage({ kind: 'error', text: 'Enter an email and a password of at least 6 characters.' });
+    const pwIssue = passwordIssue(password);
+    if (!email.trim() || pwIssue) {
+      return setMessage({ kind: 'error', text: `Enter an email and a password. ${pwIssue ?? ''}`.trim() });
     }
     setBusy(true);
     setMessage(null);
@@ -68,8 +77,22 @@ export default function SignInPage({
       options: { emailRedirectTo: `${env.NEXT_PUBLIC_APP_URL}/auth/callback?next=${encodeURIComponent(safeNext())}` },
     });
     setBusy(false);
-    if (error) return setMessage({ kind: 'error', text: error.message });
+    if (error) {
+      // Supabase surfaces a duplicate as "User already registered". Point the
+      // user at sign-in / reset instead of showing a raw, confusing error.
+      if (/already registered|already exists/i.test(error.message)) {
+        return setMessage({ kind: 'error', text: alreadyRegistered });
+      }
+      return setMessage({ kind: 'error', text: error.message });
+    }
     if (data.session) return window.location.assign(safeNext()); // confirmation disabled → straight in
+    // With email-enumeration protection on, Supabase returns a fake-success for
+    // an existing email: a user object with an EMPTY identities array and no
+    // session. Treat that as "already registered" rather than telling them to
+    // check an inbox that will never get a confirmation.
+    if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      return setMessage({ kind: 'error', text: alreadyRegistered });
+    }
     setMessage({
       kind: 'info',
       text: 'Account created! Check your email for a confirmation link to finish — then you’ll be signed in and returned here.',
@@ -88,23 +111,6 @@ export default function SignInPage({
     setBusy(false);
     if (error) return setMessage({ kind: 'error', text: error.message });
     setMessage({ kind: 'info', text: `Magic link sent to ${email}. Open it in this browser.` });
-  }
-
-  // Password reset — emails a recovery link that lands on /reset-password (via the
-  // auth callback, which establishes the recovery session).
-  async function forgotPassword() {
-    if (!email.trim()) {
-      return setMessage({ kind: 'error', text: 'Enter your work email above first, then tap “Forgot?”.' });
-    }
-    setBusy(true);
-    setMessage(null);
-    const supabase = createClient();
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${env.NEXT_PUBLIC_APP_URL}/auth/callback?next=${encodeURIComponent('/reset-password')}`,
-    });
-    setBusy(false);
-    if (error) return setMessage({ kind: 'error', text: error.message });
-    setMessage({ kind: 'info', text: `Password reset link sent to ${email}. Open it to choose a new password.` });
   }
 
   // OAuth (Google) returns a verified email — no separate confirmation step.
@@ -133,10 +139,12 @@ export default function SignInPage({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-mark.svg" alt="DatumPro" className="mb-6 h-12 w-12 rounded-xl shadow-sm" />
           <h1 className="font-display text-[27px] font-semibold leading-[1.2] tracking-[-0.02em] text-zinc-900 dark:text-white">
-            {fromInvite ? 'Accept your invitation' : 'Welcome back'}
+            {view === 'forgot' ? 'Reset your password' : fromInvite ? 'Accept your invitation' : 'Welcome back'}
           </h1>
           <p className="mt-2 max-w-[340px] text-sm text-zinc-500 dark:text-zinc-400">
-            {fromInvite ? (
+            {view === 'forgot' ? (
+              'We’ll email you a 6-digit code to set a new password.'
+            ) : fromInvite ? (
               <>
                 Sign in with <span className="font-medium text-zinc-700 dark:text-zinc-300">{email}</span> — or tap{' '}
                 <span className="font-medium">Create account</span> to set a password. Then you’ll return to accept.
@@ -147,6 +155,8 @@ export default function SignInPage({
           </p>
         </div>
 
+        {view === 'signin' ? (
+          <>
         {/* OAuth */}
         <div className="mt-8">
           <button
@@ -209,9 +219,11 @@ export default function SignInPage({
                 <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Password</label>
                 <button
                   type="button"
-                  onClick={forgotPassword}
-                  disabled={busy}
-                  className="text-xs font-medium text-brand-600 hover:underline disabled:opacity-50"
+                  onClick={() => {
+                    setMessage(null);
+                    setView('forgot');
+                  }}
+                  className="text-xs font-medium text-brand-600 hover:underline"
                 >
                   Forgot?
                 </button>
@@ -311,6 +323,17 @@ export default function SignInPage({
           >
             {message.text}
           </p>
+        )}
+          </>
+        ) : (
+          <ForgotPasswordFlow
+            initialEmail={email}
+            onBack={() => {
+              setMessage(null);
+              setView('signin');
+            }}
+            redirectTo={safeNext()}
+          />
         )}
       </div>
 

@@ -252,6 +252,13 @@ export async function resendInvitation(formData: FormData) {
     | null;
   if (!inv || inv.status !== 'pending') fail('No pending invitation to resend.');
 
+  // Resending refreshes the 7-day expiry so the new link is live again even if
+  // the original had lapsed.
+  await supabase
+    .from('org_invitations')
+    .update({ expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() })
+    .eq('id', invitationId);
+
   try {
     const {
       data: { user },
