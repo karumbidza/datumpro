@@ -4,10 +4,12 @@ import { useActionState, useState } from 'react';
 import { createTask } from '@/app/(app)/projects/[projectId]/tasks/actions';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { FormError } from '@/components/ui/form-error';
-import { TASK_PRIORITIES } from '@datumpro/shared/domain';
+import { TASK_PRIORITIES, TASK_PRIORITY_LABELS } from '@datumpro/shared/domain';
+import { PROJECT_ROLE_LABELS, isProjectRole } from '@datumpro/shared/access';
 
-const inputClass =
-  'w-full rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
+const roleLabel = (r: string) => (isProjectRole(r) ? PROJECT_ROLE_LABELS[r] : r);
+
+import { inputClass } from '@/components/ui/form';
 
 type Mode = 'direct' | 'tender' | 'unassigned';
 
@@ -60,7 +62,7 @@ export function NewTaskForm({
         <select name="priority" defaultValue="medium" className={inputClass}>
           {TASK_PRIORITIES.map((p) => (
             <option key={p} value={p}>
-              {p}
+              {TASK_PRIORITY_LABELS[p]}
             </option>
           ))}
         </select>
@@ -98,7 +100,7 @@ export function NewTaskForm({
             </option>
             {members.map((m) => (
               <option key={m.userId} value={m.userId}>
-                {m.name} ({m.role})
+                {m.name} ({roleLabel(m.role)})
               </option>
             ))}
           </select>
@@ -122,11 +124,11 @@ export function NewTaskForm({
                   className="h-4 w-4 accent-brand-600"
                 />
                 <span className="truncate">
-                  {m.name} <span className="text-zinc-400">({m.role})</span>
+                  {m.name} <span className="text-zinc-400 dark:text-zinc-500">({roleLabel(m.role)})</span>
                 </span>
               </label>
             ))}
-            {tenderPool.length === 0 && <p className="px-1 py-1 text-sm text-zinc-400">No contractors in this org yet.</p>}
+            {tenderPool.length === 0 && <p className="px-1 py-1 text-sm text-zinc-400 dark:text-zinc-500">No contractors in this org yet.</p>}
           </div>
           {invitees.map((id) => (
             <input key={id} type="hidden" name="tenderContractorIds" value={id} />
@@ -142,7 +144,7 @@ export function NewTaskForm({
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">
-            End <span className="font-normal text-zinc-400">· due date</span>
+            End <span className="font-normal text-zinc-400 dark:text-zinc-500">· due date</span>
           </label>
           <input type="date" name="plannedEndDate" min={todayIso || undefined} className={inputClass} />
         </div>
@@ -152,7 +154,7 @@ export function NewTaskForm({
       {taskOptions.length > 0 && (
         <div>
           <label className="mb-1 block text-sm font-medium">
-            Depends on <span className="font-normal text-zinc-400">· optional</span>
+            Depends on <span className="font-normal text-zinc-400 dark:text-zinc-500">· optional</span>
           </label>
           <p className="mb-2 text-xs text-zinc-500 dark:text-zinc-400">
             Pick tasks that must finish first. This task stays <span className="font-medium">blocked</span> until they’re

@@ -5,8 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
-const inputClass =
-  'w-full rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
+import { inputClass } from '@/components/ui/form';
 
 type Mode = 'loading' | 'enroll' | 'verify';
 
@@ -75,7 +74,7 @@ export default function MfaPage() {
             : 'Enter the 6-digit code from your authenticator app to continue.'}
         </p>
 
-        {mode === 'loading' && <p className="mt-6 text-sm text-zinc-500">Preparing…</p>}
+        {mode === 'loading' && <p className="mt-6 text-sm text-zinc-500 dark:text-zinc-400">Preparing…</p>}
 
         {mode === 'enroll' && qr && (
           // Supabase returns the QR as an SVG data URI.

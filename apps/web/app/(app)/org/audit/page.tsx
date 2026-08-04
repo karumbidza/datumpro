@@ -48,7 +48,7 @@ export default async function AuditPage() {
 
   return (
     <PageContainer width="3xl">
-      <Link href="/org" className="text-xs text-zinc-500 hover:underline">
+      <Link href="/org" className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
         ← Organisation
       </Link>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Audit log</h1>
@@ -58,10 +58,10 @@ export default async function AuditPage() {
 
       <Card className="mt-6 overflow-x-auto p-0">
         {rows.length === 0 ? (
-          <p className="p-4 text-sm text-zinc-500">No activity recorded yet.</p>
+          <p className="p-4 text-sm text-zinc-500 dark:text-zinc-400">No activity recorded yet.</p>
         ) : (
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-zinc-200 text-xs uppercase text-zinc-400 dark:border-zinc-800">
+            <thead className="border-b border-zinc-200 text-xs uppercase text-zinc-400 dark:text-zinc-500 dark:border-zinc-800">
               <tr>
                 <th className="px-4 py-2">When</th>
                 <th className="px-4 py-2">Who</th>
@@ -71,7 +71,7 @@ export default async function AuditPage() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} className="border-b border-zinc-100 dark:border-zinc-900">
-                  <td className="whitespace-nowrap px-4 py-2 text-zinc-500">
+                  <td className="whitespace-nowrap px-4 py-2 text-zinc-500 dark:text-zinc-400">
                     {new Date(r.created_at).toLocaleString()}
                   </td>
                   <td className="px-4 py-2">{r.actor_id ? nameOf.get(r.actor_id) ?? 'Unknown' : 'System'}</td>

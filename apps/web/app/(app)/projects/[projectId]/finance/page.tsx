@@ -45,19 +45,19 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
   const canManagePayments = can(role, 'payment:record') || projectRole === 'pm';
 
   return (
-    <PageContainer width="5xl">
+    <PageContainer width="6xl">
       <LiveRefresh
         subscriptions={[
           { table: 'contractor_payment_requests', filter: `project_id=eq.${projectId}` },
           { table: 'approvals', filter: `org_id=eq.${project.org_id}` },
         ]}
       />
-      <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 hover:underline">
+      <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
         ← {project.name}
       </Link>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Finance</h1>
 
-      <section className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <section className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Card><CardTitle>Budget</CardTitle><CardValue>{formatUsd(budgetCents)}</CardValue></Card>
         <Card><CardTitle>Committed</CardTitle><CardValue>{formatUsd(summary.committedCostCents)}</CardValue></Card>
         <Card><CardTitle>Paid</CardTitle><CardValue>{formatUsd(summary.costToDateCents)}</CardValue></Card>
@@ -65,7 +65,7 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
       </section>
 
       {(budgetCents > 0 || summary.committedCostCents > 0) && (
-        <section className="mt-6">
+        <section className="mt-8">
           <BudgetVsCost
             budgetCents={budgetCents}
             committedCostCents={summary.committedCostCents}
@@ -95,7 +95,7 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{r.title}</p>
-                      <p className="text-xs text-zinc-400">
+                      <p className="text-xs text-zinc-400 dark:text-zinc-500">
                         {r.contractorName ?? 'Contractor'}
                         {r.invoiceUrl && (
                           <>
@@ -106,7 +106,7 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
                           </>
                         )}
                       </p>
-                      {r.note && <p className="mt-1 text-xs text-zinc-500">“{r.note}”</p>}
+                      {r.note && <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">“{r.note}”</p>}
                     </div>
                     <div className="flex shrink-0 items-center gap-3">
                       <span className="text-sm font-semibold tabular-nums">{formatUsd(r.amountCents)}</span>

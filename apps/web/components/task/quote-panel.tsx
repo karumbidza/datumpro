@@ -84,12 +84,12 @@ export function QuotePanel({ taskId, canManage, currentUserId, quotes, contracto
                     <p className="mt-1 text-lg font-semibold tabular-nums">{formatUsd(q.costCents)}</p>
                   )}
                   {(q.proposedStart || q.proposedEnd) && (
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
                       {q.proposedStart ?? '?'} → {q.proposedEnd ?? '?'}
                     </p>
                   )}
                   {(q.paymentTerms.advancePct || q.paymentTerms.retentionPct) && (
-                    <p className="text-xs text-zinc-500">{paymentTermsSummary(q.paymentTerms)}</p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">{paymentTermsSummary(q.paymentTerms)}</p>
                   )}
                   {q.justification && <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">{q.justification}</p>}
                   {q.quoteUrl && (
@@ -123,7 +123,7 @@ export function QuotePanel({ taskId, canManage, currentUserId, quotes, contracto
               {myQuote.costCents != null && (
                 <p className="text-lg font-semibold tabular-nums">{formatUsd(myQuote.costCents)}</p>
               )}
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
                 {myQuote.status === 'submitted' && 'Submitted — awaiting the PM’s decision.'}
                 {myQuote.status === 'awarded' && '✓ You were awarded this task.'}
                 {myQuote.status === 'not_selected' && 'Another quote was selected.'}

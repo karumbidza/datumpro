@@ -9,8 +9,7 @@ import { signOut } from '@/app/(app)/actions';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
-const inputClass =
-  'w-full rounded-md border border-zinc-200 bg-transparent px-2.5 py-1.5 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
+import { inputCompactClass as inputClass } from '@/components/ui/form';
 
 export default async function AccountPage() {
   const supabase = await createClient();
@@ -33,8 +32,8 @@ export default async function AccountPage() {
   const hasPasswordLogin = (user.identities ?? []).some((i) => i.provider === 'email');
 
   return (
-    <PageContainer width="lg">
-      <Link href="/dashboard" className="text-xs text-zinc-500 hover:underline">
+    <PageContainer width="xl">
+      <Link href="/dashboard" className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
         ← Dashboard
       </Link>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Account</h1>
@@ -111,7 +110,7 @@ export default async function AccountPage() {
             {ctx.memberships.map((m) => (
               <li key={m.orgId} className="flex items-center justify-between">
                 <span className="text-zinc-700 dark:text-zinc-300">{m.name}</span>
-                <span className="text-xs text-zinc-400">{m.role}</span>
+                <span className="text-xs text-zinc-400 dark:text-zinc-500">{m.role}</span>
               </li>
             ))}
           </ul>

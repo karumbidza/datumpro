@@ -74,7 +74,7 @@ export function MediaUploader({
     return (
       <label
         title={label}
-        className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-[15px] text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 ${
+        className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-sm text-zinc-400 dark:text-zinc-500 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 ${
           busy ? 'pointer-events-none opacity-60' : ''
         }`}
       >

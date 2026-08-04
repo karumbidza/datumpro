@@ -11,10 +11,9 @@ import { Card, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { LiveRefresh } from '@/components/live-refresh';
-import { PROJECT_ROLES, projectRolesForType } from '@datumpro/shared/access';
+import { PROJECT_ROLES, PROJECT_ROLE_LABELS, projectRolesForType } from '@datumpro/shared/access';
 
-const inputClass =
-  'w-full rounded-md border border-zinc-200 bg-transparent px-2.5 py-1.5 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
+import { inputCompactClass as inputClass } from '@/components/ui/form';
 
 const ROLE_TONE = {
   pm: 'blue',
@@ -69,7 +68,7 @@ export default async function ProjectTeamPage({
   return (
     <PageContainer width="3xl">
       <LiveRefresh subscriptions={[{ table: 'project_members', filter: `project_id=eq.${projectId}` }]} />
-      <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 hover:underline">
+      <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
         ← {project.name}
       </Link>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Team</h1>
@@ -99,7 +98,7 @@ export default async function ProjectTeamPage({
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{m.name}</p>
-                  {m.email && <p className="truncate text-xs text-zinc-500">{m.email}</p>}
+                  {m.email && <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">{m.email}</p>}
                 </div>
                 <div className="flex items-center gap-2">
                   {canManage ? (
@@ -110,7 +109,7 @@ export default async function ProjectTeamPage({
                         <select name="role" defaultValue={m.role} className={inputClass}>
                           {projectRolesForType(m.memberType).map((r) => (
                             <option key={r} value={r}>
-                              {r}
+                              {PROJECT_ROLE_LABELS[r]}
                             </option>
                           ))}
                         </select>
@@ -127,7 +126,7 @@ export default async function ProjectTeamPage({
                       </form>
                     </>
                   ) : (
-                    <Badge tone={ROLE_TONE[m.role]}>{m.role}</Badge>
+                    <Badge tone={ROLE_TONE[m.role]}>{PROJECT_ROLE_LABELS[m.role]}</Badge>
                   )}
                 </div>
               </div>
@@ -152,10 +151,10 @@ export default async function ProjectTeamPage({
               <AddTeammateForm projectId={projectId} addable={addable} />
             )}
 
-            <ul className="mt-4 space-y-1 border-t border-zinc-100 pt-3 text-xs text-zinc-500 dark:border-zinc-800">
+            <ul className="mt-4 space-y-1 border-t border-zinc-100 pt-3 text-xs text-zinc-500 dark:text-zinc-400 dark:border-zinc-800">
               {PROJECT_ROLES.map((r) => (
                 <li key={r}>
-                  <span className="font-medium capitalize text-zinc-700 dark:text-zinc-300">{r}</span>{' '}
+                  <span className="font-medium text-zinc-700 dark:text-zinc-300">{PROJECT_ROLE_LABELS[r]}</span>{' '}
                   — {ROLE_BLURB[r]}
                 </li>
               ))}

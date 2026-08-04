@@ -5,8 +5,7 @@ import { SubmitButton } from '@/components/ui/submit-button';
 
 export const metadata = { title: 'Government & Enterprise — DatumPro' };
 
-const inputClass =
-  'w-full rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
+import { inputClass } from '@/components/ui/form';
 
 const assurances: { title: string; body: string }[] = [
   {
@@ -110,7 +109,7 @@ export default async function EnterprisePage({
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium">
-                  What do you need? <span className="text-zinc-400">(SSO, residency, timelines…)</span>
+                  What do you need? <span className="text-zinc-400 dark:text-zinc-500">(SSO, residency, timelines…)</span>
                 </label>
                 <textarea name="needs" rows={3} className={inputClass} />
               </div>

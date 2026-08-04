@@ -7,27 +7,27 @@ import { parseDate, startOfDay, formatDayMonth } from '@/lib/date';
 import type { CalendarTask } from '@/lib/data/project-calendar';
 import type { TaskPriority } from '@datumpro/shared/domain';
 
-/* Priority accents — ported from the original app's priority styles, mapped onto
- *  DatumPro's low/medium/high/urgent enum. */
+/* Priority accents — the app-wide colour language (see ui/tones.ts): urgent red,
+ *  high orange, medium/low quiet. Left borders echo the badge hue. */
 const PRIORITY_STYLE: Record<TaskPriority, { badge: string; border: string; label: string }> = {
   urgent: {
-    badge: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    badge: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400',
     border: 'border-red-400 dark:border-red-500',
     label: 'Urgent',
   },
   high: {
-    badge: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+    badge: 'bg-orange-50 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400',
     border: 'border-orange-300 dark:border-orange-500',
     label: 'High',
   },
   medium: {
-    badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-    border: 'border-amber-300 dark:border-amber-500',
+    badge: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300',
+    border: 'border-zinc-300 dark:border-zinc-600',
     label: 'Medium',
   },
   low: {
-    badge: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-    border: 'border-zinc-300 dark:border-zinc-600',
+    badge: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400',
+    border: 'border-zinc-200 dark:border-zinc-700',
     label: 'Low',
   },
 };
@@ -118,7 +118,7 @@ export function ProjectCalendar({ tasks, projectId }: { tasks: CalendarTask[]; p
     <div className="grid gap-6 lg:grid-cols-3">
       {/* Calendar */}
       <div className="lg:col-span-2">
-        <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="flex items-center gap-2 text-sm font-medium text-zinc-900 dark:text-white max-sm:hidden">
               <CalendarIcon size={18} /> Task Calendar
@@ -172,7 +172,7 @@ export function ProjectCalendar({ tasks, projectId }: { tasks: CalendarTask[]; p
 
         {/* Tasks for the selected day */}
         {selectedTasks.length > 0 && (
-          <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-medium text-zinc-900 dark:text-white">
                 Tasks for {selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -220,7 +220,7 @@ export function ProjectCalendar({ tasks, projectId }: { tasks: CalendarTask[]; p
 
       {/* Sidebar */}
       <div className="space-y-6">
-        <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
           <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-zinc-900 dark:text-white">
             <Clock size={16} /> Upcoming Tasks
           </h3>
@@ -250,7 +250,7 @@ export function ProjectCalendar({ tasks, projectId }: { tasks: CalendarTask[]; p
         </div>
 
         {overdue.length > 0 && (
-          <div className="rounded-lg border border-l-4 border-red-300 bg-white p-4 dark:border-red-500 dark:bg-zinc-900">
+          <div className="rounded-lg border border-l-4 border-red-300 bg-white p-4 dark:border-red-500 dark:bg-zinc-950">
             <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-red-700 dark:text-red-400">
               <Clock size={16} /> Overdue Tasks ({overdue.length})
             </h3>

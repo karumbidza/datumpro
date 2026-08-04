@@ -33,7 +33,7 @@ export function MyTasksCard({ tasks }: { tasks: MyTaskItem[] }) {
     <Card>
       <div className="flex items-center justify-between gap-3">
         <CardTitle>My tasks</CardTitle>
-        <span className="text-xs text-zinc-500 tabular-nums">{tasks.length} open</span>
+        <span className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">{tasks.length} open</span>
       </div>
       {tasks.length === 0 ? (
         <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">

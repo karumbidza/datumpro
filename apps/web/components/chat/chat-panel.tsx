@@ -127,7 +127,7 @@ function imageDimensions(url: string): Promise<{ width: number; height: number }
 function AttachmentView({ a }: { a: ChatAttachment }) {
   if (!a.url) {
     return (
-      <div className="flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-xs text-zinc-400 dark:border-zinc-700">
+      <div className="flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-xs text-zinc-400 dark:text-zinc-500 dark:border-zinc-700">
         <FileText size={14} /> {a.filename ?? 'Attachment'} · unavailable
       </div>
     );
@@ -158,10 +158,10 @@ function AttachmentView({ a }: { a: ChatAttachment }) {
       download={a.filename ?? undefined}
       className="flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-xs text-zinc-700 hover:border-brand-400 dark:border-zinc-700 dark:text-zinc-200"
     >
-      <FileText size={16} className="shrink-0 text-zinc-400" />
+      <FileText size={16} className="shrink-0 text-zinc-400 dark:text-zinc-500" />
       <span className="max-w-[180px] truncate">{a.filename ?? 'Document'}</span>
-      {a.sizeBytes ? <span className="text-zinc-400">· {formatBytes(a.sizeBytes)}</span> : null}
-      <Download size={14} className="ml-auto shrink-0 text-zinc-400" />
+      {a.sizeBytes ? <span className="text-zinc-400 dark:text-zinc-500">· {formatBytes(a.sizeBytes)}</span> : null}
+      <Download size={14} className="ml-auto shrink-0 text-zinc-400 dark:text-zinc-500" />
     </a>
   );
 }
@@ -609,9 +609,9 @@ export function ChatPanel({
       <div className="flex min-w-0 flex-1 flex-col">
       {title && (
         <header className="flex items-center gap-2 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
-          <MessageCircle size={18} className="text-zinc-500" />
+          <MessageCircle size={18} className="text-zinc-500 dark:text-zinc-400" />
           <h2 className="text-sm font-semibold text-zinc-900 dark:text-white">
-            {title} <span className="text-zinc-400">({messages.length})</span>
+            {title} <span className="text-zinc-400 dark:text-zinc-500">({messages.length})</span>
           </h2>
           <div className="ml-auto flex items-center gap-2">
             {roster ? (
@@ -631,7 +631,7 @@ export function ChatPanel({
                 onClick={() => setRailOpen(true)}
                 title="People"
                 aria-label="Show people"
-                className="flex items-center gap-1 rounded p-1 text-zinc-400 hover:bg-zinc-100 lg:hidden dark:hover:bg-zinc-800"
+                className="flex items-center gap-1 rounded p-1 text-zinc-400 dark:text-zinc-500 hover:bg-zinc-100 lg:hidden dark:hover:bg-zinc-800"
               >
                 <Users size={16} />
                 {onlineCount > 0 && (
@@ -645,7 +645,7 @@ export function ChatPanel({
               onClick={() => (searchOpen ? closeSearch() : setSearchOpen(true))}
               title={searchOpen ? 'Close search' : 'Search messages'}
               className={`rounded p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
-                searchOpen ? 'text-brand-600' : 'text-zinc-400'
+                searchOpen ? 'text-brand-600' : 'text-zinc-400 dark:text-zinc-500'
               }`}
             >
               {searchOpen ? <X size={16} /> : <Search size={16} />}
@@ -657,7 +657,7 @@ export function ChatPanel({
       {searchOpen && (
         <div className="border-b border-zinc-200 px-4 py-2 dark:border-zinc-800">
           <div className="flex items-center gap-2 rounded-lg border border-zinc-200 px-2 focus-within:border-brand-500 dark:border-zinc-700">
-            <Search size={14} className="text-zinc-400" />
+            <Search size={14} className="text-zinc-400 dark:text-zinc-500" />
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -666,7 +666,7 @@ export function ChatPanel({
               className="w-full bg-transparent py-1.5 text-sm outline-none"
             />
             {searchQuery && (
-              <button type="button" onClick={() => setSearchQuery('')} className="text-zinc-400 hover:text-zinc-600">
+              <button type="button" onClick={() => setSearchQuery('')} className="text-zinc-400 dark:text-zinc-500 hover:text-zinc-600">
                 <X size={14} />
               </button>
             )}
@@ -674,7 +674,7 @@ export function ChatPanel({
         </div>
       )}
       {subtitle && (
-        <p className="border-b border-zinc-100 px-4 py-1.5 text-[11px] text-zinc-400 dark:border-zinc-800">
+        <p className="border-b border-zinc-100 px-4 py-1.5 text-[11px] text-zinc-400 dark:text-zinc-500 dark:border-zinc-800">
           {subtitle}
         </p>
       )}
@@ -682,14 +682,14 @@ export function ChatPanel({
       {searchOpen && searchResults !== null ? (
         <div className="flex-1 space-y-2 overflow-y-auto p-4">
           {searching && searchResults.length === 0 ? (
-            <p className="py-8 text-center text-sm text-zinc-400">Searching…</p>
+            <p className="py-8 text-center text-sm text-zinc-400 dark:text-zinc-500">Searching…</p>
           ) : searchResults.length === 0 ? (
-            <p className="py-8 text-center text-sm text-zinc-400">
+            <p className="py-8 text-center text-sm text-zinc-400 dark:text-zinc-500">
               No messages match “{searchQuery.trim()}”.
             </p>
           ) : (
             <>
-              <p className="text-[11px] uppercase tracking-wide text-zinc-400">
+              <p className="text-[11px] uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
                 {searchResults.length} match{searchResults.length === 1 ? '' : 'es'}
               </p>
               {searchResults.map((r) => (
@@ -697,7 +697,7 @@ export function ChatPanel({
                   key={r.id}
                   className="rounded-lg border border-zinc-200 p-2.5 dark:border-zinc-800"
                 >
-                  <p className="mb-1 flex items-center gap-1.5 text-[11px] text-zinc-400">
+                  <p className="mb-1 flex items-center gap-1.5 text-[11px] text-zinc-400 dark:text-zinc-500">
                     <span className="font-medium text-zinc-600 dark:text-zinc-300">{r.senderName}</span>
                     <span>· {fullTime(r.createdAt)}</span>
                   </p>
@@ -717,28 +717,28 @@ export function ChatPanel({
               type="button"
               onClick={onLoadEarlier}
               disabled={loadingEarlier}
-              className="rounded-full border border-zinc-200 px-3 py-1 text-[11px] text-zinc-500 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+              className="rounded-full border border-zinc-200 px-3 py-1 text-[11px] text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
             >
               {loadingEarlier ? 'Loading…' : 'Load earlier messages'}
             </button>
           </div>
         )}
         {messages.length === 0 ? (
-          <p className="py-8 text-center text-sm text-zinc-400">No messages yet — start the discussion.</p>
+          <p className="py-8 text-center text-sm text-zinc-400 dark:text-zinc-500">No messages yet — start the discussion.</p>
         ) : (
           messages.map((m) => {
             const mine = m.senderId === currentUserId;
             const parent = m.parentMessageId ? msgById.get(m.parentMessageId) : null;
             return (
               <div key={m.id} className={`group flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
-                <p className="mb-1 flex items-center gap-1.5 text-[11px] text-zinc-400">
+                <p className="mb-1 flex items-center gap-1.5 text-[11px] text-zinc-400 dark:text-zinc-500">
                   <span className="font-medium text-zinc-600 dark:text-zinc-300">{m.senderName}</span>
                   <span>· {fullTime(m.createdAt)}</span>
                   {m.editedAt && !m.deletedAt && <span>· edited</span>}
                 </p>
 
                 {parent && (
-                  <p className={`mb-1 max-w-[80%] truncate border-l-2 border-zinc-300 pl-2 text-[11px] text-zinc-400 ${mine ? 'text-right' : ''}`}>
+                  <p className={`mb-1 max-w-[80%] truncate border-l-2 border-zinc-300 pl-2 text-[11px] text-zinc-400 dark:text-zinc-500 ${mine ? 'text-right' : ''}`}>
                     ↩ {parent.senderName}: {(parent.body ?? 'message').slice(0, 48)}
                   </p>
                 )}
@@ -803,7 +803,7 @@ export function ChatPanel({
                     ))}
                     <button
                       onClick={() => setReplyTo({ id: m.id, name: m.senderName, snippet: m.body ?? '' })}
-                      className="text-[11px] text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                      className="text-[11px] text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200"
                     >
                       Reply
                     </button>
@@ -813,7 +813,7 @@ export function ChatPanel({
                           setEditingId(m.id);
                           setEditingBody(m.body ?? '');
                         }}
-                        className="text-[11px] text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                        className="text-[11px] text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200"
                       >
                         Edit
                       </button>
@@ -821,7 +821,7 @@ export function ChatPanel({
                     {(mine || canModerate) && (
                       <button
                         onClick={() => deleteMessage(m.id).then(() => applyOne(m.id))}
-                        className="text-[11px] text-zinc-400 hover:text-red-500"
+                        className="text-[11px] text-zinc-400 dark:text-zinc-500 hover:text-red-500"
                       >
                         Delete
                       </button>
@@ -833,7 +833,7 @@ export function ChatPanel({
           })
         )}
         {lastOwn && !lastOwn.deletedAt && (
-          <p className="pr-1 text-right text-[10px] text-zinc-400">
+          <p className="pr-1 text-right text-[10px] text-zinc-400 dark:text-zinc-500">
             {othersRead >= lastOwn.seq ? 'Seen' : 'Sent'}
           </p>
         )}
@@ -842,7 +842,7 @@ export function ChatPanel({
       )}
 
       {typingNames.length > 0 && (
-        <p className="px-4 pb-1 text-[11px] italic text-zinc-400">
+        <p className="px-4 pb-1 text-[11px] italic text-zinc-400 dark:text-zinc-500">
           {typingNames.join(', ')} {typingNames.length === 1 ? 'is' : 'are'} typing…
         </p>
       )}
@@ -850,7 +850,7 @@ export function ChatPanel({
       {canPost && (
         <div className="p-3">
           {replyTo && (
-            <div className="mb-2 flex items-center justify-between rounded bg-zinc-100 px-2 py-1 text-[11px] text-zinc-500 dark:bg-zinc-800">
+            <div className="mb-2 flex items-center justify-between rounded bg-zinc-100 px-2 py-1 text-[11px] text-zinc-500 dark:text-zinc-400 dark:bg-zinc-800">
               <span className="truncate">↩ Replying to {replyTo.name}: {replyTo.snippet.slice(0, 40)}</span>
               <button type="button" onClick={() => setReplyTo(null)} className="ml-2">✕</button>
             </div>
@@ -878,7 +878,7 @@ export function ChatPanel({
                   <button
                     type="button"
                     onClick={() => removePending(a.localId)}
-                    className="absolute right-1 top-1 text-zinc-400 hover:text-red-500"
+                    className="absolute right-1 top-1 text-zinc-400 dark:text-zinc-500 hover:text-red-500"
                     aria-label="Remove attachment"
                   >
                     <X size={12} />
@@ -922,7 +922,7 @@ export function ChatPanel({
                   onClick={() => fileInputRef.current?.click()}
                   disabled={sending || recording}
                   title="Attach a file"
-                  className="p-1 text-zinc-400 hover:text-zinc-700 disabled:opacity-40 dark:hover:text-zinc-200"
+                  className="p-1 text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 disabled:opacity-40 dark:hover:text-zinc-200"
                 >
                   <Paperclip size={16} />
                 </button>
@@ -944,7 +944,7 @@ export function ChatPanel({
                     onClick={startRecording}
                     disabled={sending}
                     title="Record a voice note"
-                    className="p-1 text-zinc-400 hover:text-zinc-700 disabled:opacity-40 dark:hover:text-zinc-200"
+                    className="p-1 text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 disabled:opacity-40 dark:hover:text-zinc-200"
                   >
                     <Mic size={16} />
                   </button>
@@ -959,7 +959,7 @@ export function ChatPanel({
               </Button>
             </div>
           </div>
-          <p className="mt-1 text-[10px] text-zinc-400">Press ⌘/Ctrl + Enter to post.</p>
+          <p className="mt-1 text-[10px] text-zinc-400 dark:text-zinc-500">Press ⌘/Ctrl + Enter to post.</p>
         </div>
       )}
       </div>

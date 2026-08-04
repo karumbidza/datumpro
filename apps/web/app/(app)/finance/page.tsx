@@ -34,7 +34,7 @@ export default async function OrgFinancePage() {
 
   return (
     <PageContainer width="6xl">
-      <Link href="/dashboard" className="text-xs text-zinc-500 hover:underline">
+      <Link href="/dashboard" className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
         ← Dashboard
       </Link>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Finance</h1>
@@ -42,7 +42,7 @@ export default async function OrgFinancePage() {
         Contractor payments across every project in {ctx.active.name}.
       </p>
 
-      <section className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <section className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Card>
           <CardTitle>Budget</CardTitle>
           <CardValue>{formatUsd(totals.budgetCents)}</CardValue>
@@ -62,7 +62,7 @@ export default async function OrgFinancePage() {
       </section>
 
       {totals.pendingRequestsCount > 0 && (
-        <section className="mt-6">
+        <section className="mt-8">
           <Card className="flex items-center justify-between gap-3 border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950">
             <div>
               <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
@@ -93,7 +93,7 @@ export default async function OrgFinancePage() {
           <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
             <table className="w-full min-w-[760px] text-sm">
               <thead>
-                <tr className="border-b border-zinc-100 text-left text-xs uppercase tracking-wide text-zinc-400 dark:border-zinc-800">
+                <tr className="border-b border-zinc-100 text-left text-xs uppercase tracking-wide text-zinc-400 dark:text-zinc-500 dark:border-zinc-800">
                   <th className="px-4 py-2.5 font-medium">Project</th>
                   <th className="px-4 py-2.5 text-right font-medium">Budget</th>
                   <th className="px-4 py-2.5 text-right font-medium">Committed</th>
@@ -121,7 +121,7 @@ export default async function OrgFinancePage() {
                         </Badge>
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-zinc-500">
+                    <td className="px-4 py-3 text-right tabular-nums text-zinc-500 dark:text-zinc-400">
                       {formatUsd(p.budgetCents)}
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums">{formatUsd(p.committedCents)}</td>
@@ -137,7 +137,7 @@ export default async function OrgFinancePage() {
                           {p.pendingRequestsCount} · {formatUsd(p.pendingRequestsCents)}
                         </span>
                       ) : (
-                        <span className="text-zinc-400">—</span>
+                        <span className="text-zinc-400 dark:text-zinc-500">—</span>
                       )}
                     </td>
                   </tr>
@@ -146,7 +146,7 @@ export default async function OrgFinancePage() {
               <tfoot>
                 <tr className="border-t border-zinc-200 font-medium dark:border-zinc-700">
                   <td className="px-4 py-3">Total</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-zinc-500">
+                  <td className="px-4 py-3 text-right tabular-nums text-zinc-500 dark:text-zinc-400">
                     {formatUsd(totals.budgetCents)}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">{formatUsd(totals.committedCents)}</td>

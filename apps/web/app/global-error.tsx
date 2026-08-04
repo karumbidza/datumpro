@@ -32,7 +32,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
         <button
           onClick={reset}
           style={{
-            background: '#4f46e5',
+            background: '#2563eb',
             color: '#fff',
             border: 0,
             borderRadius: 8,

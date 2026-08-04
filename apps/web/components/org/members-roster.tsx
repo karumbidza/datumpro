@@ -53,11 +53,11 @@ export function MembersRoster({
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">
                   {m.name}
-                  {m.company && <span className="font-normal text-zinc-500"> · {m.company}</span>}
-                  {isSelf && <span className="text-zinc-400"> · you</span>}
+                  {m.company && <span className="font-normal text-zinc-500 dark:text-zinc-400"> · {m.company}</span>}
+                  {isSelf && <span className="text-zinc-400 dark:text-zinc-500"> · you</span>}
                 </p>
                 {m.email && m.email !== m.name && (
-                  <p className="truncate text-xs text-zinc-500">{m.email}</p>
+                  <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">{m.email}</p>
                 )}
               </div>
 

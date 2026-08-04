@@ -1,7 +1,10 @@
 import Link from 'next/link';
+import { PageContainer } from '@/components/shell/page-container';
 import { redirect, notFound } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { LiveRefresh } from '@/components/live-refresh';
+import { EmptyState } from '@/components/ui/empty-state';
+import { CheckSquare } from '@/components/icons';
 import { getProject } from '@/lib/data/projects';
 import { listTasksByProject, listOrgMembers, type TaskRow } from '@/lib/data/tasks';
 import { getProjectSchedule, type ProjectSchedule } from '@/lib/data/scheduling';
@@ -44,11 +47,12 @@ const STATUS_META: Record<TaskStatus, { label: string; pill: string; fill: strin
   },
 };
 
+/* App-wide priority colour language (ui/tones.ts): urgent red, high orange, medium/low quiet. */
 const PRIORITY_PILL: Record<TaskPriority, string> = {
-  urgent: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
-  high: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
+  urgent: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400',
+  high: 'bg-orange-50 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400',
   medium: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300',
-  low: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300',
+  low: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400',
 };
 const PRIORITY_LABEL: Record<TaskPriority, string> = {
   urgent: 'Urgent',
@@ -130,9 +134,9 @@ function statusNote(
     };
   }
   if (meta?.critical) return { text: '● Critical path', className: 'text-red-600 dark:text-red-400' };
-  if (t.status === 'submitted') return { text: 'In review', className: 'text-zinc-400' };
-  if (meta && meta.floatDays > 0) return { text: `${meta.floatDays}d slack`, className: 'text-zinc-400' };
-  return { text: 'In progress', className: 'text-zinc-400' };
+  if (t.status === 'submitted') return { text: 'In review', className: 'text-zinc-400 dark:text-zinc-500' };
+  if (meta && meta.floatDays > 0) return { text: `${meta.floatDays}d slack`, className: 'text-zinc-400 dark:text-zinc-500' };
+  return { text: 'In progress', className: 'text-zinc-400 dark:text-zinc-500' };
 }
 
 export default async function TaskBoardPage({
@@ -174,7 +178,7 @@ export default async function TaskBoardPage({
   );
 
   return (
-    <div className="mx-auto flex max-w-[1152px] flex-col gap-8 px-10 py-8">
+    <PageContainer width="6xl" className="flex flex-col gap-8">
       <LiveRefresh
         subscriptions={[
           { table: 'tasks', filter: `project_id=eq.${projectId}` },
@@ -183,7 +187,7 @@ export default async function TaskBoardPage({
       />
       <header className="flex items-start justify-between gap-4">
         <div>
-          <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 hover:underline">
+          <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
             ← {project.name}
           </Link>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Tasks</h1>
@@ -193,16 +197,16 @@ export default async function TaskBoardPage({
                 <div className="w-40">
                   <ScheduleBar actual={projectPct} expected={projectExpected} />
                 </div>
-                <span className="text-xs font-medium tabular-nums text-zinc-500">{projectPct}% complete</span>
+                <span className="text-xs font-medium tabular-nums text-zinc-500 dark:text-zinc-400">{projectPct}% complete</span>
                 {projectExpected != null && (
-                  <span className="text-[11px] tabular-nums text-zinc-400">
+                  <span className="text-[11px] tabular-nums text-zinc-400 dark:text-zinc-500">
                     · target {projectExpected}%
                     {projectPct < projectExpected - 1 ? ' (behind)' : ''}
                   </span>
                 )}
               </div>
               {/* Legend for the two-layer bars */}
-              <div className="mt-2 flex items-center gap-3 text-[10px] text-zinc-400">
+              <div className="mt-2 flex items-center gap-3 text-[10px] text-zinc-400 dark:text-zinc-500">
                 <span className="flex items-center gap-1">
                   <span className="inline-block h-2 w-3 rounded-sm bg-emerald-500" /> Completed
                 </span>
@@ -222,14 +226,16 @@ export default async function TaskBoardPage({
       </header>
 
       {tasks.length === 0 ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          No tasks yet — create the first one.
-        </p>
+        <EmptyState
+          icon={CheckSquare}
+          title="No tasks yet"
+          hint="Create the first task — assign it directly or put it out to tender."
+        />
       ) : (
         <div>
           {/* Header row — shares the grid template so columns align with rows. */}
           <div
-            className="grid items-center px-4 pb-2 text-[10px] font-medium uppercase tracking-[0.05em] text-zinc-400"
+            className="grid items-center px-4 pb-2 text-[10px] font-medium uppercase tracking-[0.05em] text-zinc-400 dark:text-zinc-500"
             style={GRID_STYLE}
           >
             <div>Task / assignee</div>
@@ -280,7 +286,7 @@ export default async function TaskBoardPage({
                     <ScheduleBar actual={pct} expected={expected} done={t.status === 'done'} />
                     <div className="mt-1 flex items-center justify-between gap-2 text-[10px]">
                       <span className={`truncate ${note.className}`}>{note.text}</span>
-                      <span className="flex-shrink-0 text-zinc-400">
+                      <span className="flex-shrink-0 text-zinc-400 dark:text-zinc-500">
                         {due ? `Due ${formatDayMonth(due)}` : 'No due date'}
                       </span>
                     </div>
@@ -311,6 +317,6 @@ export default async function TaskBoardPage({
           </div>
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }

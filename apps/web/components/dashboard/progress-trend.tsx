@@ -27,7 +27,7 @@ export function ProgressTrend({ points, className = '' }: { points: ProgressPoin
   return (
     <div className={className}>
       <div className="flex items-baseline justify-between">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">Progress trend</span>
+        <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Progress trend</span>
         <span
           className={`text-[11px] font-medium tabular-nums ${
             delta > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400'
@@ -41,7 +41,7 @@ export function ProgressTrend({ points, className = '' }: { points: ProgressPoin
         <path d={line} className="stroke-brand-600" strokeWidth={1.5} fill="none" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
         <circle cx={x(n - 1)} cy={y(last)} r={2.5} className="fill-brand-600" />
       </svg>
-      <div className="flex justify-between text-[10px] tabular-nums text-zinc-400">
+      <div className="flex justify-between text-[10px] tabular-nums text-zinc-400 dark:text-zinc-500">
         <span>{fmt(points[0]!.day)}</span>
         <span>{fmt(points[n - 1]!.day)}</span>
       </div>

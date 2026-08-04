@@ -62,7 +62,7 @@ export default async function DashboardPage() {
           </Card>
         )}
 
-        {offer && <div className="text-xs text-zinc-400">or</div>}
+        {offer && <div className="text-xs text-zinc-400 dark:text-zinc-500">or</div>}
 
         <Link href="/orgs/new">
           <Button variant={offer ? 'secondary' : undefined}>Create a new company</Button>
@@ -105,7 +105,7 @@ export default async function DashboardPage() {
       getPortfolioData(active.orgId),
     ]);
     return (
-      <div className="mx-auto flex max-w-[1152px] flex-col gap-8 px-10 py-8">
+      <PageContainer width="6xl" className="flex flex-col gap-8">
         {live}
         <Greeting
           name={displayName}
@@ -116,7 +116,7 @@ export default async function DashboardPage() {
         <TimelineOverview tasks={projectTimeline} unit="project" />
         {approvals.length > 0 && <ApprovalsInbox items={approvals} />}
         <UpcomingTasksTable tasks={portfolio.upcomingTasks} />
-      </div>
+      </PageContainer>
     );
   }
 
@@ -137,7 +137,7 @@ export default async function DashboardPage() {
         ((t.due_date && new Date(t.due_date).getTime() < now) || t.sla_status === 'breached'),
     ).length;
     return (
-      <PageContainer width="5xl" className="space-y-6">
+      <PageContainer width="6xl" className="space-y-6">
         {live}
         <Greeting
           name={displayName}
@@ -204,7 +204,7 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: 'am
         : 'text-zinc-900 dark:text-white';
   return (
     <div>
-      <p className="text-xs text-zinc-500">{label}</p>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">{label}</p>
       <p className={`font-semibold tabular-nums ${color}`}>{value}</p>
     </div>
   );

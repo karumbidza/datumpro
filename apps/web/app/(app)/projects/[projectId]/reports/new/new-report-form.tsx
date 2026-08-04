@@ -6,8 +6,7 @@ import { SubmitButton } from '@/components/ui/submit-button';
 import { FormError } from '@/components/ui/form-error';
 import { WEATHER_OPTIONS } from '@datumpro/shared/domain';
 
-const inputClass =
-  'w-full rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
+import { inputClass } from '@/components/ui/form';
 
 export function NewReportForm({ projectId, today }: { projectId: string; today: string }) {
   const [state, formAction] = useActionState(createReport, {});

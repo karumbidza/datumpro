@@ -15,7 +15,7 @@ export default async function HomePage() {
         <p className="mt-3 text-zinc-500 dark:text-zinc-400">
           Remote project monitoring, approvals, and finance — from one source of truth.
         </p>
-        <p className="mt-1 text-xs text-zinc-400">by Grafaid Engineers</p>
+        <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">by Grafaid Engineers</p>
       </div>
       <Link href="/sign-in">
         <Button>Sign in</Button>

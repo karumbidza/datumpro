@@ -25,7 +25,7 @@ export default async function ProjectChatPage({
 
   return (
     <div className="flex h-full flex-col px-4 py-4 xl:px-8">
-      <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 hover:underline">
+      <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
         ← {project.name}
       </Link>
 

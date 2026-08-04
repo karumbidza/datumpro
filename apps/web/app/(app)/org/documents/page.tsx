@@ -40,7 +40,7 @@ export default async function OrgDocumentsPage() {
 
   return (
     <PageContainer width="3xl">
-      <Link href="/org" className="text-xs text-zinc-500 hover:underline">
+      <Link href="/org" className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
         ← Organization
       </Link>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Contractor documents</h1>
@@ -67,7 +67,7 @@ export default async function OrgDocumentsPage() {
                           <p className="truncate text-sm font-medium">
                             {d.title || CONTRACTOR_DOC_TYPE_LABEL[d.docType]}
                           </p>
-                          <p className="text-xs text-zinc-400">
+                          <p className="text-xs text-zinc-400 dark:text-zinc-500">
                             {CONTRACTOR_DOC_TYPE_LABEL[d.docType]}
                             {d.expiryDate ? ` · expires ${d.expiryDate}` : ''}
                             {d.fileUrl && (

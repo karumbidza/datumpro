@@ -62,7 +62,7 @@ export function DocAttach({
 
   return (
     <div className="mt-3 border-t border-zinc-100 pt-3 dark:border-zinc-800">
-      <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-zinc-400">BoQ / invoice (PDF, Excel, CSV)</p>
+      <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">BoQ / invoice (PDF, Excel, CSV)</p>
       {docs.length > 0 && (
         <ul className="mb-2 space-y-1">
           {docs.map((d) => (
@@ -81,7 +81,7 @@ export function DocAttach({
                   <input type="hidden" name="id" value={d.id} />
                   <input type="hidden" name="taskId" value={taskId} />
                   <input type="hidden" name="projectId" value={projectId} />
-                  <button type="submit" className="text-[11px] text-zinc-400 hover:text-red-500" title="Remove">
+                  <button type="submit" className="text-[11px] text-zinc-400 dark:text-zinc-500 hover:text-red-500" title="Remove">
                     ✕
                   </button>
                 </form>
@@ -92,7 +92,7 @@ export function DocAttach({
       )}
       {canEdit && (
         <label
-          className={`inline-flex h-[38px] cursor-pointer items-center gap-2 rounded-lg border border-dashed border-zinc-300 px-4 text-[13.5px] font-medium text-zinc-700 transition-colors hover:border-brand-500 hover:bg-brand-50 hover:text-brand-600 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-brand-500/10 ${
+          className={`inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-zinc-300 px-4 text-sm font-medium text-zinc-700 transition-colors hover:border-brand-500 hover:bg-brand-50 hover:text-brand-600 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-brand-500/10 ${
             busy ? 'pointer-events-none opacity-60' : ''
           }`}
         >
@@ -107,7 +107,7 @@ export function DocAttach({
           {busy ? 'Uploading…' : docs.length > 0 ? 'Attach another file' : 'Attach BoQ / invoice'}
         </label>
       )}
-      {!canEdit && docs.length === 0 && <p className="text-sm text-zinc-400">No documents attached.</p>}
+      {!canEdit && docs.length === 0 && <p className="text-sm text-zinc-400 dark:text-zinc-500">No documents attached.</p>}
       {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
     </div>
   );

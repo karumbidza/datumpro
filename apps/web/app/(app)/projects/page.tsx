@@ -5,6 +5,8 @@ import { can } from '@datumpro/shared/access';
 import { listProjectsOverview } from '@/lib/data/projects-overview';
 import { getActiveContext, getAuthUser } from '@/lib/data/org';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
+import { FolderOpen } from '@/components/icons';
 import { ProjectOverviewCard } from '@/components/projects/project-overview-card';
 
 export default async function ProjectsPage() {
@@ -19,7 +21,7 @@ export default async function ProjectsPage() {
   const portfolioPct = totalTasks === 0 ? 0 : Math.round((doneTasks / totalTasks) * 100);
 
   return (
-    <PageContainer width="5xl">
+    <PageContainer width="6xl">
       <header className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
@@ -37,9 +39,12 @@ export default async function ProjectsPage() {
       </header>
 
       {projects.length === 0 ? (
-        <p className="mt-6 text-sm text-zinc-500 dark:text-zinc-400">
-          No projects yet — create your first one.
-        </p>
+        <EmptyState
+          className="mt-6"
+          icon={FolderOpen}
+          title="No projects yet"
+          hint="Create your first project to start planning tasks, tenders and site reports."
+        />
       ) : (
         <div className="mt-6 flex flex-col gap-2">
           {projects.map((p) => (

@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { passwordIssue } from '@datumpro/shared/validation';
 
 const fieldClass =
-  'flex h-11 w-full items-center gap-2.5 rounded-lg border border-zinc-200 bg-white px-[13px] text-sm text-zinc-900 transition focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/15 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100';
+  'flex h-11 w-full items-center gap-2.5 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 transition focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/15 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100';
 
 /** Completes the password-reset flow. The recovery link lands here (via
  *  /auth/callback, which established a recovery session), and the user sets a new
@@ -42,14 +42,14 @@ export default function ResetPasswordPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
-      <h1 className="font-display text-[26px] font-semibold leading-[1.2] tracking-[-0.02em] text-zinc-900 dark:text-white">
+      <h1 className="font-display text-2xl font-semibold leading-[1.2] tracking-[-0.02em] text-zinc-900 dark:text-white">
         Choose a new password
       </h1>
       <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
         Set a new password for your DatumPro account.
       </p>
 
-      <form onSubmit={submit} className="mt-6 flex flex-col gap-[13px]">
+      <form onSubmit={submit} className="mt-6 flex flex-col gap-3">
         <div>
           <label className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">New password</label>
           <div className={fieldClass}>
@@ -81,19 +81,19 @@ export default function ResetPasswordPage() {
         <button
           type="submit"
           disabled={busy || done}
-          className="mt-1 h-[46px] w-full rounded-lg bg-brand-500 text-[14.5px] font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
+          className="mt-1 h-11 w-full rounded-lg bg-brand-500 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
         >
           {busy ? 'Updating…' : 'Update password'}
         </button>
       </form>
 
       {message && (
-        <p className={`mt-4 text-[13.5px] ${message.kind === 'error' ? 'text-red-500' : 'text-zinc-600 dark:text-zinc-300'}`}>
+        <p className={`mt-4 text-sm ${message.kind === 'error' ? 'text-red-500' : 'text-zinc-600 dark:text-zinc-300'}`}>
           {message.text}
         </p>
       )}
 
-      <a href="/sign-in" className="mt-6 text-xs text-zinc-500 hover:underline">
+      <a href="/sign-in" className="mt-6 text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
         ← Back to sign in
       </a>
     </main>

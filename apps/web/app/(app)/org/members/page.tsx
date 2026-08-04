@@ -10,8 +10,7 @@ import { Card, CardTitle } from '@/components/ui/card';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { INVITABLE_MEMBER_TYPES, MEMBER_TYPE_META } from '@datumpro/shared/access';
 
-const inputClass =
-  'w-full rounded-md border border-zinc-200 bg-transparent px-2.5 py-1.5 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
+import { inputCompactClass as inputClass } from '@/components/ui/form';
 
 export default async function OrgMembersPage({
   searchParams,
@@ -50,7 +49,7 @@ export default async function OrgMembersPage({
 
   return (
     <PageContainer width="3xl">
-      <Link href="/org" className="text-xs text-zinc-500 hover:underline">
+      <Link href="/org" className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
         ← Organization
       </Link>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">{ctx.active.name} · Members</h1>
@@ -72,7 +71,7 @@ export default async function OrgMembersPage({
       )}
 
       {isAdmin && (
-        <section className="mt-6">
+        <section className="mt-8">
           <Card>
             <CardTitle>Invite someone</CardTitle>
             <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
@@ -111,7 +110,7 @@ export default async function OrgMembersPage({
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">{inv.email}</p>
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
                       invited as {MEMBER_TYPE_META[inv.memberType].label} · {new Date(inv.createdAt).toLocaleDateString('en-GB')}
                     </p>
                   </div>

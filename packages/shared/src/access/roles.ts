@@ -12,6 +12,15 @@ export type OrgRole = (typeof ORG_ROLES)[number];
 export const PROJECT_ROLES = ['pm', 'contractor', 'contributor', 'client', 'viewer'] as const;
 export type ProjectRole = (typeof PROJECT_ROLES)[number];
 
+/** Human labels for project roles — raw enum strings never reach the UI. */
+export const PROJECT_ROLE_LABELS: Record<ProjectRole, string> = {
+  pm: 'Project Manager',
+  contractor: 'Contractor',
+  contributor: 'Contributor',
+  client: 'Client',
+  viewer: 'Viewer',
+};
+
 /**
  * Member TYPE — the single choice made at invitation. A legible label that
  * (a) sets the person's org role and (b) constrains which project roles they may

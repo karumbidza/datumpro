@@ -19,7 +19,7 @@ function formatWhen(iso: string): string {
 
 export function RecentActivity({ items, projectId }: { items: ProjectActivityRow[]; projectId: string }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+    <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
       <div className="flex items-center gap-2 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
         <Activity size={16} className="text-zinc-900 dark:text-white" />
         <h3 className="text-sm font-medium text-zinc-900 dark:text-white">Recent Activity</h3>
@@ -59,7 +59,7 @@ export function RecentActivity({ items, projectId }: { items: ProjectActivityRow
                 <p className="truncate text-xs text-zinc-600 dark:text-zinc-400">{item.message}</p>
                 <div className="mt-1 flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400">
                   <span className="flex items-center gap-1">
-                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-zinc-200 text-[9px] text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200">
+                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-zinc-200 text-[10px] text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200">
                       {item.userName[0]?.toUpperCase() ?? '?'}
                     </span>
                     {item.userName}

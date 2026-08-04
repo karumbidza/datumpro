@@ -14,8 +14,7 @@ import { Button } from '@/components/ui/button';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { Users, DollarSign, FileText, ChevronRight, ShieldAlert } from '@/components/icons';
 
-const inputClass =
-  'w-full rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
+import { inputClass } from '@/components/ui/form';
 
 export default async function OrgPage({
   searchParams,
@@ -55,7 +54,7 @@ export default async function OrgPage({
 
   return (
     <PageContainer width="3xl">
-      <Link href="/dashboard" className="text-xs text-zinc-500 hover:underline">
+      <Link href="/dashboard" className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
         ← Dashboard
       </Link>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Organization</h1>
@@ -63,7 +62,7 @@ export default async function OrgPage({
         Manage {ctx.active.name} — its details, the people in it, and its finances.
       </p>
 
-      <section className="mt-6 space-y-4">
+      <section className="mt-8 space-y-4">
         {/* Settings */}
         <Card>
           <CardTitle>Details</CardTitle>
@@ -163,7 +162,7 @@ export default async function OrgPage({
                       <form action={removeOrgDomain}>
                         <input type="hidden" name="orgId" value={orgId} />
                         <input type="hidden" name="id" value={d.id} />
-                        <button type="submit" className="text-sm text-zinc-500 underline hover:text-red-600">
+                        <button type="submit" className="text-sm text-zinc-500 dark:text-zinc-400 underline hover:text-red-600">
                           Remove
                         </button>
                       </form>
@@ -204,7 +203,7 @@ export default async function OrgPage({
                   Who did what — a read-only record of consequential actions
                 </p>
               </div>
-              <ChevronRight size={18} className="shrink-0 text-zinc-400" />
+              <ChevronRight size={18} className="shrink-0 text-zinc-400 dark:text-zinc-500" />
             </div>
           </Card>
         </Link>
@@ -223,7 +222,7 @@ export default async function OrgPage({
                   {invitations.length > 0 && ` · ${invitations.length} pending invite${invitations.length === 1 ? '' : 's'}`}
                 </p>
               </div>
-              <ChevronRight size={18} className="shrink-0 text-zinc-400" />
+              <ChevronRight size={18} className="shrink-0 text-zinc-400 dark:text-zinc-500" />
             </div>
           </Card>
         </Link>
@@ -242,7 +241,7 @@ export default async function OrgPage({
                     Budgets, invoices and payments across every project
                   </p>
                 </div>
-                <ChevronRight size={18} className="shrink-0 text-zinc-400" />
+                <ChevronRight size={18} className="shrink-0 text-zinc-400 dark:text-zinc-500" />
               </div>
             </Card>
           </Link>
@@ -262,7 +261,7 @@ export default async function OrgPage({
                     Tax clearances &amp; company documents to review
                   </p>
                 </div>
-                <ChevronRight size={18} className="shrink-0 text-zinc-400" />
+                <ChevronRight size={18} className="shrink-0 text-zinc-400 dark:text-zinc-500" />
               </div>
             </Card>
           </Link>

@@ -7,10 +7,9 @@ import { listProjectMembers } from '@/lib/data/members';
 import { updateTask } from '../../actions';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { TASK_PRIORITIES } from '@datumpro/shared/domain';
+import { TASK_PRIORITIES, TASK_PRIORITY_LABELS } from '@datumpro/shared/domain';
 
-const inputClass =
-  'w-full rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
+import { inputClass } from '@/components/ui/form';
 
 export default async function EditTaskPage({
   params,
@@ -27,7 +26,7 @@ export default async function EditTaskPage({
 
   return (
     <PageContainer width="xl">
-      <Link href={`/projects/${projectId}/tasks/${taskId}`} className="text-xs text-zinc-500 hover:underline">
+      <Link href={`/projects/${projectId}/tasks/${taskId}`} className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
         ← {task.title}
       </Link>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Edit task</h1>
@@ -49,7 +48,7 @@ export default async function EditTaskPage({
               <select name="priority" defaultValue={task.priority} className={inputClass}>
                 {TASK_PRIORITIES.map((p) => (
                   <option key={p} value={p}>
-                    {p}
+                    {TASK_PRIORITY_LABELS[p]}
                   </option>
                 ))}
               </select>
@@ -73,7 +72,7 @@ export default async function EditTaskPage({
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">
-                End <span className="font-normal text-zinc-400">· due date</span>
+                End <span className="font-normal text-zinc-400 dark:text-zinc-500">· due date</span>
               </label>
               <input type="date" name="plannedEndDate" defaultValue={task.planned_end_date ?? ''} className={inputClass} />
             </div>

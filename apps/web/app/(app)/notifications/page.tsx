@@ -4,6 +4,8 @@ import { redirect } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { listNotifications } from '@/lib/data/notifications';
 import { LiveRefresh } from '@/components/live-refresh';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Bell } from '@/components/icons';
 import { MarkReadOnMount } from './mark-read-on-mount';
 
 function relTime(iso: string): string {
@@ -25,7 +27,7 @@ export default async function NotificationsPage() {
   const items = await listNotifications(50);
 
   return (
-    <PageContainer width="2xl">
+    <PageContainer width="3xl">
       <LiveRefresh subscriptions={[{ table: 'notifications', filter: `user_id=eq.${user.id}` }]} />
       <MarkReadOnMount />
       <h1 className="text-2xl font-semibold tracking-tight">Notifications</h1>
@@ -34,7 +36,7 @@ export default async function NotificationsPage() {
       </p>
 
       {items.length === 0 ? (
-        <p className="mt-8 text-sm text-zinc-400">You're all caught up.</p>
+        <EmptyState className="mt-4" icon={Bell} title="You're all caught up" hint="New task assignments and updates will land here." />
       ) : (
         <ul className="mt-6 space-y-2">
           {items.map((n) => {
@@ -48,9 +50,9 @@ export default async function NotificationsPage() {
               >
                 <div className="flex items-center justify-between gap-3">
                   <p className="truncate text-sm font-medium text-zinc-900 dark:text-white">{n.title}</p>
-                  <span className="flex-shrink-0 text-[11px] text-zinc-400">{relTime(n.createdAt)}</span>
+                  <span className="flex-shrink-0 text-[11px] text-zinc-400 dark:text-zinc-500">{relTime(n.createdAt)}</span>
                 </div>
-                {n.body && <p className="mt-0.5 text-[13px] text-zinc-600 dark:text-zinc-300">{n.body}</p>}
+                {n.body && <p className="mt-0.5 text-sm text-zinc-600 dark:text-zinc-300">{n.body}</p>}
               </div>
             );
             return (

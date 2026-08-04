@@ -43,10 +43,10 @@ export function ReviewDocument({ id, status }: { id: string; status: 'submitted'
             className="w-full rounded-md border border-zinc-200 bg-transparent px-2.5 py-1.5 text-sm outline-none focus:border-brand-500 dark:border-zinc-800"
           />
           <div className="flex gap-2">
-            <button disabled={busy} onClick={() => act(rejectContractorDocument, true)} className="rounded-md bg-red-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-500 disabled:opacity-50">
+            <button disabled={busy} onClick={() => act(rejectContractorDocument, true)} className="rounded-md bg-red-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50">
               Confirm reject
             </button>
-            <button disabled={busy} onClick={() => setRejecting(false)} className="rounded-md px-2.5 py-1 text-xs text-zinc-500 hover:underline">
+            <button disabled={busy} onClick={() => setRejecting(false)} className="rounded-md px-2.5 py-1 text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
               Cancel
             </button>
           </div>
@@ -54,7 +54,7 @@ export function ReviewDocument({ id, status }: { id: string; status: 'submitted'
       ) : (
         <div className="flex flex-wrap items-center gap-2">
           {status !== 'verified' && (
-            <button disabled={busy} onClick={() => act(verifyContractorDocument)} className="rounded-md bg-green-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-green-500 disabled:opacity-50">
+            <button disabled={busy} onClick={() => act(verifyContractorDocument)} className="rounded-md bg-green-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50">
               Verify
             </button>
           )}

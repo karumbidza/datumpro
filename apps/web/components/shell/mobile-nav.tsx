@@ -71,14 +71,14 @@ export function MobileNav({ projects, orgs, activeOrgId, email, canManageMembers
                   {activeOrgName}
                 </span>
               </span>
-              <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="p-1 text-zinc-500">
+              <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="p-1 text-zinc-500 dark:text-zinc-400">
                 <X size={20} />
               </button>
             </div>
 
             <nav className="flex-1 overflow-y-auto p-2">
               {activeProject && (
-                <p className="px-3 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-zinc-400">
+                <p className="px-3 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
                   {activeProject.name}
                 </p>
               )}
@@ -101,7 +101,7 @@ export function MobileNav({ projects, orgs, activeOrgId, email, canManageMembers
 
               {projects.length > 0 && (
                 <>
-                  <p className="px-3 pb-1 pt-4 text-[10px] font-medium uppercase tracking-wider text-zinc-400">
+                  <p className="px-3 pb-1 pt-4 text-[10px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
                     Projects
                   </p>
                   <div className="space-y-0.5">
@@ -126,7 +126,7 @@ export function MobileNav({ projects, orgs, activeOrgId, email, canManageMembers
             <div className="border-t border-zinc-200 p-3 dark:border-zinc-800">
               {orgs.length > 1 && (
                 <div className="mb-2">
-                  <p className="px-1 pb-1 text-[10px] uppercase tracking-wide text-zinc-400">Organisation</p>
+                  <p className="px-1 pb-1 text-[10px] uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Organisation</p>
                   {orgs.map((o) => (
                     <form key={o.orgId} action={setActiveOrg}>
                       <input type="hidden" name="orgId" value={o.orgId} />
@@ -148,9 +148,9 @@ export function MobileNav({ projects, orgs, activeOrgId, email, canManageMembers
                 <Users size={14} /> Account
               </Link>
               <div className="mt-1 flex items-center justify-between gap-2 px-2">
-                <span className="min-w-0 flex-1 truncate text-xs text-zinc-500">{email}</span>
+                <span className="min-w-0 flex-1 truncate text-xs text-zinc-500 dark:text-zinc-400">{email}</span>
                 <form action={signOut}>
-                  <button type="submit" className="flex items-center gap-1 rounded p-1 text-zinc-500" title="Sign out">
+                  <button type="submit" className="flex items-center gap-1 rounded p-1 text-zinc-500 dark:text-zinc-400" title="Sign out">
                     <LogOut size={16} />
                   </button>
                 </form>

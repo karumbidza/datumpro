@@ -5,8 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { passwordIssue } from '@datumpro/shared/validation';
 import { Button } from '@/components/ui/button';
 
-const inputClass =
-  'w-full rounded-md border border-zinc-200 bg-transparent px-2.5 py-1.5 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
+import { inputCompactClass as inputClass } from '@/components/ui/form';
 
 /** Change-password form for a signed-in user. We re-verify the CURRENT password
  *  (via signInWithPassword) before updating — Supabase's updateUser doesn't check
@@ -87,7 +86,7 @@ export function ChangePasswordForm({ email }: { email: string }) {
         {busy ? 'Updating…' : 'Update password'}
       </Button>
       {message && (
-        <p className={`text-[13px] ${message.kind === 'error' ? 'text-red-500' : 'text-zinc-600 dark:text-zinc-300'}`}>
+        <p className={`text-sm ${message.kind === 'error' ? 'text-red-500' : 'text-zinc-600 dark:text-zinc-300'}`}>
           {message.text}
         </p>
       )}

@@ -31,7 +31,7 @@ export function TaskTabs({ tabs, initialKey }: { tabs: TaskTab[]; initialKey?: s
               className={`-mb-px flex items-center gap-1.5 rounded-t-md border-b-2 px-3 py-2 text-sm font-medium transition ${
                 isActive
                   ? 'border-brand-500 text-brand-600 dark:text-brand-400'
-                  : 'border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                  : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
               }`}
             >
               {t.label}
@@ -40,7 +40,7 @@ export function TaskTabs({ tabs, initialKey }: { tabs: TaskTab[]; initialKey?: s
                   className={`rounded-full px-1.5 py-0.5 text-[11px] tabular-nums ${
                     isActive
                       ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400'
-                      : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800'
+                      : 'bg-zinc-100 text-zinc-500 dark:text-zinc-400 dark:bg-zinc-800'
                   }`}
                 >
                   {t.count}

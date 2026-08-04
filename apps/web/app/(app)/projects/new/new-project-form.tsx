@@ -4,6 +4,7 @@ import { useActionState, useEffect, useMemo, useState } from 'react';
 import { useCombobox } from 'downshift';
 import { createProject, createClientAction } from '../actions';
 import { createClient } from '@/lib/supabase/client';
+import { Button } from '@/components/ui/button';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { FormError } from '@/components/ui/form-error';
 import { parseDate, formatLongDate } from '@/lib/date';
@@ -12,13 +13,11 @@ import {
   CONSTRUCTION_TYPE_LABELS,
   CURRENCIES,
   TASK_PRIORITIES,
+  TASK_PRIORITY_LABELS,
 } from '@datumpro/shared/domain';
 import type { ClientOption } from '@/lib/data/clients';
 import type { CalendarOption } from '@/lib/data/calendars';
-
-const inputClass =
-  'w-full rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
-const labelClass = 'mb-1 block text-sm font-medium';
+import { inputClass, labelClass } from '@/components/ui/form';
 
 type Member = { userId: string; name: string };
 type NewItem = { id: '__new'; name: string };
@@ -148,7 +147,7 @@ export function NewProjectForm({
       {/* Description */}
       <div>
         <label className={labelClass}>
-          Description <span className="font-normal text-zinc-400">(optional)</span>
+          Description <span className="font-normal text-zinc-400 dark:text-zinc-500">(optional)</span>
         </label>
         <textarea
           name="description"
@@ -174,8 +173,8 @@ export function NewProjectForm({
           <label className={labelClass}>Priority</label>
           <select name="priority" defaultValue="medium" className={inputClass}>
             {TASK_PRIORITIES.map((p) => (
-              <option key={p} value={p} className="capitalize">
-                {p.charAt(0).toUpperCase() + p.slice(1)}
+              <option key={p} value={p}>
+                {TASK_PRIORITY_LABELS[p]}
               </option>
             ))}
           </select>
@@ -215,7 +214,7 @@ export function NewProjectForm({
           </ul>
         </div>
         {selectedClient && (
-          <p className="mt-1 text-xs text-zinc-500">Selected: {selectedClient.name}</p>
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Selected: {selectedClient.name}</p>
         )}
       </div>
 
@@ -228,21 +227,12 @@ export function NewProjectForm({
           <input value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="Phone (optional)" className={inputClass} />
           <FormError error={newError} />
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={saveNewClient}
-              disabled={newBusy}
-              className="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-            >
+            <Button type="button" size="sm" onClick={saveNewClient} disabled={newBusy}>
               {newBusy ? 'Saving…' : 'Save client'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setNewOpen(false)}
-              className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm dark:border-zinc-700"
-            >
+            </Button>
+            <Button type="button" size="sm" variant="secondary" onClick={() => setNewOpen(false)}>
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -313,7 +303,7 @@ export function NewProjectForm({
                     className={`px-3 text-sm capitalize ${
                       durationUnit === u
                         ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
-                        : 'text-zinc-500'
+                        : 'text-zinc-500 dark:text-zinc-400'
                     }`}
                   >
                     {u}
@@ -359,7 +349,7 @@ export function NewProjectForm({
         </div>
         <div>
           <label className={labelClass}>
-            Contract value ({currency}) <span className="font-normal text-zinc-400">(optional)</span>
+            Contract value ({currency}) <span className="font-normal text-zinc-400 dark:text-zinc-500">(optional)</span>
           </label>
           <input type="number" name="contractValue" min={0} step="0.01" placeholder="0.00" className={inputClass} />
         </div>
@@ -368,7 +358,7 @@ export function NewProjectForm({
       {/* Team members — org members picked onto the project at creation */}
       <div>
         <label className={labelClass}>
-          Team members <span className="font-normal text-zinc-400">(optional)</span>
+          Team members <span className="font-normal text-zinc-400 dark:text-zinc-500">(optional)</span>
         </label>
         <select
           value=""
@@ -413,7 +403,7 @@ export function NewProjectForm({
             })}
           </div>
         )}
-        <p className="mt-1 text-xs text-zinc-400">
+        <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
           Added as contributors — the manager and you are on the project automatically.
         </p>
       </div>

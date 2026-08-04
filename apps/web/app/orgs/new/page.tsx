@@ -5,8 +5,7 @@ import { Card } from '@/components/ui/card';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { isBusinessEmail } from '@datumpro/shared/validation';
 
-const inputClass =
-  'w-full rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
+import { inputClass } from '@/components/ui/form';
 
 export default async function NewOrgPage({
   searchParams,
@@ -50,20 +49,20 @@ export default async function NewOrgPage({
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium">
-              Legal / registered name <span className="text-zinc-400">(optional)</span>
+              Legal / registered name <span className="text-zinc-400 dark:text-zinc-500">(optional)</span>
             </label>
             <input name="legalName" placeholder="e.g. Grafaid Engineers Ltd" className={inputClass} />
           </div>
           <div className="flex gap-3">
             <div className="flex-1">
               <label className="mb-1 block text-xs font-medium">
-                Country <span className="text-zinc-400">(optional)</span>
+                Country <span className="text-zinc-400 dark:text-zinc-500">(optional)</span>
               </label>
               <input name="country" placeholder="e.g. Zimbabwe" className={inputClass} />
             </div>
             <div className="flex-1">
               <label className="mb-1 block text-xs font-medium">
-                Sector <span className="text-zinc-400">(optional)</span>
+                Sector <span className="text-zinc-400 dark:text-zinc-500">(optional)</span>
               </label>
               <select name="sector" defaultValue="" className={inputClass}>
                 <option value="">Select…</option>
@@ -77,7 +76,7 @@ export default async function NewOrgPage({
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium">
-              Registration number <span className="text-zinc-400">(optional)</span>
+              Registration number <span className="text-zinc-400 dark:text-zinc-500">(optional)</span>
             </label>
             <input name="registrationNumber" placeholder="Company / entity reg. number" className={inputClass} />
           </div>

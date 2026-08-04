@@ -17,7 +17,7 @@ const field =
   'h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100';
 const numField = `${field} tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`;
 const selectField = `${field} cursor-pointer appearance-none pr-8`;
-const labelCls = 'mb-1.5 block text-[11.5px] font-semibold text-zinc-500 dark:text-zinc-400';
+const labelCls = 'mb-1.5 block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400';
 const selectStyle = {
   backgroundImage:
     "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E\")",
@@ -62,14 +62,14 @@ export function BidPanel({
   return (
     <Card>
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-[17px] font-semibold text-zinc-900 dark:text-zinc-50">Your bid</h3>
+        <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">Your bid</h3>
         {submitted && (
           <span className="rounded-full bg-green-50 px-2.5 py-1 text-[11px] font-semibold text-green-700 dark:bg-green-500/15 dark:text-green-400">
             Submitted
           </span>
         )}
       </div>
-      <p className="mt-2 text-[13.5px] leading-[1.55] text-zinc-500 [text-wrap:pretty] dark:text-zinc-400">
+      <p className="mt-2 text-sm leading-[1.55] text-zinc-500 [text-wrap:pretty] dark:text-zinc-400">
         Break the work into the steps you’d do, each with a duration, a start date and a cost. This is your sealed
         bid — the PM compares it against others and awards the winner. You can edit until they decide.
       </p>
@@ -77,7 +77,7 @@ export function BidPanel({
       {/* Add step — bordered sub-card */}
       <form
         action={addSubtask}
-        className="mt-[22px] rounded-xl border border-zinc-200 bg-zinc-50/60 p-[18px] dark:border-zinc-800 dark:bg-zinc-900/40"
+        className="mt-[22px] rounded-xl border border-zinc-200 bg-zinc-50/60 p-4 dark:border-zinc-800 dark:bg-zinc-900/40"
       >
         <input type="hidden" name="taskId" value={taskId} />
         <input type="hidden" name="bid" value="1" />
@@ -121,7 +121,7 @@ export function BidPanel({
                 key={l.id}
                 action={updateSubtask}
                 onSubmit={() => setEditing(null)}
-                className="rounded-xl border border-brand-500/40 bg-brand-50/40 p-[18px] dark:bg-brand-500/5"
+                className="rounded-xl border border-brand-500/40 bg-brand-50/40 p-4 dark:bg-brand-500/5"
               >
                 <input type="hidden" name="id" value={l.id} />
                 <input type="hidden" name="taskId" value={taskId} />
@@ -166,21 +166,21 @@ export function BidPanel({
             ) : (
               <div
                 key={l.id}
-                className="flex items-center gap-3.5 rounded-[10px] border border-zinc-200 px-4 py-[13px] dark:border-zinc-800"
+                className="flex items-center gap-3.5 rounded-lg border border-zinc-200 px-4 py-3 dark:border-zinc-800"
               >
                 <button type="button" onClick={() => setEditing(l.id)} className="min-w-0 flex-1 text-left">
                   <div className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">{l.title}</div>
                   {lineIncomplete(l) ? (
-                    <div className="mt-0.5 text-[12.5px] font-medium text-amber-600 dark:text-amber-400">
+                    <div className="mt-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
                       Tap to add duration, start &amp; cost
                     </div>
                   ) : (
-                    <div className="mt-0.5 text-[12.5px] text-zinc-400">
+                    <div className="mt-0.5 text-xs text-zinc-400 dark:text-zinc-500">
                       {l.estQty} {l.estUnit} · starts {dmy(l.plannedStartDate)}
                     </div>
                   )}
                 </button>
-                <div className="text-[15px] font-bold tabular-nums text-zinc-900 dark:text-zinc-100">{formatUsd(l.costCents)}</div>
+                <div className="text-sm font-bold tabular-nums text-zinc-900 dark:text-zinc-100">{formatUsd(l.costCents)}</div>
                 <form action={removeSubtask}>
                   <input type="hidden" name="id" value={l.id} />
                   <input type="hidden" name="taskId" value={taskId} />
@@ -188,7 +188,7 @@ export function BidPanel({
                   <button
                     type="submit"
                     title="Remove"
-                    className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 dark:text-zinc-500 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
                   >
                     ✕
                   </button>
@@ -208,7 +208,7 @@ export function BidPanel({
         <form action={submitBid}>
           <input type="hidden" name="taskId" value={taskId} />
           <input type="hidden" name="projectId" value={projectId} />
-          <SubmitButton className="h-[42px] text-[14.5px]" pendingText="Submitting…" disabled={bidLines.length === 0 || incomplete}>
+          <SubmitButton className="h-[42px] text-sm" pendingText="Submitting…" disabled={bidLines.length === 0 || incomplete}>
             {submitted ? 'Update bid' : 'Submit bid'}
           </SubmitButton>
         </form>
