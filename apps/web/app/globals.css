@@ -46,3 +46,17 @@ body {
   0%, 100% { opacity: 0.25; }
   40% { opacity: 1; }
 }
+
+/* Gantt bar micro-animations — ported from the previous app's Gantt. */
+@keyframes gantt-shimmer {
+  0% { transform: translateX(-100%); }
+  60%, 100% { transform: translateX(250%); }
+}
+@keyframes gantt-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+@keyframes gantt-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.35); opacity: 0.7; }
+}

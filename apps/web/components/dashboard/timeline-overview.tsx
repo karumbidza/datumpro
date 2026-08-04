@@ -95,6 +95,30 @@ function shortLabel(s: BarState): string | null {
   return null;
 }
 
+/* Completed-task detail (ported from the previous app's Gantt): did it finish
+ * early, on time, or late — and by how much? */
+interface DoneInfo {
+  type: 'on-time' | 'early' | 'late';
+  days: number;
+  completed: Date | null;
+}
+
+function getDoneInfo(task: DashboardTask): DoneInfo {
+  const planned = parseDate(task.planned_end_date) ?? parseDate(task.due_date);
+  const completedRaw = parseDate(task.actual_end_date ?? null);
+  const completed = completedRaw ? startOfDay(completedRaw) : null;
+  if (!planned || !completed) return { type: 'on-time', days: 0, completed };
+  const diff = differenceInDays(completed, startOfDay(planned));
+  if (diff <= 0) return { type: diff < -1 ? 'early' : 'on-time', days: Math.abs(diff), completed };
+  return { type: 'late', days: diff, completed };
+}
+
+function doneLabel(info: DoneInfo): string {
+  if (info.type === 'on-time') return '✓ done';
+  const span = info.days >= 7 ? `${Math.floor(info.days / 7)}w` : `${info.days}d`;
+  return info.type === 'early' ? `✓ ${span} early` : `✓ +${span} late`;
+}
+
 function StatusBadge({ state }: { state: BarState }) {
   const map: { show: boolean; text: string; cls: string }[] = [
     { show: state.isDone, text: 'Done', cls: 'bg-green-100 text-green-700' },
@@ -355,19 +379,43 @@ export function TimelineOverview({
                 const todayX = todayOffset + DAY_WIDTH / 2;
                 const plannedEndX = Math.max(0, left) + ghostWidth;
 
+                const doneInfo = state.isDone ? getDoneInfo(task) : null;
+                const completedX = doneInfo?.completed
+                  ? Math.max(
+                      Math.max(0, left),
+                      (differenceInDays(doneInfo.completed, startDate) + 1) * DAY_WIDTH - 2,
+                    )
+                  : plannedEndX;
+                const doneLateSpill =
+                  doneInfo?.type === 'late'
+                    ? Math.min(Math.max(completedX - plannedEndX, 0), MAX_SPILL_DAYS * DAY_WIDTH)
+                    : 0;
+
                 const actualEndX = state.isDone ? plannedEndX : todayX;
-                const actualWidth = state.hasStarted ? Math.max(actualEndX - Math.max(0, left), 0) : 0;
+                const showProgress = state.hasStarted || state.isBlocked;
+                const actualWidth = showProgress ? Math.max(actualEndX - Math.max(0, left), 0) : 0;
                 const spill = state.isOverdue
                   ? Math.min(Math.max(todayX - plannedEndX, 0), MAX_SPILL_DAYS * DAY_WIDTH)
                   : 0;
-                const label = shortLabel(state);
-                const labelX = state.isOverdue ? plannedEndX + spill + 6 : Math.max(plannedEndX, left + actualWidth) + 6;
+                const label = doneInfo ? doneLabel(doneInfo) : shortLabel(state);
+                const labelX =
+                  doneInfo?.type === 'late'
+                    ? plannedEndX + doneLateSpill + 6
+                    : doneInfo?.type === 'early'
+                      ? Math.min(completedX, plannedEndX) + 6
+                      : state.isOverdue
+                        ? plannedEndX + spill + 6
+                        : Math.max(plannedEndX, left + actualWidth) + 6;
 
                 const rowTint = state.isOverdue
                   ? 'bg-red-50/60 dark:bg-red-950/10'
                   : state.isBlocked
                     ? 'bg-amber-50/60 dark:bg-amber-950/10'
-                    : 'bg-zinc-50/50 dark:bg-zinc-800/20';
+                    : doneInfo?.type === 'late'
+                      ? 'bg-red-50/40 dark:bg-red-950/10'
+                      : doneInfo?.type === 'early'
+                        ? 'bg-green-50/60 dark:bg-green-950/10'
+                        : 'bg-zinc-50/50 dark:bg-zinc-800/20';
 
                 return (
                   <div
@@ -413,15 +461,80 @@ export function TimelineOverview({
                         }}
                       />
 
-                      {/* Progress / done bar */}
-                      {(state.hasStarted || state.isOverdue) && (state.isOverdue ? ghostWidth : actualWidth) > 0 && (
+                      {/* Done bar — early stops at completion, late runs past the plan */}
+                      {doneInfo && (
+                        <>
+                          <div
+                            className="absolute rounded-[3px]"
+                            style={{
+                              left: Math.max(0, left),
+                              width:
+                                doneInfo.type === 'late'
+                                  ? ghostWidth
+                                  : Math.max(
+                                      Math.min(completedX, plannedEndX) - Math.max(0, left),
+                                      DAY_WIDTH / 2,
+                                    ),
+                              height: BAR_HEIGHT,
+                              background: doneInfo.type === 'late' ? '#93c5fd' : '#16a34a',
+                              opacity: 0.9,
+                            }}
+                          />
+                          {doneLateSpill > 0 && (
+                            <div
+                              className="absolute"
+                              style={{
+                                left: plannedEndX,
+                                width: doneLateSpill,
+                                height: BAR_HEIGHT,
+                                background: '#dc2626',
+                                borderRadius: '0 3px 3px 0',
+                                opacity: 0.85,
+                              }}
+                            />
+                          )}
+                        </>
+                      )}
+
+                      {/* Progress bar — shimmer while active, breathe while blocked */}
+                      {!doneInfo && (showProgress || state.isOverdue) && (state.isOverdue ? ghostWidth : actualWidth) > 0 && (
                         <div
                           className="absolute overflow-hidden rounded-[3px]"
                           style={{
-                            left: state.isOverdue ? Math.max(0, left) : Math.max(0, left),
+                            left: Math.max(0, left),
                             width: state.isOverdue ? ghostWidth : actualWidth,
                             height: BAR_HEIGHT,
                             background: state.isOverdue ? '#93c5fd' : color,
+                            animation:
+                              state.isBlocked && !state.isOverdue
+                                ? 'gantt-breathe 2s ease-in-out infinite'
+                                : undefined,
+                          }}
+                        >
+                          {state.isActive && !state.isOverdue && (
+                            <span
+                              className="pointer-events-none absolute inset-y-0 left-0 w-2/5"
+                              style={{
+                                background:
+                                  'linear-gradient(90deg, transparent, rgba(255,255,255,.4), transparent)',
+                                animation: 'gantt-shimmer 2s ease-in-out infinite',
+                              }}
+                            />
+                          )}
+                        </div>
+                      )}
+
+                      {/* Live tip — pulse dot at the progress front */}
+                      {!doneInfo && (state.isActive || state.isBlocked) && !state.isOverdue && actualWidth > 0 && (
+                        <span
+                          className="pointer-events-none absolute z-[5] size-2 rounded-full"
+                          style={{
+                            left: Math.max(0, left) + actualWidth - 4,
+                            background: state.isBlocked ? '#d97706' : '#2563eb',
+                            boxShadow: state.isBlocked
+                              ? '0 0 0 3px rgba(217,119,6,.25)'
+                              : '0 0 0 3px rgba(37,99,235,.2)',
+                            animation: 'gantt-pulse 1.2s ease-in-out infinite',
                           }}
                         />
                       )}
@@ -446,13 +559,14 @@ export function TimelineOverview({
                           style={{
                             left: labelX,
                             top: ROW_HEIGHT / 2 - 7,
-                            color: state.isOverdue
-                              ? '#dc2626'
-                              : state.isDone
-                                ? '#16a34a'
-                                : state.isBlocked
-                                  ? '#d97706'
-                                  : '#a1a1aa',
+                            color:
+                              state.isOverdue || doneInfo?.type === 'late'
+                                ? '#dc2626'
+                                : state.isDone
+                                  ? '#16a34a'
+                                  : state.isBlocked
+                                    ? '#d97706'
+                                    : '#a1a1aa',
                           }}
                         >
                           {label}

@@ -13,6 +13,9 @@ export interface DashboardTask {
   planned_start_date: string | null;
   planned_end_date: string | null;
   due_date: string | null;
+  /** When the task was actually finished — lets the timeline show early/late
+   *  completion detail. Absent on rows that aggregate projects. */
+  actual_end_date?: string | null;
 }
 
 export interface DashboardCounts {
@@ -44,7 +47,7 @@ export async function getDashboardData(orgId: string, projectId?: string): Promi
   let tasksQuery = supabase
     .from('tasks')
     .select(
-      'id, title, status, sla_status, project_id, assignee_id, planned_start_date, planned_end_date, due_date',
+      'id, title, status, sla_status, project_id, assignee_id, planned_start_date, planned_end_date, due_date, actual_end_date',
     )
     .eq('org_id', orgId);
   let projectsQuery = supabase.from('projects').select('id, name').eq('org_id', orgId);
@@ -69,6 +72,7 @@ export async function getDashboardData(orgId: string, projectId?: string): Promi
     planned_start_date: string | null;
     planned_end_date: string | null;
     due_date: string | null;
+    actual_end_date: string | null;
   };
 
   const rawTasks = (tasksRes.data ?? []) as RawTask[];
@@ -102,6 +106,7 @@ export async function getDashboardData(orgId: string, projectId?: string): Promi
     planned_start_date: t.planned_start_date,
     planned_end_date: t.planned_end_date,
     due_date: t.due_date,
+    actual_end_date: t.actual_end_date,
   }));
 
   const counts: DashboardCounts = {
