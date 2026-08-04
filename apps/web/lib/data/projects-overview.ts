@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import type { ProjectStatus } from '@datumpro/shared/domain';
+import type { ProjectStatus, TaskPriority } from '@datumpro/shared/domain';
 
 export interface OverviewMilestone {
   id: string;
@@ -15,6 +15,7 @@ export interface ProjectOverview {
   name: string;
   clientName: string | null;
   status: ProjectStatus;
+  priority: TaskPriority;
   startDate: string | null;
   endDate: string | null;
   contractValueCents: number;
@@ -31,18 +32,24 @@ export async function listProjectsOverview(): Promise<ProjectOverview[]> {
   const supabase = await createClient();
   const { data: projectRows } = await supabase
     .from('projects')
-    .select('id, name, client_name, status, contract_value_cents, start_date, end_date')
+    .select('id, name, client_name, status, priority, contract_value_cents, start_date, end_date')
     .order('created_at', { ascending: false });
   const projects = (projectRows ?? []) as {
     id: string;
     name: string;
     client_name: string | null;
     status: ProjectStatus;
+    priority: TaskPriority;
     contract_value_cents: number;
     start_date: string | null;
     end_date: string | null;
   }[];
   if (projects.length === 0) return [];
+
+  // Priority is the portfolio sort key (urgent first); created_at breaks ties
+  // via the query order above.
+  const PRIORITY_RANK: Record<TaskPriority, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+  projects.sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority]);
 
   const ids = projects.map((p) => p.id);
   const [{ data: taskRows }, { data: milestoneRows }] = await Promise.all([
@@ -98,6 +105,7 @@ export async function listProjectsOverview(): Promise<ProjectOverview[]> {
       name: p.name,
       clientName: p.client_name,
       status: p.status,
+      priority: p.priority,
       startDate: p.start_date,
       endDate: p.end_date,
       contractValueCents: p.contract_value_cents,

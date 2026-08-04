@@ -23,6 +23,7 @@ export interface InvitationPreview {
   orgName: string;
   email: string;
   role: OrgRole;
+  memberType: MemberType;
   status: 'pending' | 'accepted' | 'revoked' | 'expired';
 }
 
@@ -101,12 +102,19 @@ export async function listPendingInvitations(orgId: string): Promise<OrgInvitati
 export async function getInvitationPreview(token: string): Promise<InvitationPreview | null> {
   const supabase = await createClient();
   const { data } = await supabase.rpc('invitation_preview', { p_token: token });
-  const row = ((data ?? []) as { org_name: string; email: string; role: string; status: string }[])[0];
+  const row = ((data ?? []) as {
+    org_name: string;
+    email: string;
+    role: string;
+    member_type: string | null;
+    status: string;
+  }[])[0];
   if (!row) return null;
   return {
     orgName: row.org_name,
     email: row.email,
     role: row.role as OrgRole,
+    memberType: (row.member_type ?? 'staff') as MemberType,
     status: row.status as InvitationPreview['status'],
   };
 }

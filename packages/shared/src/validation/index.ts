@@ -72,8 +72,11 @@ export const createProjectSchema = z.object({
   // `code` is auto-generated server-side (collision-safe) — never trusted from the client.
   type: z.enum(PROJECT_TYPES).default('construction'),
   constructionType: z.enum(CONSTRUCTION_TYPES),
+  description: z.string().trim().max(2000).optional().or(z.literal('')),
+  priority: z.enum(TASK_PRIORITIES).default('medium'),
   clientId: z.string().uuid(),
   managerId: z.string().uuid(),
+  teamMemberIds: z.array(z.string().uuid()).max(100).default([]),
   startDate: z.string().date(),
   durationValue: z.number().int().positive().max(3650),
   durationUnit: z.enum(DURATION_UNITS).default('weeks'),
@@ -83,6 +86,29 @@ export const createProjectSchema = z.object({
   templateId: z.string().uuid().optional().nullable(),
 });
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
+
+/** Invitee profile setup on the invite-acceptance screen (snag spec §1.3).
+ *  Phone is required — WhatsApp is the reliable channel for site teams. Company
+ *  and trade are optional (invitations don't carry a party type yet). */
+export const profileSetupSchema = z.object({
+  username: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(/^[a-z0-9._-]{3,30}$/, 'Username must be 3–30 characters: a–z, 0–9, dots, dashes, underscores.'),
+  fullName: z.string().trim().min(2, 'Enter your full name.').max(120),
+  phone: z
+    .string()
+    .trim()
+    .min(7, 'Enter a phone number (WhatsApp preferred).')
+    .max(40)
+    .regex(/^\+?[0-9()\-\s]{7,}$/, 'Enter a valid phone number.'),
+  companyName: z.string().trim().max(160).optional().or(z.literal('')),
+  trade: z.string().trim().max(80).optional().or(z.literal('')),
+  avatarUrl: z.string().trim().max(600).optional().or(z.literal('')),
+  avatarThumbUrl: z.string().trim().max(600).optional().or(z.literal('')),
+});
+export type ProfileSetupInput = z.infer<typeof profileSetupSchema>;
 
 /** Inline "New client" sub-form (name required; email/phone optional). */
 export const createClientSchema = z.object({

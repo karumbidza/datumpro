@@ -12,6 +12,14 @@ const STATUS_TONE = {
   archived: 'neutral',
 } as const;
 
+/* Priority chip — shown only when it deviates from the 'medium' default, so the
+ * list stays quiet until priority actually says something. */
+const PRIORITY_CHIP: Record<string, { label: string; cls: string } | undefined> = {
+  urgent: { label: 'Urgent', cls: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400' },
+  high: { label: 'High', cls: 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400' },
+  low: { label: 'Low', cls: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400' },
+};
+
 function fmt(iso: string | null): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -34,7 +42,16 @@ export function ProjectOverviewCard({ project: p }: { project: ProjectOverview }
     >
       {/* Name / client */}
       <div className="w-40 shrink-0">
-        <h2 className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{p.name}</h2>
+        <span className="flex items-center gap-1.5">
+          <h2 className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{p.name}</h2>
+          {PRIORITY_CHIP[p.priority] && (
+            <span
+              className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${PRIORITY_CHIP[p.priority]!.cls}`}
+            >
+              {PRIORITY_CHIP[p.priority]!.label}
+            </span>
+          )}
+        </span>
         <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">{p.clientName ?? '—'}</p>
       </div>
 

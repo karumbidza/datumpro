@@ -1,7 +1,10 @@
 import Link from 'next/link';
+import { createClient } from '@/lib/supabase/server';
 import { getAuthUser } from '@/lib/data/org';
 import { getInvitationPreview } from '@/lib/data/org-members';
+import { MEMBER_TYPE_META } from '@datumpro/shared/access';
 import { acceptInvitation } from './actions';
+import { ProfileSetupForm } from './profile-setup-form';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { SubmitButton } from '@/components/ui/submit-button';
@@ -19,8 +22,23 @@ export default async function InvitePage({
   const user = await getAuthUser();
   const preview = await getInvitationPreview(token);
 
+  // First-time invitees get the full profile setup; anyone who already has a
+  // handle just accepts. (Profile rows exist from the auth trigger.)
+  let profile: { username: string | null; display_name: string | null } | null = null;
+  if (user) {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from('profiles')
+      .select('username, display_name')
+      .eq('id', user.id)
+      .maybeSingle();
+    profile = data as { username: string | null; display_name: string | null } | null;
+  }
+  const needsSetup = !!user && !profile?.username;
+  const typeMeta = preview ? MEMBER_TYPE_META[preview.memberType] : null;
+
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-10">
+    <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-6 py-10">
       <Card>
         {!preview ? (
           <>
@@ -43,8 +61,17 @@ export default async function InvitePage({
           <>
             <CardTitle>Join {preview.orgName}</CardTitle>
             <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-              You’ve been invited to <strong>{preview.orgName}</strong> as {preview.role}, at{' '}
-              <span className="font-medium">{preview.email}</span>.
+              {needsSetup ? (
+                <>
+                  Invited as <strong>{typeMeta?.label ?? preview.role}</strong> — set up your profile
+                  to continue.
+                </>
+              ) : (
+                <>
+                  You’ve been invited to <strong>{preview.orgName}</strong> as{' '}
+                  {typeMeta?.label ?? preview.role}, at <span className="font-medium">{preview.email}</span>.
+                </>
+              )}
             </p>
 
             {error && (
@@ -53,16 +80,28 @@ export default async function InvitePage({
               </p>
             )}
 
-            {user ? (
+            {user && user.email && user.email.toLowerCase() !== preview.email.toLowerCase() && (
+              <p className="mt-3 text-xs text-amber-600">
+                You’re signed in as {user.email}. This invite was sent to {preview.email} — sign in
+                with that address to accept.
+              </p>
+            )}
+
+            {user && needsSetup ? (
+              <ProfileSetupForm
+                token={token}
+                email={preview.email}
+                userId={user.id}
+                initialName={profile?.display_name ?? ''}
+                roleLabel={typeMeta?.label ?? preview.role}
+                roleHint={typeMeta?.hint ?? ''}
+                orgName={preview.orgName}
+                isContractor={preview.memberType === 'contractor'}
+              />
+            ) : user ? (
               <form action={acceptInvitation} className="mt-4">
                 <input type="hidden" name="token" value={token} />
                 <SubmitButton pendingText="Joining…">Accept invitation</SubmitButton>
-                {user.email && user.email.toLowerCase() !== preview.email.toLowerCase() && (
-                  <p className="mt-2 text-xs text-amber-600">
-                    You’re signed in as {user.email}. This invite was sent to {preview.email} — sign in
-                    with that address to accept.
-                  </p>
-                )}
               </form>
             ) : (
               <div className="mt-4">

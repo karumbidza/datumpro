@@ -43,9 +43,27 @@ export default async function ProjectOverviewPage({
       />
       <header className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
+          <span className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
+            {project.priority !== 'medium' && (
+              <span
+                className={`rounded px-2 py-0.5 text-xs font-medium capitalize ${
+                  project.priority === 'urgent'
+                    ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
+                    : project.priority === 'high'
+                      ? 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400'
+                      : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
+                }`}
+              >
+                {project.priority}
+              </span>
+            )}
+          </span>
           {project.client_name && (
             <p className="text-sm text-zinc-500 dark:text-zinc-400">{project.client_name}</p>
+          )}
+          {project.description && (
+            <p className="mt-1 max-w-2xl text-sm text-zinc-500 dark:text-zinc-400">{project.description}</p>
           )}
           {tasks.length > 0 && (
             <div className="mt-2 flex items-center gap-2">
