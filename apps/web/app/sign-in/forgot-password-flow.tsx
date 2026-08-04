@@ -54,7 +54,12 @@ export function ForgotPasswordFlow({
       setStep('code');
       return;
     }
-    if (error) return setMessage({ kind: 'error', text: error.message });
+    if (error) {
+      return setMessage({
+        kind: 'error',
+        text: 'Please wait a moment before requesting another code — the previous one is still valid.',
+      });
+    }
     setMessage({ kind: 'info', text: `If an account exists for ${email.trim()}, a 6-digit code is on its way.` });
     setStep('code');
   }
@@ -69,11 +74,14 @@ export function ForgotPasswordFlow({
     const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token, type: 'recovery' });
     setBusy(false);
     if (error) {
+      // "Expired" from GoTrue also covers already-consumed tokens (each code is
+      // single-use, and every resend invalidates earlier codes) — steer the user
+      // to the NEWEST email rather than implying they were just slow.
       return setMessage({
         kind: 'error',
         text: /expired/i.test(error.message)
-          ? 'That code has expired. Tap “Resend code” for a fresh one.'
-          : 'That code is incorrect or expired. Check the latest email, or resend.',
+          ? 'That code is no longer valid — codes are single-use and a resend replaces older ones. Tap “Resend code” and use the code from the newest email.'
+          : 'That code is incorrect. Check the newest email, or resend.',
       });
     }
     setMessage(null);

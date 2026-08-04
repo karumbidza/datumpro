@@ -14,8 +14,6 @@ const inputClass = 'flex-1 bg-transparent outline-none placeholder:text-zinc-400
 const alreadyRegistered =
   'This email already has an account. Sign in with your password below, or tap “Forgot?” to reset it.';
 
-type Method = 'password' | 'magiclink';
-
 /** Post-auth destination from ?next=, restricted to same-site relative paths so
  *  it can't be turned into an open redirect. Defaults to the dashboard. */
 function safeNext(): string {
@@ -33,7 +31,6 @@ export default function SignInPage({
   // it's identical on server and client (no hydration mismatch).
   const invited = (use(searchParams).email ?? '').trim();
   const [view, setView] = useState<'signin' | 'forgot'>('signin');
-  const [method, setMethod] = useState<Method>('password');
   const [email, setEmail] = useState(invited);
   const fromInvite = invited !== '';
   const [password, setPassword] = useState('');
@@ -96,20 +93,6 @@ export default function SignInPage({
       kind: 'info',
       text: 'Account created! Check your email for a confirmation link to finish — then you’ll be signed in and returned here.',
     });
-  }
-
-  async function magicLink(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setMessage(null);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext())}` },
-    });
-    setBusy(false);
-    if (error) return setMessage({ kind: 'error', text: error.message });
-    setMessage({ kind: 'info', text: `Magic link sent to ${email}. Open it in this browser.` });
   }
 
   // OAuth (Google) returns a verified email — no separate confirmation step.
@@ -176,29 +159,7 @@ export default function SignInPage({
           <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
         </div>
 
-        {/* Method tabs */}
-        <div className="flex gap-1 rounded-lg bg-zinc-100 p-1 dark:bg-zinc-900">
-          {(['password', 'magiclink'] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => {
-                setMethod(m);
-                setMessage(null);
-              }}
-              className={`flex-1 rounded-md py-2 text-sm font-semibold transition ${
-                method === m
-                  ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-white'
-                  : 'text-zinc-500 dark:text-zinc-400'
-              }`}
-            >
-              {m === 'password' ? 'Password' : 'Magic link'}
-            </button>
-          ))}
-        </div>
-
-        {method === 'password' ? (
-          <form onSubmit={passwordSignIn} className="mt-[18px] flex flex-col gap-3">
+        <form onSubmit={passwordSignIn} className="mt-[18px] flex flex-col gap-3">
             <div>
               <label className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Work email</label>
               <div className={fieldClass}>
@@ -288,31 +249,6 @@ export default function SignInPage({
               )}
             </div>
           </form>
-        ) : (
-          <form onSubmit={magicLink} className="mt-[18px] flex flex-col gap-3">
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Work email</label>
-              <div className={fieldClass}>
-                <MailIcon />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@company.com"
-                  className={inputClass}
-                />
-              </div>
-            </div>
-            <button
-              type="submit"
-              disabled={busy}
-              className="h-11 w-full rounded-lg bg-brand-500 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
-            >
-              {busy ? 'Sending…' : 'Email me a magic link'}
-            </button>
-          </form>
-        )}
 
         {message && (
           <p

@@ -1,0 +1,10 @@
+<h2>Reset your DatumPro password</h2>
+<p>Enter this 6-digit code on the reset screen:</p>
+<p style="font-size:28px;font-weight:700;letter-spacing:6px;margin:16px 0;font-family:monospace">{{ .Token }}</p>
+<p style="color:#888;font-size:12px">
+  The code expires in 1 hour and can be used once. If you didn&rsquo;t request a
+  reset, you can ignore this email &mdash; your password is unchanged.
+</p>
+<!-- Deliberately NO {{ .ConfirmationURL }} link: email security scanners
+     (Yahoo, Outlook SafeLinks, etc.) prefetch links, which consumes the
+     one-time token and makes the code the human types read as "expired". -->
