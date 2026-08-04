@@ -2,7 +2,6 @@
 
 import { use, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { env } from '@/lib/env';
 import { passwordIssue } from '@datumpro/shared/validation';
 import { ForgotPasswordFlow } from './forgot-password-flow';
 
@@ -74,7 +73,7 @@ export default function SignInPage({
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
-      options: { emailRedirectTo: `${env.NEXT_PUBLIC_APP_URL}/auth/callback?next=${encodeURIComponent(safeNext())}` },
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext())}` },
     });
     setBusy(false);
     if (error) {
@@ -106,7 +105,7 @@ export default function SignInPage({
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim(),
-      options: { emailRedirectTo: `${env.NEXT_PUBLIC_APP_URL}/auth/callback?next=${encodeURIComponent(safeNext())}` },
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext())}` },
     });
     setBusy(false);
     if (error) return setMessage({ kind: 'error', text: error.message });
@@ -121,7 +120,7 @@ export default function SignInPage({
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${env.NEXT_PUBLIC_APP_URL}/auth/callback?next=${encodeURIComponent(safeNext())}`,
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext())}`,
         ...(fromInvite ? { queryParams: { login_hint: email } } : {}),
       },
     });
