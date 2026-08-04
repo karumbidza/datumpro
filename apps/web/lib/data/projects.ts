@@ -1,6 +1,6 @@
 import { cache } from 'react';
 import { createClient } from '@/lib/supabase/server';
-import type { ProjectStatus, ProjectType } from '@datumpro/shared/domain';
+import type { ProjectStatus, ProjectType, TaskPriority } from '@datumpro/shared/domain';
 
 /** Row shapes for the columns we select. Replace with generated DB types once
  *  `pnpm db:types` is wired (kept explicit here so the app stays type-safe now). */
@@ -11,6 +11,8 @@ export interface ProjectRow {
   code: string | null;
   type: ProjectType;
   status: ProjectStatus;
+  description: string | null;
+  priority: TaskPriority;
   client_name: string | null;
   contract_value_cents: number;
   start_date: string | null;
@@ -19,7 +21,7 @@ export interface ProjectRow {
 
 
 const PROJECT_COLUMNS =
-  'id, org_id, name, code, type, status, client_name, contract_value_cents, start_date, end_date';
+  'id, org_id, name, code, type, status, description, priority, client_name, contract_value_cents, start_date, end_date';
 
 /** RLS scopes every query to the caller's orgs — no manual org filter needed. */
 export async function listProjects(): Promise<ProjectRow[]> {

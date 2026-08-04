@@ -2,6 +2,7 @@ import {
   LayoutDashboard,
   FolderOpen,
   Building,
+  Calendar,
   CheckSquare,
   DollarSign,
   Wallet,
@@ -44,6 +45,7 @@ export function computeNav(
     const items: NavItem[] = [
       { name: 'Overview', href: `/projects/${id}`, icon: LayoutDashboard },
       { name: 'Tasks', href: `/projects/${id}/tasks`, icon: CheckSquare },
+      { name: 'Calendar', href: `/projects/${id}/calendar`, icon: Calendar },
     ];
     if (manages) {
       items.push({ name: 'Finance', href: `/projects/${id}/finance`, icon: DollarSign });

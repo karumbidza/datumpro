@@ -30,8 +30,11 @@ export async function createProject(_prev: FormState, formData: FormData): Promi
     name: String(formData.get('name') ?? ''),
     type: 'construction',
     constructionType: String(formData.get('constructionType') ?? ''),
+    description: String(formData.get('description') ?? ''),
+    priority: String(formData.get('priority') ?? 'medium'),
     clientId: String(formData.get('clientId') ?? ''),
     managerId: String(formData.get('managerId') ?? ''),
+    teamMemberIds: formData.getAll('teamMemberIds').map(String),
     startDate: String(formData.get('startDate') ?? ''),
     durationValue: Number.isFinite(durationValue) ? durationValue : 0,
     durationUnit: String(formData.get('durationUnit') ?? 'weeks'),
@@ -68,6 +71,8 @@ export async function createProject(_prev: FormState, formData: FormData): Promi
       name: d.name,
       type: d.type,
       construction_type: d.constructionType,
+      description: d.description || null,
+      priority: d.priority,
       client_id: d.clientId,
       currency: d.currency,
       calendar_id: d.calendarId,
@@ -91,6 +96,19 @@ export async function createProject(_prev: FormState, formData: FormData): Promi
       () => {},
       () => {},
     );
+
+  // Team picked at creation joins as contributors. Conflicts (already a member,
+  // e.g. the manager or creator) are expected and ignored; a member whose type
+  // forbids 'contributor' is skipped by the DB trigger the same way.
+  for (const userId of d.teamMemberIds.filter((id) => id !== d.managerId && id !== user.id)) {
+    await supabase
+      .from('project_members')
+      .insert({ org_id: orgId, project_id: projectId, user_id: userId, role: 'contributor' })
+      .then(
+        () => {},
+        () => {},
+      );
+  }
 
   revalidatePath('/projects');
   redirect(`/projects/${projectId}/setup`);

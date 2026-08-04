@@ -11,6 +11,7 @@ import {
   CONSTRUCTION_TYPES,
   CONSTRUCTION_TYPE_LABELS,
   CURRENCIES,
+  TASK_PRIORITIES,
 } from '@datumpro/shared/domain';
 import type { ClientOption } from '@/lib/data/clients';
 import type { CalendarOption } from '@/lib/data/calendars';
@@ -28,12 +29,14 @@ export function NewProjectForm({
   clients: initialClients,
   calendars,
   members,
+  teamOptions,
   currentUserId,
   defaultCalendarId,
 }: {
   clients: ClientOption[];
   calendars: CalendarOption[];
   members: Member[];
+  teamOptions: Member[];
   currentUserId: string;
   defaultCalendarId: string;
 }) {
@@ -51,6 +54,7 @@ export function NewProjectForm({
   const [durationUnit, setDurationUnit] = useState<'weeks' | 'days'>('weeks');
   const [calendarId, setCalendarId] = useState(defaultCalendarId);
   const [currency, setCurrency] = useState<string>('USD');
+  const [teamIds, setTeamIds] = useState<string[]>([]);
 
   // Inline "New client" sub-form.
   const [newOpen, setNewOpen] = useState(false);
@@ -141,15 +145,41 @@ export function NewProjectForm({
         <input name="name" required placeholder="e.g. Riverside Office Block" className={inputClass} />
       </div>
 
-      {/* Code (auto) */}
+      {/* Description */}
       <div>
-        <label className={labelClass}>Project code</label>
-        <input
-          readOnly
-          value="Assigned on save · DP-YYYY-###"
-          className={`${inputClass} cursor-not-allowed text-zinc-400 dark:text-zinc-500`}
-          tabIndex={-1}
+        <label className={labelClass}>
+          Description <span className="font-normal text-zinc-400">(optional)</span>
+        </label>
+        <textarea
+          name="description"
+          rows={3}
+          maxLength={2000}
+          placeholder="Scope, siting, anything the team should know up front…"
+          className={inputClass}
         />
+      </div>
+
+      {/* Code (auto) + priority */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label className={labelClass}>Project code</label>
+          <input
+            readOnly
+            value="Assigned on save · DP-YYYY-###"
+            className={`${inputClass} cursor-not-allowed text-zinc-400 dark:text-zinc-500`}
+            tabIndex={-1}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>Priority</label>
+          <select name="priority" defaultValue="medium" className={inputClass}>
+            {TASK_PRIORITIES.map((p) => (
+              <option key={p} value={p} className="capitalize">
+                {p.charAt(0).toUpperCase() + p.slice(1)}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Client — searchable + inline new */}
@@ -217,80 +247,82 @@ export function NewProjectForm({
         </div>
       )}
 
-      {/* Project type (construction work-type) */}
-      <div>
-        <label className={labelClass}>Project type</label>
-        <select
-          name="constructionType"
-          required
-          value={constructionType}
-          onChange={(e) => setConstructionType(e.target.value)}
-          className={inputClass}
-        >
-          {CONSTRUCTION_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {CONSTRUCTION_TYPE_LABELS[t]}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Project manager */}
-      <div>
-        <label className={labelClass}>Project manager</label>
-        <select name="managerId" value={managerId} onChange={(e) => setManagerId(e.target.value)} className={inputClass}>
-          {members.map((m) => (
-            <option key={m.userId} value={m.userId}>
-              {m.name}
-              {m.userId === currentUserId ? ' (you)' : ''}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Start date */}
-      <div>
-        <label className={labelClass}>Start date</label>
-        <input
-          type="date"
-          name="startDate"
-          required
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-          className={inputClass}
-        />
-      </div>
-
-      {/* Duration + unit + live helper */}
-      <div>
-        <label className={labelClass}>Duration</label>
-        <div className="flex gap-2">
-          <input
-            type="number"
-            name="durationValue"
-            min={1}
-            value={durationValue}
-            onChange={(e) => setDurationValue(e.target.value)}
+      {/* Project type + manager */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label className={labelClass}>Project type</label>
+          <select
+            name="constructionType"
             required
+            value={constructionType}
+            onChange={(e) => setConstructionType(e.target.value)}
             className={inputClass}
-          />
-          <div className="flex shrink-0 overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800">
-            {(['weeks', 'days'] as const).map((u) => (
-              <button
-                key={u}
-                type="button"
-                onClick={() => setDurationUnit(u)}
-                className={`px-3 text-sm capitalize ${
-                  durationUnit === u
-                    ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
-                    : 'text-zinc-500'
-                }`}
-              >
-                {u}
-              </button>
+          >
+            {CONSTRUCTION_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {CONSTRUCTION_TYPE_LABELS[t]}
+              </option>
             ))}
+          </select>
+        </div>
+        <div>
+          <label className={labelClass}>Project manager</label>
+          <select name="managerId" value={managerId} onChange={(e) => setManagerId(e.target.value)} className={inputClass}>
+            {members.map((m) => (
+              <option key={m.userId} value={m.userId}>
+                {m.name}
+                {m.userId === currentUserId ? ' (you)' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Start date + duration, live end-date helper under the row */}
+      <div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className={labelClass}>Start date</label>
+            <input
+              type="date"
+              name="startDate"
+              required
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className={inputClass}
+            />
           </div>
-          <input type="hidden" name="durationUnit" value={durationUnit} />
+          <div>
+            <label className={labelClass}>Duration</label>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                name="durationValue"
+                min={1}
+                value={durationValue}
+                onChange={(e) => setDurationValue(e.target.value)}
+                required
+                className={`${inputClass} min-w-0`}
+              />
+              <div className="flex shrink-0 overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800">
+                {(['weeks', 'days'] as const).map((u) => (
+                  <button
+                    key={u}
+                    type="button"
+                    onClick={() => setDurationUnit(u)}
+                    className={`px-3 text-sm capitalize ${
+                      durationUnit === u
+                        ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
+                        : 'text-zinc-500'
+                    }`}
+                  >
+                    {u}
+                  </button>
+                ))}
+              </div>
+              <input type="hidden" name="durationUnit" value={durationUnit} />
+            </div>
+          </div>
         </div>
         {preview && selectedCalendar && (
           <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
@@ -313,29 +345,84 @@ export function NewProjectForm({
         </select>
       </div>
 
-      {/* Currency */}
-      <div>
-        <label className={labelClass}>Currency</label>
-        <select name="currency" required value={currency} onChange={(e) => setCurrency(e.target.value)} className={inputClass}>
-          {CURRENCIES.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
+      {/* Currency + contract value */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label className={labelClass}>Currency</label>
+          <select name="currency" required value={currency} onChange={(e) => setCurrency(e.target.value)} className={inputClass}>
+            {CURRENCIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className={labelClass}>
+            Contract value ({currency}) <span className="font-normal text-zinc-400">(optional)</span>
+          </label>
+          <input type="number" name="contractValue" min={0} step="0.01" placeholder="0.00" className={inputClass} />
+        </div>
       </div>
 
-      {/* Contract value */}
+      {/* Team members — org members picked onto the project at creation */}
       <div>
-        <label className={labelClass}>Contract value ({currency}) — optional</label>
-        <input type="number" name="contractValue" min={0} step="0.01" placeholder="0.00" className={inputClass} />
+        <label className={labelClass}>
+          Team members <span className="font-normal text-zinc-400">(optional)</span>
+        </label>
+        <select
+          value=""
+          onChange={(e) => {
+            const id = e.target.value;
+            if (id && !teamIds.includes(id)) setTeamIds((prev) => [...prev, id]);
+          }}
+          className={inputClass}
+        >
+          <option value="">Add team members…</option>
+          {teamOptions
+            .filter((m) => !teamIds.includes(m.userId) && m.userId !== managerId && m.userId !== currentUserId)
+            .map((m) => (
+              <option key={m.userId} value={m.userId}>
+                {m.name}
+              </option>
+            ))}
+        </select>
+        {teamIds.map((id) => (
+          <input key={id} type="hidden" name="teamMemberIds" value={id} />
+        ))}
+        {teamIds.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {teamIds.map((id) => {
+              const m = teamOptions.find((t) => t.userId === id);
+              return (
+                <span
+                  key={id}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-brand-50 px-2 py-1 text-xs font-medium text-brand-600 dark:bg-brand-600/15 dark:text-brand-500"
+                >
+                  {m?.name ?? 'Member'}
+                  <button
+                    type="button"
+                    aria-label={`Remove ${m?.name ?? 'member'}`}
+                    onClick={() => setTeamIds((prev) => prev.filter((x) => x !== id))}
+                    className="rounded px-0.5 hover:bg-brand-100 dark:hover:bg-brand-600/25"
+                  >
+                    ✕
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        )}
+        <p className="mt-1 text-xs text-zinc-400">
+          Added as contributors — the manager and you are on the project automatically.
+        </p>
       </div>
 
       {/* Template (out of scope to apply yet) */}
       <div>
         <label className={labelClass}>Template</label>
         <select name="templateId" defaultValue="" className={inputClass}>
-          <option value="">Start from scratch</option>
+          <option value="">No templates yet — you can add tasks manually</option>
         </select>
       </div>
 

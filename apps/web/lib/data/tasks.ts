@@ -22,6 +22,11 @@ export interface TaskActivityRow {
   userName: string;
 }
 
+export interface ProjectActivityRow extends TaskActivityRow {
+  taskId: string;
+  taskTitle: string;
+}
+
 export interface ExtensionRequestRow {
   id: string;
   proposedDueDate: string;
@@ -207,6 +212,58 @@ export async function listTaskActivity(taskId: string): Promise<TaskActivityRow[
     message: r.message,
     createdAt: r.created_at,
     userName: r.user_id ? names.get(r.user_id) ?? 'Member' : 'System',
+  }));
+}
+
+/** Recent activity across a whole project, newest first, with actor and task
+ *  names — feeds the project overview's Recent Activity card. */
+export async function listProjectActivity(projectId: string, limit = 10): Promise<ProjectActivityRow[]> {
+  const supabase = await createClient();
+  const { data: taskRows, error: tasksError } = await supabase
+    .from('tasks')
+    .select('id, title')
+    .eq('project_id', projectId);
+  if (tasksError) throw tasksError;
+  const titles = new Map(((taskRows ?? []) as { id: string; title: string }[]).map((t) => [t.id, t.title]));
+  if (titles.size === 0) return [];
+
+  const { data, error } = await supabase
+    .from('task_activity')
+    .select('id, type, message, created_at, user_id, task_id')
+    .in('task_id', [...titles.keys()])
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  const rows = (data ?? []) as {
+    id: string;
+    type: string;
+    message: string;
+    created_at: string;
+    user_id: string | null;
+    task_id: string;
+  }[];
+
+  const ids = [...new Set(rows.map((r) => r.user_id).filter(Boolean))] as string[];
+  let names = new Map<string, string>();
+  if (ids.length > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, display_name, email')
+      .in('id', ids);
+    names = new Map(
+      ((profiles ?? []) as { id: string; display_name: string | null; email: string | null }[]).map(
+        (p) => [p.id, p.display_name || p.email || 'Member'],
+      ),
+    );
+  }
+  return rows.map((r) => ({
+    id: r.id,
+    type: r.type,
+    message: r.message,
+    createdAt: r.created_at,
+    userName: r.user_id ? (names.get(r.user_id) ?? 'Member') : 'System',
+    taskId: r.task_id,
+    taskTitle: titles.get(r.task_id) ?? 'Task',
   }));
 }
 

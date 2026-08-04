@@ -27,6 +27,10 @@ export default async function NewProjectPage() {
   const activeMembers = members
     .filter((m) => m.status === 'active' && ['owner', 'admin', 'pm'].includes(m.role))
     .map((m) => ({ userId: m.userId, name: m.name }));
+  // Anyone active in the org can be picked onto the team at creation.
+  const teamOptions = members
+    .filter((m) => m.status === 'active')
+    .map((m) => ({ userId: m.userId, name: m.name }));
   const defaultCalendarId = calendars.find((c) => c.isDefault)?.id ?? calendars[0]?.id ?? '';
 
   return (
@@ -35,12 +39,16 @@ export default async function NewProjectPage() {
         ← Projects
       </Link>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">New project</h1>
+      <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
+        In organisation: <span className="font-medium text-brand-600 dark:text-brand-500">{ctx.active.name}</span>
+      </p>
 
       <Card className="mt-6">
         <NewProjectForm
           clients={clients}
           calendars={calendars}
           members={activeMembers}
+          teamOptions={teamOptions}
           currentUserId={user.id}
           defaultCalendarId={defaultCalendarId}
         />

@@ -5,9 +5,11 @@ import { LiveRefresh } from '@/components/live-refresh';
 import { getProject } from '@/lib/data/projects';
 import { getDashboardData } from '@/lib/data/dashboard';
 import { getProjectProgress, getProgressHistory } from '@/lib/data/subtasks';
+import { listProjectActivity } from '@/lib/data/tasks';
 import { StatCards } from '@/components/dashboard/stat-cards';
 import { TimelineOverview } from '@/components/dashboard/timeline-overview';
 import { ProgressTrend } from '@/components/dashboard/progress-trend';
+import { RecentActivity } from '@/components/project/recent-activity';
 import { Button } from '@/components/ui/button';
 
 export default async function ProjectOverviewPage({
@@ -23,10 +25,11 @@ export default async function ProjectOverviewPage({
   const project = await getProject(projectId);
   if (!project) notFound();
 
-  const [{ counts, tasks }, projectPct, history] = await Promise.all([
+  const [{ counts, tasks }, projectPct, history, activity] = await Promise.all([
     getDashboardData(project.org_id, projectId),
     getProjectProgress(projectId),
     getProgressHistory(projectId),
+    listProjectActivity(projectId),
   ]);
 
   return (
@@ -35,13 +38,32 @@ export default async function ProjectOverviewPage({
         subscriptions={[
           { table: 'tasks', filter: `project_id=eq.${projectId}` },
           { table: 'task_subtasks', filter: `org_id=eq.${project.org_id}` },
+          { table: 'task_activity', filter: `org_id=eq.${project.org_id}` },
         ]}
       />
       <header className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
+          <span className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
+            {project.priority !== 'medium' && (
+              <span
+                className={`rounded px-2 py-0.5 text-xs font-medium capitalize ${
+                  project.priority === 'urgent'
+                    ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
+                    : project.priority === 'high'
+                      ? 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400'
+                      : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
+                }`}
+              >
+                {project.priority}
+              </span>
+            )}
+          </span>
           {project.client_name && (
             <p className="text-sm text-zinc-500 dark:text-zinc-400">{project.client_name}</p>
+          )}
+          {project.description && (
+            <p className="mt-1 max-w-2xl text-sm text-zinc-500 dark:text-zinc-400">{project.description}</p>
           )}
           {tasks.length > 0 && (
             <div className="mt-2 flex items-center gap-2">
@@ -71,6 +93,8 @@ export default async function ProjectOverviewPage({
       <StatCards counts={counts} />
 
       <TimelineOverview tasks={tasks} />
+
+      <RecentActivity items={activity} projectId={projectId} />
     </div>
   );
 }
