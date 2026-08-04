@@ -29,21 +29,21 @@ export async function createOrg(formData: FormData) {
   }
 
   const { name, legalName, country, sector, registrationNumber } = parsed.data;
-  const { data: org, error } = await supabase
-    .from('organizations')
-    .insert({
-      name,
-      legal_name: legalName ?? null,
-      country: country ?? null,
-      sector: sector ?? null,
-      registration_number: registrationNumber ?? null,
-      onboarding_completed_at: new Date().toISOString(),
-    })
-    .select('id')
-    .single();
-  if (error) redirect(`/orgs/new?error=${encodeURIComponent(error.message)}`);
-
-  const orgId = (org as { id: string }).id;
+  // Atomic create via SECURITY DEFINER RPC: inserts the org + owner membership and
+  // returns the id as a scalar. A plain `insert().select('id')` fails here because
+  // RETURNING applies the SELECT policy (is_org_member) to the brand-new row, but
+  // the owner membership is only added by the AFTER trigger — see migration
+  // 20260101007500.
+  const { data: orgId, error } = await supabase.rpc('create_organization', {
+    p_name: name,
+    p_legal_name: legalName ?? null,
+    p_country: country ?? null,
+    p_sector: sector ?? null,
+    p_registration_number: registrationNumber ?? null,
+  });
+  if (error || !orgId) {
+    redirect(`/orgs/new?error=${encodeURIComponent(error?.message ?? 'Could not create your company. Please try again.')}`);
+  }
   await logAudit({ orgId, actorId: user.id, entityType: 'organization', entityId: orgId, action: 'organization.created', after: { name } });
 
   revalidatePath('/dashboard');
