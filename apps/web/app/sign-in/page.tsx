@@ -131,7 +131,7 @@ export default function SignInPage({
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center bg-white px-6 py-14 dark:bg-zinc-950">
+    <main className="relative flex min-h-screen items-center justify-center bg-white px-6 py-12 dark:bg-zinc-950">
       <div className="relative z-10 w-full max-w-[400px]">
         {/* Brand + heading (centered) */}
         <div className="flex flex-col items-center text-center">

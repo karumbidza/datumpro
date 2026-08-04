@@ -137,7 +137,7 @@ export default async function DashboardPage() {
         ((t.due_date && new Date(t.due_date).getTime() < now) || t.sla_status === 'breached'),
     ).length;
     return (
-      <PageContainer width="6xl" className="space-y-6">
+      <PageContainer width="6xl" className="space-y-8">
         {live}
         <Greeting
           name={displayName}
@@ -157,7 +157,7 @@ export default async function DashboardPage() {
   ]);
   const hasPay = myPay.summary.earnedCents > 0;
   return (
-    <PageContainer width="3xl" className="space-y-6">
+    <PageContainer width="3xl" className="space-y-8">
       {live}
       <Greeting name={displayName} subtitle={`Here's your work today · ${formatLongDate(new Date())}`} />
       {approvals.length > 0 && <ApprovalsInbox items={approvals} />}

@@ -8,7 +8,7 @@ export default async function OrgCreatedPage() {
   if (!user) redirect('/sign-in');
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-6 py-10">
+    <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-6 py-12">
       <Card>
         <p className="text-xs font-medium uppercase tracking-wide text-brand-600">Step 2 of 2 · You&apos;re set up</p>
         <h1 className="mt-1 text-lg font-semibold tracking-tight">Your company is ready</h1>

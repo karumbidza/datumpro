@@ -34,7 +34,7 @@ export default async function EnterprisePage({
   const { sent, error } = await searchParams;
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-16">
+    <main className="mx-auto max-w-2xl px-6 py-12">
       <p className="text-xs font-medium uppercase tracking-wide text-brand-600">Government &amp; enterprise</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">DatumPro for larger organisations</h1>
       <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">

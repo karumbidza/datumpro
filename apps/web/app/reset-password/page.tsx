@@ -41,7 +41,7 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
+    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-12">
       <h1 className="font-display text-2xl font-semibold leading-[1.2] tracking-[-0.02em] text-zinc-900 dark:text-white">
         Choose a new password
       </h1>

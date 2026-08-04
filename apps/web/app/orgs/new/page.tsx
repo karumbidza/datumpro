@@ -20,7 +20,7 @@ export default async function NewOrgPage({
   const personalEmail = !!user.email && !isBusinessEmail(user.email);
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-6 py-10">
+    <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-6 py-12">
       <Card>
         <p className="text-xs font-medium uppercase tracking-wide text-brand-600">Step 1 of 2 · Your company</p>
         <h1 className="mt-1 text-lg font-semibold tracking-tight">Set up your company</h1>

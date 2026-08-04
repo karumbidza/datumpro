@@ -65,7 +65,7 @@ export default function MfaPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
+    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-12">
       <Card>
         <h1 className="text-lg font-semibold tracking-tight">Two-factor authentication</h1>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">

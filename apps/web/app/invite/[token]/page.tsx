@@ -38,7 +38,7 @@ export default async function InvitePage({
   const typeMeta = preview ? MEMBER_TYPE_META[preview.memberType] : null;
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-6 py-10">
+    <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-6 py-12">
       <Card>
         {!preview ? (
           <>
