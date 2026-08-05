@@ -51,6 +51,22 @@ body {
   40% { opacity: 1; }
 }
 
+/* Landing gallery marquee — content is duplicated once, so -50% loops seamlessly. */
+@keyframes marquee-x {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.marquee-track {
+  animation: marquee-x 45s linear infinite;
+}
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track { animation: none; }
+  .marquee { overflow-x: auto; }
+}
+
 /* Gantt bar micro-animations — ported from the previous app's Gantt. */
 @keyframes gantt-shimmer {
   0% { transform: translateX(-100%); }

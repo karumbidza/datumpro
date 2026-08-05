@@ -571,7 +571,57 @@ function FieldBand() {
           </div>
         </div>
       </div>
+
+      <ProjectGallery />
     </section>
+  );
+}
+
+/** Auto-scrolling gallery inside the dark band — projects and industries in
+ *  motion. Images live in /public/gallery; drop real site photos in with the
+ *  same filenames to replace the branded placeholder scenes (no code change).
+ *  The list is duplicated once so the -50% marquee loops seamlessly; hover
+ *  pauses it, and reduced-motion users get a plain scrollable strip. */
+function ProjectGallery() {
+  const cards: { img: string; title: string; tag: string }[] = [
+    { img: 'office-block', title: 'Office block build', tag: 'Construction' },
+    { img: 'clinic', title: 'District clinic', tag: 'Healthcare' },
+    { img: 'irrigation', title: 'Irrigation scheme', tag: 'Agriculture' },
+    { img: 'solar', title: 'Solar plant', tag: 'Energy' },
+    { img: 'factory', title: 'Processing line', tag: 'Manufacturing' },
+    { img: 'road', title: 'Road programme', tag: 'Public works' },
+    { img: 'site-team', title: 'Site teams on the app', tag: 'In the field' },
+    { img: 'handover', title: 'Client handover day', tag: 'Delivered' },
+  ];
+  const strip = [...cards, ...cards]; // duplicate for the seamless loop
+  return (
+    <div className="marquee overflow-hidden border-t border-zinc-800/80 py-8" aria-label="Projects across industries">
+      <div className="marquee-track flex w-max gap-4 px-4">
+        {strip.map((c, i) => (
+          <figure
+            key={`${c.img}-${i}`}
+            className="w-60 shrink-0 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 sm:w-72"
+            aria-hidden={i >= cards.length || undefined}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`/gallery/${c.img}.jpg`}
+              alt={i < cards.length ? `${c.title} — ${c.tag}` : ''}
+              width={640}
+              height={420}
+              loading="lazy"
+              className="aspect-[3/2] w-full object-cover"
+            />
+            <figcaption className="flex items-center justify-between gap-2 px-3.5 py-2.5">
+              <span className="truncate text-xs font-medium text-white">{c.title}</span>
+              <span className="shrink-0 rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] font-medium text-zinc-300">
+                {c.tag}
+              </span>
+            </figcaption>
+          </figure>
+        ))}
+      </div>
+    </div>
   );
 }
 
