@@ -70,6 +70,16 @@ export default async function EnterprisePage({
               </p>
             )}
             <form action={submitEnterpriseRequest} className="space-y-3">
+              {/* Honeypot (spam trap, assessment F6): hidden from real users; bots
+                  that auto-fill every field will populate it and the server
+                  silently drops the submission. Not display:none so headless
+                  crawlers that skip hidden inputs still see it. */}
+              <div aria-hidden className="absolute left-[-9999px] top-[-9999px] h-0 w-0 overflow-hidden" data-hp>
+                <label>
+                  Website
+                  <input name="website" type="text" tabIndex={-1} autoComplete="off" />
+                </label>
+              </div>
               <div className="flex gap-3">
                 <div className="flex-1">
                   <label className="mb-1 block text-xs font-medium">Organisation</label>

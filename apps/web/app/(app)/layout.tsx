@@ -13,24 +13,21 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const ctx = await getActiveContext();
   if (!ctx) redirect('/sign-in');
 
-  if (!ctx.active) {
-    return <div className="min-h-screen">{children}</div>;
-  }
-
-  // Org-enforced MFA: if this org requires 2FA and the session hasn't reached
-  // AAL2, send the user to enrol/verify. /mfa lives outside this route group, so
-  // there's no redirect loop.
+  // Org-enforced MFA. This is now enforced at the DATA LAYER too (migration
+  // 20260101007900): when a require_mfa org's session is still AAL1, the RLS
+  // membership helpers return nothing, so `ctx` would show no memberships and we
+  // would wrongly fall through to onboarding below. `mfa_required_pending()` is
+  // AAL-independent (SECURITY DEFINER), so it still detects the pending factor
+  // and sends the user to enrol/verify. /mfa lives outside this route group, so
+  // there's no redirect loop. Checked before the no-org branch for that reason.
   {
     const supabase = await createClient();
-    const { data: orgRow } = await supabase
-      .from('organizations')
-      .select('require_mfa')
-      .eq('id', ctx.active.orgId)
-      .single();
-    if ((orgRow as { require_mfa?: boolean } | null)?.require_mfa) {
-      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      if (aal && aal.currentLevel !== 'aal2') redirect('/mfa');
-    }
+    const { data: mfaPending } = await supabase.rpc('mfa_required_pending');
+    if (mfaPending === true) redirect('/mfa');
+  }
+
+  if (!ctx.active) {
+    return <div className="min-h-screen">{children}</div>;
   }
 
   const { projects, myTaskCount, isContractor, managedProjectIds } = await getSidebarData(

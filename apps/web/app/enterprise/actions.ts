@@ -17,6 +17,13 @@ export async function submitEnterpriseRequest(formData: FormData) {
   const teamSize = String(formData.get('teamSize') ?? '').trim();
   const needs = String(formData.get('needs') ?? '').trim();
 
+  // Honeypot (assessment F6): a hidden field no human sees. If it's filled, the
+  // submitter is a bot — pretend success and drop it silently so the bot gets no
+  // signal to adapt. Real submissions leave it empty.
+  if (String(formData.get('website') ?? '').trim() !== '') {
+    redirect('/enterprise?sent=1');
+  }
+
   if (!orgName || !contactEmail || !contactEmail.includes('@')) {
     redirect('/enterprise?error=' + encodeURIComponent('Please enter your organisation and a valid email.'));
   }
