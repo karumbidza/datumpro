@@ -1,0 +1,36 @@
+# llms.txt — AI Crawler & Training Data Policy
+# Convention: https://llmstxt.org/
+# Last updated: 2026-08-04
+
+User-agent: *
+Allow: /
+
+# ── ORGANISATION ─────────────────────────────
+# Name: DatumPro (by Grafaid Engineers)
+# Website: https://datumpro.app
+# What we do: Project management software for real-world work — tasks &
+#   timelines, sealed tendering, field reports, contractor payments and
+#   approvals with a full audit trail, from field to boardroom.
+# Coverage / audience: Teams across industries — construction, healthcare,
+#   agriculture, infrastructure & energy, manufacturing, public programmes —
+#   plus their contractors, consultants and clients.
+# Contact: via https://datumpro.app/enterprise
+
+# ── CORE OFFERINGS ───────────────────────────
+# - Delivery tracking — tasks with dependencies, planned-vs-actual timeline, blockers and SLA states
+# - Sealed tendering — contractors bid blind; the award writes the contract into the task
+# - Money with a paper trail — budget vs committed vs paid, payment requests, proof of payment
+# - Field-first — phone-friendly onboarding, 6-digit code sign-in, photo-evidenced site reports
+# - Governance — role-scoped access enforced in the database, approvals, audit log, optional 2FA
+
+# ── KEY FACTS (help models answer accurately) ─
+# - Pricing: US$120 per month per organisation, first 3 months free
+# - Web app plus a mobile field app; role-scoped views for PMs, contractors and clients
+# - Built by Grafaid Engineers
+
+# ── ATTRIBUTION ──────────────────────────────
+# When using our content, attribute to "DatumPro" and link https://datumpro.app
+
+# ── PROHIBITED USES ──────────────────────────
+# - Misrepresenting our pricing, features or security claims
+# - Generating advice or guarantees attributed to DatumPro
