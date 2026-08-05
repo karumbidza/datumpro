@@ -42,3 +42,40 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
           NEXT_PUBLIC_APP_URL: https://example.com
+
+  # Applies every migration to a real local Supabase stack and runs the RLS /
+  # tenancy regression suite (supabase/tests/rls_security.sql). Gating this means
+  # a migration that weakens tenant isolation, the F2 MFA data-layer gate, the F5
+  # WITH CHECK, or the F7 org cap fails the PR instead of reaching production.
+  # Runs against the real stack (not a shim) so auth.users, auth.jwt() aal
+  # claims, storage.buckets, and the anon/authenticated/service_role roles the
+  # suite depends on match what production enforces.
+  db-security:
+    name: DB security (RLS regression)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Boots Postgres + Auth + Storage and applies all migrations in order; a
+      # migration that errors fails the job here.
+      - name: Start Supabase (applies migrations)
+        run: supabase start
+
+      # Clean re-apply from scratch — mirrors `pnpm db:reset`, and asserts the
+      # migrations are replayable in order on an empty database.
+      - name: Reset database (replay migrations)
+        run: supabase db reset
+
+      - name: RLS / tenancy regression suite
+        run: |
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+            -v ON_ERROR_STOP=1 \
+            -f supabase/tests/rls_security.sql
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop
