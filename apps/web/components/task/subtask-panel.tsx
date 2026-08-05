@@ -40,8 +40,8 @@ const field =
   'h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100';
 const numField = `${field} tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`;
 const selectField = `${field} cursor-pointer appearance-none pr-8`;
-const stepLabel = 'mb-1.5 block text-[11.5px] font-semibold text-zinc-500 dark:text-zinc-400';
-const capsCls = 'text-[10.5px] font-semibold uppercase tracking-[.05em] text-zinc-400';
+const stepLabel = 'mb-1.5 block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400';
+const capsCls = 'text-[10px] font-semibold uppercase tracking-[.05em] text-zinc-400 dark:text-zinc-500';
 const selectStyle = {
   backgroundImage:
     "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E\")",
@@ -227,7 +227,7 @@ export function SubtaskPanel({
               <button
                 type="button"
                 onClick={() => setDeclineOpen(false)}
-                className="text-sm text-zinc-500 hover:underline"
+                className="text-sm text-zinc-500 dark:text-zinc-400 hover:underline"
               >
                 Cancel
               </button>
@@ -244,7 +244,7 @@ export function SubtaskPanel({
       <div className="flex items-center justify-between gap-3">
         <CardTitle>{planDraft || planPending ? 'Plan & cost' : 'Task plan'}</CardTitle>
         {(planLocked || !usesPlanFlow) && (
-          <span className="text-xs font-medium tabular-nums text-zinc-500">
+          <span className="text-xs font-medium tabular-nums text-zinc-500 dark:text-zinc-400">
             {doneCount}/{counted.length} done · {pct}%
           </span>
         )}
@@ -282,7 +282,7 @@ export function SubtaskPanel({
             {baseline.map((s) => (
               <li key={s.id} className="flex items-center justify-between gap-2 text-sm">
                 <span className="text-zinc-700 dark:text-zinc-200">{s.title}</span>
-                <span className="text-[11px] tabular-nums text-zinc-400">
+                <span className="text-[11px] tabular-nums text-zinc-400 dark:text-zinc-500">
                   {s.estQty ? `${s.estQty} ${s.estUnit}` : ''} · {formatUsd(s.costCents)}
                 </span>
               </li>
@@ -300,7 +300,7 @@ export function SubtaskPanel({
               Your plan was sent back. Revise the steps or costs below and resubmit.
             </p>
           )}
-          <p className="text-[13.5px] leading-[1.55] text-zinc-500 [text-wrap:pretty] dark:text-zinc-400">
+          <p className="text-sm leading-[1.55] text-zinc-500 [text-wrap:pretty] dark:text-zinc-400">
             Break the task into the steps needed to complete it, each with a duration, a start date and a cost. This is
             your quote — it goes to the PM &amp; admin for approval.
           </p>
@@ -308,7 +308,7 @@ export function SubtaskPanel({
           {/* Add step — bordered sub-card, first */}
           <form
             action={addSubtask}
-            className="mt-[18px] rounded-xl border border-zinc-200 bg-zinc-50/60 p-[18px] dark:border-zinc-800 dark:bg-zinc-900/40"
+            className="mt-[18px] rounded-xl border border-zinc-200 bg-zinc-50/60 p-4 dark:border-zinc-800 dark:bg-zinc-900/40"
           >
             <input type="hidden" name="taskId" value={taskId} />
             <div>
@@ -351,7 +351,7 @@ export function SubtaskPanel({
                     key={s.id}
                     action={updateSubtask}
                     onSubmit={() => setEditing(null)}
-                    className="rounded-xl border border-brand-500/40 bg-brand-50/40 p-[18px] dark:bg-brand-500/5"
+                    className="rounded-xl border border-brand-500/40 bg-brand-50/40 p-4 dark:bg-brand-500/5"
                   >
                     <input type="hidden" name="id" value={s.id} />
                     <input type="hidden" name="taskId" value={taskId} />
@@ -394,25 +394,25 @@ export function SubtaskPanel({
                     </div>
                   </form>
                 ) : (
-                  <div key={s.id} className="flex items-center gap-3.5 rounded-[10px] border border-zinc-200 px-4 py-[13px] dark:border-zinc-800">
+                  <div key={s.id} className="flex items-center gap-3.5 rounded-lg border border-zinc-200 px-4 py-3 dark:border-zinc-800">
                     <button type="button" onClick={() => setEditing(s.id)} className="min-w-0 flex-1 text-left">
                       <div className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">{s.title}</div>
                       {stepIncomplete(s) ? (
-                        <div className="mt-0.5 text-[12.5px] font-medium text-amber-600 dark:text-amber-400">
+                        <div className="mt-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
                           Tap to add duration, start &amp; cost
                         </div>
                       ) : (
-                        <div className="mt-0.5 text-[12.5px] text-zinc-400">
+                        <div className="mt-0.5 text-xs text-zinc-400 dark:text-zinc-500">
                           {s.estQty} {s.estUnit} · starts {dmy(s.plannedStartDate)}
                         </div>
                       )}
                     </button>
-                    <div className="text-[15px] font-bold tabular-nums text-zinc-900 dark:text-zinc-100">{formatUsd(s.costCents)}</div>
+                    <div className="text-sm font-bold tabular-nums text-zinc-900 dark:text-zinc-100">{formatUsd(s.costCents)}</div>
                     <form action={removeSubtask}>
                       <input type="hidden" name="id" value={s.id} />
                       <input type="hidden" name="taskId" value={taskId} />
                       <input type="hidden" name="projectId" value={projectId} />
-                      <button type="submit" title="Remove" className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10">
+                      <button type="submit" title="Remove" className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 dark:text-zinc-500 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10">
                         ✕
                       </button>
                     </form>
@@ -430,7 +430,7 @@ export function SubtaskPanel({
             </div>
             <form action={submitPlanAction}>
               <input type="hidden" name="taskId" value={taskId} />
-              <SubmitButton className="h-[42px] text-[14.5px]" pendingText="Submitting…" disabled={baseline.length === 0 || baseline.some(stepIncomplete)}>
+              <SubmitButton className="h-[42px] text-sm" pendingText="Submitting…" disabled={baseline.length === 0 || baseline.some(stepIncomplete)}>
                 Submit plan for approval
               </SubmitButton>
             </form>
@@ -454,13 +454,13 @@ export function SubtaskPanel({
           {canStartTask && (
             <form action={startTask} className="mt-3">
               <input type="hidden" name="taskId" value={taskId} />
-              <SubmitButton className="h-[42px] w-full text-[14.5px]" pendingText="Starting…">
+              <SubmitButton className="h-[42px] w-full text-sm" pendingText="Starting…">
                 Start task
               </SubmitButton>
             </form>
           )}
           {isAssignee && taskStatus === 'todo' && blockedByDeps && (
-            <p className="mt-3 text-[12px] text-zinc-400">
+            <p className="mt-3 text-xs text-zinc-400 dark:text-zinc-500">
               Waiting on predecessor tasks — you can start once they’re done.
             </p>
           )}
@@ -497,7 +497,7 @@ export function SubtaskPanel({
               return (
                 <li
                   key={s.id}
-                  className={`overflow-hidden rounded-[9px] border ${
+                  className={`overflow-hidden rounded-lg border ${
                     s.isDone
                       ? 'border-green-100 bg-green-50/40 dark:border-green-500/20 dark:bg-green-500/5'
                       : 'border-zinc-100 dark:border-zinc-800'
@@ -508,7 +508,7 @@ export function SubtaskPanel({
                       type="button"
                       onClick={() => toggleOpen(s.id)}
                       aria-label={open ? 'Collapse step' : 'Expand step'}
-                      className={`flex h-[22px] w-[22px] flex-none items-center justify-center rounded-md text-[11px] text-zinc-400 transition-transform hover:bg-zinc-100 dark:hover:bg-zinc-800 ${open ? 'rotate-90' : ''}`}
+                      className={`flex h-[22px] w-[22px] flex-none items-center justify-center rounded-md text-[11px] text-zinc-400 dark:text-zinc-500 transition-transform hover:bg-zinc-100 dark:hover:bg-zinc-800 ${open ? 'rotate-90' : ''}`}
                     >
                       ▶
                     </button>
@@ -538,7 +538,7 @@ export function SubtaskPanel({
                         </span>
                       )}
                     </span>
-                    {meta && <span className="text-[12.5px] tabular-nums text-zinc-400">{meta}</span>}
+                    {meta && <span className="text-xs tabular-nums text-zinc-400 dark:text-zinc-500">{meta}</span>}
                   </div>
 
                   {open && (
@@ -551,7 +551,7 @@ export function SubtaskPanel({
                               <button
                                 type="button"
                                 onClick={() => setConfirmStep(s)}
-                                className="text-[12px] font-medium text-brand-600 hover:underline"
+                                className="text-xs font-medium text-brand-600 hover:underline"
                               >
                                 Mark complete
                               </button>
@@ -562,7 +562,7 @@ export function SubtaskPanel({
                               m.url ? (
                                 <a key={m.id} href={m.url} target="_blank" rel="noreferrer" title="Open photo">
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img src={m.url} alt="Step evidence" className="h-[46px] w-[46px] rounded-md border border-zinc-200 object-cover dark:border-zinc-800" />
+                                  <img src={m.url} alt="Step evidence" className="h-11 w-[46px] rounded-md border border-zinc-200 object-cover dark:border-zinc-800" />
                                 </a>
                               ) : null,
                             )}
@@ -580,7 +580,7 @@ export function SubtaskPanel({
                           </div>
                         </div>
                       ) : (
-                        <div className="grid grid-cols-[auto_1fr] items-center gap-x-5 gap-y-2 text-[13px]">
+                        <div className="grid grid-cols-[auto_1fr] items-center gap-x-5 gap-y-2 text-sm">
                           <span className={capsCls}>Duration</span>
                           <span className="text-zinc-600 dark:text-zinc-300">{s.estQty ? `${s.estQty} ${s.estUnit}` : '—'}</span>
                           <span className={capsCls}>Start</span>
@@ -597,7 +597,7 @@ export function SubtaskPanel({
                                   m.url ? (
                                     <a key={m.id} href={m.url} target="_blank" rel="noreferrer" title="Open photo">
                                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                                      <img src={m.url} alt="Step evidence" className="h-[46px] w-[46px] rounded-md border border-zinc-200 object-cover dark:border-zinc-800" />
+                                      <img src={m.url} alt="Step evidence" className="h-11 w-[46px] rounded-md border border-zinc-200 object-cover dark:border-zinc-800" />
                                     </a>
                                   ) : null,
                                 )}
@@ -612,7 +612,7 @@ export function SubtaskPanel({
               );
             })}
             {counted.length === 0 && (
-              <li className="py-2 text-sm text-zinc-400">
+              <li className="py-2 text-sm text-zinc-400 dark:text-zinc-500">
                 {!usesPlanFlow && canTick ? 'Break the task into steps below.' : 'No plan steps.'}
               </li>
             )}
@@ -626,15 +626,15 @@ export function SubtaskPanel({
             >
               <input type="hidden" name="taskId" value={taskId} />
               <div className="min-w-40 flex-1">
-                <label className="mb-1 block text-[11px] font-medium text-zinc-500">Step</label>
+                <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Step</label>
                 <input name="title" required placeholder="e.g. Set formwork" className={`${inputClass} w-full`} />
               </div>
               <div>
-                <label className="mb-1 block text-[11px] font-medium text-zinc-500">Start</label>
+                <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Start</label>
                 <input type="date" name="plannedStartDate" min={startMin} max={taskEnd ?? undefined} className={inputClass} />
               </div>
               <div>
-                <label className="mb-1 block text-[11px] font-medium text-zinc-500">End</label>
+                <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">End</label>
                 <input type="date" name="plannedEndDate" min={startMin} max={taskEnd ?? undefined} className={inputClass} />
               </div>
               <SubmitButton variant="secondary" pendingText="Adding…">
@@ -645,15 +645,15 @@ export function SubtaskPanel({
 
           {counted.length > 0 &&
             (canTick ? (
-              <p className="mt-2.5 text-[11.5px] text-zinc-400">
+              <p className="mt-2.5 text-[11px] text-zinc-400 dark:text-zinc-500">
                 Open a step to tick it off and attach proof. Marking complete is final.
               </p>
             ) : isAssignee && usesPlanFlow && taskStatus === 'todo' ? (
-              <p className="mt-2.5 text-[11.5px] text-zinc-400">
+              <p className="mt-2.5 text-[11px] text-zinc-400 dark:text-zinc-500">
                 Start the task above to tick steps off and attach proof.
               </p>
             ) : usesPlanFlow ? (
-              <p className="mt-2.5 text-[11.5px] text-zinc-400">
+              <p className="mt-2.5 text-[11px] text-zinc-400 dark:text-zinc-500">
                 Read-only — the assignee ticks steps and attaches proof. Open a step to review time and evidence.
               </p>
             ) : null)}
@@ -670,7 +670,7 @@ export function SubtaskPanel({
           Evidence tab is gone. Retrievable by the assignee and the PM/admin. */}
       {completionMedia.length > 0 && (
         <div className="mt-4 border-t border-zinc-100 pt-3 dark:border-zinc-800">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">Attachments</p>
+          <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Attachments</p>
           <ul className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
             {completionMedia.map((m) => (
               <li key={m.id} className="relative overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800">
@@ -716,21 +716,21 @@ export function SubtaskPanel({
             onClick={() => setSubmitOpen(true)}
             disabled={!planComplete}
             title={planComplete ? undefined : 'Complete every step above first'}
-            className="inline-flex h-[44px] flex-1 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex h-11 flex-1 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Submit for sign-off
           </button>
           <button
             type="button"
             onClick={() => setBlockerOpen(true)}
-            className="inline-flex h-[44px] flex-1 items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-red-700"
+            className="inline-flex h-11 flex-1 items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-red-700"
           >
             Raise a blocker
           </button>
         </div>
       )}
       {canWorkflow && !planComplete && (
-        <p className="mt-2 text-[11.5px] text-zinc-400">
+        <p className="mt-2 text-[11px] text-zinc-400 dark:text-zinc-500">
           Complete every step above to submit for sign-off.
         </p>
       )}
@@ -744,14 +744,14 @@ export function SubtaskPanel({
           {/* Variations column */}
           {planLocked && (openVariations.length > 0 || canAddVariation) && (
             <div>
-              <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">Variations</p>
+              <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Variations</p>
 
               {openVariations.map((v) => (
                 <div key={v.id} className="mt-2 rounded-md border border-zinc-100 p-2 dark:border-zinc-800">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm text-zinc-800 dark:text-zinc-200">{v.title}</span>
                     <span className="flex items-center gap-2">
-                      <span className="text-[11px] tabular-nums text-zinc-400">{formatUsd(v.costCents)}</span>
+                      <span className="text-[11px] tabular-nums text-zinc-400 dark:text-zinc-500">{formatUsd(v.costCents)}</span>
                       <span
                         className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
                           v.variationStatus === 'rejected'
@@ -785,27 +785,27 @@ export function SubtaskPanel({
                   >
                     <input type="hidden" name="taskId" value={taskId} />
                     <div>
-                      <label className="mb-1 block text-[11px] font-medium text-zinc-500">Extra step</label>
+                      <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Extra step</label>
                       <input name="title" required placeholder="e.g. Additional rockbreaking" className={`${inputClass} w-full`} />
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="mb-1 block text-[11px] font-medium text-zinc-500">Duration</label>
+                        <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Duration</label>
                         <input name="estQty" type="number" min="0" step="0.5" className={`${inputClass} w-full`} />
                       </div>
                       <div>
-                        <label className="mb-1 block text-[11px] font-medium text-zinc-500">Unit</label>
+                        <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Unit</label>
                         <select name="estUnit" defaultValue="days" className={`${inputClass} w-full`}>
                           <option value="hours">hours</option>
                           <option value="days">day(s)</option>
                         </select>
                       </div>
                       <div>
-                        <label className="mb-1 block text-[11px] font-medium text-zinc-500">Start</label>
+                        <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Start</label>
                         <input type="date" name="plannedStartDate" min={startMin} max={taskEnd ?? undefined} className={`${inputClass} w-full`} />
                       </div>
                       <div>
-                        <label className="mb-1 block text-[11px] font-medium text-zinc-500">Cost ($)</label>
+                        <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Cost ($)</label>
                         <input name="cost" type="number" min="0" step="0.01" className={`${inputClass} w-full`} />
                       </div>
                     </div>
@@ -813,7 +813,7 @@ export function SubtaskPanel({
                       <SubmitButton variant="secondary" pendingText="Sending…">
                         Submit variation
                       </SubmitButton>
-                      <button type="button" onClick={() => setVariationOpen(false)} className="text-sm text-zinc-500 hover:underline">
+                      <button type="button" onClick={() => setVariationOpen(false)} className="text-sm text-zinc-500 dark:text-zinc-400 hover:underline">
                         Cancel
                       </button>
                     </div>
@@ -825,7 +825,7 @@ export function SubtaskPanel({
           {/* Extension-of-time column */}
           {(extensionRequests.length > 0 || canRequestExtension || extensionPreStart) && (
             <div>
-              <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">Extension of time</p>
+              <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Extension of time</p>
 
               {extensionRequests.map((r) => (
                 <div key={r.id} className="mt-2 rounded-md border border-zinc-100 p-2 dark:border-zinc-800">
@@ -856,18 +856,18 @@ export function SubtaskPanel({
                   >
                     <input type="hidden" name="taskId" value={taskId} />
                     <div>
-                      <label className="mb-1 block text-[11px] font-medium text-zinc-500">Proposed new due date</label>
+                      <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Proposed new due date</label>
                       <input name="proposedDueDate" type="date" required min={taskEnd ?? undefined} className={`${inputClass} w-full`} />
                     </div>
                     <div>
-                      <label className="mb-1 block text-[11px] font-medium text-zinc-500">Reason</label>
+                      <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Reason</label>
                       <input name="reason" placeholder="e.g. rain delays, material lead-time" className={`${inputClass} w-full`} />
                     </div>
                     <div className="flex gap-2">
                       <SubmitButton variant="secondary" pendingText="Sending…">
                         Request
                       </SubmitButton>
-                      <button type="button" onClick={() => setExtensionOpen(false)} className="text-sm text-zinc-500 hover:underline">
+                      <button type="button" onClick={() => setExtensionOpen(false)} className="text-sm text-zinc-500 dark:text-zinc-400 hover:underline">
                         Cancel
                       </button>
                     </div>
@@ -876,7 +876,7 @@ export function SubtaskPanel({
                 ))}
 
               {extensionPreStart && extensionRequests.length === 0 && (
-                <p className="mt-2 text-[11px] text-zinc-400">You can request an extension once the task is underway.</p>
+                <p className="mt-2 text-[11px] text-zinc-400 dark:text-zinc-500">You can request an extension once the task is underway.</p>
               )}
             </div>
           )}
@@ -889,7 +889,7 @@ export function SubtaskPanel({
             <button
               type="button"
               onClick={() => setHandBackOpen(true)}
-              className="text-[11px] font-medium text-zinc-400 hover:text-red-500"
+              className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500 hover:text-red-500"
             >
               Can’t complete this? Hand the task back
             </button>
@@ -897,7 +897,7 @@ export function SubtaskPanel({
             <form action={returnTask} className="space-y-2">
               <input type="hidden" name="taskId" value={taskId} />
               <label className="block text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
-                Hand back to the project manager — why? <span className="text-zinc-400">(shared with them)</span>
+                Hand back to the project manager — why? <span className="text-zinc-400 dark:text-zinc-500">(shared with them)</span>
               </label>
               <textarea
                 name="reason"
@@ -910,7 +910,7 @@ export function SubtaskPanel({
                 <SubmitButton variant="secondary" pendingText="Handing back…">
                   Hand back task
                 </SubmitButton>
-                <button type="button" onClick={() => setHandBackOpen(false)} className="text-sm text-zinc-500 hover:underline">
+                <button type="button" onClick={() => setHandBackOpen(false)} className="text-sm text-zinc-500 dark:text-zinc-400 hover:underline">
                   Cancel
                 </button>
               </div>
@@ -925,7 +925,7 @@ export function SubtaskPanel({
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-6">
         <div className="w-[360px] rounded-2xl bg-white p-[22px] shadow-2xl dark:bg-zinc-900">
           <h4 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">Mark step complete?</h4>
-          <p className="mt-2 text-[13.5px] leading-[1.55] text-zinc-500 dark:text-zinc-400">
+          <p className="mt-2 text-sm leading-[1.55] text-zinc-500 dark:text-zinc-400">
             You’re marking <b className="text-zinc-900 dark:text-zinc-100">“{confirmStep.title}”</b> as complete. This
             can’t be undone — it locks the step and counts toward sign-off.
           </p>
@@ -933,7 +933,7 @@ export function SubtaskPanel({
             <button
               type="button"
               onClick={() => setConfirmStep(null)}
-              className="h-[38px] rounded-lg border border-zinc-200 px-4 text-[13.5px] font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300"
+              className="h-9 rounded-lg border border-zinc-200 px-4 text-sm font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300"
             >
               Cancel
             </button>
@@ -944,7 +944,7 @@ export function SubtaskPanel({
               <input type="hidden" name="done" value="true" />
               <button
                 type="submit"
-                className="h-[38px] rounded-lg bg-green-600 px-[18px] text-[13.5px] font-semibold text-white hover:bg-green-700"
+                className="h-9 rounded-lg bg-green-600 px-4 text-sm font-semibold text-white hover:bg-green-700"
               >
                 Yes, mark complete
               </button>
@@ -959,7 +959,7 @@ export function SubtaskPanel({
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-6">
         <div className="w-[420px] rounded-2xl bg-white p-[22px] shadow-2xl dark:bg-zinc-900">
           <h4 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">Submit for sign-off</h4>
-          <p className="mt-1 text-[13px] leading-[1.55] text-zinc-500 dark:text-zinc-400">
+          <p className="mt-1 text-sm leading-[1.55] text-zinc-500 dark:text-zinc-400">
             This sends the completed task to the project manager for approval.
           </p>
           <form action={submitTaskAction} className="mt-4 space-y-3">
@@ -983,10 +983,10 @@ export function SubtaskPanel({
                   glyph="📎"
                   label="Attach a photo, PDF or Excel (optional)"
                 />
-                <span className="pr-1 text-[10.5px] text-zinc-400">optional</span>
+                <span className="pr-1 text-[10px] text-zinc-400 dark:text-zinc-500">optional</span>
               </div>
             </div>
-            <label className="flex items-center gap-2 text-[13.5px] text-zinc-700 dark:text-zinc-200">
+            <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-200">
               <input type="checkbox" name="declaration" className="h-[16px] w-[16px] accent-brand-600" />
               I confirm this work is complete and accurate.
             </label>
@@ -994,11 +994,11 @@ export function SubtaskPanel({
               <button
                 type="button"
                 onClick={() => setSubmitOpen(false)}
-                className="h-[38px] rounded-lg border border-zinc-200 px-4 text-[13.5px] font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300"
+                className="h-9 rounded-lg border border-zinc-200 px-4 text-sm font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300"
               >
                 Cancel
               </button>
-              <SubmitButton className="h-[38px]" pendingText="Submitting…">
+              <SubmitButton className="h-9" pendingText="Submitting…">
                 Submit
               </SubmitButton>
             </div>
@@ -1012,7 +1012,7 @@ export function SubtaskPanel({
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-6">
         <div className="w-[420px] rounded-2xl bg-white p-[22px] shadow-2xl dark:bg-zinc-900">
           <h4 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">Raise a blocker</h4>
-          <p className="mt-1 text-[13px] leading-[1.55] text-zinc-500 dark:text-zinc-400">
+          <p className="mt-1 text-sm leading-[1.55] text-zinc-500 dark:text-zinc-400">
             Pauses the task and flags it to the project manager. The deadline clock stops until it’s resolved.
           </p>
           <form action={raiseBlockerAction} className="mt-4 space-y-3">
@@ -1043,13 +1043,13 @@ export function SubtaskPanel({
               <button
                 type="button"
                 onClick={() => setBlockerOpen(false)}
-                className="h-[38px] rounded-lg border border-zinc-200 px-4 text-[13.5px] font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300"
+                className="h-9 rounded-lg border border-zinc-200 px-4 text-sm font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="inline-flex h-[38px] items-center justify-center rounded-lg bg-red-600 px-[18px] text-[13.5px] font-semibold text-white hover:bg-red-700"
+                className="inline-flex h-9 items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700"
               >
                 Raise blocker
               </button>

@@ -4,6 +4,15 @@
 export const PROJECT_STATUSES = ['planning', 'active', 'on_hold', 'completed', 'archived'] as const;
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 
+/** Human labels for project statuses — raw enum strings never reach the UI. */
+export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
+  planning: 'Planning',
+  active: 'Active',
+  on_hold: 'On hold',
+  completed: 'Completed',
+  archived: 'Archived',
+};
+
 export const PROJECT_TYPES = ['construction', 'marketing', 'it', 'general'] as const;
 export type ProjectType = (typeof PROJECT_TYPES)[number];
 

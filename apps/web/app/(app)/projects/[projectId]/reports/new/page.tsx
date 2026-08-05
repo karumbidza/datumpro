@@ -19,7 +19,7 @@ export default async function NewReportPage({
 
   return (
     <PageContainer width="xl">
-      <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 hover:underline">
+      <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
         ← Back to project
       </Link>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">New site report</h1>

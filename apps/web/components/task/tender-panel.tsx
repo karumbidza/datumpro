@@ -8,11 +8,11 @@ import { awardTender, inviteTenderContractors, withdrawTenderInvite } from '@/ap
 import type { TenderInvite, BidLine, TaskDoc } from '@/lib/data/tenders';
 
 const STATUS_LABEL: Record<TenderInvite['status'], { label: string; cls: string }> = {
-  invited: { label: 'Not submitted', cls: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800' },
+  invited: { label: 'Not submitted', cls: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400' },
   submitted: { label: 'Bid in', cls: 'bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400' },
   awarded: { label: 'Awarded', cls: 'bg-green-50 text-green-700 dark:bg-green-500/15 dark:text-green-400' },
-  not_selected: { label: 'Not selected', cls: 'bg-zinc-100 text-zinc-400 dark:bg-zinc-800' },
-  withdrawn: { label: 'Withdrawn', cls: 'bg-zinc-100 text-zinc-400 dark:bg-zinc-800' },
+  not_selected: { label: 'Not selected', cls: 'bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500' },
+  withdrawn: { label: 'Withdrawn', cls: 'bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500' },
 };
 
 export function TenderPanel({
@@ -61,13 +61,13 @@ export function TenderPanel({
       <div className="flex items-center justify-between gap-3">
         <CardTitle>Tender</CardTitle>
         {!decided && (
-          <span className="text-xs text-zinc-500">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">
             {submittedCount}/{invites.length} bid{invites.length === 1 ? '' : 's'} in
           </span>
         )}
       </div>
 
-      {invites.length === 0 && <p className="mt-2 text-sm text-zinc-400">No contractors invited yet.</p>}
+      {invites.length === 0 && <p className="mt-2 text-sm text-zinc-400 dark:text-zinc-500">No contractors invited yet.</p>}
 
       <ul className="mt-3 space-y-2">
         {invites.map((inv) => {
@@ -87,7 +87,7 @@ export function TenderPanel({
                   <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${meta.cls}`}>{meta.label}</span>
                 </button>
                 {expandable && (
-                  <span className="text-xs tabular-nums text-zinc-500">
+                  <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
                     {inv.bidLineCount} step{inv.bidLineCount === 1 ? '' : 's'} · {formatUsd(inv.bidTotalCents)}
                   </span>
                 )}
@@ -96,7 +96,7 @@ export function TenderPanel({
                     <input type="hidden" name="inviteId" value={inv.id} />
                     <input type="hidden" name="taskId" value={taskId} />
                     <input type="hidden" name="projectId" value={projectId} />
-                    <button type="submit" className="text-[11px] text-zinc-400 hover:text-red-500" title="Remove invite">
+                    <button type="submit" className="text-[11px] text-zinc-400 dark:text-zinc-500 hover:text-red-500" title="Remove invite">
                       ✕
                     </button>
                   </form>
@@ -109,7 +109,7 @@ export function TenderPanel({
                     {lines.map((l) => (
                       <li key={l.id} className="flex items-center justify-between gap-2 text-sm">
                         <span className="truncate text-zinc-700 dark:text-zinc-200">{l.title}</span>
-                        <span className="flex-shrink-0 text-[11px] tabular-nums text-zinc-400">
+                        <span className="flex-shrink-0 text-[11px] tabular-nums text-zinc-400 dark:text-zinc-500">
                           {l.estQty ? `${l.estQty}${l.estUnit === 'hours' ? 'h' : 'd'}` : ''}
                           {l.plannedStartDate ? ` · ${l.plannedStartDate}` : ''} · {formatUsd(l.costCents)}
                         </span>
@@ -170,7 +170,7 @@ export function TenderPanel({
                 <SubmitButton variant="secondary" pendingText="Sending…" disabled={picks.length === 0}>
                   Send invitations
                 </SubmitButton>
-                <button type="button" onClick={() => setInviteOpen(false)} className="text-sm text-zinc-500 hover:underline">
+                <button type="button" onClick={() => setInviteOpen(false)} className="text-sm text-zinc-500 dark:text-zinc-400 hover:underline">
                   Cancel
                 </button>
               </div>

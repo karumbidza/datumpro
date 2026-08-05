@@ -47,13 +47,13 @@ export function TaskPaymentPanel({
       {isAssignee ? (
         info.requestableCents > 0 ? (
           <div className="border-t border-zinc-100 pt-4 dark:border-zinc-800">
-            <p className="mb-2 text-[13px] text-zinc-500 dark:text-zinc-400">
+            <p className="mb-2 text-sm text-zinc-500 dark:text-zinc-400">
               {formatUsd(info.requestableCents)} still claimable on this task.
             </p>
             <RequestPaymentForm tasks={[requestTask]} taskId={task.taskId} />
           </div>
         ) : (
-          <p className="border-t border-zinc-100 pt-4 text-[13px] text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+          <p className="border-t border-zinc-100 pt-4 text-sm text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
             {info.committedCents > 0 && info.paidCents >= info.committedCents
               ? 'Fully paid — nothing left to claim on this task.'
               : 'Nothing more to claim right now — a request is in review.'}
@@ -64,7 +64,7 @@ export function TaskPaymentPanel({
       {/* Request history for this task */}
       {info.requests.length > 0 && (
         <div className="border-t border-zinc-100 pt-3 dark:border-zinc-800">
-          <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-zinc-400">Requests</p>
+          <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Requests</p>
           <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
             {info.requests.map((r) => (
               <li key={r.id} className="py-2.5">
@@ -88,7 +88,7 @@ export function TaskPaymentPanel({
                   </div>
                 </div>
                 {r.status === 'rejected' && r.reviewNote && (
-                  <p className="mt-1 text-xs text-zinc-500">Rejected — “{r.reviewNote}”</p>
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Rejected — “{r.reviewNote}”</p>
                 )}
                 {r.status === 'paid' && r.paidReference && (
                   <p className="mt-1 text-xs text-green-600 dark:text-green-400">Paid · ref {r.paidReference}</p>

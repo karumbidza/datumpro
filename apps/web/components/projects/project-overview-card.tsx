@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { ProjectOverview, OverviewMilestone } from '@/lib/data/projects-overview';
 import { Badge } from '@/components/ui/badge';
 import { ChevronRight } from '@/components/icons';
-import { formatUsd } from '@datumpro/shared/domain';
+import { formatUsd, PROJECT_STATUS_LABELS } from '@datumpro/shared/domain';
 
 const STATUS_TONE = {
   active: 'green',
@@ -15,8 +15,8 @@ const STATUS_TONE = {
 /* Priority chip — shown only when it deviates from the 'medium' default, so the
  * list stays quiet until priority actually says something. */
 const PRIORITY_CHIP: Record<string, { label: string; cls: string } | undefined> = {
-  urgent: { label: 'Urgent', cls: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400' },
-  high: { label: 'High', cls: 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400' },
+  urgent: { label: 'Urgent', cls: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400' },
+  high: { label: 'High', cls: 'bg-orange-50 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400' },
   low: { label: 'Low', cls: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400' },
 };
 
@@ -71,7 +71,7 @@ export function ProjectOverviewCard({ project: p }: { project: ProjectOverview }
             />
           ))}
         </div>
-        <div className="mt-1 hidden items-center justify-between text-[10px] text-zinc-400 sm:flex">
+        <div className="mt-1 hidden items-center justify-between text-[10px] text-zinc-400 dark:text-zinc-500 sm:flex">
           <span>{fmt(p.startDate)}</span>
           {p.nextMilestone && (
             <span className="truncate px-2">
@@ -89,21 +89,21 @@ export function ProjectOverviewCard({ project: p }: { project: ProjectOverview }
       </div>
 
       {/* Status + contract (contract hidden on small) */}
-      <div className="hidden w-24 shrink-0 text-right text-xs tabular-nums text-zinc-400 md:block">
+      <div className="hidden w-24 shrink-0 text-right text-xs tabular-nums text-zinc-400 dark:text-zinc-500 md:block">
         {formatUsd(p.contractValueCents)}
       </div>
-      <Badge tone={STATUS_TONE[p.status]}>{p.status.replace('_', ' ')}</Badge>
+      <Badge tone={STATUS_TONE[p.status]}>{PROJECT_STATUS_LABELS[p.status]}</Badge>
       <ChevronRight size={16} className="hidden shrink-0 text-zinc-300 group-hover:text-zinc-500 sm:block" />
 
       {/* Hover popover — timeline + milestones */}
       <div className="pointer-events-none absolute right-4 top-full z-10 mt-1 w-64 rounded-lg border border-zinc-200 bg-white p-3 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 dark:border-zinc-700 dark:bg-zinc-900">
-        <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-zinc-400">Timeline</p>
+        <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Timeline</p>
         <Row label="Start" value={fmt(p.startDate)} />
         <Row label="Target end" value={fmt(p.endDate)} />
         <Row label="Tasks done" value={`${p.doneTasks}/${p.totalTasks}`} />
         {p.milestones.length > 0 && (
           <div className="mt-2 border-t border-zinc-100 pt-2 dark:border-zinc-800">
-            <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-zinc-400">Milestones</p>
+            <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Milestones</p>
             <ul className="space-y-1">
               {p.milestones.map((m) => (
                 <li key={m.id} className="flex items-center justify-between gap-2 text-xs">
@@ -111,7 +111,7 @@ export function ProjectOverviewCard({ project: p }: { project: ProjectOverview }
                     <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${DOT[m.status]}`} />
                     <span className="truncate text-zinc-700 dark:text-zinc-300">{m.name}</span>
                   </span>
-                  <span className="shrink-0 text-zinc-400">{fmt(m.targetDate)}</span>
+                  <span className="shrink-0 text-zinc-400 dark:text-zinc-500">{fmt(m.targetDate)}</span>
                 </li>
               ))}
             </ul>

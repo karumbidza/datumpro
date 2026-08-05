@@ -29,13 +29,12 @@ import { TaskTabs, type TaskTab } from '@/components/task/task-tabs';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { inputClass } from '@/components/ui/form';
+import { STATUS_TONE } from '@/components/ui/tones';
+import { TASK_STATUS_LABELS, TASK_PRIORITY_LABELS, TASK_SLA_LABELS } from '@datumpro/shared/domain';
+import { formatShortDate } from '@/lib/date';
 import { resolveBlocker, addDependency, removeDependency } from '../actions';
 import { ReviewSubmission } from '@/components/task/review-submission';
-
-const inputClass =
-  'w-full rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
-
-const STATUS_TONE = { done: 'green', submitted: 'blue', blocked: 'amber', in_progress: 'blue', todo: 'neutral' } as const;
 
 export default async function TaskDetailPage({
   params,
@@ -196,13 +195,13 @@ export default async function TaskDetailPage({
           label="Assignee"
           value={isTendering ? (isBidder ? 'You’re bidding on this' : 'Open for bidding') : assigneeName}
         />
-        <Row label="Priority" value={task.priority} />
-        <Row label="SLA" value={task.sla_status.replace('_', ' ')} />
+        <Row label="Priority" value={TASK_PRIORITY_LABELS[task.priority]} />
+        <Row label="SLA" value={TASK_SLA_LABELS[task.sla_status]} />
         {task.status !== 'done' && sched && (
           <Row label="Schedule" value={sched.critical ? 'On critical path' : `${sched.floatDays}d slack`} />
         )}
-        {task.planned_start_date && <Row label="Start" value={task.planned_start_date} />}
-        {task.due_date && <Row label="Due" value={task.due_date} />}
+        {task.planned_start_date && <Row label="Start" value={formatShortDate(task.planned_start_date)} />}
+        {task.due_date && <Row label="Due" value={formatShortDate(task.due_date)} />}
         {task.description && (
           <p className="pt-2 text-zinc-600 dark:text-zinc-300">{task.description}</p>
         )}
@@ -264,8 +263,8 @@ export default async function TaskDetailPage({
                   >
                     {d.title}
                   </Link>
-                  <Badge tone={STATUS_TONE[d.status]}>{d.status.replace('_', ' ')}</Badge>
-                  {d.lagDays > 0 && <span className="text-[11px] text-zinc-400">+{d.lagDays}d lag</span>}
+                  <Badge tone={STATUS_TONE[d.status]}>{TASK_STATUS_LABELS[d.status]}</Badge>
+                  {d.lagDays > 0 && <span className="text-[11px] text-zinc-400 dark:text-zinc-500">+{d.lagDays}d lag</span>}
                 </div>
                 {canManage && (
                   <form action={removeDependency}>
@@ -364,7 +363,7 @@ export default async function TaskDetailPage({
             <li key={a.id} className="relative">
               <span className="absolute -left-[21px] top-1.5 size-2 rounded-full bg-zinc-300 dark:bg-zinc-600" />
               <p className="text-sm text-zinc-700 dark:text-zinc-200">{a.message}</p>
-              <p className="text-[11px] text-zinc-400">
+              <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
                 {a.userName} · {new Date(a.createdAt).toLocaleString()}
               </p>
             </li>
@@ -375,7 +374,7 @@ export default async function TaskDetailPage({
   }
 
   return (
-    <PageContainer width="4xl">
+    <PageContainer width="3xl">
       <LiveRefresh
         subscriptions={[
           { table: 'task_subtasks', filter: `task_id=eq.${taskId}` },
@@ -387,7 +386,7 @@ export default async function TaskDetailPage({
           { table: 'approvals', filter: `org_id=eq.${task.org_id}` },
         ]}
       />
-      <Link href={`/projects/${projectId}/tasks`} className="text-xs text-zinc-500 hover:underline">
+      <Link href={`/projects/${projectId}/tasks`} className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
         ← Tasks
       </Link>
       <div className="mt-1 flex items-start justify-between gap-4">
@@ -396,7 +395,7 @@ export default async function TaskDetailPage({
           {isTendering ? (
             <Badge tone="amber">{isBidder ? 'Bidding' : 'Open for bidding'}</Badge>
           ) : (
-            <Badge tone={STATUS_TONE[task.status]}>{task.status.replace('_', ' ')}</Badge>
+            <Badge tone={STATUS_TONE[task.status]}>{TASK_STATUS_LABELS[task.status]}</Badge>
           )}
           {canManage && !isAssignee && task.status !== 'done' && (
             <Link href={`/projects/${projectId}/tasks/${taskId}/edit`}>
@@ -421,7 +420,7 @@ export default async function TaskDetailPage({
           )}
           {blockedByDeps && (
             <p className="flex items-center gap-2 font-semibold text-red-600 dark:text-red-400">
-              <span className="text-[13px]">🔒</span> Blocked: {waitingOn.join(', ')}
+              <span className="text-sm">🔒</span> Blocked: {waitingOn.join(', ')}
             </p>
           )}
           {task.status === 'blocked' && task.blocker_description && (

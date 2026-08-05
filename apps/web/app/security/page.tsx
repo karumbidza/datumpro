@@ -28,7 +28,7 @@ const points: { id: string; title: string; body: string }[] = [
 
 export default function SecurityPage() {
   return (
-    <main className="mx-auto max-w-2xl px-6 py-16">
+    <main className="mx-auto max-w-2xl px-6 py-12">
       <p className="text-xs font-medium uppercase tracking-wide text-brand-600">Trust &amp; security</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">How DatumPro protects your organization</h1>
       <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">

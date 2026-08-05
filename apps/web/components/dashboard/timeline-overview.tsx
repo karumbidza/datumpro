@@ -121,15 +121,15 @@ function doneLabel(info: DoneInfo): string {
 
 function StatusBadge({ state }: { state: BarState }) {
   const map: { show: boolean; text: string; cls: string }[] = [
-    { show: state.isDone, text: 'Done', cls: 'bg-green-100 text-green-700' },
-    { show: state.isBlocked, text: 'Blocked', cls: 'bg-amber-100 text-amber-700' },
-    { show: state.isOverdue, text: 'Overdue', cls: 'bg-red-100 text-red-700' },
-    { show: state.isPending, text: 'Review', cls: 'bg-blue-100 text-blue-700' },
-    { show: state.isActive, text: 'Active', cls: 'bg-blue-100 text-blue-700' },
+    { show: state.isDone, text: 'Done', cls: 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400' },
+    { show: state.isBlocked, text: 'Blocked', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400' },
+    { show: state.isOverdue, text: 'Overdue', cls: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400' },
+    { show: state.isPending, text: 'Review', cls: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400' },
+    { show: state.isActive, text: 'Active', cls: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400' },
   ];
   const hit = map.find((m) => m.show);
-  if (!hit) return <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[9px] font-medium text-zinc-500">To do</span>;
-  return <span className={`rounded px-1.5 py-0.5 text-[9px] font-medium ${hit.cls}`}>{hit.text}</span>;
+  const cls = hit?.cls ?? 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400';
+  return <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${cls}`}>{hit?.text ?? 'To do'}</span>;
 }
 
 /* ── Component ──────────────────────────────────────────────────────── */
@@ -235,27 +235,27 @@ export function TimelineOverview({
     `rounded-full px-2.5 py-1 text-[11px] transition-colors ${
       selected
         ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
-        : 'border border-zinc-200 text-zinc-500 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800'
+        : 'border border-zinc-200 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800'
     }`;
 
   if (tasks.length === 0) {
     return (
-      <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
         <div className="flex items-center gap-2 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
           <GanttChart size={16} className="text-zinc-900 dark:text-white" />
           <h3 className="text-sm font-medium text-zinc-900 dark:text-white">Timeline Overview</h3>
         </div>
         <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
           <Calendar size={28} className="text-zinc-300 dark:text-zinc-600" />
-          <p className="text-sm text-zinc-500">No scheduled {unitPlural} yet.</p>
-          <p className="text-xs text-zinc-400">Add planned dates to {unitPlural} to see them on the timeline.</p>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">No scheduled {unitPlural} yet.</p>
+          <p className="text-xs text-zinc-400 dark:text-zinc-500">Add planned dates to {unitPlural} to see them on the timeline.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+    <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
       <div className="flex items-center gap-2 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
         <GanttChart size={16} className="text-zinc-900 dark:text-white" />
         <h3 className="text-sm font-medium text-zinc-900 dark:text-white">Timeline Overview</h3>
@@ -264,7 +264,7 @@ export function TimelineOverview({
       {/* Filter bar */}
       <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
         <div className="relative">
-          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -281,7 +281,7 @@ export function TimelineOverview({
           ))}
         </div>
 
-        <div className="ml-auto flex items-center gap-1 text-[11px] text-zinc-500">
+        <div className="ml-auto flex items-center gap-1 text-[11px] text-zinc-500 dark:text-zinc-400">
           <span>Scale:</span>
           {(Object.keys(SCALES) as Scale[]).map((s) => (
             <button key={s} onClick={() => setScale(s)} className={`capitalize ${pillBtn(scale === s)}`}>
@@ -291,14 +291,14 @@ export function TimelineOverview({
         </div>
       </div>
 
-      <div className="px-3 pb-2 text-[11px] text-zinc-400">
+      <div className="px-3 pb-2 text-[11px] text-zinc-400 dark:text-zinc-500">
         Showing {summary.showing} of {summary.total} {unitPlural}
         {summary.overdue > 0 && <> · {summary.overdue} overdue</>}
         {summary.blocked > 0 && <> · {summary.blocked} blocked</>}
       </div>
 
       {filtered.length === 0 ? (
-        <div className="py-8 text-center text-xs text-zinc-400">
+        <div className="py-8 text-center text-xs text-zinc-400 dark:text-zinc-500">
           No {unitPlural} match the current filters.
           <button
             onClick={() => {
@@ -319,7 +319,7 @@ export function TimelineOverview({
                 className="sticky left-0 z-30 flex items-end border-b border-r border-zinc-200 bg-zinc-50 px-3 dark:border-zinc-800 dark:bg-zinc-800/40"
                 style={{ width: TASK_COL_WIDTH, minWidth: TASK_COL_WIDTH }}
               >
-                <span className="pb-1 text-[10px] tracking-wider text-zinc-400">
+                <span className="pb-1 text-[10px] tracking-wider text-zinc-400 dark:text-zinc-500">
                   {unit === 'project' ? 'PROJECT' : 'TASK / ASSIGNEE'}
                 </span>
               </div>
@@ -345,7 +345,7 @@ export function TimelineOverview({
                   : scaleColumns.map((col) => (
                       <div
                         key={col.key}
-                        className="flex items-center justify-center text-[10px] text-zinc-400"
+                        className="flex items-center justify-center text-[10px] text-zinc-400 dark:text-zinc-500"
                         style={{ flex: `0 0 ${col.width}px` }}
                       >
                         {col.label}
@@ -434,10 +434,10 @@ export function TimelineOverview({
                         </span>
                         <StatusBadge state={state} />
                       </div>
-                      <span className="mt-0.5 truncate text-[10px] text-zinc-400">
+                      <span className="mt-0.5 truncate text-[10px] text-zinc-400 dark:text-zinc-500">
                         {task.assigneeName ?? 'Unassigned'}
                       </span>
-                      <span className="truncate text-[10px] text-zinc-400/70">{task.projectName}</span>
+                      <span className="truncate text-[10px] text-zinc-400 dark:text-zinc-500/70">{task.projectName}</span>
                     </div>
 
                     {/* Bar lane */}
@@ -591,7 +591,7 @@ export function TimelineOverview({
           { c: '#d97706', l: 'Blocked' },
           { c: '#3b82f6', l: 'In review' },
         ].map((item) => (
-          <span key={item.l} className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+          <span key={item.l} className="flex items-center gap-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
             <span className="inline-block h-2 w-5 rounded-sm" style={{ background: item.c }} />
             {item.l}
           </span>

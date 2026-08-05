@@ -5,8 +5,7 @@ import { submitQuote } from '@/app/(app)/projects/[projectId]/tasks/actions';
 import { Button } from '@/components/ui/button';
 import { FormError } from '@/components/ui/form-error';
 
-const inputClass =
-  'w-full rounded-md border border-zinc-200 bg-transparent px-2.5 py-1.5 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
+import { inputCompactClass as inputClass } from '@/components/ui/form';
 
 /** Contractor's blind bid: cost + payment terms + proposed window. Submit needs a
  *  positive cost; Decline skips it (both go through submitQuote via `decision`). */

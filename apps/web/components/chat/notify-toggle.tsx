@@ -56,7 +56,7 @@ export function NotifyToggle() {
       title={title}
       aria-label={title}
       className={`rounded p-1 hover:bg-zinc-100 disabled:opacity-40 dark:hover:bg-zinc-800 ${
-        subscribed ? 'text-brand-600' : 'text-zinc-400'
+        subscribed ? 'text-brand-600' : 'text-zinc-400 dark:text-zinc-500'
       }`}
     >
       {subscribed ? <Bell size={16} /> : <BellOff size={16} />}

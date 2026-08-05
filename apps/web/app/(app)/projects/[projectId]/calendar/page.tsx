@@ -22,7 +22,7 @@ export default async function ProjectCalendarPage({
   const tasks = await listCalendarTasks(projectId);
 
   return (
-    <PageContainer width="6xl" className="space-y-6">
+    <PageContainer width="6xl" className="space-y-8">
       <LiveRefresh subscriptions={[{ table: 'tasks', filter: `project_id=eq.${projectId}` }]} />
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Calendar</h1>

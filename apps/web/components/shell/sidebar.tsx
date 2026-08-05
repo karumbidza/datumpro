@@ -49,7 +49,7 @@ export function Sidebar({ projects, orgs, activeOrgId, email, canManageMembers, 
 
       <nav className="flex-1 overflow-y-auto p-2">
         {activeProject && (
-          <p className="px-3 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-zinc-400">
+          <p className="px-3 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
             {activeProject.name}
           </p>
         )}
@@ -131,7 +131,7 @@ function OrgSwitcher({ orgs, activeOrgId }: { orgs: OrgMembershipSummary[]; acti
             onClick={() => setOpen(false)}
           />
           <div className="absolute bottom-full left-0 right-0 z-20 mb-1 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
-            <p className="px-3 py-1.5 text-[10px] uppercase tracking-wide text-zinc-400">
+            <p className="px-3 py-1.5 text-[10px] uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
               Organisations
             </p>
             {orgs.map((o) => (
@@ -165,7 +165,7 @@ function OrgSwitcher({ orgs, activeOrgId }: { orgs: OrgMembershipSummary[]; acti
         <span className="truncate text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
           {activeName}
         </span>
-        <ChevronDown size={12} className="shrink-0 text-zinc-400" />
+        <ChevronDown size={12} className="shrink-0 text-zinc-400 dark:text-zinc-500" />
       </button>
     </div>
   );
@@ -200,7 +200,7 @@ function ProjectSwitcher({
             </span>
           </span>
         </span>
-        <ChevronDown size={16} className="shrink-0 text-zinc-400" />
+        <ChevronDown size={16} className="shrink-0 text-zinc-400 dark:text-zinc-500" />
       </button>
 
       {open && (
@@ -213,7 +213,7 @@ function ProjectSwitcher({
                 onClick={() => setOpen(false)}
                 className="flex items-center gap-3 rounded p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800"
               >
-                <FolderOpen size={16} className="text-zinc-500" />
+                <FolderOpen size={16} className="text-zinc-500 dark:text-zinc-400" />
                 <span className="flex-1 text-sm font-medium text-zinc-800 dark:text-white">All projects</span>
                 {!activeProject && <Check size={16} className="text-brand-500" />}
               </Link>
@@ -221,7 +221,7 @@ function ProjectSwitcher({
 
             {projects.length > 0 && (
               <>
-                <p className="px-3 pt-1 text-[10px] font-medium uppercase tracking-wider text-zinc-400">
+                <p className="px-3 pt-1 text-[10px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
                   Projects
                 </p>
                 <div className="p-1.5">

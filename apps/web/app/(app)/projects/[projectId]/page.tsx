@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { PageContainer } from '@/components/shell/page-container';
 import { notFound, redirect } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { LiveRefresh } from '@/components/live-refresh';
@@ -11,6 +12,9 @@ import { TimelineOverview } from '@/components/dashboard/timeline-overview';
 import { ProgressTrend } from '@/components/dashboard/progress-trend';
 import { RecentActivity } from '@/components/project/recent-activity';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { PRIORITY_TONE } from '@/components/ui/tones';
+import { TASK_PRIORITY_LABELS } from '@datumpro/shared/domain';
 
 export default async function ProjectOverviewPage({
   params,
@@ -33,7 +37,7 @@ export default async function ProjectOverviewPage({
   ]);
 
   return (
-    <div className="mx-auto flex max-w-[1152px] flex-col gap-8 px-10 py-8">
+    <PageContainer width="6xl" className="flex flex-col gap-8">
       <LiveRefresh
         subscriptions={[
           { table: 'tasks', filter: `project_id=eq.${projectId}` },
@@ -46,17 +50,7 @@ export default async function ProjectOverviewPage({
           <span className="flex items-center gap-2">
             <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
             {project.priority !== 'medium' && (
-              <span
-                className={`rounded px-2 py-0.5 text-xs font-medium capitalize ${
-                  project.priority === 'urgent'
-                    ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
-                    : project.priority === 'high'
-                      ? 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400'
-                      : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
-                }`}
-              >
-                {project.priority}
-              </span>
+              <Badge tone={PRIORITY_TONE[project.priority]}>{TASK_PRIORITY_LABELS[project.priority]}</Badge>
             )}
           </span>
           {project.client_name && (
@@ -71,7 +65,7 @@ export default async function ProjectOverviewPage({
                 <div className="h-2 rounded-full bg-brand-600 transition-all" style={{ width: `${projectPct}%` }} />
               </div>
               <span
-                className="text-xs font-medium tabular-nums text-zinc-500"
+                className="text-xs font-medium tabular-nums text-zinc-500 dark:text-zinc-400"
                 title="Effort-weighted by each task's awarded contract value"
               >
                 {projectPct}% complete
@@ -95,6 +89,6 @@ export default async function ProjectOverviewPage({
       <TimelineOverview tasks={tasks} />
 
       <RecentActivity items={activity} projectId={projectId} />
-    </div>
+    </PageContainer>
   );
 }

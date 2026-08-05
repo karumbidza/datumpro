@@ -35,7 +35,7 @@ export default async function NewProjectPage() {
 
   return (
     <PageContainer width="xl">
-      <Link href="/projects" className="text-xs text-zinc-500 hover:underline">
+      <Link href="/projects" className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
         ← Projects
       </Link>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">New project</h1>

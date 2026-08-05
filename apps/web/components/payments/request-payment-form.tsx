@@ -19,8 +19,7 @@ export type RequestTask = {
   requestableCents: number;
 };
 
-const inputClass =
-  'w-full rounded-md border border-zinc-200 bg-transparent px-2.5 py-1.5 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
+import { inputCompactClass as inputClass } from '@/components/ui/form';
 
 /** The assignee's "Request payment" form — invoice a task with an approved plan.
  *  Amount is capped at what's still claimable; an invoice is mandatory. */
@@ -95,17 +94,17 @@ export function RequestPaymentForm({ tasks, taskId }: { tasks: RequestTask[]; ta
   return (
     <form
       onSubmit={submit}
-      className="space-y-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
+      className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950"
     >
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">New payment request</h3>
-        <button type="button" onClick={() => setOpen(false)} className="text-xs text-zinc-500 hover:underline">
+        <button type="button" onClick={() => setOpen(false)} className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
           Cancel
         </button>
       </div>
 
       {claimable.length > 1 ? (
-        <label className="block text-xs font-medium text-zinc-500">
+        <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400">
           Task (approved plan)
           <select value={selId} onChange={(e) => pickTask(e.target.value)} className={inputClass}>
             {claimable.map((t) => (
@@ -117,8 +116,8 @@ export function RequestPaymentForm({ tasks, taskId }: { tasks: RequestTask[]; ta
         </label>
       ) : null}
 
-      <label className="block text-xs font-medium text-zinc-500">
-        Amount (USD) <span className="text-zinc-400">· up to {formatUsd(task?.requestableCents ?? 0)}</span>
+      <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400">
+        Amount (USD) <span className="text-zinc-400 dark:text-zinc-500">· up to {formatUsd(task?.requestableCents ?? 0)}</span>
         <input
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
@@ -131,13 +130,13 @@ export function RequestPaymentForm({ tasks, taskId }: { tasks: RequestTask[]; ta
         />
       </label>
 
-      <label className="block text-xs font-medium text-zinc-500">
+      <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400">
         Note (optional)
         <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Anything the reviewer should know" className={inputClass} />
       </label>
 
-      <label className="block text-xs font-medium text-zinc-500">
-        Invoice <span className="text-red-500">*</span> <span className="text-zinc-400">· PDF, image or Excel — required</span>
+      <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400">
+        Invoice <span className="text-red-500">*</span> <span className="text-zinc-400 dark:text-zinc-500">· PDF, image or Excel — required</span>
         <input
           type="file"
           accept="application/pdf,image/*,.xls,.xlsx,.csv"

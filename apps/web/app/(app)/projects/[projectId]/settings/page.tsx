@@ -32,7 +32,7 @@ export default async function ProjectSettingsPage({
 
   return (
     <PageContainer width="3xl">
-      <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 hover:underline">
+      <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
         ← {project.name}
       </Link>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Settings</h1>
@@ -40,7 +40,7 @@ export default async function ProjectSettingsPage({
         Manage this project — its team and its setup.
       </p>
 
-      <section className="mt-6 space-y-4">
+      <section className="mt-8 space-y-4">
         <Link href={`/projects/${projectId}/setup`} className="block">
           <Card className="transition-colors hover:border-zinc-300 dark:hover:border-zinc-700">
             <div className="flex items-center gap-4">
@@ -57,7 +57,7 @@ export default async function ProjectSettingsPage({
                       } outstanding`}
                 </p>
               </div>
-              <ChevronRight size={18} className="shrink-0 text-zinc-400" />
+              <ChevronRight size={18} className="shrink-0 text-zinc-400 dark:text-zinc-500" />
             </div>
           </Card>
         </Link>
@@ -74,7 +74,7 @@ export default async function ProjectSettingsPage({
                   Who&apos;s on this project and what they can do
                 </p>
               </div>
-              <ChevronRight size={18} className="shrink-0 text-zinc-400" />
+              <ChevronRight size={18} className="shrink-0 text-zinc-400 dark:text-zinc-500" />
             </div>
           </Card>
         </Link>

@@ -37,16 +37,16 @@ export default async function SupportPage({
   const active = orgs.find((o) => o.id === org) ?? orgs[0];
 
   return (
-    <PageContainer width="2xl">
+    <PageContainer width="3xl">
       <h1 className="text-2xl font-semibold tracking-tight">Support</h1>
       <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
         Message the DatumPro team. We&apos;ll reply right here.
       </p>
 
       {!configured ? (
-        <p className="mt-8 text-sm text-zinc-500">Support chat isn&apos;t available right now.</p>
+        <p className="mt-8 text-sm text-zinc-500 dark:text-zinc-400">Support chat isn&apos;t available right now.</p>
       ) : orgs.length === 0 ? (
-        <p className="mt-8 text-sm text-zinc-500">
+        <p className="mt-8 text-sm text-zinc-500 dark:text-zinc-400">
           Support is available to organization admins. Ask an admin on your team to reach out.
         </p>
       ) : (

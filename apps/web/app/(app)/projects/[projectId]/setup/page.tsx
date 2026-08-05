@@ -22,8 +22,8 @@ export default async function ProjectSetupPage({
   const outstanding = total - done;
 
   return (
-    <PageContainer width="2xl">
-      <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 hover:underline">
+    <PageContainer width="xl">
+      <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
         ← {project.name}
       </Link>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Project setup</h1>

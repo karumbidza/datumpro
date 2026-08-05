@@ -6,15 +6,13 @@ import { passwordIssue } from '@datumpro/shared/validation';
 import { ForgotPasswordFlow } from './forgot-password-flow';
 
 const fieldClass =
-  'flex h-11 w-full items-center gap-2.5 rounded-lg border border-zinc-200 bg-white px-[13px] text-sm text-zinc-900 transition focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/15 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100';
+  'flex h-11 w-full items-center gap-2.5 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 transition focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/15 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100';
 const inputClass = 'flex-1 bg-transparent outline-none placeholder:text-zinc-400';
 
 /** Shown when someone tries to "Create account" with an email that already
  *  exists — the #1 real-world signup confusion (see auth debug 2026-08-03). */
 const alreadyRegistered =
   'This email already has an account. Sign in with your password below, or tap “Forgot?” to reset it.';
-
-type Method = 'password' | 'magiclink';
 
 /** Post-auth destination from ?next=, restricted to same-site relative paths so
  *  it can't be turned into an open redirect. Defaults to the dashboard. */
@@ -33,7 +31,6 @@ export default function SignInPage({
   // it's identical on server and client (no hydration mismatch).
   const invited = (use(searchParams).email ?? '').trim();
   const [view, setView] = useState<'signin' | 'forgot'>('signin');
-  const [method, setMethod] = useState<Method>('password');
   const [email, setEmail] = useState(invited);
   const fromInvite = invited !== '';
   const [password, setPassword] = useState('');
@@ -98,20 +95,6 @@ export default function SignInPage({
     });
   }
 
-  async function magicLink(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setMessage(null);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext())}` },
-    });
-    setBusy(false);
-    if (error) return setMessage({ kind: 'error', text: error.message });
-    setMessage({ kind: 'info', text: `Magic link sent to ${email}. Open it in this browser.` });
-  }
-
   // OAuth (Google) returns a verified email — no separate confirmation step.
   async function oauth(provider: 'google') {
     setBusy(true);
@@ -131,13 +114,13 @@ export default function SignInPage({
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center bg-white px-6 py-14 dark:bg-zinc-950">
+    <main className="relative flex min-h-screen items-center justify-center bg-white px-6 py-12 dark:bg-zinc-950">
       <div className="relative z-10 w-full max-w-[400px]">
         {/* Brand + heading (centered) */}
         <div className="flex flex-col items-center text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-mark.svg" alt="DatumPro" className="mb-6 h-12 w-12 rounded-xl shadow-sm" />
-          <h1 className="font-display text-[27px] font-semibold leading-[1.2] tracking-[-0.02em] text-zinc-900 dark:text-white">
+          <h1 className="font-display text-2xl font-semibold leading-[1.2] tracking-[-0.02em] text-zinc-900 dark:text-white">
             {view === 'forgot' ? 'Reset your password' : fromInvite ? 'Accept your invitation' : 'Welcome back'}
           </h1>
           <p className="mt-2 max-w-[340px] text-sm text-zinc-500 dark:text-zinc-400">
@@ -162,7 +145,7 @@ export default function SignInPage({
             type="button"
             onClick={() => oauth('google')}
             disabled={busy}
-            className="flex h-11 w-full items-center justify-center gap-[9px] rounded-lg border border-zinc-200 bg-white text-sm font-semibold text-zinc-900 transition hover:border-zinc-300 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-900"
+            className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-white text-sm font-semibold text-zinc-900 transition hover:border-zinc-300 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-900"
           >
             <GoogleIcon />
             Continue with Google
@@ -170,35 +153,13 @@ export default function SignInPage({
         </div>
 
         {/* Divider */}
-        <div className="my-5 flex items-center gap-3 text-xs text-zinc-400">
+        <div className="my-5 flex items-center gap-3 text-xs text-zinc-400 dark:text-zinc-500">
           <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
           or with email
           <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
         </div>
 
-        {/* Method tabs */}
-        <div className="flex gap-1 rounded-[9px] bg-zinc-100 p-1 dark:bg-zinc-900">
-          {(['password', 'magiclink'] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => {
-                setMethod(m);
-                setMessage(null);
-              }}
-              className={`flex-1 rounded-md py-2 text-[13.5px] font-semibold transition ${
-                method === m
-                  ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-white'
-                  : 'text-zinc-500 dark:text-zinc-400'
-              }`}
-            >
-              {m === 'password' ? 'Password' : 'Magic link'}
-            </button>
-          ))}
-        </div>
-
-        {method === 'password' ? (
-          <form onSubmit={passwordSignIn} className="mt-[18px] flex flex-col gap-[13px]">
+        <form onSubmit={passwordSignIn} className="mt-[18px] flex flex-col gap-3">
             <div>
               <label className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Work email</label>
               <div className={fieldClass}>
@@ -240,7 +201,7 @@ export default function SignInPage({
                 <button
                   type="button"
                   onClick={() => setShowPassword((s) => !s)}
-                  className="text-zinc-400 transition hover:text-zinc-600 dark:hover:text-zinc-300"
+                  className="text-zinc-400 dark:text-zinc-500 transition hover:text-zinc-600 dark:hover:text-zinc-300"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <EyeOffIcon /> : <EyeIcon />}
@@ -255,14 +216,14 @@ export default function SignInPage({
                     type="button"
                     onClick={signUp}
                     disabled={busy}
-                    className="h-[46px] flex-1 rounded-lg bg-brand-500 text-[14.5px] font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
+                    className="h-11 flex-1 rounded-lg bg-brand-500 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
                   >
                     {busy ? 'Creating…' : 'Create account'}
                   </button>
                   <button
                     type="submit"
                     disabled={busy}
-                    className="h-[46px] rounded-lg border border-zinc-200 bg-white px-[18px] text-[14.5px] font-semibold text-zinc-900 transition hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-900"
+                    className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-900"
                   >
                     {busy ? '…' : 'I have an account'}
                   </button>
@@ -272,7 +233,7 @@ export default function SignInPage({
                   <button
                     type="submit"
                     disabled={busy}
-                    className="h-[46px] flex-1 rounded-lg bg-brand-500 text-[14.5px] font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
+                    className="h-11 flex-1 rounded-lg bg-brand-500 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
                   >
                     {busy ? '…' : 'Sign in'}
                   </button>
@@ -280,7 +241,7 @@ export default function SignInPage({
                     type="button"
                     onClick={signUp}
                     disabled={busy}
-                    className="h-[46px] rounded-lg border border-zinc-200 bg-white px-[18px] text-[14.5px] font-semibold text-zinc-900 transition hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-900"
+                    className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-900"
                   >
                     Create account
                   </button>
@@ -288,35 +249,10 @@ export default function SignInPage({
               )}
             </div>
           </form>
-        ) : (
-          <form onSubmit={magicLink} className="mt-[18px] flex flex-col gap-[13px]">
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Work email</label>
-              <div className={fieldClass}>
-                <MailIcon />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@company.com"
-                  className={inputClass}
-                />
-              </div>
-            </div>
-            <button
-              type="submit"
-              disabled={busy}
-              className="h-[46px] w-full rounded-lg bg-brand-500 text-[14.5px] font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
-            >
-              {busy ? 'Sending…' : 'Email me a magic link'}
-            </button>
-          </form>
-        )}
 
         {message && (
           <p
-            className={`mt-4 text-center text-[13.5px] ${
+            className={`mt-4 text-center text-sm ${
               message.kind === 'error' ? 'text-red-500' : 'text-zinc-600 dark:text-zinc-300'
             }`}
           >
@@ -337,18 +273,18 @@ export default function SignInPage({
       </div>
 
       {/* Legal + enterprise entry point — pinned to the bottom of the canvas */}
-      <div className="absolute inset-x-0 bottom-6 z-10 mx-auto flex w-full max-w-[400px] flex-wrap items-center justify-between gap-2 px-6 text-xs text-zinc-400">
+      <div className="absolute inset-x-0 bottom-6 z-10 mx-auto flex w-full max-w-[400px] flex-wrap items-center justify-between gap-2 px-6 text-xs text-zinc-400 dark:text-zinc-500">
         <span>
           © 2026 DatumPro ·{' '}
-          <a href="/security" className="text-zinc-500 hover:underline">
+          <a href="/security" className="text-zinc-500 dark:text-zinc-400 hover:underline">
             Terms
           </a>{' '}
           ·{' '}
-          <a href="/security" className="text-zinc-500 hover:underline">
+          <a href="/security" className="text-zinc-500 dark:text-zinc-400 hover:underline">
             Privacy
           </a>
         </span>
-        <a href="/enterprise" className="text-zinc-500 hover:text-brand-600 hover:underline">
+        <a href="/enterprise" className="text-zinc-500 dark:text-zinc-400 hover:text-brand-600 hover:underline">
           For government &amp; enterprise →
         </a>
       </div>
@@ -371,7 +307,7 @@ function GoogleIcon() {
 
 function MailIcon() {
   return (
-    <svg className="h-4 w-4 flex-none text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+    <svg className="h-4 w-4 flex-none text-zinc-400 dark:text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
       <rect x="2" y="4" width="20" height="16" rx="2" />
       <path d="m2 7 10 6 10-6" />
     </svg>
@@ -380,7 +316,7 @@ function MailIcon() {
 
 function LockIcon() {
   return (
-    <svg className="h-4 w-4 flex-none text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+    <svg className="h-4 w-4 flex-none text-zinc-400 dark:text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
       <rect x="3" y="11" width="18" height="10" rx="2" />
       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>

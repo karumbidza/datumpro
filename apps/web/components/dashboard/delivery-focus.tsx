@@ -47,7 +47,7 @@ export function DeliveryFocus({
               Awaiting approval
               <ChevronRight
                 size={13}
-                className={`text-zinc-400 transition-transform ${open ? 'rotate-90' : ''}`}
+                className={`text-zinc-400 dark:text-zinc-500 transition-transform ${open ? 'rotate-90' : ''}`}
               />
             </span>
             <span className={`mt-1 block text-2xl font-semibold tabular-nums ${color(awaiting > 0 ? 'amber' : 'zinc')}`}>

@@ -89,7 +89,7 @@ export function ApprovalsInbox({ items }: { items: PendingApproval[] }) {
               </button>
               {open && (
                 <div className="pb-3 pl-5">
-                  <p className="text-[13px] leading-normal text-zinc-700 dark:text-zinc-300">{t.detail}</p>
+                  <p className="text-sm leading-normal text-zinc-700 dark:text-zinc-300">{t.detail}</p>
                   <div className="mt-3 flex items-center gap-2">
                     <Link
                       href={href(t)}
@@ -105,7 +105,7 @@ export function ApprovalsInbox({ items }: { items: PendingApproval[] }) {
                     </Link>
                     <Link
                       href={href(t)}
-                      className="ml-auto text-[13px] font-medium text-brand-600 hover:underline dark:text-brand-400"
+                      className="ml-auto text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
                     >
                       Open full detail →
                     </Link>

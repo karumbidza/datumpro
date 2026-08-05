@@ -40,15 +40,15 @@ export function BudgetVsCost({
 
       <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
         <div>
-          <p className="text-xs text-zinc-500">Budget</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">Budget</p>
           <p className="font-semibold tabular-nums">{formatUsd(budgetCents)}</p>
         </div>
         <div>
-          <p className="text-xs text-zinc-500">Committed</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">Committed</p>
           <p className="font-semibold tabular-nums">{formatUsd(committedCostCents)}</p>
         </div>
         <div>
-          <p className="text-xs text-zinc-500">Cost to date</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">Cost to date</p>
           <p className="font-semibold tabular-nums text-green-600 dark:text-green-400">
             {formatUsd(costToDateCents)}
           </p>

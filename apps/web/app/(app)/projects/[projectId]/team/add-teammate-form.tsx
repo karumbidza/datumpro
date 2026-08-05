@@ -5,8 +5,7 @@ import { projectRolesForType, type MemberType } from '@datumpro/shared/access';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { addProjectMember } from './actions';
 
-const inputClass =
-  'w-full rounded-md border border-zinc-200 bg-transparent px-2.5 py-1.5 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
+import { inputCompactClass as inputClass } from '@/components/ui/form';
 
 interface Addable {
   userId: string;

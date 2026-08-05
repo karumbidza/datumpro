@@ -51,11 +51,11 @@ export default async function MyPaymentsPage() {
   }));
 
   return (
-    <PageContainer width="4xl">
+    <PageContainer width="3xl">
       <LiveRefresh
         subscriptions={[{ table: 'contractor_payment_requests', filter: `contractor_id=eq.${user.id}` }]}
       />
-      <Link href="/dashboard" className="text-xs text-zinc-500 hover:underline">
+      <Link href="/dashboard" className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
         ← Dashboard
       </Link>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Finance</h1>
@@ -64,7 +64,7 @@ export default async function MyPaymentsPage() {
         payment request from each task&apos;s Payment tab.
       </p>
 
-      <section className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <section className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Card>
           <CardTitle>Earned</CardTitle>
           <CardValue>{formatUsd(summary.earnedCents)}</CardValue>
@@ -108,14 +108,14 @@ export default async function MyPaymentsPage() {
                     >
                       {t.title}
                     </Link>
-                    <p className="text-xs text-zinc-400">{t.projectName}</p>
+                    <p className="text-xs text-zinc-400 dark:text-zinc-500">{t.projectName}</p>
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="text-sm font-semibold tabular-nums">{formatUsd(t.outstandingCents)}</p>
-                    <p className="text-[11px] text-zinc-400">outstanding</p>
+                    <p className="text-[11px] text-zinc-400 dark:text-zinc-500">outstanding</p>
                   </div>
                 </div>
-                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-500">
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-500 dark:text-zinc-400">
                   <span>Committed {formatUsd(t.committedCents)}</span>
                   <span className="text-green-600 dark:text-green-400">Paid {formatUsd(t.paidCents)}</span>
                   {t.pendingCents > 0 && (
@@ -145,7 +145,7 @@ export default async function MyPaymentsPage() {
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">{r.title}</p>
-                    <p className="text-xs text-zinc-400">
+                    <p className="text-xs text-zinc-400 dark:text-zinc-500">
                       {r.projectName}
                       {r.invoiceUrl && (
                         <>
@@ -163,7 +163,7 @@ export default async function MyPaymentsPage() {
                   </div>
                 </div>
                 {r.status === 'rejected' && r.reviewNote && (
-                  <p className="mt-1 text-xs text-zinc-500">Rejected — “{r.reviewNote}”</p>
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Rejected — “{r.reviewNote}”</p>
                 )}
                 {r.status === 'paid' && (
                   <p className="mt-1 text-xs text-green-600 dark:text-green-400">
@@ -188,7 +188,7 @@ export default async function MyPaymentsPage() {
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <h2 className="text-sm font-semibold">Compliance documents</h2>
-            <p className="text-xs text-zinc-400">
+            <p className="text-xs text-zinc-400 dark:text-zinc-500">
               Tax clearances, company registration, insurance — visible only to you and the admins.
             </p>
           </div>
@@ -206,7 +206,7 @@ export default async function MyPaymentsPage() {
                   <p className="truncate text-sm font-medium">
                     {d.title || CONTRACTOR_DOC_TYPE_LABEL[d.docType]}
                   </p>
-                  <p className="text-xs text-zinc-400">
+                  <p className="text-xs text-zinc-400 dark:text-zinc-500">
                     {CONTRACTOR_DOC_TYPE_LABEL[d.docType]}
                     {d.expiryDate ? ` · expires ${d.expiryDate}` : ''}
                     {d.fileUrl && (

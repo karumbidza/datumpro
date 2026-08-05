@@ -37,12 +37,20 @@ enable_signup = true
 # project via `supabase config push`.
 enable_confirmations = true
 
-# The magic-link template is also what `signInWithOtp` emails. Mobile signs in
-# with the 6-digit {{ .Token }}, web clicks {{ .ConfirmationURL }} — the template
-# carries both. Apply to the hosted project with `supabase config push`.
+# The magic-link template is what `signInWithOtp` emails — used ONLY by the
+# mobile app's 6-digit OTP sign-in (the web app is password/OAuth only). It is
+# code-only on purpose: any {{ .ConfirmationURL }} link gets prefetched by mail
+# scanners (Yahoo/Outlook), consuming the one-time token so the code the human
+# types reads as expired. Apply to hosted with `supabase config push`.
 [auth.email.template.magic_link]
 subject = "Your DatumPro sign-in code"
 content_path = "./supabase/templates/magic_link.html"
+
+# Password reset is the in-page 6-digit flow (verifyOtp type:'recovery') —
+# same rule: code only, no link, or scanner prefetch kills the code.
+[auth.email.template.recovery]
+subject = "Your DatumPro password reset code"
+content_path = "./supabase/templates/recovery.html"
 
 # chat-push is invoked by a Database Webhook, not an end-user JWT. It authorizes
 # itself with the CHAT_PUSH_SECRET shared-secret header, so skip JWT verification.

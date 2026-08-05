@@ -75,12 +75,12 @@ export function SupportChat({ orgId }: { orgId: string }) {
   }
 
   return (
-    <div className="flex h-[60vh] flex-col rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+    <div className="flex h-[60vh] flex-col rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
         {loading ? (
-          <p className="text-sm text-zinc-400">Loading…</p>
+          <p className="text-sm text-zinc-400 dark:text-zinc-500">Loading…</p>
         ) : messages.length === 0 ? (
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-zinc-400 dark:text-zinc-500">
             No messages yet. Send us a note and our team will reply here.
           </p>
         ) : (
@@ -98,7 +98,7 @@ export function SupportChat({ orgId }: { orgId: string }) {
                   >
                     <p className="whitespace-pre-wrap break-words">{m.body}</p>
                   </div>
-                  <p className={`mt-0.5 text-[11px] text-zinc-400 ${mine ? 'text-right' : ''}`}>
+                  <p className={`mt-0.5 text-[11px] text-zinc-400 dark:text-zinc-500 ${mine ? 'text-right' : ''}`}>
                     {mine ? 'You' : 'Support'} · {new Date(m.createdAt).toLocaleString()}
                   </p>
                 </div>
@@ -122,7 +122,7 @@ export function SupportChat({ orgId }: { orgId: string }) {
         <button
           type="submit"
           disabled={sending || !body.trim()}
-          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-50"
+          className="rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
         >
           Send
         </button>

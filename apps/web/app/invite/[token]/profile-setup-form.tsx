@@ -7,9 +7,7 @@ import { SubmitButton } from '@/components/ui/submit-button';
 import { FormError } from '@/components/ui/form-error';
 import { Check } from '@/components/icons';
 
-const inputClass =
-  'w-full rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
-const labelClass = 'mb-1 block text-sm font-medium';
+import { inputClass, labelClass } from '@/components/ui/form';
 
 const USERNAME_RE = /^[a-z0-9._-]{3,30}$/;
 
@@ -152,7 +150,7 @@ export function ProfileSetupForm({
 
   const availabilityLine =
     availability === 'checking' ? (
-      <p className="mt-1 text-xs text-zinc-400">Checking…</p>
+      <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">Checking…</p>
     ) : availability === 'free' ? (
       <p className="mt-1 flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
         <Check size={12} /> {username} is available
@@ -160,7 +158,7 @@ export function ProfileSetupForm({
     ) : availability === 'taken' ? (
       <p className="mt-1 text-xs text-red-600 dark:text-red-400">{username} is taken — try another.</p>
     ) : availability === 'invalid' ? (
-      <p className="mt-1 text-xs text-zinc-400">3–30 characters: a–z, 0–9, dots, dashes, underscores.</p>
+      <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">3–30 characters: a–z, 0–9, dots, dashes, underscores.</p>
     ) : null;
 
   return (
@@ -183,7 +181,7 @@ export function ProfileSetupForm({
           tabIndex={-1}
           className={`${inputClass} cursor-not-allowed bg-zinc-50 text-zinc-400 dark:bg-zinc-900 dark:text-zinc-500`}
         />
-        <p className="mt-1 text-xs text-zinc-400">Locked — it's the address that was invited.</p>
+        <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">Locked — it's the address that was invited.</p>
       </div>
 
       <div>
@@ -226,11 +224,11 @@ export function ProfileSetupForm({
           />
         </div>
       </div>
-      <p className="-mt-2 text-xs text-zinc-400">WhatsApp number preferred — site notifications fall back to it.</p>
+      <p className="-mt-2 text-xs text-zinc-400 dark:text-zinc-500">WhatsApp number preferred — site notifications fall back to it.</p>
 
       <div>
         <label className={labelClass}>
-          Profile photo <span className="font-normal text-zinc-400">(optional)</span>
+          Profile photo <span className="font-normal text-zinc-400 dark:text-zinc-500">(optional)</span>
         </label>
         <div className="flex items-center gap-4">
           {avatarUrl ? (
@@ -272,7 +270,7 @@ export function ProfileSetupForm({
         </div>
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => handlePickedFile(e.target.files?.[0])} />
         <input ref={cameraRef} type="file" accept="image/*" capture="user" className="hidden" onChange={(e) => handlePickedFile(e.target.files?.[0])} />
-        <p className="mt-1 text-xs text-zinc-400">
+        <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
           {avatarError ?? 'Skipped? Your initials on this colour stand in everywhere.'}
         </p>
       </div>
@@ -286,12 +284,12 @@ export function ProfileSetupForm({
             </div>
             <div>
               <label className={labelClass}>
-                Trade <span className="font-normal text-zinc-400">(optional)</span>
+                Trade <span className="font-normal text-zinc-400 dark:text-zinc-500">(optional)</span>
               </label>
               <input name="trade" placeholder="e.g. Electrical" className={inputClass} />
             </div>
           </div>
-          <p className="mt-1 text-xs text-zinc-400">Shown because this invite is for a contractor.</p>
+          <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">Shown because this invite is for a contractor.</p>
         </div>
       )}
 

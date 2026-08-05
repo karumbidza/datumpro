@@ -67,7 +67,7 @@ export function ApprovalChain({
                     ? 'text-amber-600 dark:text-amber-400'
                     : s.id === active?.id
                       ? 'font-medium text-zinc-600 dark:text-zinc-300'
-                      : 'text-zinc-400'
+                      : 'text-zinc-400 dark:text-zinc-500'
               }
             >
               {s.decision === 'approved' ? '✓' : s.decision === 'rejected' ? '✕' : '○'}{' '}
@@ -106,7 +106,7 @@ export function ApprovalChain({
           >
             Approve
           </button>
-          <p className="mt-1 text-[11px] text-zinc-400">
+          <p className="mt-1 text-[11px] text-zinc-400 dark:text-zinc-500">
             Pending {ROLE_LABEL[active.approverRole] ?? active.approverRole} approval
           </p>
         </div>

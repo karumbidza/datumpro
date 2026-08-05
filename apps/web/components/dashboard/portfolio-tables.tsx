@@ -1,14 +1,10 @@
 import Link from 'next/link';
 import { Card, CardTitle } from '@/components/ui/card';
-import type { TaskPriority } from '@datumpro/shared/domain';
+import { Badge } from '@/components/ui/badge';
+import { PRIORITY_TONE } from '@/components/ui/tones';
+import { TASK_PRIORITY_LABELS } from '@datumpro/shared/domain';
+import { formatShortDate } from '@/lib/date';
 import type { UpcomingTask } from '@/lib/data/portfolio';
-
-const PRIORITY_PILL: Record<TaskPriority, string> = {
-  urgent: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
-  high: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
-  medium: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300',
-  low: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300',
-};
 
 export function UpcomingTasksTable({ tasks }: { tasks: UpcomingTask[] }) {
   return (
@@ -31,12 +27,10 @@ export function UpcomingTasksTable({ tasks }: { tasks: UpcomingTask[] }) {
                     {t.assigneeName ? ` · ${t.assigneeName}` : ''}
                   </p>
                 </div>
-                <span
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${PRIORITY_PILL[t.priority]}`}
-                >
-                  {t.priority}
+                <Badge tone={PRIORITY_TONE[t.priority]}>{TASK_PRIORITY_LABELS[t.priority]}</Badge>
+                <span className="w-24 text-right text-xs tabular-nums text-zinc-400 dark:text-zinc-500">
+                  {formatShortDate(t.dueDate)}
                 </span>
-                <span className="w-24 text-right text-xs tabular-nums text-zinc-400">{t.dueDate}</span>
               </Link>
             </li>
           ))}

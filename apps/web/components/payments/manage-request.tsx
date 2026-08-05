@@ -9,8 +9,7 @@ import type { ApprovalStep } from '@/lib/data/approvals';
 
 const BUCKET = 'project-media';
 
-const inputClass =
-  'w-full rounded-md border border-zinc-200 bg-transparent px-2.5 py-1.5 text-sm outline-none focus:border-brand-500 dark:border-zinc-800';
+import { inputCompactClass as inputClass } from '@/components/ui/form';
 
 /** Manager controls for one payment request. RLS + the DB trigger are the hard
  *  gate; this is the operator surface for approve / reject / mark-paid(+POP). */
@@ -104,7 +103,7 @@ export function ManageRequest({
         (rejectOpen ? (
         <div className="space-y-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
           <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-300">
-            Reason for rejecting <span className="text-zinc-400">(shared with the contractor)</span>
+            Reason for rejecting <span className="text-zinc-400 dark:text-zinc-500">(shared with the contractor)</span>
           </label>
           <textarea
             value={reason}
@@ -118,7 +117,7 @@ export function ManageRequest({
             <button
               disabled={busy || !reason.trim()}
               onClick={confirmReject}
-              className="rounded-md bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-500 disabled:opacity-50"
+              className="rounded-md bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
             >
               {busy ? 'Rejecting…' : 'Confirm reject'}
             </button>
@@ -128,7 +127,7 @@ export function ManageRequest({
                 setRejectOpen(false);
                 setReason('');
               }}
-              className="rounded-md px-3 py-1 text-xs text-zinc-500 hover:underline"
+              className="rounded-md px-3 py-1 text-xs text-zinc-500 dark:text-zinc-400 hover:underline"
             >
               Cancel
             </button>
@@ -139,7 +138,7 @@ export function ManageRequest({
           <button
             disabled={busy}
             onClick={() => setPayOpen(true)}
-            className="rounded-md bg-green-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-green-500 disabled:opacity-50"
+            className="rounded-md bg-green-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
           >
             Mark paid
           </button>
@@ -159,7 +158,7 @@ export function ManageRequest({
             placeholder="Payment reference (optional)"
             className={inputClass}
           />
-          <label className="block text-xs text-zinc-500">
+          <label className="block text-xs text-zinc-500 dark:text-zinc-400">
             Proof of payment (optional)
             <input
               type="file"
@@ -172,14 +171,14 @@ export function ManageRequest({
             <button
               disabled={busy}
               onClick={markPaid}
-              className="rounded-md bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-500 disabled:opacity-50"
+              className="rounded-md bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
             >
               {busy ? 'Saving…' : 'Confirm paid'}
             </button>
             <button
               disabled={busy}
               onClick={() => setPayOpen(false)}
-              className="rounded-md px-3 py-1 text-xs text-zinc-500 hover:underline"
+              className="rounded-md px-3 py-1 text-xs text-zinc-500 dark:text-zinc-400 hover:underline"
             >
               Cancel
             </button>

@@ -5,10 +5,10 @@ import { createClient } from '@/lib/supabase/client';
 import { passwordIssue } from '@datumpro/shared/validation';
 
 const fieldClass =
-  'flex h-11 w-full items-center gap-2.5 rounded-lg border border-zinc-200 bg-white px-[13px] text-sm text-zinc-900 transition focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/15 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100';
+  'flex h-11 w-full items-center gap-2.5 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 transition focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/15 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100';
 const inputClass = 'flex-1 bg-transparent outline-none placeholder:text-zinc-400';
 const primaryBtn =
-  'h-[46px] w-full rounded-lg bg-brand-500 text-[14.5px] font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50';
+  'h-11 w-full rounded-lg bg-brand-500 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50';
 
 type Step = 'email' | 'code' | 'password';
 
@@ -54,7 +54,12 @@ export function ForgotPasswordFlow({
       setStep('code');
       return;
     }
-    if (error) return setMessage({ kind: 'error', text: error.message });
+    if (error) {
+      return setMessage({
+        kind: 'error',
+        text: 'Please wait a moment before requesting another code — the previous one is still valid.',
+      });
+    }
     setMessage({ kind: 'info', text: `If an account exists for ${email.trim()}, a 6-digit code is on its way.` });
     setStep('code');
   }
@@ -69,11 +74,14 @@ export function ForgotPasswordFlow({
     const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token, type: 'recovery' });
     setBusy(false);
     if (error) {
+      // "Expired" from GoTrue also covers already-consumed tokens (each code is
+      // single-use, and every resend invalidates earlier codes) — steer the user
+      // to the NEWEST email rather than implying they were just slow.
       return setMessage({
         kind: 'error',
         text: /expired/i.test(error.message)
-          ? 'That code has expired. Tap “Resend code” for a fresh one.'
-          : 'That code is incorrect or expired. Check the latest email, or resend.',
+          ? 'That code is no longer valid — codes are single-use and a resend replaces older ones. Tap “Resend code” and use the code from the newest email.'
+          : 'That code is incorrect. Check the newest email, or resend.',
       });
     }
     setMessage(null);
@@ -112,7 +120,7 @@ export function ForgotPasswordFlow({
       </div>
 
       {step === 'email' && (
-        <form onSubmit={sendCode} className="flex flex-col gap-[13px]">
+        <form onSubmit={sendCode} className="flex flex-col gap-3">
           <div>
             <label className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Work email</label>
             <div className={fieldClass}>
@@ -135,7 +143,7 @@ export function ForgotPasswordFlow({
       )}
 
       {step === 'code' && (
-        <form onSubmit={verifyCode} className="flex flex-col gap-[13px]">
+        <form onSubmit={verifyCode} className="flex flex-col gap-3">
           <div>
             <label className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
               6-digit code sent to {email.trim()}
@@ -166,7 +174,7 @@ export function ForgotPasswordFlow({
                 setCode('');
                 setMessage(null);
               }}
-              className="text-zinc-500 hover:underline"
+              className="text-zinc-500 dark:text-zinc-400 hover:underline"
             >
               ← Change email
             </button>
@@ -183,7 +191,7 @@ export function ForgotPasswordFlow({
       )}
 
       {step === 'password' && (
-        <form onSubmit={setNewPassword} className="flex flex-col gap-[13px]">
+        <form onSubmit={setNewPassword} className="flex flex-col gap-3">
           <div>
             <label className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">New password</label>
             <div className={fieldClass}>
@@ -201,7 +209,7 @@ export function ForgotPasswordFlow({
               <button
                 type="button"
                 onClick={() => setShowPassword((s) => !s)}
-                className="text-zinc-400 transition hover:text-zinc-600 dark:hover:text-zinc-300"
+                className="text-zinc-400 dark:text-zinc-500 transition hover:text-zinc-600 dark:hover:text-zinc-300"
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
                 {showPassword ? <EyeOffIcon /> : <EyeIcon />}
@@ -231,7 +239,7 @@ export function ForgotPasswordFlow({
 
       {message && (
         <p
-          className={`mt-4 text-center text-[13.5px] ${
+          className={`mt-4 text-center text-sm ${
             message.kind === 'error' ? 'text-red-500' : 'text-zinc-600 dark:text-zinc-300'
           }`}
         >
@@ -242,7 +250,7 @@ export function ForgotPasswordFlow({
       <button
         type="button"
         onClick={onBack}
-        className="mx-auto mt-6 block text-xs text-zinc-500 hover:underline"
+        className="mx-auto mt-6 block text-xs text-zinc-500 dark:text-zinc-400 hover:underline"
       >
         ← Back to sign in
       </button>
@@ -254,7 +262,7 @@ export function ForgotPasswordFlow({
 
 function MailIcon() {
   return (
-    <svg className="h-4 w-4 flex-none text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+    <svg className="h-4 w-4 flex-none text-zinc-400 dark:text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
       <rect x="2" y="4" width="20" height="16" rx="2" />
       <path d="m2 7 10 6 10-6" />
     </svg>
@@ -263,7 +271,7 @@ function MailIcon() {
 
 function LockIcon() {
   return (
-    <svg className="h-4 w-4 flex-none text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+    <svg className="h-4 w-4 flex-none text-zinc-400 dark:text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
       <rect x="3" y="11" width="18" height="10" rx="2" />
       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>

@@ -36,6 +36,12 @@ export function formatDayMonth(date: Date): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+/** "Jul 19, 2026" style label — the default way to render a stored date. */
+export function formatShortDate(value: string | Date | null | undefined): string {
+  const d = parseDate(value);
+  return d ? d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+}
+
 /** "Monday, 3 June 2026" style label for the dashboard header. */
 export function formatLongDate(date: Date): string {
   return date.toLocaleDateString('en-US', {
