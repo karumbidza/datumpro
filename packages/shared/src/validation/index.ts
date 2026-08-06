@@ -4,6 +4,7 @@
 import { z } from 'zod';
 import { ORG_ROLES } from '../access/roles';
 import { PROJECT_TYPES, CONSTRUCTION_TYPES, CURRENCIES, DURATION_UNITS } from '../domain/projects';
+import { BOQ_INDUSTRIES } from '../domain/boq';
 import { REQUEST_TYPES } from '../domain/requests';
 import { REPORT_STATUSES, WEATHER_OPTIONS } from '../domain/monitoring';
 import { PAYMENT_METHODS } from '../domain/finance';
@@ -117,6 +118,19 @@ export const createClientSchema = z.object({
   phone: z.string().trim().max(40).optional().or(z.literal('')),
 });
 export type CreateClientInput = z.infer<typeof createClientSchema>;
+
+/** New BOQ header — the "Start a new BOQ" form. Only the name is required; a bill
+ *  can be an unnamed-client template. Sections and items are added in the builder. */
+export const createBoqSchema = z.object({
+  name: z.string().trim().min(2).max(200),
+  clientName: z.string().trim().max(200).optional().or(z.literal('')),
+  industry: z.enum(BOQ_INDUSTRIES).optional(),
+  reference: z.string().trim().max(80).optional().or(z.literal('')),
+  location: z.string().trim().max(160).optional().or(z.literal('')),
+  boqDate: z.string().date().optional().or(z.literal('')),
+  currency: z.enum(CURRENCIES).default('USD'),
+});
+export type CreateBoqInput = z.infer<typeof createBoqSchema>;
 
 export const createRequestSchema = z.object({
   projectId: z.string().uuid(),

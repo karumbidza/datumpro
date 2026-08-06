@@ -1,6 +1,7 @@
 import {
   LayoutDashboard,
   FolderOpen,
+  FileText,
   Building,
   Calendar,
   CheckSquare,
@@ -59,6 +60,7 @@ export function computeNav(
   return [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'All projects', href: '/projects', icon: FolderOpen },
+    { name: 'Estimates', href: '/estimates', icon: FileText },
     // One "Finance" item: managers → the org finance hub; an assignee without
     // finance access → their own statement. Same label, role-appropriate target.
     ...(canViewFinance
