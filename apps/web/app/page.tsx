@@ -86,8 +86,8 @@ function JsonLd() {
       url: BASE,
       logo: `${BASE}/icon-512.png`,
       description:
-        'Project management software by Grafaid Engineers for real-world work across construction, healthcare, agriculture and more — delivery, tendering and payments with a full audit trail.',
-      parentOrganization: { '@type': 'Organization', name: 'Grafaid Engineers' },
+        'Project management software by Quillstone Digital for real-world work across construction, healthcare, agriculture and more — delivery, tendering and payments with a full audit trail.',
+      parentOrganization: { '@type': 'Organization', name: 'Quillstone Digital' },
     },
     {
       '@context': 'https://schema.org',
@@ -772,7 +772,7 @@ function Footer() {
   return (
     <footer className="border-t border-zinc-200 dark:border-zinc-800">
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-8 text-xs text-zinc-500 dark:text-zinc-400 sm:flex-row sm:px-6 lg:px-8">
-        <p>© 2026 DatumPro · by Grafaid Engineers</p>
+        <p>© 2026 DatumPro · by Quillstone Digital</p>
         <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
           <Link href="/terms" className="hover:underline">Terms</Link>
           <Link href="/privacy" className="hover:underline">Privacy</Link>

@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
   title: { default: 'DatumPro', template: '%s · DatumPro' },
   description:
-    'Construction project management software — tasks & timelines, sealed tenders, contractor payments and approvals with a full audit trail. By Grafaid Engineers.',
+    'Construction project management software — tasks & timelines, sealed tenders, contractor payments and approvals with a full audit trail. By Quillstone Digital.',
   applicationName: 'DatumPro',
   openGraph: {
     title: 'DatumPro',

@@ -2,7 +2,7 @@
   "name": "datumpro",
   "private": true,
   "version": "0.1.0",
-  "description": "DatumPro — universal project management with remote monitoring & finance. By Grafaid Engineers.",
+  "description": "DatumPro — universal project management with remote monitoring & finance. By Quillstone Digital.",
   "packageManager": "pnpm@9.12.0",
   "engines": {
     "node": ">=20"

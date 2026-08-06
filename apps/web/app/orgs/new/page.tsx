@@ -45,13 +45,13 @@ export default async function NewOrgPage({
         <form action={createOrg} className="mt-6 space-y-3">
           <div>
             <label className="mb-1 block text-xs font-medium">Company name</label>
-            <input name="name" required placeholder="e.g. Grafaid Engineers" className={inputClass} />
+            <input name="name" required placeholder="e.g. Acme Construction" className={inputClass} />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium">
               Legal / registered name <span className="text-zinc-400 dark:text-zinc-500">(optional)</span>
             </label>
-            <input name="legalName" placeholder="e.g. Grafaid Engineers Ltd" className={inputClass} />
+            <input name="legalName" placeholder="e.g. Acme Construction (Private) Limited" className={inputClass} />
           </div>
           <div className="flex gap-3">
             <div className="flex-1">
