@@ -22,7 +22,7 @@ export default async function NewOrgPage({
   return (
     <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-6 py-12">
       <Card>
-        <p className="text-xs font-medium uppercase tracking-wide text-brand-600">Step 1 of 2 · Your company</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-brand-600 dark:text-brand-400">Step 1 of 2 · Your company</p>
         <h1 className="mt-1 text-lg font-semibold tracking-tight">Set up your company</h1>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
           This is your tenant — you&apos;ll be the owner. A short profile keeps your workspace on record and
@@ -45,24 +45,24 @@ export default async function NewOrgPage({
         <form action={createOrg} className="mt-6 space-y-3">
           <div>
             <label className="mb-1 block text-xs font-medium">Company name</label>
-            <input name="name" required placeholder="e.g. Grafaid Engineers" className={inputClass} />
+            <input name="name" required placeholder="e.g. Acme Construction" className={inputClass} />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium">
-              Legal / registered name <span className="text-zinc-400 dark:text-zinc-500">(optional)</span>
+              Legal / registered name <span className="text-zinc-500 dark:text-zinc-400">(optional)</span>
             </label>
-            <input name="legalName" placeholder="e.g. Grafaid Engineers Ltd" className={inputClass} />
+            <input name="legalName" placeholder="e.g. Acme Construction (Private) Limited" className={inputClass} />
           </div>
           <div className="flex gap-3">
             <div className="flex-1">
               <label className="mb-1 block text-xs font-medium">
-                Country <span className="text-zinc-400 dark:text-zinc-500">(optional)</span>
+                Country <span className="text-zinc-500 dark:text-zinc-400">(optional)</span>
               </label>
               <input name="country" placeholder="e.g. Zimbabwe" className={inputClass} />
             </div>
             <div className="flex-1">
               <label className="mb-1 block text-xs font-medium">
-                Sector <span className="text-zinc-400 dark:text-zinc-500">(optional)</span>
+                Sector <span className="text-zinc-500 dark:text-zinc-400">(optional)</span>
               </label>
               <select name="sector" defaultValue="" className={inputClass}>
                 <option value="">Select…</option>
@@ -76,7 +76,7 @@ export default async function NewOrgPage({
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium">
-              Registration number <span className="text-zinc-400 dark:text-zinc-500">(optional)</span>
+              Registration number <span className="text-zinc-500 dark:text-zinc-400">(optional)</span>
             </label>
             <input name="registrationNumber" placeholder="Company / entity reg. number" className={inputClass} />
           </div>

@@ -36,6 +36,16 @@ export function MobileNav({ projects, orgs, activeOrgId, email, canManageMembers
     setOpen(false);
   }, [pathname]);
 
+  // Close on Escape while the drawer is open (keyboard accessibility).
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
+
   return (
     <div className="md:hidden">
       <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-zinc-200 bg-white px-4 dark:border-zinc-800 dark:bg-zinc-950">
@@ -63,7 +73,12 @@ export function MobileNav({ projects, orgs, activeOrgId, email, canManageMembers
             className="absolute inset-0 bg-black/40"
             onClick={() => setOpen(false)}
           />
-          <aside className="absolute left-0 top-0 flex h-full w-72 max-w-[85%] flex-col border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+          <aside
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation menu"
+            className="absolute left-0 top-0 flex h-full w-72 max-w-[85%] flex-col border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950"
+          >
             <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
               <span className="flex items-center gap-2">
                 <BrandMark size={26} />

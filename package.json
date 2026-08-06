@@ -2,7 +2,7 @@
   "name": "datumpro",
   "private": true,
   "version": "0.1.0",
-  "description": "DatumPro — universal project management with remote monitoring & finance. By Grafaid Engineers.",
+  "description": "DatumPro — universal project management with remote monitoring & finance. By Quillstone Digital.",
   "packageManager": "pnpm@9.12.0",
   "engines": {
     "node": ">=20"
@@ -16,7 +16,8 @@
     "db:start": "supabase start",
     "db:reset": "supabase db reset",
     "db:diff": "supabase db diff",
-    "db:types": "supabase gen types typescript --local > packages/shared/src/db/database.types.ts"
+    "db:types": "supabase gen types typescript --local > packages/shared/src/db/database.types.ts",
+    "test:rls": "psql \"${DATABASE_URL:-postgresql://postgres:postgres@127.0.0.1:54322/postgres}\" -v ON_ERROR_STOP=1 -f supabase/tests/rls_security.sql"
   },
   "devDependencies": {
     "@eslint/js": "^9",

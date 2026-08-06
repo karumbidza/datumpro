@@ -35,7 +35,7 @@ export default async function EnterprisePage({
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">
-      <p className="text-xs font-medium uppercase tracking-wide text-brand-600">Government &amp; enterprise</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-brand-600 dark:text-brand-400">Government &amp; enterprise</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">DatumPro for larger organisations</h1>
       <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
         For corporates, construction firms, NGOs, and government teams with procurement, identity, and
@@ -58,7 +58,7 @@ export default async function EnterprisePage({
             <p className="text-sm text-zinc-700 dark:text-zinc-200">
               Thanks — we’ve received your request and a member of the DatumPro team will be in touch shortly.
             </p>
-            <Link href="/sign-in" className="mt-3 inline-block text-sm text-brand-600 hover:underline">
+            <Link href="/sign-in" className="mt-3 inline-block text-sm text-brand-600 dark:text-brand-400 hover:underline">
               Back to sign in →
             </Link>
           </Card>
@@ -70,14 +70,24 @@ export default async function EnterprisePage({
               </p>
             )}
             <form action={submitEnterpriseRequest} className="space-y-3">
+              {/* Honeypot (spam trap, assessment F6): hidden from real users; bots
+                  that auto-fill every field will populate it and the server
+                  silently drops the submission. Not display:none so headless
+                  crawlers that skip hidden inputs still see it. */}
+              <div aria-hidden className="absolute left-[-9999px] top-[-9999px] h-0 w-0 overflow-hidden" data-hp>
+                <label>
+                  Website
+                  <input name="website" type="text" tabIndex={-1} autoComplete="off" />
+                </label>
+              </div>
               <div className="flex gap-3">
                 <div className="flex-1">
-                  <label className="mb-1 block text-xs font-medium">Organisation</label>
-                  <input name="orgName" required placeholder="e.g. Ministry of Public Works" className={inputClass} />
+                  <label htmlFor="orgName" className="mb-1 block text-xs font-medium">Organisation</label>
+                  <input id="orgName" name="orgName" required placeholder="e.g. Ministry of Public Works" className={inputClass} />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium">Buyer type</label>
-                  <select name="buyerType" defaultValue="" className={inputClass}>
+                  <label htmlFor="buyerType" className="mb-1 block text-xs font-medium">Buyer type</label>
+                  <select id="buyerType" name="buyerType" defaultValue="" className={inputClass}>
                     <option value="">Select…</option>
                     <option value="government">Government</option>
                     <option value="enterprise">Enterprise</option>
@@ -89,29 +99,29 @@ export default async function EnterprisePage({
               </div>
               <div className="flex gap-3">
                 <div className="flex-1">
-                  <label className="mb-1 block text-xs font-medium">Your name</label>
-                  <input name="contactName" placeholder="Full name" className={inputClass} />
+                  <label htmlFor="contactName" className="mb-1 block text-xs font-medium">Your name</label>
+                  <input id="contactName" name="contactName" placeholder="Full name" className={inputClass} />
                 </div>
                 <div className="flex-1">
-                  <label className="mb-1 block text-xs font-medium">Work email</label>
-                  <input name="contactEmail" type="email" required placeholder="you@org.gov" className={inputClass} />
+                  <label htmlFor="contactEmail" className="mb-1 block text-xs font-medium">Work email</label>
+                  <input id="contactEmail" name="contactEmail" type="email" required placeholder="you@org.gov" className={inputClass} />
                 </div>
               </div>
               <div className="flex gap-3">
                 <div className="flex-1">
-                  <label className="mb-1 block text-xs font-medium">Country</label>
-                  <input name="country" placeholder="e.g. Zimbabwe" className={inputClass} />
+                  <label htmlFor="country" className="mb-1 block text-xs font-medium">Country</label>
+                  <input id="country" name="country" placeholder="e.g. Zimbabwe" className={inputClass} />
                 </div>
                 <div className="flex-1">
-                  <label className="mb-1 block text-xs font-medium">Team size</label>
-                  <input name="teamSize" placeholder="e.g. 50–200" className={inputClass} />
+                  <label htmlFor="teamSize" className="mb-1 block text-xs font-medium">Team size</label>
+                  <input id="teamSize" name="teamSize" placeholder="e.g. 50–200" className={inputClass} />
                 </div>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium">
-                  What do you need? <span className="text-zinc-400 dark:text-zinc-500">(SSO, residency, timelines…)</span>
+                <label htmlFor="needs" className="mb-1 block text-xs font-medium">
+                  What do you need? <span className="text-zinc-500 dark:text-zinc-400">(SSO, residency, timelines…)</span>
                 </label>
-                <textarea name="needs" rows={3} className={inputClass} />
+                <textarea id="needs" name="needs" rows={3} className={inputClass} />
               </div>
               <SubmitButton className="w-full" pendingText="Sending…">
                 Request access

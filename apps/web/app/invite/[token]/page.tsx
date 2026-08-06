@@ -53,7 +53,7 @@ export default async function InvitePage({
             <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
               This invitation to <strong>{preview.orgName}</strong> is no longer active.
             </p>
-            <Link href="/dashboard" className="mt-4 inline-block text-sm text-brand-600 hover:underline">
+            <Link href="/dashboard" className="mt-4 inline-block text-sm text-brand-600 dark:text-brand-400 hover:underline">
               Go to dashboard →
             </Link>
           </>

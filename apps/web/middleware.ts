@@ -1,13 +1,45 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { env } from '@/lib/env';
+import { clientIp, rateLimit } from '@/lib/rate-limit';
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
+
+/** Per-IP edge rate limits for the machine-callable API surface. The
+ *  bearer-guarded admin/support endpoints get a tighter cap so the secret can't
+ *  be brute-forced by volume; other API routes get a general abuse ceiling.
+ *  (App reads/writes are additionally protected by Supabase Auth limits + RLS,
+ *  and the enterprise form is throttled in its RPC.) */
+async function apiRateLimit(request: NextRequest): Promise<NextResponse | null> {
+  const path = request.nextUrl.pathname;
+  if (!path.startsWith('/api/')) return null;
+
+  const sensitive = path.startsWith('/api/admin') || path.startsWith('/api/support');
+  const limit = sensitive ? 20 : 60; // requests per minute per IP
+  const ip = clientIp(request.headers);
+  const bucket = sensitive ? 'api-sensitive' : 'api';
+
+  const { ok, remaining, reset } = await rateLimit(`${bucket}:${ip}`, limit, 60);
+  if (ok) return null;
+
+  return new NextResponse('Too Many Requests', {
+    status: 429,
+    headers: {
+      'Retry-After': String(Math.max(1, Math.ceil((reset - Date.now()) / 1000))),
+      'X-RateLimit-Limit': String(limit),
+      'X-RateLimit-Remaining': String(remaining),
+    },
+  });
+}
 
 /** Refreshes the Supabase session cookie on every request and gates the
  *  authenticated app area. Unauthed users hitting /dashboard|/projects|/finance
  *  are redirected to /sign-in. */
 export async function middleware(request: NextRequest) {
+  // Rate limit the API surface before any session work.
+  const limited = await apiRateLimit(request);
+  if (limited) return limited;
+
   const response = NextResponse.next({ request });
 
   const supabase = createServerClient(

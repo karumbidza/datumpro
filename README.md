@@ -1,6 +1,6 @@
 # DatumPro
 
-Universal project management with **remote monitoring** and a real **finance module** (budgets, invoices, proof-of-payment, Paynow collection, variations). First vertical: **construction**. By **Grafaid Engineers**.
+Universal project management with **remote monitoring** and a real **finance module** (budgets, invoices, proof-of-payment, Paynow collection, variations). First vertical: **construction**. By **Quillstone Digital**.
 
 > Multi-tenant SaaS. One backend, two clients: an offline-first **mobile field app** (Expo) and a **web dashboard** (Next.js), over **Supabase** (Postgres + RLS + Storage + Auth).
 

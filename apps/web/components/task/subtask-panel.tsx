@@ -551,7 +551,7 @@ export function SubtaskPanel({
                               <button
                                 type="button"
                                 onClick={() => setConfirmStep(s)}
-                                className="text-xs font-medium text-brand-600 hover:underline"
+                                className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline"
                               >
                                 Mark complete
                               </button>
@@ -774,7 +774,7 @@ export function SubtaskPanel({
                   <button
                     type="button"
                     onClick={() => setVariationOpen(true)}
-                    className="mt-2 text-[11px] font-medium text-brand-600 hover:underline"
+                    className="mt-2 text-[11px] font-medium text-brand-600 dark:text-brand-400 hover:underline"
                   >
                     + Add a variation (needs approval)
                   </button>
@@ -845,7 +845,7 @@ export function SubtaskPanel({
                   <button
                     type="button"
                     onClick={() => setExtensionOpen(true)}
-                    className="mt-2 text-[11px] font-medium text-brand-600 hover:underline"
+                    className="mt-2 text-[11px] font-medium text-brand-600 dark:text-brand-400 hover:underline"
                   >
                     + Request an extension (needs approval)
                   </button>

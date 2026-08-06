@@ -153,7 +153,7 @@ export default function SignInPage({
         </div>
 
         {/* Divider */}
-        <div className="my-5 flex items-center gap-3 text-xs text-zinc-400 dark:text-zinc-500">
+        <div className="my-5 flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400">
           <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
           or with email
           <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
@@ -183,7 +183,7 @@ export default function SignInPage({
                     setMessage(null);
                     setView('forgot');
                   }}
-                  className="text-xs font-medium text-brand-600 hover:underline"
+                  className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline"
                 >
                   Forgot?
                 </button>
@@ -273,18 +273,18 @@ export default function SignInPage({
       </div>
 
       {/* Legal + enterprise entry point — pinned to the bottom of the canvas */}
-      <div className="absolute inset-x-0 bottom-6 z-10 mx-auto flex w-full max-w-[400px] flex-wrap items-center justify-between gap-2 px-6 text-xs text-zinc-400 dark:text-zinc-500">
+      <div className="absolute inset-x-0 bottom-6 z-10 mx-auto flex w-full max-w-[400px] flex-wrap items-center justify-between gap-2 px-6 text-xs text-zinc-500 dark:text-zinc-400">
         <span>
           © 2026 DatumPro ·{' '}
-          <a href="/security" className="text-zinc-500 dark:text-zinc-400 hover:underline">
+          <a href="/terms" className="font-medium underline underline-offset-2 hover:text-brand-600">
             Terms
           </a>{' '}
           ·{' '}
-          <a href="/security" className="text-zinc-500 dark:text-zinc-400 hover:underline">
+          <a href="/privacy" className="font-medium underline underline-offset-2 hover:text-brand-600">
             Privacy
           </a>
         </span>
-        <a href="/enterprise" className="text-zinc-500 dark:text-zinc-400 hover:text-brand-600 hover:underline">
+        <a href="/enterprise" className="font-medium underline underline-offset-2 hover:text-brand-600">
           For government &amp; enterprise →
         </a>
       </div>

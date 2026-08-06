@@ -71,7 +71,7 @@ export function DocAttach({
                 href={d.url ?? '#'}
                 target="_blank"
                 rel="noreferrer"
-                className="flex min-w-0 items-center gap-1.5 text-brand-600 hover:underline"
+                className="flex min-w-0 items-center gap-1.5 text-brand-600 dark:text-brand-400 hover:underline"
               >
                 <span aria-hidden>📄</span>
                 <span className="truncate">{d.filename}</span>

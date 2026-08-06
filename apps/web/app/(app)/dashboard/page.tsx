@@ -166,7 +166,7 @@ export default async function DashboardPage() {
         <Card>
           <div className="flex items-center justify-between gap-3">
             <CardTitle>My payments</CardTitle>
-            <Link href="/payments" className="text-xs font-medium text-brand-600 hover:underline dark:text-brand-400">
+            <Link href="/payments" className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline dark:text-brand-400">
               View all →
             </Link>
           </div>

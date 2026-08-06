@@ -105,7 +105,7 @@ export function ApprovalsInbox({ items }: { items: PendingApproval[] }) {
                     </Link>
                     <Link
                       href={href(t)}
-                      className="ml-auto text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
+                      className="ml-auto text-sm font-medium text-brand-600 dark:text-brand-400 hover:underline dark:text-brand-400"
                     >
                       Open full detail →
                     </Link>

@@ -173,26 +173,51 @@ export function TimelineOverview({
       if (t.start < minDate) minDate = t.start;
       if (t.end > maxDate) maxDate = t.end;
     }
-    const start = startOfDay(addDays(minDate, -7));
-    const end = startOfDay(addDays(maxDate, 14));
+    let start = startOfDay(addDays(minDate, -7));
+    let end = startOfDay(addDays(maxDate, 14));
+    if (scale === 'month') {
+      // Month scale reads as a year planner: always span at least the whole
+      // current year (data can extend it), aligned to real month boundaries,
+      // so the year looks complete even when the schedule is sparse.
+      const yearStart = new Date(today.getFullYear(), 0, 1);
+      const yearEnd = new Date(today.getFullYear(), 11, 31);
+      if (yearStart < start) start = yearStart;
+      if (yearEnd > end) end = yearEnd;
+      start = new Date(start.getFullYear(), start.getMonth(), 1);
+      end = new Date(end.getFullYear(), end.getMonth() + 1, 0); // last day of end month
+    }
     const numDays = differenceInDays(end, start) + 1;
     const daysArr = Array.from({ length: numDays }, (_, i) => startOfDay(addDays(start, i)));
     return { tasks: scheduled, startDate: start, totalDays: numDays, days: daysArr };
-  }, [input]);
+  }, [input, scale]);
 
   const scaleColumns = useMemo(() => {
     if (scale === 'day') return [];
-    const step = SCALES[scale].days;
     const cols: { key: string; label: string; width: number }[] = [];
+    if (scale === 'month') {
+      // Real calendar months (the window is month-aligned above), each column
+      // exactly as wide as its month.
+      const windowEnd = addDays(startDate, totalDays - 1);
+      let d = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+      while (d <= windowEnd) {
+        const next = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+        const to = next > windowEnd ? addDays(windowEnd, 1) : next;
+        cols.push({
+          key: d.toISOString(),
+          label: d.toLocaleString('en-US', { month: 'short', year: '2-digit' }),
+          width: differenceInDays(to, d) * DAY_WIDTH,
+        });
+        d = next;
+      }
+      return cols;
+    }
+    const step = SCALES[scale].days;
     for (let i = 0; i < totalDays; i += step) {
       const d = addDays(startDate, i);
       const span = Math.min(step, totalDays - i);
       cols.push({
         key: d.toISOString(),
-        label:
-          scale === 'week'
-            ? `W${weekNumber(d)}`
-            : d.toLocaleString('en-US', { month: 'short', year: '2-digit' }),
+        label: `W${weekNumber(d)}`,
         width: span * DAY_WIDTH,
       });
     }

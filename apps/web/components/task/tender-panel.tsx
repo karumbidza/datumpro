@@ -120,7 +120,7 @@ export function TenderPanel({
                     <ul className="mt-2 space-y-1">
                       {(bidDocs[inv.contractorId] ?? []).map((d) => (
                         <li key={d.id}>
-                          <a href={d.url ?? '#'} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs text-brand-600 hover:underline">
+                          <a href={d.url ?? '#'} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs text-brand-600 dark:text-brand-400 hover:underline">
                             <span aria-hidden>📄</span>
                             <span className="truncate">{d.filename}</span>
                           </a>
@@ -149,7 +149,7 @@ export function TenderPanel({
       {!decided && availableContractors.length > 0 && (
         <div className="mt-3 border-t border-zinc-100 pt-3 dark:border-zinc-800">
           {!inviteOpen ? (
-            <button type="button" onClick={() => setInviteOpen(true)} className="text-[11px] font-medium text-brand-600 hover:underline">
+            <button type="button" onClick={() => setInviteOpen(true)} className="text-[11px] font-medium text-brand-600 dark:text-brand-400 hover:underline">
               + Invite more contractors
             </button>
           ) : (
