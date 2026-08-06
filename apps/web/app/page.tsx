@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { Button } from '@/components/ui/button';
+import { ManageCookiesLink } from '@/components/consent/manage-cookies-link';
 
 const BASE = process.env.NEXT_PUBLIC_APP_URL || 'https://datumpro.app';
 
@@ -772,11 +773,12 @@ function Footer() {
     <footer className="border-t border-zinc-200 dark:border-zinc-800">
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-8 text-xs text-zinc-500 dark:text-zinc-400 sm:flex-row sm:px-6 lg:px-8">
         <p>© 2026 DatumPro · by Grafaid Engineers</p>
-        <div className="flex items-center gap-5">
-          <a href="/security" className="hover:underline">Terms</a>
-          <a href="/security" className="hover:underline">Privacy</a>
+        <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+          <Link href="/terms" className="hover:underline">Terms</Link>
+          <Link href="/privacy" className="hover:underline">Privacy</Link>
           <Link href="/security" className="hover:underline">Security</Link>
           <Link href="/enterprise" className="hover:underline">Enterprise</Link>
+          <ManageCookiesLink className="hover:underline" />
         </div>
       </div>
     </footer>
