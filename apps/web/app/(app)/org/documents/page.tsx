@@ -73,7 +73,7 @@ export default async function OrgDocumentsPage() {
                             {d.fileUrl && (
                               <>
                                 {' · '}
-                                <a href={d.fileUrl} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline dark:text-brand-400">
+                                <a href={d.fileUrl} target="_blank" rel="noreferrer" className="text-brand-600 dark:text-brand-400 hover:underline dark:text-brand-400">
                                   view
                                 </a>
                               </>

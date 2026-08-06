@@ -100,7 +100,7 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
                         {r.invoiceUrl && (
                           <>
                             {' · '}
-                            <a href={r.invoiceUrl} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline dark:text-brand-400">
+                            <a href={r.invoiceUrl} target="_blank" rel="noreferrer" className="text-brand-600 dark:text-brand-400 hover:underline dark:text-brand-400">
                               {r.invoiceName ?? 'invoice'}
                             </a>
                           </>

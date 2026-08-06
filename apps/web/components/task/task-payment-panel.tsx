@@ -76,7 +76,7 @@ export function TaskPaymentPanel({
                         href={r.invoiceUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-xs text-brand-600 hover:underline dark:text-brand-400"
+                        className="text-xs text-brand-600 dark:text-brand-400 hover:underline dark:text-brand-400"
                       >
                         view invoice
                       </a>

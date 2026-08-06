@@ -128,7 +128,7 @@ export function MembersRoster({
 
             {isAdmin && !disabled && projects.length > 0 && (
               <details className="mt-2 border-t border-zinc-100 pt-2 dark:border-zinc-800">
-                <summary className="cursor-pointer text-xs text-brand-600 hover:underline">
+                <summary className="cursor-pointer text-xs text-brand-600 dark:text-brand-400 hover:underline">
                   Assign to a project
                 </summary>
                 <form action={assignMemberToProject} className="mt-2 flex flex-wrap items-center gap-2">

@@ -26,14 +26,14 @@ export default function TermsPage() {
     <main className="mx-auto max-w-2xl px-6 py-12">
       <DraftNotice />
 
-      <p className="text-xs font-medium uppercase tracking-wide text-brand-600">Legal</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-brand-600 dark:text-brand-400">Legal</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Terms of Service</h1>
       <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Last updated: {LEGAL.lastUpdated}</p>
 
       <P>
-        These Terms of Service (“Terms”) are an agreement between you and {LEGAL.legalEntity}
-        (“{LEGAL.product}”, “we”, “us”) and govern your access to and use of the {LEGAL.product} website
-        and application (the “Service”). By creating an account or using the Service, you agree to these
+        These Terms of Service (“Terms”) are an agreement between you and {LEGAL.legalEntity}, which
+        provides {LEGAL.product} through its {LEGAL.department} division (“{LEGAL.product}”, “we”, “us”),
+        and govern your access to and use of the {LEGAL.product} website and application (the “Service”). By creating an account or using the Service, you agree to these
         Terms. If you are entering into these Terms on behalf of an organisation, you confirm you have
         authority to bind that organisation.
       </P>

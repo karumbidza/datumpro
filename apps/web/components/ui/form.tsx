@@ -14,8 +14,9 @@ export const inputCompactClass =
 
 export const labelClass = 'mb-1 block text-sm font-medium';
 
-/** Helper line under a field — tier-2 muted. */
-export const hintClass = 'mt-1 text-xs text-zinc-400 dark:text-zinc-500';
+/** Helper line under a field — tier-2 muted. zinc-500 on light meets WCAG AA
+ *  contrast (zinc-400 did not); zinc-400 on the dark surface also passes. */
+export const hintClass = 'mt-1 text-xs text-zinc-500 dark:text-zinc-400';
 
 export function Input({ className = '', ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={`${inputClass} ${className}`} {...props} />;

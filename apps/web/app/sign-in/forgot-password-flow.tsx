@@ -114,7 +114,7 @@ export function ForgotPasswordFlow({
   return (
     <div className="mt-8">
       <div className="mb-5 flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">
+        <p className="text-xs font-semibold uppercase tracking-wide text-brand-600 dark:text-brand-400">
           Reset password · Step {step === 'email' ? 1 : step === 'code' ? 2 : 3} of 3
         </p>
       </div>
@@ -182,7 +182,7 @@ export function ForgotPasswordFlow({
               type="button"
               onClick={() => sendCode()}
               disabled={busy}
-              className="font-medium text-brand-600 hover:underline disabled:opacity-50"
+              className="font-medium text-brand-600 dark:text-brand-400 hover:underline disabled:opacity-50"
             >
               Resend code
             </button>

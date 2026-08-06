@@ -147,7 +147,7 @@ export function NewProjectForm({
       {/* Description */}
       <div>
         <label className={labelClass}>
-          Description <span className="font-normal text-zinc-400 dark:text-zinc-500">(optional)</span>
+          Description <span className="font-normal text-zinc-500 dark:text-zinc-400">(optional)</span>
         </label>
         <textarea
           name="description"
@@ -165,7 +165,7 @@ export function NewProjectForm({
           <input
             readOnly
             value="Assigned on save · DP-YYYY-###"
-            className={`${inputClass} cursor-not-allowed text-zinc-400 dark:text-zinc-500`}
+            className={`${inputClass} cursor-not-allowed text-zinc-500 dark:text-zinc-400`}
             tabIndex={-1}
           />
         </div>
@@ -349,7 +349,7 @@ export function NewProjectForm({
         </div>
         <div>
           <label className={labelClass}>
-            Contract value ({currency}) <span className="font-normal text-zinc-400 dark:text-zinc-500">(optional)</span>
+            Contract value ({currency}) <span className="font-normal text-zinc-500 dark:text-zinc-400">(optional)</span>
           </label>
           <input type="number" name="contractValue" min={0} step="0.01" placeholder="0.00" className={inputClass} />
         </div>
@@ -358,7 +358,7 @@ export function NewProjectForm({
       {/* Team members — org members picked onto the project at creation */}
       <div>
         <label className={labelClass}>
-          Team members <span className="font-normal text-zinc-400 dark:text-zinc-500">(optional)</span>
+          Team members <span className="font-normal text-zinc-500 dark:text-zinc-400">(optional)</span>
         </label>
         <select
           value=""
@@ -403,7 +403,7 @@ export function NewProjectForm({
             })}
           </div>
         )}
-        <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
+        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
           Added as contributors — the manager and you are on the project automatically.
         </p>
       </div>

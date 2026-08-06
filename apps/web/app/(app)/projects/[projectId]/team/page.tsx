@@ -142,7 +142,7 @@ export default async function ProjectTeamPage({
             {addable.length === 0 ? (
               <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
                 Everyone in this company is already on the project. To bring in someone new,{' '}
-                <Link href="/org/members" className="text-brand-600 hover:underline">
+                <Link href="/org/members" className="text-brand-600 dark:text-brand-400 hover:underline">
                   invite them to the company
                 </Link>{' '}
                 first, then add them here.

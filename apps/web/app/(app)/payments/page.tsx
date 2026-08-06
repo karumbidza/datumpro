@@ -150,7 +150,7 @@ export default async function MyPaymentsPage() {
                       {r.invoiceUrl && (
                         <>
                           {' · '}
-                          <a href={r.invoiceUrl} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline dark:text-brand-400">
+                          <a href={r.invoiceUrl} target="_blank" rel="noreferrer" className="text-brand-600 dark:text-brand-400 hover:underline dark:text-brand-400">
                             {r.invoiceName ?? 'invoice'}
                           </a>
                         </>
@@ -212,7 +212,7 @@ export default async function MyPaymentsPage() {
                     {d.fileUrl && (
                       <>
                         {' · '}
-                        <a href={d.fileUrl} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline dark:text-brand-400">
+                        <a href={d.fileUrl} target="_blank" rel="noreferrer" className="text-brand-600 dark:text-brand-400 hover:underline dark:text-brand-400">
                           view
                         </a>
                       </>

@@ -86,8 +86,8 @@ function JsonLd() {
       url: BASE,
       logo: `${BASE}/icon-512.png`,
       description:
-        'Project management software by Quillstone Digital for real-world work across construction, healthcare, agriculture and more — delivery, tendering and payments with a full audit trail.',
-      parentOrganization: { '@type': 'Organization', name: 'Quillstone Digital' },
+        'DatumPro is a product of Quillstone Capital Private Limited, built by its Quillstone Digital division — project management for real-world work across construction, healthcare, agriculture and more, with delivery, tendering and payments on a full audit trail.',
+      parentOrganization: { '@type': 'Organization', name: 'Quillstone Capital Private Limited' },
     },
     {
       '@context': 'https://schema.org',
@@ -219,7 +219,7 @@ function Hero() {
               <Button size="lg" variant="secondary" className="px-6">See pricing</Button>
             </a>
           </div>
-          <p className="mt-3 text-xs text-zinc-400 dark:text-zinc-500">
+          <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
             Then $120/month per organisation · every feature included
           </p>
         </div>
@@ -248,7 +248,7 @@ function ProductMock() {
       chip: 'Done',
       chipCls: 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400',
       bar: [{ left: '2%', width: '26%', cls: 'bg-green-600' }],
-      note: { text: '✓ 2d early', cls: 'text-green-600 dark:text-green-400', at: '30%' },
+      note: { text: '✓ 2d early', cls: 'text-green-700 dark:text-green-400', at: '30%' },
     },
     {
       title: 'Slab reinforcement',
@@ -259,7 +259,7 @@ function ProductMock() {
         { left: '20%', width: '38%', cls: 'bg-zinc-300 dark:bg-zinc-700' },
         { left: '20%', width: '24%', cls: 'bg-brand-500' },
       ],
-      note: { text: '3d left', cls: 'text-zinc-400 dark:text-zinc-500', at: '60%' },
+      note: { text: '3d left', cls: 'text-zinc-500 dark:text-zinc-400', at: '60%' },
     },
     {
       title: 'Electrical first fix',
@@ -270,7 +270,7 @@ function ProductMock() {
         { left: '34%', width: '34%', cls: 'bg-zinc-300 dark:bg-zinc-700' },
         { left: '34%', width: '12%', cls: 'bg-amber-500' },
       ],
-      note: { text: 'blocked — cable delivery', cls: 'text-amber-600 dark:text-amber-400', at: '70%' },
+      note: { text: 'blocked — cable delivery', cls: 'text-amber-700 dark:text-amber-400', at: '70%' },
     },
     {
       title: 'Blockwork ground floor',
@@ -278,7 +278,7 @@ function ProductMock() {
       chip: 'Tender',
       chipCls: 'bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400',
       bar: [{ left: '52%', width: '30%', cls: 'bg-zinc-200 dark:bg-zinc-800' }],
-      note: { text: 'award opens Fri', cls: 'text-zinc-400 dark:text-zinc-500', at: '84%' },
+      note: { text: 'award opens Fri', cls: 'text-zinc-500 dark:text-zinc-400', at: '84%' },
     },
   ];
 
@@ -292,7 +292,7 @@ function ProductMock() {
             <i className="h-2.5 w-2.5 rounded-full bg-zinc-300 dark:bg-zinc-700" />
             <i className="h-2.5 w-2.5 rounded-full bg-zinc-300 dark:bg-zinc-700" />
           </span>
-          <span className="ml-2 flex-1 truncate rounded border border-zinc-200 bg-white px-2.5 py-0.5 text-left font-mono text-[10px] text-zinc-400 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-500">
+          <span className="ml-2 flex-1 truncate rounded border border-zinc-200 bg-white px-2.5 py-0.5 text-left font-mono text-[10px] text-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-400">
             datumpro.app/projects/riverside-office-block
           </span>
         </div>
@@ -301,12 +301,12 @@ function ProductMock() {
           {/* KPI tiles */}
           <div className="grid grid-cols-3 gap-3">
             {[
-              { label: 'Progress vs plan', value: '62%', sub: 'target 58% — ahead', tone: 'text-green-600 dark:text-green-400' },
-              { label: 'Active blockers', value: '1', sub: 'cable delivery', tone: 'text-amber-600 dark:text-amber-400' },
+              { label: 'Progress vs plan', value: '62%', sub: 'target 58% — ahead', tone: 'text-green-700 dark:text-green-400' },
+              { label: 'Active blockers', value: '1', sub: 'cable delivery', tone: 'text-amber-700 dark:text-amber-400' },
               { label: 'Budget committed', value: '$311k', sub: 'of $480k', tone: 'text-zinc-500 dark:text-zinc-400' },
             ].map((k) => (
               <div key={k.label} className="rounded-lg border border-zinc-200 p-3 text-left dark:border-zinc-800">
-                <p className="text-[10px] uppercase tracking-wide text-zinc-400 dark:text-zinc-500">{k.label}</p>
+                <p className="text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{k.label}</p>
                 <p className="mt-0.5 text-xl font-semibold tabular-nums sm:text-2xl">{k.value}</p>
                 <p className={`text-[11px] ${k.tone}`}>{k.sub}</p>
               </div>
@@ -317,7 +317,7 @@ function ProductMock() {
           <div className="mt-4 rounded-lg border border-zinc-200 dark:border-zinc-800">
             <div className="flex items-center justify-between border-b border-zinc-200 px-3 py-2 dark:border-zinc-800">
               <span className="text-xs font-medium">Timeline — planned vs actual</span>
-              <span className="text-[10px] text-zinc-400">Week 31</span>
+              <span className="text-[10px] text-zinc-500 dark:text-zinc-400">Week 31</span>
             </div>
             <div className="space-y-1 p-3">
               {rows.map((r) => (
@@ -327,7 +327,7 @@ function ProductMock() {
                       <span className="truncate">{r.title}</span>
                       <span className={`shrink-0 rounded px-1 py-px text-[9px] font-medium ${r.chipCls}`}>{r.chip}</span>
                     </p>
-                    <p className="truncate text-[10px] text-zinc-400 dark:text-zinc-500">{r.who}</p>
+                    <p className="truncate text-[10px] text-zinc-500 dark:text-zinc-400">{r.who}</p>
                   </div>
                   <div className="relative h-8 flex-1">
                     {/* today line */}
@@ -448,7 +448,7 @@ function FeatureTrio() {
               ].map((b, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <span className={`h-2 rounded-sm ${b.cls}`} style={{ width: b.w }} />
-                  <span className="text-[10px] text-zinc-400">{b.label}</span>
+                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400">{b.label}</span>
                 </div>
               ))}
             </div>
@@ -491,7 +491,7 @@ function FeatureTrio() {
                 <span className="w-[18%] bg-brand-300 dark:bg-brand-500/40" />
                 <span className="flex-1 bg-zinc-200 dark:bg-zinc-800" />
               </div>
-              <div className="mt-2 flex justify-between text-[10px] text-zinc-400 dark:text-zinc-500">
+              <div className="mt-2 flex justify-between text-[10px] text-zinc-500 dark:text-zinc-400">
                 <span>Paid $250k</span>
                 <span>Committed $86k</span>
                 <span>Budget $480k</span>
@@ -547,7 +547,7 @@ function FieldBand() {
         <div className="mx-auto w-full max-w-[280px]">
           <div className="rounded-[28px] border border-zinc-800 bg-zinc-900 p-2 shadow-2xl shadow-black/50">
             <div className="rounded-[22px] bg-zinc-950 p-4">
-              <p className="text-[10px] uppercase tracking-wide text-zinc-500">Today · Riverside Office Block</p>
+              <p className="text-[10px] uppercase tracking-wide text-zinc-400">Today · Riverside Office Block</p>
               <div className="mt-3 rounded-lg border border-zinc-800 p-3">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-medium">Slab reinforcement</p>
@@ -556,7 +556,7 @@ function FieldBand() {
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-zinc-800">
                   <div className="h-full w-[64%] rounded-full bg-brand-500" />
                 </div>
-                <p className="mt-1.5 text-[10px] text-zinc-500">7 of 11 steps done · due Fri</p>
+                <p className="mt-1.5 text-[10px] text-zinc-400">7 of 11 steps done · due Fri</p>
                 <div className="mt-3 flex gap-2">
                   <span className="flex-1 rounded-md bg-brand-500 py-1.5 text-center text-[11px] font-semibold">Tick step</span>
                   <span className="flex-1 rounded-md border border-zinc-700 py-1.5 text-center text-[11px] text-zinc-300">Add photo</span>
@@ -689,7 +689,7 @@ function Pricing() {
                 <span className="font-display text-5xl font-semibold tracking-tight">$120</span>
                 <span className="pb-1.5 text-sm text-zinc-500 dark:text-zinc-400">/ month · per organisation</span>
               </div>
-              <p className="mt-2 text-center text-xs text-zinc-400 dark:text-zinc-500">
+              <p className="mt-2 text-center text-xs text-zinc-500 dark:text-zinc-400">
                 Pay nothing until month four. Cancel any time.
               </p>
               <ul className="mt-6 space-y-2.5 text-sm">
@@ -705,9 +705,9 @@ function Pricing() {
               <Link href="/sign-in" className="mt-7 block">
                 <Button size="lg" className="w-full">Start free — 3 months on us</Button>
               </Link>
-              <p className="mt-3 text-center text-xs text-zinc-400 dark:text-zinc-500">
+              <p className="mt-3 text-center text-xs text-zinc-500 dark:text-zinc-400">
                 Larger organisation?{' '}
-                <Link href="/enterprise" className="font-medium text-brand-600 hover:underline dark:text-brand-400">
+                <Link href="/enterprise" className="font-medium text-brand-600 dark:text-brand-400 hover:underline dark:text-brand-400">
                   Talk to us about enterprise →
                 </Link>
               </p>

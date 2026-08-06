@@ -26,14 +26,15 @@ export default function PrivacyPage() {
     <main className="mx-auto max-w-2xl px-6 py-12">
       <DraftNotice />
 
-      <p className="text-xs font-medium uppercase tracking-wide text-brand-600">Legal</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-brand-600 dark:text-brand-400">Legal</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Privacy Policy</h1>
       <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Last updated: {LEGAL.lastUpdated}</p>
 
       <P>
-        This Privacy Policy explains how {LEGAL.legalEntity} (“{LEGAL.product}”, “we”, “us”) collects,
-        uses, shares and protects personal information when you use the {LEGAL.product} website and
-        application (the “Service”). We act as the responsible party / data controller for information
+        This Privacy Policy explains how {LEGAL.legalEntity} — which provides {LEGAL.product} through its
+        {' '}{LEGAL.department} division (“{LEGAL.product}”, “we”, “us”) — collects, uses, shares and
+        protects personal information when you use the {LEGAL.product} website and application (the
+        “Service”). We act as the responsible party / data controller for information
         about your account, and as an operator / processor for the content your organisation stores in
         the Service.
       </P>

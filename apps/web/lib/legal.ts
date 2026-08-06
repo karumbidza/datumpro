@@ -9,10 +9,12 @@
  * — those are intentionally left blank rather than guessed.
  */
 export const LEGAL = {
-  /** Owning/operating company. */
+  /** Owning/operating company (the entity you contract with). */
   operator: 'Quillstone Capital Private Limited',
   product: 'DatumPro',
   legalEntity: 'Quillstone Capital Private Limited',
+  /** The division that builds/operates the product — used as the brand credit. */
+  department: 'Quillstone Digital',
   /** Still to fill from the company registration papers — not guessed. */
   registrationNumber: '[company registration number]',
   registeredAddress: '275 Henderson Road, Hatfield, Harare, Zimbabwe',
