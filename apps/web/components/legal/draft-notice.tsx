@@ -9,9 +9,9 @@ export function DraftNotice() {
   return (
     <div className="mb-8 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
       <strong>Draft — not yet legal-reviewed.</strong> This page is a stack-accurate starting point,
-      not legal advice. Have a qualified lawyer review it and fill any{' '}
-      <code>[bracketed]</code> facts (company registration number, registered address) before
-      publishing. This notice is hidden in production.
+      not legal advice. Have a qualified lawyer review it and fill the remaining{' '}
+      <code>[bracketed]</code> fact (company registration number) before publishing. This notice is
+      hidden in production.
     </div>
   );
 }

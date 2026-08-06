@@ -178,8 +178,8 @@ export default function PrivacyPage() {
 
       <H2 id="contact">12. Contact us</H2>
       <P>
-        {LEGAL.legalEntity} · Registration {LEGAL.registrationNumber} · {LEGAL.registeredAddress}.
-        Privacy enquiries:{' '}
+        {LEGAL.legalEntity} · Registration {LEGAL.registrationNumber} · {LEGAL.registeredAddress} ·{' '}
+        {LEGAL.phone}. Privacy enquiries:{' '}
         <a href={`mailto:${LEGAL.privacyEmail}`} className="underline">{LEGAL.privacyEmail}</a>.
       </P>
 

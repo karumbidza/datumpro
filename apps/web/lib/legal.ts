@@ -9,17 +9,17 @@
  * — those are intentionally left blank rather than guessed.
  */
 export const LEGAL = {
-  /** Operator — established in-app ("by Grafaid Engineers"). */
-  operator: 'Grafaid Engineers',
+  /** Owning/operating company. */
+  operator: 'Quillstone Capital Private Limited',
   product: 'DatumPro',
-  /** Confirm the exact registered form (e.g. "(Private) Limited") with your papers. */
-  legalEntity: 'Grafaid Engineers',
-  /** Must be filled from the real company registration — not guessed. */
+  legalEntity: 'Quillstone Capital Private Limited',
+  /** Still to fill from the company registration papers — not guessed. */
   registrationNumber: '[company registration number]',
-  registeredAddress: '[registered business address]',
-  /** Confirm these inboxes exist and are monitored. */
-  privacyEmail: 'privacy@datumpro.app',
-  supportEmail: 'support@datumpro.app',
+  registeredAddress: '275 Henderson Road, Hatfield, Harare, Zimbabwe',
+  /** Confirm this inbox is monitored for privacy/support enquiries. */
+  privacyEmail: 'allenk@quillstonecapital.com',
+  supportEmail: 'allenk@quillstonecapital.com',
+  phone: '+263 77 618 3229',
   /** Primary governing law; the policy also states POPIA / GDPR-style rights. */
   governingLaw: 'Zimbabwe',
   lastUpdated: '6 August 2026',

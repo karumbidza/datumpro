@@ -131,8 +131,8 @@ export default function TermsPage() {
 
       <H2 id="contact">12. Contact</H2>
       <P>
-        {LEGAL.legalEntity} · Registration {LEGAL.registrationNumber} · {LEGAL.registeredAddress}.
-        Questions:{' '}
+        {LEGAL.legalEntity} · Registration {LEGAL.registrationNumber} · {LEGAL.registeredAddress} ·{' '}
+        {LEGAL.phone}. Questions:{' '}
         <a href={`mailto:${LEGAL.supportEmail}`} className="underline">{LEGAL.supportEmail}</a>.
       </P>
 
