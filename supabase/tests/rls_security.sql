@@ -54,6 +54,16 @@ insert into public.projects (id, org_id, name) values
   ('a2220000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','Project A'),
   ('b2220000-0000-0000-0000-000000000000','b1110000-0000-0000-0000-000000000000','Project B');
 
+-- BOQ estimate library (org-scoped): one bill per tenant, with a section + a
+-- priced item in org A to exercise the composite FK and the generated total.
+insert into public.boqs (id, org_id, name) values
+  ('a3330000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','BOQ A'),
+  ('b3330000-0000-0000-0000-000000000000','b1110000-0000-0000-0000-000000000000','BOQ B');
+insert into public.boq_sections (id, org_id, boq_id, name) values
+  ('a3340000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a3330000-0000-0000-0000-000000000000','Substructure');
+insert into public.boq_items (id, org_id, section_id, description, uom, qty, budget_rate_cents) values
+  ('a3350000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a3340000-0000-0000-0000-000000000000','Excavate to reduced level','m³',10,250);
+
 -- ── Tenant isolation: user A sees only org A ─────────────────────────────────
 set role authenticated;
 set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
@@ -66,6 +76,19 @@ select pg_temp.ok((select count(*) from public.projects where id = 'a2220000-000
   'tenant: user A can read own project');
 select pg_temp.ok((select count(*) from public.projects where id = 'b2220000-0000-0000-0000-000000000000') = 0,
   'tenant: user A CANNOT read org B project');
+
+-- BOQ estimate library is org-isolated exactly like projects.
+select pg_temp.ok((select count(*) from public.boqs where id = 'a3330000-0000-0000-0000-000000000000') = 1,
+  'tenant: user A can read own BOQ');
+select pg_temp.ok((select count(*) from public.boqs where id = 'b3330000-0000-0000-0000-000000000000') = 0,
+  'tenant: user A CANNOT read org B BOQ');
+select pg_temp.ok((select count(*) from public.boq_sections where boq_id = 'a3330000-0000-0000-0000-000000000000') = 1,
+  'tenant: user A can read own BOQ section');
+select pg_temp.ok((select count(*) from public.boq_items where id = 'a3350000-0000-0000-0000-000000000000') = 1,
+  'tenant: user A can read own BOQ item');
+-- Generated roll-up: amount_cents = round(qty × budget_rate_cents) = 10 × 250.
+select pg_temp.ok((select amount_cents from public.boq_items where id = 'a3350000-0000-0000-0000-000000000000') = 2500,
+  'boq_item.amount_cents is the generated qty × rate total');
 
 -- A cannot write into org B (RLS WITH CHECK on insert).
 do $$
