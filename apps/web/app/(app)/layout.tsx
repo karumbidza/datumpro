@@ -44,6 +44,14 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
+      {/* Skip link (WCAG 2.4.1): lets keyboard users jump past the sidebar nav
+          to the page content. Hidden until focused. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-brand-500 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white"
+      >
+        Skip to content
+      </a>
       <Sidebar
         projects={projects}
         orgs={ctx.memberships}
@@ -68,7 +76,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           showMyPayments={isContractor}
           managedProjectIds={managedProjectIds}
         />
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto outline-none">
+          {children}
+        </main>
       </div>
     </div>
   );
