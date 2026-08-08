@@ -32,9 +32,9 @@ async function apiRateLimit(request: NextRequest): Promise<NextResponse | null> 
   });
 }
 
-/** Refreshes the Supabase session cookie on every request and gates the
- *  authenticated app area. Unauthed users hitting /dashboard|/projects|/finance
- *  are redirected to /sign-in. */
+/** Refreshes the Supabase session cookie on every request and gates every
+ *  authenticated area (see `protectedPrefixes`). Unauthed users hitting a
+ *  protected path are redirected to /sign-in with a `?next=` back-link. */
 export async function middleware(request: NextRequest) {
   // Rate limit the API surface before any session work.
   const limited = await apiRateLimit(request);
@@ -67,7 +67,24 @@ export async function middleware(request: NextRequest) {
     data: { session },
   } = await supabase.auth.getSession();
 
-  const protectedPrefixes = ['/dashboard', '/projects', '/finance', '/requests', '/orgs'];
+  // Every authenticated area. Kept in sync with the (app) route group plus the
+  // top-level authed pages (/mfa, /orgs). '/org' also covers '/orgs' by prefix,
+  // but both are listed to be self-documenting. This is the fast pre-gate; the
+  // (app) layout + RLS remain the real trust boundary.
+  const protectedPrefixes = [
+    '/account',
+    '/dashboard',
+    '/documents',
+    '/estimates',
+    '/finance',
+    '/mfa',
+    '/notifications',
+    '/org',
+    '/orgs',
+    '/payments',
+    '/projects',
+    '/support',
+  ];
   const isProtected = protectedPrefixes.some((p) => request.nextUrl.pathname.startsWith(p));
 
   if (isProtected && !session) {
