@@ -1,4 +1,5 @@
 export * from './projects';
+export * from './boq';
 export * from './requests';
 export * from './finance';
 export * from './monitoring';
