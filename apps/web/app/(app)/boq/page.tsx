@@ -12,7 +12,7 @@ import { fmtMoney } from '@/lib/money';
 
 const STATUS_TONE: Record<BoqStatus, BadgeTone> = { draft: 'amber', approved: 'green', archived: 'faint' };
 
-export default async function EstimatesPage() {
+export default async function BoqIndexPage() {
   const user = await getAuthUser();
   if (!user) redirect('/sign-in');
   const ctx = await getActiveContext();
@@ -25,14 +25,14 @@ export default async function EstimatesPage() {
     <PageContainer width="5xl">
       <div className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Estimates</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Bills of Quantities</h1>
           <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
             Bills of quantities for{' '}
             <span className="font-medium text-brand-600 dark:text-brand-500">{ctx.active.name}</span>.
           </p>
         </div>
         {canEdit && (
-          <Link href="/estimates/new">
+          <Link href="/boq/new">
             <Button>New BOQ</Button>
           </Link>
         )}
@@ -46,7 +46,7 @@ export default async function EstimatesPage() {
             hint="A BOQ is an estimate you build once and reuse — sections of priced items, ready to put to tender."
             action={
               canEdit ? (
-                <Link href="/estimates/new">
+                <Link href="/boq/new">
                   <Button size="sm">Start a new BOQ</Button>
                 </Link>
               ) : undefined
@@ -72,7 +72,7 @@ export default async function EstimatesPage() {
                   className="border-b border-zinc-100 last:border-0 hover:bg-zinc-50 dark:border-zinc-900 dark:hover:bg-zinc-900/50"
                 >
                   <td className="px-4 py-3">
-                    <Link href={`/estimates/${b.id}`} className="font-medium text-zinc-900 hover:underline dark:text-zinc-100">
+                    <Link href={`/boq/${b.id}`} className="font-medium text-zinc-900 hover:underline dark:text-zinc-100">
                       {b.name}
                     </Link>
                     {b.clientName && <p className="text-xs text-zinc-500 dark:text-zinc-400">{b.clientName}</p>}

@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import type { BoqItemType } from '@datumpro/shared/domain';
+import type { BoqItemType, BoqType } from '@datumpro/shared/domain';
 
 // PostgREST returns numeric as string and bigint as number-or-string depending on
 // size; coerce everything through Number at the boundary so the app deals in plain
@@ -81,6 +81,7 @@ export interface BoqSection {
 export interface BoqDetail {
   id: string;
   name: string;
+  boqType: BoqType;
   clientName: string | null;
   industry: string | null;
   reference: string | null;
@@ -98,7 +99,7 @@ export async function getBoqDetail(orgId: string, boqId: string): Promise<BoqDet
   const { data } = await supabase
     .from('boqs')
     .select(
-      'id, name, client_name, industry, reference, location, boq_date, currency, status, ' +
+      'id, name, boq_type, client_name, industry, reference, location, boq_date, currency, status, ' +
         'boq_sections(id, name, position, ' +
         'boq_items(id, description, uom, qty, budget_rate_cents, item_type, position, amount_cents))',
     )
@@ -121,6 +122,7 @@ export async function getBoqDetail(orgId: string, boqId: string): Promise<BoqDet
   type BoqRow = {
     id: string;
     name: string;
+    boq_type: BoqType;
     client_name: string | null;
     industry: string | null;
     reference: string | null;
@@ -159,6 +161,7 @@ export async function getBoqDetail(orgId: string, boqId: string): Promise<BoqDet
   return {
     id: b.id,
     name: b.name,
+    boqType: b.boq_type,
     clientName: b.client_name,
     industry: b.industry,
     reference: b.reference,

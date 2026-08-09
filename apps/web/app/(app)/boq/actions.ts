@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveContext } from '@/lib/data/org';
 import { createBoqSchema } from '@datumpro/shared/validation';
-import { BOQ_UNITS, BOQ_ITEM_TYPES, BOQ_STATUSES, type BoqItemType, type BoqStatus } from '@datumpro/shared/domain';
+import { BOQ_ITEM_TYPES, BOQ_STATUSES, type BoqItemType, type BoqStatus } from '@datumpro/shared/domain';
 import type { FormState } from '@/components/ui/form-error';
 
 /** Resolve the signed-in user + their active org, or bounce. Every mutation runs
@@ -31,6 +31,7 @@ export async function createBoq(_prev: FormState, formData: FormData): Promise<F
 
   const parsed = createBoqSchema.safeParse({
     name: String(formData.get('name') ?? ''),
+    boqType: String(formData.get('boqType') ?? ''),
     clientName: String(formData.get('clientName') ?? ''),
     industry: (formData.get('industry') as string) || undefined,
     reference: String(formData.get('reference') ?? ''),
@@ -46,6 +47,7 @@ export async function createBoq(_prev: FormState, formData: FormData): Promise<F
     .insert({
       org_id: orgId,
       name: d.name,
+      boq_type: d.boqType,
       client_name: d.clientName || null,
       industry: d.industry ?? null,
       reference: d.reference || null,
@@ -58,8 +60,8 @@ export async function createBoq(_prev: FormState, formData: FormData): Promise<F
     .single();
   if (error) return { error: error.message };
 
-  revalidatePath('/estimates');
-  redirect(`/estimates/${(data as { id: string }).id}`);
+  revalidatePath('/boq');
+  redirect(`/boq/${(data as { id: string }).id}`);
 }
 
 async function touchBoq(supabase: Awaited<ReturnType<typeof createClient>>, boqId: string) {
@@ -84,7 +86,7 @@ export async function addSection(boqId: string): Promise<Ok<{ id: string }> | Er
     .single();
   if (error) return { error: error.message };
   await touchBoq(supabase, boqId);
-  revalidatePath(`/estimates/${boqId}`);
+  revalidatePath(`/boq/${boqId}`);
   return { id: (data as { id: string }).id };
 }
 
@@ -96,7 +98,7 @@ export async function renameSection(boqId: string, sectionId: string, name: stri
     .eq('id', sectionId);
   if (error) return { error: error.message };
   await touchBoq(supabase, boqId);
-  revalidatePath(`/estimates/${boqId}`);
+  revalidatePath(`/boq/${boqId}`);
 }
 
 export async function deleteSection(boqId: string, sectionId: string): Promise<Err | void> {
@@ -104,7 +106,7 @@ export async function deleteSection(boqId: string, sectionId: string): Promise<E
   const { error } = await supabase.from('boq_sections').delete().eq('id', sectionId);
   if (error) return { error: error.message };
   await touchBoq(supabase, boqId);
-  revalidatePath(`/estimates/${boqId}`);
+  revalidatePath(`/boq/${boqId}`);
 }
 
 export async function addItem(boqId: string, sectionId: string): Promise<Ok<{ id: string }> | Err> {
@@ -125,7 +127,7 @@ export async function addItem(boqId: string, sectionId: string): Promise<Ok<{ id
     .single();
   if (error) return { error: error.message };
   await touchBoq(supabase, boqId);
-  revalidatePath(`/estimates/${boqId}`);
+  revalidatePath(`/boq/${boqId}`);
   return { id: (data as { id: string }).id };
 }
 
@@ -142,12 +144,8 @@ export async function updateItem(boqId: string, itemId: string, patch: ItemPatch
 
   const row: Record<string, unknown> = {};
   if (patch.description !== undefined) row.description = patch.description.slice(0, 500);
-  if (patch.uom !== undefined) {
-    if (patch.uom !== null && patch.uom !== '' && !BOQ_UNITS.includes(patch.uom as never)) {
-      return { error: 'Unit must be metric.' };
-    }
-    row.uom = patch.uom || null;
-  }
+  // Units are free text (validated softly in the UI); store trimmed, or null.
+  if (patch.uom !== undefined) row.uom = patch.uom ? patch.uom.trim().slice(0, 24) || null : null;
   if (patch.qty !== undefined) row.qty = Number.isFinite(patch.qty) ? Math.max(0, patch.qty) : 0;
   if (patch.budgetRateCents !== undefined)
     row.budget_rate_cents = Number.isFinite(patch.budgetRateCents) ? Math.max(0, Math.round(patch.budgetRateCents)) : 0;
@@ -160,7 +158,7 @@ export async function updateItem(boqId: string, itemId: string, patch: ItemPatch
   const { error } = await supabase.from('boq_items').update(row).eq('id', itemId);
   if (error) return { error: error.message };
   await touchBoq(supabase, boqId);
-  revalidatePath(`/estimates/${boqId}`);
+  revalidatePath(`/boq/${boqId}`);
 }
 
 export async function deleteItem(boqId: string, itemId: string): Promise<Err | void> {
@@ -168,7 +166,96 @@ export async function deleteItem(boqId: string, itemId: string): Promise<Err | v
   const { error } = await supabase.from('boq_items').delete().eq('id', itemId);
   if (error) return { error: error.message };
   await touchBoq(supabase, boqId);
-  revalidatePath(`/estimates/${boqId}`);
+  revalidatePath(`/boq/${boqId}`);
+}
+
+/** Deep-copy a bill (header + sections + items) into a fresh draft — the "similar
+ *  job, slightly different scope" flow. Returns the new bill's id. */
+export async function duplicateBoq(boqId: string): Promise<Ok<{ id: string }> | Err> {
+  const { supabase, userId, orgId } = await requireOrg();
+
+  const { data } = await supabase
+    .from('boqs')
+    .select(
+      'name, boq_type, client_id, client_name, industry, reference, location, boq_date, currency, is_template, ' +
+        'boq_sections(name, position, boq_items(description, uom, qty, budget_rate_cents, item_type, position))',
+    )
+    .eq('id', boqId)
+    .eq('org_id', orgId)
+    .maybeSingle();
+  if (!data) return { error: 'BOQ not found.' };
+
+  type ItemRow = {
+    description: string;
+    uom: string | null;
+    qty: number | string | null;
+    budget_rate_cents: number | string | null;
+    item_type: BoqItemType;
+    position: number;
+  };
+  type Src = {
+    name: string;
+    boq_type: string;
+    client_id: string | null;
+    client_name: string | null;
+    industry: string | null;
+    reference: string | null;
+    location: string | null;
+    boq_date: string | null;
+    currency: string;
+    is_template: boolean;
+    boq_sections: { name: string; position: number; boq_items: ItemRow[] | null }[] | null;
+  };
+  const s = data as unknown as Src;
+
+  const { data: nb, error: be } = await supabase
+    .from('boqs')
+    .insert({
+      org_id: orgId,
+      name: `${s.name} (copy)`,
+      boq_type: s.boq_type,
+      client_id: s.client_id,
+      client_name: s.client_name,
+      industry: s.industry,
+      reference: s.reference,
+      location: s.location,
+      boq_date: s.boq_date,
+      currency: s.currency,
+      is_template: s.is_template,
+      status: 'draft',
+      created_by: userId,
+    })
+    .select('id')
+    .single();
+  if (be) return { error: be.message };
+  const newId = (nb as { id: string }).id;
+
+  for (const sec of (s.boq_sections ?? []).slice().sort((a, b) => a.position - b.position)) {
+    const { data: ns, error: se } = await supabase
+      .from('boq_sections')
+      .insert({ org_id: orgId, boq_id: newId, name: sec.name, position: sec.position })
+      .select('id')
+      .single();
+    if (se || !ns) continue;
+    const items = (sec.boq_items ?? []).slice().sort((a, b) => a.position - b.position);
+    if (items.length) {
+      await supabase.from('boq_items').insert(
+        items.map((it) => ({
+          org_id: orgId,
+          section_id: (ns as { id: string }).id,
+          description: it.description,
+          uom: it.uom,
+          qty: it.qty,
+          budget_rate_cents: it.budget_rate_cents,
+          item_type: it.item_type,
+          position: it.position,
+        })),
+      );
+    }
+  }
+
+  revalidatePath('/boq');
+  return { id: newId };
 }
 
 export async function setBoqStatus(boqId: string, status: BoqStatus): Promise<Err | void> {
@@ -176,6 +263,6 @@ export async function setBoqStatus(boqId: string, status: BoqStatus): Promise<Er
   if (!BOQ_STATUSES.includes(status)) return { error: 'Invalid status.' };
   const { error } = await supabase.from('boqs').update({ status }).eq('id', boqId);
   if (error) return { error: error.message };
-  revalidatePath(`/estimates/${boqId}`);
-  revalidatePath('/estimates');
+  revalidatePath(`/boq/${boqId}`);
+  revalidatePath('/boq');
 }

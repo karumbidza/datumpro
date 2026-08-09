@@ -19,8 +19,8 @@ export default async function BoqPage({ params }: { params: Promise<{ boqId: str
 
   return (
     <PageContainer width="6xl">
-      <Link href="/estimates" className="text-xs text-zinc-500 hover:underline dark:text-zinc-400">
-        ← Estimates
+      <Link href="/boq" className="text-xs text-zinc-500 hover:underline dark:text-zinc-400">
+        ← BOQ
       </Link>
       <BoqBuilder boq={boq} canEdit={canEdit} />
     </PageContainer>
