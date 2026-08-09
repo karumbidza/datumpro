@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import type { BoqDetail } from '@/lib/data/boq';
 import {
   addSection,
@@ -119,6 +120,13 @@ export function BoqBuilder({ boq, canEdit }: { boq: BoqDetail; canEdit: boolean 
         </div>
         <div className="flex items-center gap-2">
           {pending && <span className="text-xs text-zinc-400">Saving…</span>}
+          {canEdit && (
+            <Link href={`/boq/${boq.id}/import`}>
+              <Button variant="secondary" size="sm">
+                Import Excel
+              </Button>
+            </Link>
+          )}
           {canEdit && (
             <Button variant="secondary" size="sm" onClick={onDuplicate} disabled={pending}>
               Duplicate

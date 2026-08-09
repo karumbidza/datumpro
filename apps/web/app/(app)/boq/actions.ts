@@ -258,6 +258,70 @@ export async function duplicateBoq(boqId: string): Promise<Ok<{ id: string }> | 
   return { id: newId };
 }
 
+export interface ImportItem {
+  description: string;
+  uom: string | null;
+  qty: number;
+  rateCents: number;
+}
+export interface ImportSection {
+  name: string;
+  items: ImportItem[];
+}
+
+/** Bulk-append parsed spreadsheet rows to a bill: create each section after the
+ *  existing ones, then its items. The client does the parsing + column mapping;
+ *  this only trusts the structured result, re-clamps it, and writes under RLS. */
+export async function importBoqRows(
+  boqId: string,
+  sections: ImportSection[],
+): Promise<Ok<{ sections: number; items: number }> | Err> {
+  const { supabase, orgId } = await requireOrg();
+
+  const totalItems = sections.reduce((a, s) => a + s.items.length, 0);
+  if (totalItems === 0) return { error: 'Nothing to import — no priced items were found.' };
+  if (totalItems > 2000) return { error: 'That sheet has over 2000 items — split it and import in parts.' };
+
+  const { data: last } = await supabase
+    .from('boq_sections')
+    .select('position')
+    .eq('boq_id', boqId)
+    .order('position', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  let pos = ((last as { position: number } | null)?.position ?? -1) + 1;
+
+  let secCount = 0;
+  let itemCount = 0;
+  for (const s of sections) {
+    const { data: ns, error: se } = await supabase
+      .from('boq_sections')
+      .insert({ org_id: orgId, boq_id: boqId, name: (s.name || 'Untitled section').slice(0, 200), position: pos++ })
+      .select('id')
+      .single();
+    if (se || !ns) return { error: se?.message ?? 'Failed to create a section.' };
+    secCount++;
+    if (s.items.length) {
+      const rows = s.items.map((it, i) => ({
+        org_id: orgId,
+        section_id: (ns as { id: string }).id,
+        description: (it.description || '').slice(0, 500),
+        uom: it.uom ? it.uom.trim().slice(0, 24) || null : null,
+        qty: Number.isFinite(it.qty) ? Math.max(0, it.qty) : 0,
+        budget_rate_cents: Number.isFinite(it.rateCents) ? Math.max(0, Math.round(it.rateCents)) : 0,
+        item_type: 'measured' as const,
+        position: i,
+      }));
+      const { error: ie } = await supabase.from('boq_items').insert(rows);
+      if (ie) return { error: ie.message };
+      itemCount += rows.length;
+    }
+  }
+
+  revalidatePath(`/boq/${boqId}`);
+  return { sections: secCount, items: itemCount };
+}
+
 export async function setBoqStatus(boqId: string, status: BoqStatus): Promise<Err | void> {
   const { supabase } = await requireOrg();
   if (!BOQ_STATUSES.includes(status)) return { error: 'Invalid status.' };
