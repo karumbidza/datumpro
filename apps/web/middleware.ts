@@ -73,9 +73,9 @@ export async function middleware(request: NextRequest) {
   // (app) layout + RLS remain the real trust boundary.
   const protectedPrefixes = [
     '/account',
+    '/boq',
     '/dashboard',
     '/documents',
-    '/estimates',
     '/finance',
     '/mfa',
     '/notifications',
