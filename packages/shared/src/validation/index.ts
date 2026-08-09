@@ -4,7 +4,7 @@
 import { z } from 'zod';
 import { ORG_ROLES } from '../access/roles';
 import { PROJECT_TYPES, CONSTRUCTION_TYPES, CURRENCIES, DURATION_UNITS } from '../domain/projects';
-import { BOQ_INDUSTRIES } from '../domain/boq';
+import { BOQ_INDUSTRIES, BOQ_TYPES } from '../domain/boq';
 import { REQUEST_TYPES } from '../domain/requests';
 import { REPORT_STATUSES, WEATHER_OPTIONS } from '../domain/monitoring';
 import { PAYMENT_METHODS } from '../domain/finance';
@@ -123,6 +123,8 @@ export type CreateClientInput = z.infer<typeof createClientSchema>;
  *  can be an unnamed-client template. Sections and items are added in the builder. */
 export const createBoqSchema = z.object({
   name: z.string().trim().min(2).max(200),
+  boqType: z.enum(BOQ_TYPES),
+
   clientName: z.string().trim().max(200).optional().or(z.literal('')),
   industry: z.enum(BOQ_INDUSTRIES).optional(),
   reference: z.string().trim().max(80).optional().or(z.literal('')),
