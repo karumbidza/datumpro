@@ -62,6 +62,7 @@ export async function listBoqs(orgId: string): Promise<BoqListRow[]> {
 
 export interface BoqItem {
   id: string;
+  sectionId: string;
   description: string;
   uom: string | null;
   qty: number;
@@ -71,11 +72,14 @@ export interface BoqItem {
   amountCents: number;
 }
 
+/** A section can be a sub-topic of another via parentId (null = top level). The
+ *  builder nests them; both sections and items are returned FLAT and assembled
+ *  client-side, which keeps mutation state simple. */
 export interface BoqSection {
   id: string;
   name: string;
   position: number;
-  items: BoqItem[];
+  parentId: string | null;
 }
 
 export interface BoqDetail {
@@ -90,9 +94,10 @@ export interface BoqDetail {
   currency: string;
   status: string;
   sections: BoqSection[];
+  items: BoqItem[];
 }
 
-/** One bill with its sections and priced items, ordered for the builder. Returns
+/** One bill with its sections (nestable) and priced items, both flat. Returns
  *  null when the id isn't visible to the caller (RLS) or doesn't exist. */
 export async function getBoqDetail(orgId: string, boqId: string): Promise<BoqDetail | null> {
   const supabase = await createClient();
@@ -100,7 +105,7 @@ export async function getBoqDetail(orgId: string, boqId: string): Promise<BoqDet
     .from('boqs')
     .select(
       'id, name, boq_type, client_name, industry, reference, location, boq_date, currency, status, ' +
-        'boq_sections(id, name, position, ' +
+        'boq_sections(id, name, position, parent_id, ' +
         'boq_items(id, description, uom, qty, budget_rate_cents, item_type, position, amount_cents))',
     )
     .eq('id', boqId)
@@ -118,7 +123,7 @@ export async function getBoqDetail(orgId: string, boqId: string): Promise<BoqDet
     position: number;
     amount_cents: number | string | null;
   };
-  type SectionRow = { id: string; name: string; position: number; boq_items: ItemRow[] | null };
+  type SectionRow = { id: string; name: string; position: number; parent_id: string | null; boq_items: ItemRow[] | null };
   type BoqRow = {
     id: string;
     name: string;
@@ -136,27 +141,30 @@ export async function getBoqDetail(orgId: string, boqId: string): Promise<BoqDet
   // The select is built by concatenation, so supabase-js can't infer the row
   // shape (it widens to a parse-error type); assert through unknown to our type.
   const b = data as unknown as BoqRow;
-  const sections: BoqSection[] = (b.boq_sections ?? [])
-    .slice()
-    .sort((a, c) => a.position - c.position)
-    .map((s) => ({
-      id: s.id,
-      name: s.name,
-      position: s.position,
-      items: (s.boq_items ?? [])
-        .slice()
-        .sort((a, c) => a.position - c.position)
-        .map((it) => ({
-          id: it.id,
-          description: it.description,
-          uom: it.uom,
-          qty: n(it.qty),
-          budgetRateCents: n(it.budget_rate_cents),
-          itemType: it.item_type,
-          position: it.position,
-          amountCents: n(it.amount_cents),
-        })),
-    }));
+  const secRows = (b.boq_sections ?? []).slice().sort((a, c) => a.position - c.position);
+
+  const sections: BoqSection[] = secRows.map((s) => ({
+    id: s.id,
+    name: s.name,
+    position: s.position,
+    parentId: s.parent_id,
+  }));
+  const items: BoqItem[] = [];
+  for (const s of secRows) {
+    for (const it of (s.boq_items ?? []).slice().sort((a, c) => a.position - c.position)) {
+      items.push({
+        id: it.id,
+        sectionId: s.id,
+        description: it.description,
+        uom: it.uom,
+        qty: n(it.qty),
+        budgetRateCents: n(it.budget_rate_cents),
+        itemType: it.item_type,
+        position: it.position,
+        amountCents: n(it.amount_cents),
+      });
+    }
+  }
 
   return {
     id: b.id,
@@ -170,5 +178,6 @@ export async function getBoqDetail(orgId: string, boqId: string): Promise<BoqDet
     currency: b.currency,
     status: b.status,
     sections,
+    items,
   };
 }

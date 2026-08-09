@@ -68,20 +68,26 @@ async function touchBoq(supabase: Awaited<ReturnType<typeof createClient>>, boqI
   await supabase.from('boqs').update({ updated_at: new Date().toISOString() }).eq('id', boqId);
 }
 
-export async function addSection(boqId: string): Promise<Ok<{ id: string }> | Err> {
+export async function addSection(boqId: string, parentId: string | null = null): Promise<Ok<{ id: string }> | Err> {
   const { supabase, orgId } = await requireOrg();
-  const { data: last } = await supabase
+  const base = supabase
     .from('boq_sections')
     .select('position')
     .eq('boq_id', boqId)
     .order('position', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(1);
+  const { data: last } = await (parentId ? base.eq('parent_id', parentId) : base.is('parent_id', null)).maybeSingle();
   const position = ((last as { position: number } | null)?.position ?? -1) + 1;
 
   const { data, error } = await supabase
     .from('boq_sections')
-    .insert({ org_id: orgId, boq_id: boqId, name: 'Untitled section', position })
+    .insert({
+      org_id: orgId,
+      boq_id: boqId,
+      parent_id: parentId,
+      name: parentId ? 'Untitled sub-section' : 'Untitled section',
+      position,
+    })
     .select('id')
     .single();
   if (error) return { error: error.message };
@@ -178,7 +184,7 @@ export async function duplicateBoq(boqId: string): Promise<Ok<{ id: string }> | 
     .from('boqs')
     .select(
       'name, boq_type, client_id, client_name, industry, reference, location, boq_date, currency, is_template, ' +
-        'boq_sections(name, position, boq_items(description, uom, qty, budget_rate_cents, item_type, position))',
+        'boq_sections(id, parent_id, name, position, boq_items(description, uom, qty, budget_rate_cents, item_type, position))',
     )
     .eq('id', boqId)
     .eq('org_id', orgId)
@@ -204,7 +210,9 @@ export async function duplicateBoq(boqId: string): Promise<Ok<{ id: string }> | 
     boq_date: string | null;
     currency: string;
     is_template: boolean;
-    boq_sections: { name: string; position: number; boq_items: ItemRow[] | null }[] | null;
+    boq_sections:
+      | { id: string; parent_id: string | null; name: string; position: number; boq_items: ItemRow[] | null }[]
+      | null;
   };
   const s = data as unknown as Src;
 
@@ -230,19 +238,34 @@ export async function duplicateBoq(boqId: string): Promise<Ok<{ id: string }> | 
   if (be) return { error: be.message };
   const newId = (nb as { id: string }).id;
 
-  for (const sec of (s.boq_sections ?? []).slice().sort((a, b) => a.position - b.position)) {
+  const secs = (s.boq_sections ?? []).slice().sort((a, b) => a.position - b.position);
+  const idMap: Record<string, string> = {};
+
+  // Pass 1: copy every section (parent unset), recording old→new ids.
+  for (const sec of secs) {
     const { data: ns, error: se } = await supabase
       .from('boq_sections')
       .insert({ org_id: orgId, boq_id: newId, name: sec.name, position: sec.position })
       .select('id')
       .single();
-    if (se || !ns) continue;
+    if (se || !ns) return { error: se?.message ?? 'Failed to copy a section.' };
+    idMap[sec.id] = (ns as { id: string }).id;
+  }
+  // Pass 2: re-point sub-sections at their copied parent (all now exist).
+  for (const sec of secs) {
+    const newSec = idMap[sec.id];
+    const newParent = sec.parent_id ? idMap[sec.parent_id] : null;
+    if (newSec && newParent) await supabase.from('boq_sections').update({ parent_id: newParent }).eq('id', newSec);
+  }
+  // Pass 3: copy items under their new section.
+  for (const sec of secs) {
+    const newSec = idMap[sec.id];
     const items = (sec.boq_items ?? []).slice().sort((a, b) => a.position - b.position);
-    if (items.length) {
+    if (newSec && items.length) {
       await supabase.from('boq_items').insert(
         items.map((it) => ({
           org_id: orgId,
-          section_id: (ns as { id: string }).id,
+          section_id: newSec,
           description: it.description,
           uom: it.uom,
           qty: it.qty,

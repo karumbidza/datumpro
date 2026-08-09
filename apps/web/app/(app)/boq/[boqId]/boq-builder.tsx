@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, type ReactElement } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { BoqDetail } from '@/lib/data/boq';
@@ -13,83 +13,80 @@ import {
   deleteItem,
   duplicateBoq,
 } from '../actions';
-import {
-  BOQ_UNITS,
-  BOQ_TYPE_LABELS,
-  BOQ_STATUS_LABELS,
-  isKnownUnit,
-  type BoqStatus,
-} from '@datumpro/shared/domain';
+import { BOQ_UNITS, BOQ_TYPE_LABELS, BOQ_STATUS_LABELS, isKnownUnit, type BoqStatus } from '@datumpro/shared/domain';
 import { fmtMoney } from '@/lib/money';
 import { Button } from '@/components/ui/button';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 
-type Item = { id: string; description: string; uom: string; qty: number; rateCents: number };
-type Section = { id: string; name: string; items: Item[] };
+type Item = { id: string; sectionId: string; description: string; uom: string; qty: number; rateCents: number };
+type Section = { id: string; name: string; parentId: string | null };
 
 const STATUS_TONE: Record<BoqStatus, BadgeTone> = { draft: 'amber', approved: 'green', archived: 'faint' };
+const UOM_LIST = 'boq-uom-list';
 
-// Shared cell recipe: borderless until focus, spreadsheet feel.
+const rowB = 'border-b border-zinc-200 dark:border-zinc-800';
+const colB = 'border-r border-zinc-200 dark:border-zinc-800';
 const cell =
   'w-full bg-transparent px-2.5 py-2 text-sm outline-none focus:bg-white focus:ring-1 focus:ring-inset focus:ring-brand-500 dark:focus:bg-zinc-950';
 const numCell = `${cell} text-right font-mono tabular-nums`;
-const UOM_LIST = 'boq-uom-list';
 
 export function BoqBuilder({ boq, canEdit }: { boq: BoqDetail; canEdit: boolean }) {
   const router = useRouter();
   const [sections, setSections] = useState<Section[]>(() =>
-    boq.sections.map((s) => ({
-      id: s.id,
-      name: s.name,
-      items: s.items.map((it) => ({
-        id: it.id,
-        description: it.description,
-        uom: it.uom ?? '',
-        qty: it.qty,
-        rateCents: it.budgetRateCents,
-      })),
+    boq.sections.map((s) => ({ id: s.id, name: s.name, parentId: s.parentId })),
+  );
+  const [items, setItems] = useState<Item[]>(() =>
+    boq.items.map((it) => ({
+      id: it.id,
+      sectionId: it.sectionId,
+      description: it.description,
+      uom: it.uom ?? '',
+      qty: it.qty,
+      rateCents: it.budgetRateCents,
     })),
   );
   const [pending, start] = useTransition();
   const cur = boq.currency;
   const status = (boq.status as BoqStatus) ?? 'draft';
 
+  const childSections = (pid: string | null) => sections.filter((s) => s.parentId === pid);
+  const itemsOf = (sid: string) => items.filter((i) => i.sectionId === sid);
   const itemTotal = (it: Item) => Math.round(it.qty * it.rateCents);
-  const sectionTotal = (s: Section) => s.items.reduce((a, it) => a + itemTotal(it), 0);
-  const grand = sections.reduce((a, s) => a + sectionTotal(s), 0);
-  const itemCount = sections.reduce((a, s) => a + s.items.length, 0);
+  const sectionTotal = (sid: string): number =>
+    itemsOf(sid).reduce((a, it) => a + itemTotal(it), 0) + childSections(sid).reduce((a, c) => a + sectionTotal(c.id), 0);
+  const grand = items.reduce((a, it) => a + itemTotal(it), 0);
 
-  const patchItem = (sectionId: string, itemId: string, up: (it: Item) => Item) =>
-    setSections((prev) =>
-      prev.map((s) => (s.id !== sectionId ? s : { ...s, items: s.items.map((it) => (it.id !== itemId ? it : up(it))) })),
-    );
-  const persist = (itemId: string, p: { description?: string; uom?: string | null; qty?: number; budgetRateCents?: number }) =>
-    start(() => updateItem(boq.id, itemId, p).then(() => {}));
+  // ── mutations (local state first, persisted via server actions) ─────────────
+  const persistItem = (id: string, p: { description?: string; uom?: string | null; qty?: number; budgetRateCents?: number }) =>
+    start(() => updateItem(boq.id, id, p).then(() => {}));
+  const patchLocal = (id: string, up: (it: Item) => Item) => setItems((prev) => prev.map((it) => (it.id === id ? up(it) : it)));
 
-  const onAddSection = () =>
+  const onAddSection = (parentId: string | null) =>
     start(async () => {
-      const res = await addSection(boq.id);
-      if ('id' in res) setSections((p) => [...p, { id: res.id, name: 'Untitled section', items: [] }]);
-    });
-  const onDeleteSection = (id: string) =>
-    start(async () => {
-      await deleteSection(boq.id, id);
-      setSections((p) => p.filter((s) => s.id !== id));
+      const res = await addSection(boq.id, parentId);
+      if ('id' in res) setSections((p) => [...p, { id: res.id, name: parentId ? 'Untitled sub-section' : 'Untitled section', parentId }]);
     });
   const onAddItem = (sectionId: string) =>
     start(async () => {
       const res = await addItem(boq.id, sectionId);
-      if ('id' in res)
-        setSections((p) =>
-          p.map((s) =>
-            s.id !== sectionId ? s : { ...s, items: [...s.items, { id: res.id, description: '', uom: '', qty: 0, rateCents: 0 }] },
-          ),
-        );
+      if ('id' in res) setItems((p) => [...p, { id: res.id, sectionId, description: '', uom: '', qty: 0, rateCents: 0 }]);
     });
-  const onDeleteItem = (sectionId: string, itemId: string) =>
+  const onDeleteItem = (id: string) =>
     start(async () => {
-      await deleteItem(boq.id, itemId);
-      setSections((p) => p.map((s) => (s.id !== sectionId ? s : { ...s, items: s.items.filter((it) => it.id !== itemId) })));
+      await deleteItem(boq.id, id);
+      setItems((p) => p.filter((i) => i.id !== id));
+    });
+  const onDeleteSection = (id: string) =>
+    start(async () => {
+      await deleteSection(boq.id, id);
+      const dead = new Set<string>();
+      const collect = (sid: string) => {
+        dead.add(sid);
+        sections.filter((s) => s.parentId === sid).forEach((c) => collect(c.id));
+      };
+      collect(id);
+      setSections((p) => p.filter((s) => !dead.has(s.id)));
+      setItems((p) => p.filter((i) => !dead.has(i.sectionId)));
     });
   const onDuplicate = () =>
     start(async () => {
@@ -97,9 +94,150 @@ export function BoqBuilder({ boq, canEdit }: { boq: BoqDetail; canEdit: boolean 
       if ('id' in res) router.push(`/boq/${res.id}`);
     });
 
-  const meta = [BOQ_TYPE_LABELS[boq.boqType], boq.industry, boq.clientName, boq.reference, boq.boqDate]
-    .filter(Boolean)
-    .join(' · ');
+  const meta = [BOQ_TYPE_LABELS[boq.boqType], boq.industry, boq.clientName, boq.reference, boq.boqDate].filter(Boolean).join(' · ');
+
+  // ── recursive render → an array of <tr> ─────────────────────────────────────
+  function renderSection(s: Section, depth: number, number: string): ReactElement[] {
+    const my = itemsOf(s.id);
+    const kids = childSections(s.id);
+    const out: ReactElement[] = [];
+
+    out.push(
+      <tr key={`s-${s.id}`} className="bg-zinc-50 dark:bg-zinc-900/50">
+        <td className={`${rowB} ${colB} px-2.5 py-2 text-center font-mono text-xs font-bold text-zinc-500`}>{number}</td>
+        <td className={`${rowB} ${colB} py-1.5 pr-2`} colSpan={4}>
+          <div className="flex items-center gap-2" style={{ paddingLeft: depth * 18 }}>
+            <input
+              defaultValue={s.name}
+              disabled={!canEdit}
+              aria-label="Section name"
+              onChange={(e) => setSections((p) => p.map((x) => (x.id === s.id ? { ...x, name: e.target.value } : x)))}
+              onBlur={(e) => start(() => renameSection(boq.id, s.id, e.target.value.trim() || 'Untitled section').then(() => {}))}
+              className="min-w-[150px] flex-1 rounded bg-transparent px-1 py-1 text-sm font-semibold outline-none focus:ring-1 focus:ring-brand-500 disabled:text-zinc-700 dark:disabled:text-zinc-300"
+            />
+            <span className="whitespace-nowrap font-mono text-xs text-zinc-400">
+              {my.length + kids.length} entr{my.length + kids.length === 1 ? 'y' : 'ies'}
+            </span>
+          </div>
+        </td>
+        <td className={`${rowB} px-2.5 py-2 text-right font-mono text-sm font-bold tabular-nums text-brand-600 dark:text-brand-500`}>
+          {fmtMoney(sectionTotal(s.id), cur)}
+        </td>
+        <td className={`${rowB} px-1 text-center`}>
+          {canEdit && (
+            <button type="button" onClick={() => onDeleteSection(s.id)} aria-label="Delete section" className="rounded p-1 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10">
+              ✕
+            </button>
+          )}
+        </td>
+      </tr>,
+    );
+
+    my.forEach((it, j) => {
+      const badUnit = !isKnownUnit(it.uom);
+      out.push(
+        <tr key={`i-${it.id}`} className="group hover:bg-brand-50/40 dark:hover:bg-brand-600/5">
+          <td className={`${rowB} ${colB} px-2.5 py-2 text-center font-mono text-xs text-zinc-400`}>
+            {number}.{j + 1}
+          </td>
+          <td className={`${rowB} ${colB} p-0`}>
+            <input
+              defaultValue={it.description}
+              disabled={!canEdit}
+              placeholder="Item description"
+              aria-label="Description"
+              style={{ paddingLeft: (depth + 1) * 18 + 10 }}
+              onChange={(e) => patchLocal(it.id, (x) => ({ ...x, description: e.target.value }))}
+              onBlur={(e) => persistItem(it.id, { description: e.target.value })}
+              className={cell}
+            />
+          </td>
+          <td className={`${rowB} ${colB} p-0`}>
+            <input
+              defaultValue={it.uom}
+              disabled={!canEdit}
+              list={UOM_LIST}
+              placeholder="unit"
+              aria-label="Unit"
+              title={badUnit ? 'Unrecognised unit — allowed, but check it' : undefined}
+              onChange={(e) => patchLocal(it.id, (x) => ({ ...x, uom: e.target.value }))}
+              onBlur={(e) => persistItem(it.id, { uom: e.target.value })}
+              className={`${cell} text-center ${badUnit ? 'text-red-600 dark:text-red-400' : ''}`}
+            />
+          </td>
+          <td className={`${rowB} ${colB} p-0`}>
+            <input
+              defaultValue={it.qty ? String(it.qty) : ''}
+              disabled={!canEdit}
+              inputMode="decimal"
+              placeholder="0"
+              aria-label="Quantity"
+              onBlur={(e) => {
+                const qty = Math.max(0, Number(e.target.value) || 0);
+                patchLocal(it.id, (x) => ({ ...x, qty }));
+                persistItem(it.id, { qty });
+              }}
+              className={numCell}
+            />
+          </td>
+          <td className={`${rowB} ${colB} p-0`}>
+            <input
+              defaultValue={it.rateCents ? (it.rateCents / 100).toFixed(2) : ''}
+              disabled={!canEdit}
+              inputMode="decimal"
+              placeholder="0.00"
+              aria-label="Estimate rate"
+              onBlur={(e) => {
+                const rateCents = Math.round((Number(e.target.value) || 0) * 100);
+                patchLocal(it.id, (x) => ({ ...x, rateCents }));
+                persistItem(it.id, { budgetRateCents: rateCents });
+              }}
+              className={numCell}
+            />
+          </td>
+          <td className={`${rowB} px-2.5 py-2 text-right font-mono text-sm tabular-nums`}>{fmtMoney(itemTotal(it), cur)}</td>
+          <td className={`${rowB} px-1 text-center`}>
+            {canEdit && (
+              <button
+                type="button"
+                onClick={() => onDeleteItem(it.id)}
+                aria-label="Delete item"
+                className="rounded p-1 text-zinc-400 opacity-0 transition group-hover:opacity-100 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10"
+              >
+                ✕
+              </button>
+            )}
+          </td>
+        </tr>,
+      );
+    });
+
+    if (canEdit) {
+      out.push(
+        <tr key={`add-${s.id}`}>
+          <td className={`${rowB} ${colB}`} />
+          <td className={`${rowB} py-1.5`} colSpan={6}>
+            <div className="flex gap-2" style={{ paddingLeft: (depth + 1) * 18 + 10 }}>
+              <button type="button" onClick={() => onAddItem(s.id)} className="inline-flex items-center gap-1 rounded border border-dashed border-zinc-300 px-2.5 py-1 text-xs font-medium text-zinc-500 transition hover:border-brand-500 hover:text-brand-600 dark:border-zinc-700">
+                + Add item
+              </button>
+              <button type="button" onClick={() => onAddSection(s.id)} className="inline-flex items-center gap-1 rounded border border-dashed border-zinc-300 px-2.5 py-1 text-xs font-medium text-zinc-500 transition hover:border-brand-500 hover:text-brand-600 dark:border-zinc-700">
+                + Add sub-section
+              </button>
+            </div>
+          </td>
+        </tr>,
+      );
+    }
+
+    kids.forEach((c, m) => {
+      out.push(...renderSection(c, depth + 1, `${number}.${my.length + m + 1}`));
+    });
+    return out;
+  }
+
+  const topSections = childSections(null);
+  const bodyRows = topSections.flatMap((s, i) => renderSection(s, 0, String(i + 1)));
 
   return (
     <div>
@@ -139,7 +277,7 @@ export function BoqBuilder({ boq, canEdit }: { boq: BoqDetail; canEdit: boolean 
       <div className="mt-4 overflow-x-auto rounded-lg border border-zinc-300 dark:border-zinc-700">
         <table className="w-full min-w-[720px] border-collapse text-sm">
           <colgroup>
-            <col className="w-14" />
+            <col className="w-16" />
             <col />
             <col className="w-24" />
             <col className="w-24" />
@@ -149,38 +287,21 @@ export function BoqBuilder({ boq, canEdit }: { boq: BoqDetail; canEdit: boolean 
           </colgroup>
           <thead>
             <tr className="bg-zinc-100 text-[11px] uppercase tracking-wide text-zinc-500 dark:bg-zinc-800/70 dark:text-zinc-400">
-              <th className="border-b border-r border-zinc-300 px-2.5 py-2.5 text-left font-semibold dark:border-zinc-700">Item</th>
-              <th className="border-b border-r border-zinc-300 px-2.5 py-2.5 text-left font-semibold dark:border-zinc-700">Description</th>
-              <th className="border-b border-r border-zinc-300 px-2.5 py-2.5 text-left font-semibold dark:border-zinc-700">Unit</th>
-              <th className="border-b border-r border-zinc-300 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700">Qty</th>
-              <th className="border-b border-r border-zinc-300 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700">Est.</th>
-              <th className="border-b border-r border-zinc-300 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700">Total</th>
+              <th className={`${colB} border-b border-zinc-300 px-2.5 py-2.5 text-left font-semibold dark:border-zinc-700`}>Item</th>
+              <th className={`${colB} border-b border-zinc-300 px-2.5 py-2.5 text-left font-semibold dark:border-zinc-700`}>Description</th>
+              <th className={`${colB} border-b border-zinc-300 px-2.5 py-2.5 text-left font-semibold dark:border-zinc-700`}>Unit</th>
+              <th className={`${colB} border-b border-zinc-300 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700`}>Qty</th>
+              <th className={`${colB} border-b border-zinc-300 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700`}>Est.</th>
+              <th className={`${colB} border-b border-zinc-300 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700`}>Total</th>
               <th className="border-b border-zinc-300 dark:border-zinc-700" />
             </tr>
           </thead>
           <tbody>
-            {sections.map((s, si) => (
-              <SectionRows
-                key={s.id}
-                index={si}
-                section={s}
-                canEdit={canEdit}
-                currency={cur}
-                itemTotal={itemTotal}
-                sectionTotal={sectionTotal(s)}
-                onRenameLocal={(name) => setSections((p) => p.map((x) => (x.id === s.id ? { ...x, name } : x)))}
-                onRenamePersist={(name) => start(() => renameSection(boq.id, s.id, name).then(() => {}))}
-                onDeleteSection={() => onDeleteSection(s.id)}
-                onAddItem={() => onAddItem(s.id)}
-                onDeleteItem={(itemId) => onDeleteItem(s.id, itemId)}
-                onItemLocal={patchItem}
-                persist={persist}
-              />
-            ))}
-            {sections.length === 0 && (
+            {bodyRows}
+            {topSections.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-3 py-10 text-center text-sm text-zinc-500 dark:text-zinc-400">
-                  Blank bill. Add a section — like <b>Preliminaries</b> or <b>Earthworks</b> — then add priced items.
+                  Blank bill. Add a section — like <b>Preliminaries</b> or <b>Earthworks</b> — then add priced items or sub-sections.
                 </td>
               </tr>
             )}
@@ -190,7 +311,7 @@ export function BoqBuilder({ boq, canEdit }: { boq: BoqDetail; canEdit: boolean 
               <td className="px-2.5 py-3" colSpan={5}>
                 Bill total
                 <span className="ml-2 font-mono text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                  {itemCount} items · {sections.length} section{sections.length === 1 ? '' : 's'}
+                  {items.length} items · {topSections.length} section{topSections.length === 1 ? '' : 's'}
                 </span>
               </td>
               <td className="border-l border-zinc-300 px-2.5 py-3 text-right tabular-nums text-brand-600 dark:border-zinc-700 dark:text-brand-500">
@@ -206,7 +327,7 @@ export function BoqBuilder({ boq, canEdit }: { boq: BoqDetail; canEdit: boolean 
         <div className="mt-3">
           <button
             type="button"
-            onClick={onAddSection}
+            onClick={() => onAddSection(null)}
             disabled={pending}
             className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-500 transition hover:border-brand-500 hover:text-brand-600 disabled:opacity-50 dark:border-zinc-700"
           >
@@ -215,167 +336,5 @@ export function BoqBuilder({ boq, canEdit }: { boq: BoqDetail; canEdit: boolean 
         </div>
       )}
     </div>
-  );
-}
-
-function SectionRows({
-  index,
-  section,
-  canEdit,
-  currency,
-  itemTotal,
-  sectionTotal,
-  onRenameLocal,
-  onRenamePersist,
-  onDeleteSection,
-  onAddItem,
-  onDeleteItem,
-  onItemLocal,
-  persist,
-}: {
-  index: number;
-  section: Section;
-  canEdit: boolean;
-  currency: string;
-  itemTotal: (it: Item) => number;
-  sectionTotal: number;
-  onRenameLocal: (name: string) => void;
-  onRenamePersist: (name: string) => void;
-  onDeleteSection: () => void;
-  onAddItem: () => void;
-  onDeleteItem: (itemId: string) => void;
-  onItemLocal: (sectionId: string, itemId: string, up: (it: Item) => Item) => void;
-  persist: (itemId: string, patch: { description?: string; uom?: string | null; qty?: number; budgetRateCents?: number }) => void;
-}) {
-  const rowBorder = 'border-b border-zinc-200 dark:border-zinc-800';
-  const colBorder = 'border-r border-zinc-200 dark:border-zinc-800';
-
-  return (
-    <>
-      {/* section header */}
-      <tr className="bg-zinc-50 dark:bg-zinc-900/50">
-        <td className={`${rowBorder} ${colBorder} px-2.5 py-2 text-center font-mono text-xs font-bold text-zinc-500`}>{index + 1}</td>
-        <td className={`${rowBorder} ${colBorder} px-2.5 py-1.5`} colSpan={4}>
-          <div className="flex items-center gap-2">
-            <input
-              defaultValue={section.name}
-              disabled={!canEdit}
-              aria-label="Section name"
-              onChange={(e) => onRenameLocal(e.target.value)}
-              onBlur={(e) => onRenamePersist(e.target.value.trim() || 'Untitled section')}
-              className="min-w-[160px] flex-1 rounded bg-transparent px-1 py-1 text-sm font-semibold outline-none focus:ring-1 focus:ring-brand-500 disabled:text-zinc-700 dark:disabled:text-zinc-300"
-            />
-            <span className="font-mono text-xs text-zinc-400">
-              {section.items.length} item{section.items.length === 1 ? '' : 's'}
-            </span>
-          </div>
-        </td>
-        <td className={`${rowBorder} px-2.5 py-2 text-right font-mono text-sm font-bold tabular-nums text-brand-600 dark:text-brand-500`}>
-          {fmtMoney(sectionTotal, currency)}
-        </td>
-        <td className={`${rowBorder} px-1 text-center`}>
-          {canEdit && (
-            <button type="button" onClick={onDeleteSection} aria-label="Delete section" className="rounded p-1 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10">
-              ✕
-            </button>
-          )}
-        </td>
-      </tr>
-
-      {/* items */}
-      {section.items.map((it, ii) => {
-        const badUnit = !isKnownUnit(it.uom);
-        return (
-          <tr key={it.id} className="group hover:bg-brand-50/40 dark:hover:bg-brand-600/5">
-            <td className={`${rowBorder} ${colBorder} px-2.5 py-2 text-center font-mono text-xs text-zinc-400`}>
-              {index + 1}.{ii + 1}
-            </td>
-            <td className={`${rowBorder} ${colBorder} p-0`}>
-              <input
-                defaultValue={it.description}
-                disabled={!canEdit}
-                placeholder="Item description"
-                aria-label="Description"
-                onChange={(e) => onItemLocal(section.id, it.id, (x) => ({ ...x, description: e.target.value }))}
-                onBlur={(e) => persist(it.id, { description: e.target.value })}
-                className={cell}
-              />
-            </td>
-            <td className={`${rowBorder} ${colBorder} p-0`}>
-              <input
-                defaultValue={it.uom}
-                disabled={!canEdit}
-                list={UOM_LIST}
-                placeholder="unit"
-                aria-label="Unit"
-                title={badUnit ? 'Unrecognised unit — allowed, but check it' : undefined}
-                onChange={(e) => onItemLocal(section.id, it.id, (x) => ({ ...x, uom: e.target.value }))}
-                onBlur={(e) => persist(it.id, { uom: e.target.value })}
-                className={`${cell} text-center ${badUnit ? 'text-red-600 dark:text-red-400' : ''}`}
-              />
-            </td>
-            <td className={`${rowBorder} ${colBorder} p-0`}>
-              <input
-                defaultValue={it.qty ? String(it.qty) : ''}
-                disabled={!canEdit}
-                inputMode="decimal"
-                placeholder="0"
-                aria-label="Quantity"
-                onBlur={(e) => {
-                  const qty = Math.max(0, Number(e.target.value) || 0);
-                  onItemLocal(section.id, it.id, (x) => ({ ...x, qty }));
-                  persist(it.id, { qty });
-                }}
-                className={numCell}
-              />
-            </td>
-            <td className={`${rowBorder} ${colBorder} p-0`}>
-              <input
-                defaultValue={it.rateCents ? (it.rateCents / 100).toFixed(2) : ''}
-                disabled={!canEdit}
-                inputMode="decimal"
-                placeholder="0.00"
-                aria-label="Estimate rate"
-                onBlur={(e) => {
-                  const rateCents = Math.round((Number(e.target.value) || 0) * 100);
-                  onItemLocal(section.id, it.id, (x) => ({ ...x, rateCents }));
-                  persist(it.id, { budgetRateCents: rateCents });
-                }}
-                className={numCell}
-              />
-            </td>
-            <td className={`${rowBorder} px-2.5 py-2 text-right font-mono text-sm tabular-nums`}>{fmtMoney(itemTotal(it), currency)}</td>
-            <td className={`${rowBorder} px-1 text-center`}>
-              {canEdit && (
-                <button
-                  type="button"
-                  onClick={() => onDeleteItem(it.id)}
-                  aria-label="Delete item"
-                  className="rounded p-1 text-zinc-400 opacity-0 transition group-hover:opacity-100 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10"
-                >
-                  ✕
-                </button>
-              )}
-            </td>
-          </tr>
-        );
-      })}
-
-      {/* add item — a row inside the table */}
-      {canEdit && (
-        <tr>
-          <td className={`${rowBorder} ${colBorder}`} />
-          <td className={`${rowBorder} px-2.5 py-1.5`} colSpan={6}>
-            <button
-              type="button"
-              onClick={onAddItem}
-              className="inline-flex items-center gap-1.5 rounded border border-dashed border-zinc-300 px-2.5 py-1 text-xs font-medium text-zinc-500 transition hover:border-brand-500 hover:text-brand-600 dark:border-zinc-700"
-            >
-              + Add item
-            </button>
-          </td>
-        </tr>
-      )}
-    </>
   );
 }
