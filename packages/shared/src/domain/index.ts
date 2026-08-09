@@ -8,3 +8,4 @@ export * from './scheduling';
 export * from './commitments';
 export * from './payments';
 export * from './documents';
+export * from './tender';

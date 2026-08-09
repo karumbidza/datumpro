@@ -220,3 +220,30 @@ export const recordPaymentSchema = z.object({
   reference: z.string().trim().max(120).optional(),
 });
 export type RecordPaymentInput = z.infer<typeof recordPaymentSchema>;
+
+/** Put a BOQ out to sealed tender. */
+export const createTenderSchema = z.object({
+  boqId: z.string().uuid(),
+  title: z.string().trim().min(2).max(160),
+  closeAt: z.string().datetime().optional().nullable(),
+});
+export type CreateTenderInput = z.infer<typeof createTenderSchema>;
+
+/** Invite a bidding company — existing member (userId set) or new by email. */
+export const inviteBidderSchema = z.object({
+  tenderId: z.string().uuid(),
+  companyName: z.string().trim().min(2).max(160),
+  email: z.string().trim().email(),
+  userId: z.string().uuid().optional().nullable(),
+});
+export type InviteBidderInput = z.infer<typeof inviteBidderSchema>;
+
+/** A bidder saving one line's rate. */
+export const saveBidRateSchema = z.object({
+  token: z.string().min(10),
+  boqItemId: z.string().uuid(),
+  rateCents: z.number().int().min(0),
+  noBid: z.boolean().optional(),
+  note: z.string().trim().max(500).optional().nullable(),
+});
+export type SaveBidRateInput = z.infer<typeof saveBidRateSchema>;
