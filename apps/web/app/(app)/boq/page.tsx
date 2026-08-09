@@ -69,10 +69,15 @@ export default async function BoqIndexPage() {
               {boqs.map((b) => (
                 <tr
                   key={b.id}
-                  className="border-b border-zinc-100 last:border-0 hover:bg-zinc-50 dark:border-zinc-900 dark:hover:bg-zinc-900/50"
+                  className="relative cursor-pointer border-b border-zinc-100 last:border-0 hover:bg-zinc-50 dark:border-zinc-900 dark:hover:bg-zinc-900/50"
                 >
                   <td className="px-4 py-3">
-                    <Link href={`/boq/${b.id}`} className="font-medium text-zinc-900 hover:underline dark:text-zinc-100">
+                    {/* Stretched link: the whole row navigates (one accessible anchor
+                        via after:inset-0 over the `relative` row), not just the name. */}
+                    <Link
+                      href={`/boq/${b.id}`}
+                      className="font-medium text-zinc-900 after:absolute after:inset-0 hover:underline dark:text-zinc-100"
+                    >
                       {b.name}
                     </Link>
                     {b.clientName && <p className="text-xs text-zinc-500 dark:text-zinc-400">{b.clientName}</p>}
