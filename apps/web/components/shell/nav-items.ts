@@ -13,6 +13,7 @@ import {
   type IconComponent,
 } from '@/components/icons';
 import type { SidebarProject } from '@/lib/data/org';
+import type { MemberType } from '@datumpro/shared/access';
 
 export interface NavItem {
   name: string;
@@ -36,6 +37,7 @@ export function computeNav(
   canViewFinance = false,
   showMyPayments = true,
   managedProjectIds: string[] = [],
+  memberType: MemberType = 'staff',
 ): NavItem[] {
   if (activeProject) {
     const id = activeProject.id;
@@ -60,7 +62,11 @@ export function computeNav(
   return [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'All projects', href: '/projects', icon: FolderOpen },
-    { name: 'BOQ', href: '/boq', icon: FileText },
+    ...(memberType === 'contractor'
+      ? [{ name: 'Tenders', href: '/boq', icon: FileText }]
+      : memberType === 'client' || memberType === 'viewer'
+        ? []
+        : [{ name: 'BOQ', href: '/boq', icon: FileText }]),
     // One "Finance" item: managers → the org finance hub; an assignee without
     // finance access → their own statement. Same label, role-appropriate target.
     ...(canViewFinance

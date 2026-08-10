@@ -63,6 +63,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         showMyPayments={isContractor}
         managedProjectIds={managedProjectIds}
         myTaskCount={myTaskCount}
+        memberType={ctx.active.memberType}
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <MobileNav
@@ -75,6 +76,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           canViewFinance={canViewFinance}
           showMyPayments={isContractor}
           managedProjectIds={managedProjectIds}
+          memberType={ctx.active.memberType}
         />
         <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto outline-none">
           {children}

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Menu, X, Check, LogOut, Users, BrandMark } from '@/components/icons';
 import type { SidebarProject, OrgMembershipSummary } from '@/lib/data/org';
+import type { MemberType } from '@datumpro/shared/access';
 import { signOut, setActiveOrg } from '@/app/(app)/actions';
 import { activeProjectId, computeNav, isNavActive } from '@/components/shell/nav-items';
 import { ThemeToggle } from '@/components/shell/theme-toggle';
@@ -19,16 +20,17 @@ interface Props {
   canViewFinance: boolean;
   showMyPayments?: boolean;
   managedProjectIds?: string[];
+  memberType: MemberType;
 }
 
 /** Mobile-only top bar + slide-over drawer. The desktop sidebar is hidden below
  *  `md`, so this is the sole navigation on phones. */
-export function MobileNav({ projects, orgs, activeOrgId, email, canManageMembers, canViewFinance, showMyPayments = true, managedProjectIds = [] }: Props) {
+export function MobileNav({ projects, orgs, activeOrgId, email, canManageMembers, canViewFinance, showMyPayments = true, managedProjectIds = [], memberType = 'staff' }: Props) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
   const activeProject = projects.find((p) => p.id === activeProjectId(pathname)) ?? null;
-  const nav = computeNav(activeProject, canManageMembers, canViewFinance, showMyPayments, managedProjectIds);
+  const nav = computeNav(activeProject, canManageMembers, canViewFinance, showMyPayments, managedProjectIds, memberType);
   const activeOrgName = orgs.find((o) => o.orgId === activeOrgId)?.name ?? 'DatumPro';
 
   // Close the drawer whenever the route changes.

@@ -13,6 +13,7 @@ import {
   BrandMark,
 } from '@/components/icons';
 import type { SidebarProject, OrgMembershipSummary } from '@/lib/data/org';
+import type { MemberType } from '@datumpro/shared/access';
 import { signOut, setActiveOrg } from '@/app/(app)/actions';
 import { NotificationsBell } from '@/components/shell/notifications-bell';
 import { ThemeToggle } from '@/components/shell/theme-toggle';
@@ -29,14 +30,15 @@ interface SidebarProps {
   showMyPayments?: boolean;
   managedProjectIds?: string[];
   myTaskCount: number;
+  memberType: MemberType;
 }
 
-export function Sidebar({ projects, orgs, activeOrgId, email, canManageMembers, canCreateProject, canViewFinance, showMyPayments = true, managedProjectIds = [], myTaskCount }: SidebarProps) {
+export function Sidebar({ projects, orgs, activeOrgId, email, canManageMembers, canCreateProject, canViewFinance, showMyPayments = true, managedProjectIds = [], myTaskCount, memberType = 'staff' }: SidebarProps) {
   const pathname = usePathname();
   const activeId = activeProjectId(pathname);
   const activeProject = projects.find((p) => p.id === activeId) ?? null;
 
-  const nav = computeNav(activeProject, canManageMembers, canViewFinance, showMyPayments, managedProjectIds);
+  const nav = computeNav(activeProject, canManageMembers, canViewFinance, showMyPayments, managedProjectIds, memberType);
   const isActive = (href: string) => isNavActive(href, pathname, activeProject);
 
   return (

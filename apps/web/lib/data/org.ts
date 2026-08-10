@@ -2,6 +2,7 @@ import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import type { OrgRole } from '@datumpro/shared/access';
+import type { MemberType } from '@datumpro/shared/access';
 
 /** The signed-in auth user, memoised for the lifetime of ONE server request
  *  (React.cache). Every `auth.getUser()` is a network round-trip to the auth
@@ -24,6 +25,7 @@ export interface OrgMembershipSummary {
   orgId: string;
   name: string;
   role: OrgRole;
+  memberType: MemberType;
 }
 
 export interface ActiveContext {
@@ -35,6 +37,7 @@ export interface ActiveContext {
 
 type MembershipQueryRow = {
   role: string | null;
+  member_type: string | null;
   org_id: string;
   organizations: { id: string; name: string | null } | { id: string; name: string | null }[] | null;
 };
@@ -54,7 +57,7 @@ export const getActiveContext = cache(async (): Promise<ActiveContext | null> =>
   const supabase = await createClient();
   const { data } = await supabase
     .from('org_members')
-    .select('role, org_id, organizations(id, name)')
+    .select('role, member_type, org_id, organizations(id, name)')
     .eq('user_id', user.id)
     .eq('status', 'active');
 
@@ -62,6 +65,7 @@ export const getActiveContext = cache(async (): Promise<ActiveContext | null> =>
     orgId: m.org_id,
     name: orgName(m),
     role: (m.role ?? 'viewer') as OrgRole,
+    memberType: (m.member_type ?? 'staff') as MemberType,
   }));
 
   const cookieStore = await cookies();
