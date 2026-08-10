@@ -243,4 +243,210 @@ export async function getBidWorkspace(token: string): Promise<BidWorkspace | nul
   };
 }
 
-// Phase 2: listBidderTotals(...) — post-unseal comparison. Not implemented in Phase 1.
+// ---------------------------------------------------------------------------
+// Phase 2: post-unseal comparison types
+// ---------------------------------------------------------------------------
+
+export interface CompareLine {
+  itemId: string;
+  description: string;
+  uom: string | null;
+  qty: number;
+  budgetRateCents: number;
+  budgetAmountCents: number;
+}
+export interface CompareSection { sectionId: string; name: string; items: CompareLine[]; }
+export interface CompareBidder {
+  bidderId: string;
+  companyName: string;
+  totalCents: number;
+  varianceCents: number;
+  variancePct: number;
+  rank: number;
+  rates: Record<string, { rateCents: number; amountCents: number; noBid: boolean }>;
+}
+export interface TenderComparison {
+  tenderId: string;
+  title: string;
+  status: TenderStatus;
+  awardedBidderId: string | null;
+  budgetTotalCents: number;
+  sections: CompareSection[];
+  bidders: CompareBidder[];
+  currency: string;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: getTenderComparison — ranked bidder totals, variance vs budget, per-line rates
+// ---------------------------------------------------------------------------
+
+/** Returns a full comparison matrix for a sealed tender (post-unseal only).
+ *  Returns null when no tender exists, the tender has not been unsealed yet,
+ *  or RLS blocks access. */
+export async function getTenderComparison(
+  orgId: string,
+  boqId: string,
+): Promise<TenderComparison | null> {
+  const supabase = await createClient();
+
+  // 1. Load the latest tender for the boq.
+  const { data: tenderRaw } = await supabase
+    .from('boq_tenders')
+    .select('id, title, status, unsealed_at, awarded_bidder_id, boq_id')
+    .eq('org_id', orgId)
+    .eq('boq_id', boqId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  type TenderRow = {
+    id: string;
+    title: string;
+    status: TenderStatus;
+    unsealed_at: string | null;
+    awarded_bidder_id: string | null;
+    boq_id: string;
+  };
+
+  if (!tenderRaw) return null;
+  const tender = tenderRaw as unknown as TenderRow;
+  if (!tender.unsealed_at) return null;
+
+  // 2. Load the bill (sections + items with budget figures).
+  const { data: boqRaw } = await supabase
+    .from('boqs')
+    .select(
+      'id, currency, ' +
+        'boq_sections(id, name, position, ' +
+        'boq_items(id, description, uom, qty, budget_rate_cents, position))',
+    )
+    .eq('id', tender.boq_id)
+    .eq('org_id', orgId)
+    .maybeSingle();
+
+  type BillItemRow = {
+    id: string;
+    description: string;
+    uom: string | null;
+    qty: number | string | null;
+    budget_rate_cents: number | string | null;
+    position: number;
+  };
+  type BillSectionRow = { id: string; name: string; position: number; boq_items: BillItemRow[] | null };
+  type BoqBillRow = {
+    id: string;
+    currency: string | null;
+    boq_sections: BillSectionRow[] | null;
+  };
+
+  if (!boqRaw) return null;
+  const boq = boqRaw as unknown as BoqBillRow;
+  const currency = boq.currency ?? 'USD';
+
+  // Build sections, compute budget amounts, collect flat item qty map.
+  const qtyMap = new Map<string, number>();
+  let budgetTotalCents = 0;
+
+  const sections: CompareSection[] = (boq.boq_sections ?? [])
+    .slice()
+    .sort((a, c) => a.position - c.position)
+    .map((s) => ({
+      sectionId: s.id,
+      name: s.name,
+      items: (s.boq_items ?? [])
+        .slice()
+        .sort((a, c) => a.position - c.position)
+        .map((it) => {
+          const qty = n(it.qty);
+          const budgetRateCents = n(it.budget_rate_cents);
+          const budgetAmountCents = Math.round(qty * budgetRateCents);
+          qtyMap.set(it.id, qty);
+          budgetTotalCents += budgetAmountCents;
+          return { itemId: it.id, description: it.description, uom: it.uom, qty, budgetRateCents, budgetAmountCents };
+        }),
+    }));
+
+  // 3. Load submitted bidders.
+  const { data: biddersRaw } = await supabase
+    .from('boq_bidders')
+    .select('id, company_name')
+    .eq('tender_id', tender.id)
+    .eq('status', 'submitted');
+
+  type BidderRow2 = { id: string; company_name: string };
+  const biddersData = (biddersRaw ?? []) as unknown as BidderRow2[];
+  const bidderIds = biddersData.map((b) => b.id);
+
+  // 4. Load bid items for all submitted bidders.
+  type BidItemRow = {
+    bidder_id: string;
+    boq_item_id: string;
+    rate_cents: number | string | null;
+    no_bid: boolean | null;
+  };
+
+  let bidItemRows: BidItemRow[] = [];
+  if (bidderIds.length > 0) {
+    const { data: bidItemsRaw } = await supabase
+      .from('boq_bid_items')
+      .select('bidder_id, boq_item_id, rate_cents, no_bid')
+      .in('bidder_id', bidderIds);
+    bidItemRows = (bidItemsRaw ?? []) as unknown as BidItemRow[];
+  }
+
+  // Group bid items by bidder_id.
+  const bidItemsByBidder = new Map<string, BidItemRow[]>();
+  for (const row of bidItemRows) {
+    const existing = bidItemsByBidder.get(row.bidder_id) ?? [];
+    existing.push(row);
+    bidItemsByBidder.set(row.bidder_id, existing);
+  }
+
+  // 5. Build CompareBidder entries (unsorted — rank assigned after sort).
+  const unsortedBidders: Omit<CompareBidder, 'rank'>[] = biddersData.map((bd) => {
+    const rows = bidItemsByBidder.get(bd.id) ?? [];
+    const rates: CompareBidder['rates'] = {};
+    let totalCents = 0;
+    for (const row of rows) {
+      const noBid = !!row.no_bid;
+      const rateCents = n(row.rate_cents);
+      const qty = qtyMap.get(row.boq_item_id) ?? 0;
+      const amountCents = noBid ? 0 : Math.round(qty * rateCents);
+      rates[row.boq_item_id] = { rateCents, amountCents, noBid };
+      totalCents += amountCents;
+    }
+    const varianceCents = totalCents - budgetTotalCents;
+    const variancePct = budgetTotalCents > 0 ? varianceCents / budgetTotalCents : 0;
+    return { bidderId: bd.id, companyName: bd.company_name, totalCents, varianceCents, variancePct, rates };
+  });
+
+  // 6. Sort ascending by totalCents, assign rank.
+  const bidders: CompareBidder[] = unsortedBidders
+    .slice()
+    .sort((a, c) => a.totalCents - c.totalCents)
+    .map((bd, idx) => ({ ...bd, rank: idx + 1 }));
+
+  // 7. Return.
+  return {
+    tenderId: tender.id,
+    title: tender.title,
+    status: tender.status,
+    awardedBidderId: tender.awarded_bidder_id,
+    budgetTotalCents,
+    sections,
+    bidders,
+    currency,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: getTenderOwnerExtras — RPC-based eligibility check
+// ---------------------------------------------------------------------------
+
+export async function getTenderOwnerExtras(
+  tenderId: string,
+): Promise<{ unsealEligible: boolean }> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc('tender_unseal_eligible', { p_tender_id: tenderId });
+  return { unsealEligible: !!data };
+}

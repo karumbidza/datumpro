@@ -9,6 +9,8 @@ import type { FormState } from '@/components/ui/form-error';
 import { sendEmail } from '@/lib/email/resend';
 import { appUrl } from '@/lib/email/templates';
 import { tenderInviteEmail } from '@/lib/email/tender-invite';
+import { logAudit } from '@/lib/audit';
+import { awardWinEmail, awardRegretEmail } from '@/lib/email/tender-award';
 
 /** Next's redirect() signals control flow by throwing a special error — never
  *  swallow it inside a best-effort catch. */
@@ -198,5 +200,51 @@ export async function closeTender(formData: FormData): Promise<void> {
   const { error } = await supabase.from('boq_tenders').update({ status: 'closed' }).eq('id', tenderId);
   if (error) throw new Error(error.message);
 
+  revalidatePath(`/boq/${boqId}/tender`);
+}
+
+/** Unseal a tender so staff can read bid prices. RPC enforces the gate
+ *  (all bidders submitted or deadline passed) + staff auth. Audit-logged. */
+export async function unsealTender(formData: FormData): Promise<void> {
+  const { supabase, userId, orgId } = await requireOrg();
+  const tenderId = String(formData.get('tenderId') ?? '');
+  const boqId = String(formData.get('boqId') ?? '');
+  const { error } = await supabase.rpc('unseal_tender', { p_tender_id: tenderId });
+  if (error) throw new Error(error.message);
+  await logAudit({ orgId, actorId: userId, entityType: 'boq_tender', entityId: tenderId, action: 'tender.unsealed' });
+  revalidatePath(`/boq/${boqId}/tender`);
+}
+
+/** Award a bidder. RPC requires the tender be unsealed + the bidder submitted.
+ *  Then emails the winner (win) and the other submitted bidders (regret),
+ *  best-effort — a mail failure never breaks the award. */
+export async function awardTender(formData: FormData): Promise<void> {
+  const { supabase, orgId } = await requireOrg();
+  const tenderId = String(formData.get('tenderId') ?? '');
+  const bidderId = String(formData.get('bidderId') ?? '');
+  const boqId = String(formData.get('boqId') ?? '');
+
+  const { error } = await supabase.rpc('award_boq_tender', { p_tender_id: tenderId, p_bidder_id: bidderId });
+  if (error) throw new Error(error.message);
+
+  try {
+    const [{ data: org }, { data: tender }, { data: bidders }] = await Promise.all([
+      supabase.from('organizations').select('name').eq('id', orgId).single(),
+      supabase.from('boq_tenders').select('title').eq('id', tenderId).single(),
+      supabase.from('boq_bidders').select('id, company_name, contact_email').eq('tender_id', tenderId).eq('status', 'submitted'),
+    ]);
+    const orgName = (org as { name?: string } | null)?.name ?? 'DatumPro';
+    const tenderTitle = (tender as { title?: string } | null)?.title ?? 'Tender';
+    for (const b of ((bidders ?? []) as { id: string; company_name: string; contact_email: string }[])) {
+      const isWinner = b.id === bidderId;
+      const { subject, html } = isWinner
+        ? awardWinEmail({ orgName, tenderTitle, companyName: b.company_name })
+        : awardRegretEmail({ orgName, tenderTitle, companyName: b.company_name });
+      await sendEmail({ to: b.contact_email, subject, html });
+    }
+  } catch (e) {
+    if (isRedirect(e)) throw e;
+    console.error('[tender] award emails failed:', e);
+  }
   revalidatePath(`/boq/${boqId}/tender`);
 }
