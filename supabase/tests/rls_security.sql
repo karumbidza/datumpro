@@ -260,6 +260,18 @@ exception when others then
   else raise; end if;
 end $$;
 
+-- Hardened guard regression: the shipped tender RPCs also coalesce is_org_admin()/
+-- org_role() so a non-member (user B) cannot drive them on org A's tender a336.
+set request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-0000000000b1","role":"authenticated","aal":"aal1"}';
+do $$
+begin
+  perform public.unseal_tender('a3360000-0000-0000-0000-000000000000');
+  raise exception 'FAIL: guard: outsider drove unseal_tender';
+exception when others then
+  if position('not authorised' in SQLERRM) > 0 then raise notice 'PASS: guard: outsider blocked from unseal_tender.';
+  else raise; end if;
+end $$;
+
 reset role;
 reset request.jwt.claims;
 
