@@ -64,6 +64,21 @@ insert into public.boq_sections (id, org_id, boq_id, name) values
 insert into public.boq_items (id, org_id, section_id, description, uom, qty, budget_rate_cents) values
   ('a3350000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a3340000-0000-0000-0000-000000000000','Excavate to reduced level','m³',10,250);
 
+-- Contractor in org A + two tenders on BOQ A: one the contractor is invited to bid
+-- on, one they are not. Exercises the Piece 2 role split — a contractor is an org
+-- member but must NOT read the BOQ library / PRIVATE budget rates, only tenders they
+-- were invited to (via is_tender_bidder), still able to price through the
+-- tender_bill_lines projection (which omits budget_rate_cents).
+insert into auth.users (id, email) values
+  ('a0000000-0000-0000-0000-0000000000a2','contractor-a@test.dev');
+insert into public.org_members (org_id, user_id, role, member_type, status) values
+  ('a1110000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000a2','member','contractor','active');
+insert into public.boq_tenders (id, org_id, boq_id, title, status) values
+  ('a3360000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a3330000-0000-0000-0000-000000000000','Tender A1','open'),
+  ('a3380000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a3330000-0000-0000-0000-000000000000','Tender A2 (contractor not invited)','open');
+insert into public.boq_bidders (id, org_id, tender_id, company_name, contact_email, invite_token, user_id, status) values
+  ('a3370000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a3360000-0000-0000-0000-000000000000','Contractor A Ltd','contractor-a@test.dev','tok-a337','a0000000-0000-0000-0000-0000000000a2','invited');
+
 -- ── Tenant isolation: user A sees only org A ─────────────────────────────────
 set role authenticated;
 set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
@@ -157,6 +172,39 @@ exception
   when check_violation then
     raise notice 'PASS: F7: 11th organisation is rejected by the cap.';
 end $$;
+reset role;
+reset request.jwt.claims;
+
+-- ── Piece 2: BOQ role split — staff read the library, contractors do not ──────
+-- is_org_staff() keys on member_type (staff vs contractor both hold org_role
+-- 'member'). Staff read the whole BOQ library incl. PRIVATE budget rates and every
+-- org tender; a contractor org-member is blocked from the library and sees only
+-- tenders they were invited to bid on, still able to price via tender_bill_lines
+-- (which never returns budget_rate_cents).
+set role authenticated;
+
+-- Staff (user A, member_type defaults to 'staff'): full library + both tenders.
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok((select count(*) from public.boq_items where id = 'a3350000-0000-0000-0000-000000000000') = 1,
+  'role-split: staff can read BOQ library items');
+select pg_temp.ok((select count(*) from public.boq_tenders where org_id = 'a1110000-0000-0000-0000-000000000000') = 2,
+  'role-split: staff can read all org tenders');
+
+-- Contractor (user A2, member_type contractor): no library, only their tender.
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok((select count(*) from public.boqs where id = 'a3330000-0000-0000-0000-000000000000') = 0,
+  'role-split: contractor CANNOT read the BOQ library (bill header)');
+select pg_temp.ok((select count(*) from public.boq_items where id = 'a3350000-0000-0000-0000-000000000000') = 0,
+  'role-split: contractor CANNOT read boq_items / budget rates');
+select pg_temp.ok((select count(*) from public.boq_tenders where org_id = 'a1110000-0000-0000-0000-000000000000') = 1,
+  'role-split: contractor sees ONLY tenders they were invited to');
+select pg_temp.ok((select count(*) from public.boq_tenders where id = 'a3360000-0000-0000-0000-000000000000') = 1,
+  'role-split: contractor can see their own tender');
+select pg_temp.ok((select count(*) from public.boq_tenders where id = 'a3380000-0000-0000-0000-000000000000') = 0,
+  'role-split: contractor CANNOT see a tender they were not invited to');
+select pg_temp.ok((select count(*) from public.tender_bill_lines('a3360000-0000-0000-0000-000000000000')) = 1,
+  'role-split: contractor can still price via tender_bill_lines (budget rate omitted)');
+
 reset role;
 reset request.jwt.claims;
 
