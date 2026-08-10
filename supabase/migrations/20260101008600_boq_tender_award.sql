@@ -41,7 +41,7 @@ end; $$;
 revoke all on function public.unseal_tender(uuid) from public;
 grant execute on function public.unseal_tender(uuid) to authenticated;
 
-create or replace function public.award_tender(p_tender_id uuid, p_bidder_id uuid)
+create or replace function public.award_boq_tender(p_tender_id uuid, p_bidder_id uuid)
 returns void language plpgsql security definer set search_path = '' as $$
 declare v_org uuid; v_sealed timestamptz; v_bidder_ok boolean;
 begin
@@ -60,5 +60,5 @@ begin
     set status = 'awarded', awarded_bidder_id = p_bidder_id, updated_at = now()
     where id = p_tender_id;
 end; $$;
-revoke all on function public.award_tender(uuid, uuid) from public;
-grant execute on function public.award_tender(uuid, uuid) to authenticated;
+revoke all on function public.award_boq_tender(uuid, uuid) from public;
+grant execute on function public.award_boq_tender(uuid, uuid) to authenticated;
