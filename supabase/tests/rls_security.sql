@@ -272,6 +272,20 @@ exception when others then
   else raise; end if;
 end $$;
 
+-- Guard helpers are NULL-safe at the source: a non-member sees is_org_admin() = false
+-- (not NULL), so bare `if not is_org_admin(...)` guards (e.g. set_org_approval_policy)
+-- reject them instead of letting NULL skip the raise.
+select pg_temp.ok(public.is_org_admin('a1110000-0000-0000-0000-000000000000') = false,
+  'guard: is_org_admin() returns false (not NULL) for a non-member');
+do $$
+begin
+  perform public.set_org_approval_policy('a1110000-0000-0000-0000-000000000000', 'none');
+  raise exception 'FAIL: guard: outsider changed org approval policy';
+exception when others then
+  if position('owner or admin' in SQLERRM) > 0 then raise notice 'PASS: guard: outsider blocked from set_org_approval_policy.';
+  else raise; end if;
+end $$;
+
 reset role;
 reset request.jwt.claims;
 
