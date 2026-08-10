@@ -234,13 +234,15 @@ export function BiddersPanel({ tenderId, boqId, bidders, contractors, canManage 
                       <td className="px-4 py-3">
                         {b.status !== 'withdrawn' && (
                           <div className="flex items-center gap-2">
-                            <form action={resendBidInvite}>
-                              <input type="hidden" name="bidderId" value={b.id} />
-                              <input type="hidden" name="boqId" value={boqId} />
-                              <Button type="submit" variant="secondary" size="sm">
-                                Resend
-                              </Button>
-                            </form>
+                            {b.status !== 'submitted' && (
+                              <form action={resendBidInvite}>
+                                <input type="hidden" name="bidderId" value={b.id} />
+                                <input type="hidden" name="boqId" value={boqId} />
+                                <Button type="submit" variant="secondary" size="sm">
+                                  Resend
+                                </Button>
+                              </form>
+                            )}
                             <form action={revokeBidder}>
                               <input type="hidden" name="bidderId" value={b.id} />
                               <input type="hidden" name="boqId" value={boqId} />

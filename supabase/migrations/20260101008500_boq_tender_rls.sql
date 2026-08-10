@@ -105,6 +105,15 @@ begin
   if not (public.is_org_admin(v_org) or public.org_role(v_org) = 'pm') then
     raise exception 'not authorised';
   end if;
+  -- If a specific existing user is named, it must be an ACTIVE member of THIS org,
+  -- so a forged client-supplied p_user_id can't grant an arbitrary account
+  -- self-read access to the bidder row (RLS boundary).
+  if p_user_id is not null and not exists (
+    select 1 from public.org_members m
+    where m.org_id = v_org and m.user_id = p_user_id and m.status = 'active'
+  ) then
+    raise exception 'named user is not an active member of this organisation';
+  end if;
   insert into public.boq_bidders (org_id, tender_id, company_name, contact_email, user_id, invite_token, invited_by)
   values (v_org, p_tender_id, trim(p_company_name), lower(trim(p_email)), p_user_id, v_token, (select auth.uid()))
   on conflict (tender_id, lower(contact_email)) do update

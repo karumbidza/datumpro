@@ -89,6 +89,7 @@ export async function inviteBidder(_prev: FormState, formData: FormData): Promis
 /** Stub action — resend the invite email for a bidder. Email wiring is Task 7.
  *  The button is present here so the UI slot exists and gets wired in the next task. */
 export async function resendBidInvite(formData: FormData): Promise<void> {
+  await requireOrg();
   // TODO(Task 7): resend bid-invite email using the stored invite_token.
   const boqId = String(formData.get('boqId') ?? '');
   revalidatePath(`/boq/${boqId}/tender`);
@@ -100,7 +101,8 @@ export async function revokeBidder(formData: FormData): Promise<void> {
   const bidderId = String(formData.get('bidderId') ?? '');
   const boqId = String(formData.get('boqId') ?? '');
 
-  await supabase.from('boq_bidders').update({ status: 'withdrawn' }).eq('id', bidderId);
+  const { error } = await supabase.from('boq_bidders').update({ status: 'withdrawn' }).eq('id', bidderId);
+  if (error) throw new Error(error.message);
 
   revalidatePath(`/boq/${boqId}/tender`);
 }
@@ -111,7 +113,8 @@ export async function closeTender(formData: FormData): Promise<void> {
   const tenderId = String(formData.get('tenderId') ?? '');
   const boqId = String(formData.get('boqId') ?? '');
 
-  await supabase.from('boq_tenders').update({ status: 'closed' }).eq('id', tenderId);
+  const { error } = await supabase.from('boq_tenders').update({ status: 'closed' }).eq('id', tenderId);
+  if (error) throw new Error(error.message);
 
   revalidatePath(`/boq/${boqId}/tender`);
 }
