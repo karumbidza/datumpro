@@ -1,7 +1,7 @@
 # BOQ sealed-tender & comparison — design
 
 **Date:** 2026-08-09
-**Status:** Approved (phased). Phase 0 shipping first.
+**Status:** Phase 0 shipped. **Phase 1 (bidding side) implemented & verified** (plan `docs/superpowers/plans/2026-08-09-boq-tender-phase1.md`; migrations `20260101008400`/`008500` applied; RLS + RPCs + owner dashboard + bidder pricing screen + invite emails on branch `feat/boq-tender-phase1`). **Phase 2 (unseal → comparison matrix → award) is the next plan.**
 
 ## Goal
 Evolve the BOQ from a solo priced estimate into a **sealed tender**: multiple
