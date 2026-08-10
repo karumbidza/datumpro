@@ -1,7 +1,7 @@
 # BOQ sealed-tender & comparison — design
 
 **Date:** 2026-08-09
-**Status:** Phase 0 shipped. **Phase 1 (bidding side) implemented & verified** (plan `docs/superpowers/plans/2026-08-09-boq-tender-phase1.md`; migrations `20260101008400`/`008500` applied; RLS + RPCs + owner dashboard + bidder pricing screen + invite emails on branch `feat/boq-tender-phase1`). **Phase 2 (unseal → comparison matrix → award) is the next plan.**
+**Status:** Phases 0, 1, and **2 shipped**. Phase 1 (bidding side): migrations `008400`/`008500`; RLS + RPCs + owner dashboard + bidder pricing screen + invite emails. **Phase 2 (unseal → comparison matrix → award)** (plan `docs/superpowers/plans/2026-08-10-boq-tender-phase2.md`; migration `008600`): `unseal_tender` (gated: all invited bidders submitted OR deadline passed, audit-logged), `award_boq_tender` (marks winner + emails win/regret to all submitted bidders), comparison matrix (ranked bidder columns, variance vs budget, per-line cheapest/dearest highlight). Feature complete for v1. Deliberately still out: cryptographic hard-seal, bidders adding/removing lines, auto-generating a project/contract from award, multi-round/best-and-final.
 
 ## Goal
 Evolve the BOQ from a solo priced estimate into a **sealed tender**: multiple
