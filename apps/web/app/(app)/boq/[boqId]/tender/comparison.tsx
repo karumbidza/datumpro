@@ -78,6 +78,7 @@ export function Comparison({ data, boqId, canManage }: Props) {
                 const variancePct = bidder.variancePct;
                 const variancePositive = variancePct >= 0;
                 const showAwardForm = canManage && status !== 'awarded';
+                const unpricedCount = bidder.totalLines - bidder.pricedLines;
 
                 return (
                   <th
@@ -96,6 +97,14 @@ export function Comparison({ data, boqId, canManage }: Props) {
                         </Badge>
                         {isAwarded && (
                           <Badge tone="green">Awarded ✓</Badge>
+                        )}
+                        {bidder.isComplete ? (
+                          <Badge tone="green">✓ complete</Badge>
+                        ) : (
+                          <Badge tone="amber">
+                            ⚠ priced {bidder.pricedLines}/{bidder.totalLines} (
+                            {Math.round(bidder.coveragePct * 100)}%)
+                          </Badge>
                         )}
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
@@ -116,11 +125,10 @@ export function Comparison({ data, boqId, canManage }: Props) {
                         <form
                           action={awardTender}
                           onSubmit={(e) => {
-                            if (
-                              !window.confirm(
-                                `Award this tender to ${bidder.companyName}? All bidders will be notified.`,
-                              )
-                            ) {
+                            const message = bidder.isComplete
+                              ? `Award this tender to ${bidder.companyName}? All bidders will be notified.`
+                              : `${bidder.companyName} left ${unpricedCount} of ${bidder.totalLines} lines unpriced. Award anyway? All bidders will be notified.`;
+                            if (!window.confirm(message)) {
                               e.preventDefault();
                             }
                           }}
