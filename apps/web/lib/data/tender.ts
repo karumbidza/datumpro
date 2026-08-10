@@ -465,10 +465,36 @@ export async function getTenderComparison(
 
 export async function getTenderOwnerExtras(
   tenderId: string,
-): Promise<{ unsealEligible: boolean }> {
+): Promise<{ unsealEligible: boolean; awardedProjectId: string | null; awardedProjectName: string | null }> {
   const supabase = await createClient();
-  const { data } = await supabase.rpc('tender_unseal_eligible', { p_tender_id: tenderId });
-  return { unsealEligible: !!data };
+  const [{ data: elig }, { data: tenderRow }] = await Promise.all([
+    supabase.rpc('tender_unseal_eligible', { p_tender_id: tenderId }),
+    supabase.from('boq_tenders').select('awarded_project_id').eq('id', tenderId).maybeSingle(),
+  ]);
+  const awardedProjectId =
+    (tenderRow as { awarded_project_id: string | null } | null)?.awarded_project_id ?? null;
+  let awardedProjectName: string | null = null;
+  if (awardedProjectId) {
+    const { data: proj } = await supabase
+      .from('projects')
+      .select('name')
+      .eq('id', awardedProjectId)
+      .maybeSingle();
+    awardedProjectName = (proj as { name: string } | null)?.name ?? null;
+  }
+  return { unsealEligible: !!elig, awardedProjectId, awardedProjectName };
+}
+
+/** Lists the org's projects (newest first) for the "add to existing project"
+ *  picker. RLS also scopes visibility; the explicit org filter narrows the set. */
+export async function listOrgProjects(orgId: string): Promise<{ id: string; name: string }[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('projects')
+    .select('id, name')
+    .eq('org_id', orgId)
+    .order('created_at', { ascending: false });
+  return (data ?? []) as { id: string; name: string }[];
 }
 
 // ---------------------------------------------------------------------------
