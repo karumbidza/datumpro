@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getAuthUser, getActiveContext } from '@/lib/data/org';
 import { getBoqDetail } from '@/lib/data/boq';
-import { getTenderForOwner } from '@/lib/data/tender';
+import { getTenderForOwner, getTenderComparison, getTenderOwnerExtras } from '@/lib/data/tender';
 import { listOrgMembers } from '@/lib/data/org-members';
 import { TENDER_STATUS_LABELS, type TenderStatus } from '@datumpro/shared/domain';
 import { PageContainer } from '@/components/shell/page-container';
@@ -10,7 +10,8 @@ import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { BiddersPanel, type ContractorOption } from './bidders-panel';
 import { CreateTenderForm } from './create-tender-form';
-import { closeTender } from './actions';
+import { closeTender, unsealTender } from './actions';
+import { Comparison } from './comparison';
 
 const STATUS_TONE: Record<TenderStatus, BadgeTone> = {
   draft: 'faint',
@@ -45,6 +46,21 @@ export default async function TenderPage({
   const contractors: ContractorOption[] = allMembers
     .filter((m) => m.memberType === 'contractor' && m.status === 'active' && m.email)
     .map((m) => ({ id: m.userId, name: m.name, email: m.email! }));
+
+  // Phase-2 data — only fetched when tender is in the relevant state.
+  let unsealEligible = false;
+  let comparison = null;
+
+  if (tender !== null) {
+    if (tender.unsealedAt === null && canManage) {
+      // Sealed tender: check unseal eligibility.
+      const extras = await getTenderOwnerExtras(tender.id);
+      unsealEligible = extras.unsealEligible;
+    } else if (tender.unsealedAt !== null) {
+      // Unsealed tender: load comparison matrix.
+      comparison = await getTenderComparison(ctx.active.orgId, boqId);
+    }
+  }
 
   return (
     <PageContainer width="4xl">
@@ -108,15 +124,51 @@ export default async function TenderPage({
               No tender has been created for this BOQ yet.
             </p>
           )
+        ) : tender.unsealedAt === null ? (
+          /* ── Tender sealed — unseal controls + bidder dashboard ── */
+          <div className="space-y-6">
+            {/* Unseal bids section — staff only */}
+            {canManage && (
+              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-900/40">
+                <h2 className="mb-2 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                  Unseal bids
+                </h2>
+                <form action={unsealTender} className="flex flex-wrap items-center gap-3">
+                  <input type="hidden" name="tenderId" value={tender.id} />
+                  <input type="hidden" name="boqId" value={boqId} />
+                  <Button
+                    type="submit"
+                    variant="secondary"
+                    size="sm"
+                    disabled={!unsealEligible}
+                  >
+                    Unseal bids
+                  </Button>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    Unseal unlocks once all invited bidders submit, or the deadline passes.
+                  </p>
+                </form>
+              </div>
+            )}
+
+            {/* Bidder list */}
+            <BiddersPanel
+              tenderId={tender.id}
+              boqId={boqId}
+              bidders={tender.bidders}
+              contractors={contractors}
+              canManage={canManage}
+            />
+          </div>
         ) : (
-          /* ── Tender exists — show bidder dashboard ── */
-          <BiddersPanel
-            tenderId={tender.id}
-            boqId={boqId}
-            bidders={tender.bidders}
-            contractors={contractors}
-            canManage={canManage}
-          />
+          /* ── Tender unsealed — comparison matrix ── */
+          comparison !== null ? (
+            <Comparison data={comparison} boqId={boqId} canManage={canManage} />
+          ) : (
+            <p className="rounded-md border border-dashed border-zinc-300 px-4 py-8 text-center text-sm text-zinc-500 dark:border-zinc-700">
+              Comparison data is not available yet.
+            </p>
+          )
         )}
       </div>
     </PageContainer>
