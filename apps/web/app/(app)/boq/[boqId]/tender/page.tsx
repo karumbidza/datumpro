@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getAuthUser, getActiveContext } from '@/lib/data/org';
 import { getBoqDetail } from '@/lib/data/boq';
-import { getTenderForOwner, getTenderComparison, getTenderOwnerExtras } from '@/lib/data/tender';
+import { getTenderForOwner, getTenderComparison, getTenderOwnerExtras, listOrgProjects } from '@/lib/data/tender';
 import { listOrgMembers } from '@/lib/data/org-members';
 import { TENDER_STATUS_LABELS, type TenderStatus } from '@datumpro/shared/domain';
 import { PageContainer } from '@/components/shell/page-container';
@@ -12,6 +12,7 @@ import { BiddersPanel, type ContractorOption } from './bidders-panel';
 import { CreateTenderForm } from './create-tender-form';
 import { closeTender, unsealTender } from './actions';
 import { Comparison } from './comparison';
+import { StartDelivery } from './start-delivery';
 
 const STATUS_TONE: Record<TenderStatus, BadgeTone> = {
   draft: 'faint',
@@ -50,6 +51,9 @@ export default async function TenderPage({
   // Phase-2 data — only fetched when tender is in the relevant state.
   let unsealEligible = false;
   let comparison = null;
+  let awardedProjectId: string | null = null;
+  let awardedProjectName: string | null = null;
+  let projects: { id: string; name: string }[] = [];
 
   if (tender !== null) {
     if (tender.unsealedAt === null && canManage) {
@@ -57,8 +61,20 @@ export default async function TenderPage({
       const extras = await getTenderOwnerExtras(tender.id);
       unsealEligible = extras.unsealEligible;
     } else if (tender.unsealedAt !== null) {
-      // Unsealed tender: load comparison matrix.
-      comparison = await getTenderComparison(ctx.active.orgId, boqId);
+      // Unsealed tender: load comparison matrix, plus delivery-export data for staff.
+      if (canManage) {
+        const [cmp, extras, projs] = await Promise.all([
+          getTenderComparison(ctx.active.orgId, boqId),
+          getTenderOwnerExtras(tender.id),
+          listOrgProjects(ctx.active.orgId),
+        ]);
+        comparison = cmp;
+        awardedProjectId = extras.awardedProjectId;
+        awardedProjectName = extras.awardedProjectName;
+        projects = projs;
+      } else {
+        comparison = await getTenderComparison(ctx.active.orgId, boqId);
+      }
     }
   }
 
@@ -163,7 +179,26 @@ export default async function TenderPage({
         ) : (
           /* ── Tender unsealed — comparison matrix ── */
           comparison !== null ? (
-            <Comparison data={comparison} boqId={boqId} canManage={canManage} />
+            <div className="space-y-6">
+              <Comparison data={comparison} boqId={boqId} canManage={canManage} />
+
+              {/* Delivery export — staff only, once the tender is awarded */}
+              {canManage && tender.status === 'awarded' && (
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-900/40">
+                  <h2 className="mb-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300">Delivery</h2>
+                  {awardedProjectId ? (
+                    <Link
+                      href={`/projects/${awardedProjectId}/tasks`}
+                      className="text-sm font-medium text-brand-600 hover:underline dark:text-brand-500"
+                    >
+                      View delivery project{awardedProjectName ? `: ${awardedProjectName}` : ''} →
+                    </Link>
+                  ) : (
+                    <StartDelivery tenderId={tender.id} boqId={boqId} projects={projects} />
+                  )}
+                </div>
+              )}
+            </div>
           ) : (
             <p className="rounded-md border border-dashed border-zinc-300 px-4 py-8 text-center text-sm text-zinc-500 dark:border-zinc-700">
               Comparison data is not available yet.

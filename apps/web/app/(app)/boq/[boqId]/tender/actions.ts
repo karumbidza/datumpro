@@ -11,6 +11,7 @@ import { appUrl } from '@/lib/email/templates';
 import { tenderInviteEmail } from '@/lib/email/tender-invite';
 import { logAudit } from '@/lib/audit';
 import { awardWinEmail, awardRegretEmail } from '@/lib/email/tender-award';
+import { deliveryAssignedEmail } from '@/lib/email/tender-delivery';
 
 /** Next's redirect() signals control flow by throwing a special error — never
  *  swallow it inside a best-effort catch. */
@@ -213,6 +214,54 @@ export async function unsealTender(formData: FormData): Promise<void> {
   if (error) throw new Error(error.message);
   await logAudit({ orgId, actorId: userId, entityType: 'boq_tender', entityId: tenderId, action: 'tender.unsealed' });
   revalidatePath(`/boq/${boqId}/tender`);
+}
+
+/** Export an AWARDED tender to a delivery project. The RPC creates/uses a
+ *  project, enrols the winner, generates costed tasks, links the tender, and
+ *  returns the project id. Then notifies the winning contractor best-effort. */
+export async function startDelivery(formData: FormData): Promise<void> {
+  const { supabase, orgId } = await requireOrg();
+  const tenderId = String(formData.get('tenderId') ?? '');
+  const boqId = String(formData.get('boqId') ?? '');
+  const mode = String(formData.get('mode') ?? 'new');
+  const projectName = String(formData.get('projectName') ?? '');
+  const projectId = String(formData.get('projectId') ?? '');
+
+  const { data: newProjectId, error } = await supabase.rpc('export_award_to_project', {
+    p_tender_id: tenderId,
+    p_project_id: mode === 'existing' && projectId ? projectId : null,
+    p_new_project_name: mode === 'new' ? projectName : null,
+  });
+  if (error) throw new Error(error.message);
+  const projId = newProjectId as unknown as string;
+
+  // Best-effort: notify the winning contractor.
+  try {
+    const [{ data: org }, { data: tender }, { count: taskCount }, { data: proj }] = await Promise.all([
+      supabase.from('organizations').select('name').eq('id', orgId).single(),
+      supabase.from('boq_tenders').select('awarded_bidder_id').eq('id', tenderId).single(),
+      supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('project_id', projId),
+      supabase.from('projects').select('name').eq('id', projId).single(),
+    ]);
+    const awardedBidderId = (tender as { awarded_bidder_id?: string } | null)?.awarded_bidder_id ?? '';
+    const { data: bidder } = await supabase
+      .from('boq_bidders').select('contact_email').eq('id', awardedBidderId).single();
+    const email = (bidder as { contact_email?: string } | null)?.contact_email;
+    if (email) {
+      const { subject, html } = deliveryAssignedEmail({
+        orgName: (org as { name?: string } | null)?.name ?? 'DatumPro',
+        projectName: (proj as { name?: string } | null)?.name ?? 'your project',
+        taskCount: taskCount ?? 0,
+      });
+      await sendEmail({ to: email, subject, html });
+    }
+  } catch (e) {
+    if (isRedirect(e)) throw e;
+    console.error('[tender] delivery email failed:', e);
+  }
+
+  revalidatePath(`/boq/${boqId}/tender`);
+  redirect(`/projects/${projId}/tasks`);
 }
 
 /** Award a bidder. RPC requires the tender be unsealed + the bidder submitted.
