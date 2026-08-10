@@ -470,3 +470,60 @@ export async function getTenderOwnerExtras(
   const { data } = await supabase.rpc('tender_unseal_eligible', { p_tender_id: tenderId });
   return { unsealEligible: !!data };
 }
+
+// ---------------------------------------------------------------------------
+// Contractor portal: the caller's own tender invites
+// ---------------------------------------------------------------------------
+
+export interface MyTenderInvite {
+  bidderId: string;
+  inviteToken: string;
+  bidderStatus: 'invited' | 'viewing' | 'submitted' | 'withdrawn';
+  tenderId: string;
+  title: string;
+  closeAt: string | null;
+  tenderStatus: TenderStatus;
+  awardedToMe: boolean;
+  tenderAwarded: boolean;
+}
+
+export async function listMyTenderInvites(userId: string): Promise<MyTenderInvite[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('boq_bidders')
+    .select(
+      'id, invite_token, status, tender_id, ' +
+        'boq_tenders(id, title, close_at, status, awarded_bidder_id)',
+    )
+    .eq('user_id', userId)
+    .neq('status', 'withdrawn');
+
+  type Row = {
+    id: string;
+    invite_token: string;
+    status: MyTenderInvite['bidderStatus'];
+    tender_id: string;
+    boq_tenders:
+      | { id: string; title: string; close_at: string | null; status: TenderStatus; awarded_bidder_id: string | null }
+      | { id: string; title: string; close_at: string | null; status: TenderStatus; awarded_bidder_id: string | null }[]
+      | null;
+  };
+
+  return ((data ?? []) as unknown as Row[])
+    .map((r) => {
+      const t = Array.isArray(r.boq_tenders) ? r.boq_tenders[0] : r.boq_tenders;
+      if (!t) return null;
+      return {
+        bidderId: r.id,
+        inviteToken: r.invite_token,
+        bidderStatus: r.status,
+        tenderId: t.id,
+        title: t.title,
+        closeAt: t.close_at,
+        tenderStatus: t.status,
+        awardedToMe: t.awarded_bidder_id === r.id,
+        tenderAwarded: t.status === 'awarded',
+      } as MyTenderInvite;
+    })
+    .filter((x): x is MyTenderInvite => x !== null);
+}

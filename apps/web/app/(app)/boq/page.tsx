@@ -1,7 +1,9 @@
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { getActiveContext, getAuthUser } from '@/lib/data/org';
 import { listBoqs } from '@/lib/data/boq';
+import { listMyTenderInvites } from '@/lib/data/tender';
+import { ContractorTenderPortal } from './contractor-portal';
 import { PageContainer } from '@/components/shell/page-container';
 import { Button } from '@/components/ui/button';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
@@ -17,6 +19,13 @@ export default async function BoqIndexPage() {
   if (!user) redirect('/sign-in');
   const ctx = await getActiveContext();
   if (!ctx?.active) redirect('/orgs/new');
+
+  const memberType = ctx.active.memberType;
+  if (memberType === 'client' || memberType === 'viewer') notFound();
+  if (memberType === 'contractor') {
+    const invites = await listMyTenderInvites(ctx.userId);
+    return <ContractorTenderPortal invites={invites} orgName={ctx.active.name} />;
+  }
 
   const boqs = await listBoqs(ctx.active.orgId);
   const canEdit = ['owner', 'admin', 'pm'].includes(ctx.active.role);
