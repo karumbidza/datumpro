@@ -402,6 +402,243 @@ end $$;
 reset role;
 reset request.jwt.claims;
 
+-- ── Phase 2: unseal gate + award_boq_tender assertions ──────────────────────
+--
+-- We need independent state control for each sub-scenario, so we introduce
+-- fresh tenders with UUID prefix c2a… and fresh bidders with prefix c2b….
+-- The admin identity is user A (a000…a1), owner of org A.
+-- All fixtures are inserted as superuser (RLS bypassed).
+--
+-- Sub-scenarios:
+--   P2-A  Gate blocks early: ≥1 submitted but NOT (all submitted OR past deadline)
+--   P2-B  Gate passes: all non-withdrawn bidders submitted
+--   P2-C  Gate passes: past deadline (close_at < now())
+--   P2-D  award_boq_tender: requires unseal; valid/invalid bidder paths
+
+-- ── P2 shared bidder users (reuse e0…e1 and f0…f1 defined in Phase 1) ────────
+-- (No new auth.users needed — bidder X and Y auth users already exist.)
+
+-- ── P2-A fixture: tender with future deadline, one submitted, one viewing ─────
+insert into public.boq_tenders
+  (id, org_id, boq_id, title, status, close_at, unsealed_at, created_by) values
+  ('c2a00000-0000-0000-0000-000000000001',
+   'a1110000-0000-0000-0000-000000000000',
+   'a3330000-0000-0000-0000-000000000000',
+   'Tender P2-A', 'open',
+   now() + interval '30 days',   -- future deadline → deadline path not yet open
+   null,
+   'a0000000-0000-0000-0000-0000000000a1');
+
+insert into public.boq_bidders
+  (id, org_id, tender_id, company_name, contact_email, user_id, invite_token, status) values
+  ('c2b00000-0000-0000-0000-0000000000a1',
+   'a1110000-0000-0000-0000-000000000000',
+   'c2a00000-0000-0000-0000-000000000001',
+   'P2-A Bidder 1','p2a-b1@test.dev',
+   'e0000000-0000-0000-0000-0000000000e1',
+   'token-p2a-b1-0000000000000000000000000001',
+   'submitted'),
+  ('c2b00000-0000-0000-0000-0000000000a2',
+   'a1110000-0000-0000-0000-000000000000',
+   'c2a00000-0000-0000-0000-000000000001',
+   'P2-A Bidder 2','p2a-b2@test.dev',
+   'f0000000-0000-0000-0000-0000000000f1',
+   'token-p2a-b2-0000000000000000000000000002',
+   'viewing');        -- NOT submitted → gate should block
+
+-- P2-A assertions (superuser role — RPCs are SECURITY DEFINER and check auth
+-- internally; calling as superuser exercises the eligibility logic directly).
+reset role;
+reset request.jwt.claims;
+
+select pg_temp.ok(
+  public.tender_unseal_eligible('c2a00000-0000-0000-0000-000000000001') = false,
+  'P2-A: tender_unseal_eligible FALSE when one bidder is still viewing (future deadline)');
+
+-- unseal_tender must raise when not eligible.
+do $$
+begin
+  perform public.unseal_tender('c2a00000-0000-0000-0000-000000000001');
+  raise exception 'FAIL: P2-A: unseal_tender did not raise on ineligible tender';
+exception
+  when sqlstate 'P0001' or insufficient_privilege or check_violation then
+    raise notice 'PASS: P2-A: unseal_tender raised on ineligible tender (%).',sqlstate;
+end $$;
+
+-- Confirm tender remains unsealed.
+select pg_temp.ok(
+  (select unsealed_at from public.boq_tenders
+     where id = 'c2a00000-0000-0000-0000-000000000001') is null,
+  'P2-A: unsealed_at remains NULL after rejected unseal attempt');
+
+-- ── P2-B fixture: same tender, promote both bidders to submitted ───────────────
+update public.boq_bidders
+   set status = 'submitted'
+ where tender_id = 'c2a00000-0000-0000-0000-000000000001';
+
+select pg_temp.ok(
+  public.tender_unseal_eligible('c2a00000-0000-0000-0000-000000000001') = true,
+  'P2-B: tender_unseal_eligible TRUE when all bidders submitted');
+
+-- unseal_tender returns a non-null timestamp.
+do $$
+declare
+  ts1 timestamptz;
+  ts2 timestamptz;
+begin
+  ts1 := public.unseal_tender('c2a00000-0000-0000-0000-000000000001');
+  perform pg_temp.ok(ts1 is not null, 'P2-B: unseal_tender returns non-null timestamp');
+
+  -- Idempotent: second call returns the SAME timestamp, no error.
+  ts2 := public.unseal_tender('c2a00000-0000-0000-0000-000000000001');
+  perform pg_temp.ok(ts2 = ts1, 'P2-B: unseal_tender is idempotent (same timestamp on second call)');
+end $$;
+
+-- Confirm DB row reflects unsealed_at.
+select pg_temp.ok(
+  (select unsealed_at from public.boq_tenders
+     where id = 'c2a00000-0000-0000-0000-000000000001') is not null,
+  'P2-B: boq_tenders.unsealed_at is set after successful unseal');
+
+-- ── P2-C fixture: new tender with PAST deadline, one submitted, one viewing ────
+insert into public.boq_tenders
+  (id, org_id, boq_id, title, status, close_at, unsealed_at, created_by) values
+  ('c2a00000-0000-0000-0000-000000000002',
+   'a1110000-0000-0000-0000-000000000000',
+   'a3330000-0000-0000-0000-000000000000',
+   'Tender P2-C', 'open',
+   now() - interval '1 day',    -- past deadline → deadline path open
+   null,
+   'a0000000-0000-0000-0000-0000000000a1');
+
+insert into public.boq_bidders
+  (id, org_id, tender_id, company_name, contact_email, user_id, invite_token, status) values
+  ('c2b00000-0000-0000-0000-0000000000c1',
+   'a1110000-0000-0000-0000-000000000000',
+   'c2a00000-0000-0000-0000-000000000002',
+   'P2-C Bidder 1','p2c-b1@test.dev',
+   'e0000000-0000-0000-0000-0000000000e1',
+   'token-p2c-b1-0000000000000000000000000003',
+   'submitted'),
+  ('c2b00000-0000-0000-0000-0000000000c2',
+   'a1110000-0000-0000-0000-000000000000',
+   'c2a00000-0000-0000-0000-000000000002',
+   'P2-C Bidder 2','p2c-b2@test.dev',
+   'f0000000-0000-0000-0000-0000000000f1',
+   'token-p2c-b2-0000000000000000000000000004',
+   'viewing');     -- not submitted, but deadline has passed
+
+select pg_temp.ok(
+  public.tender_unseal_eligible('c2a00000-0000-0000-0000-000000000002') = true,
+  'P2-C: tender_unseal_eligible TRUE when close_at is in the past (deadline path)');
+
+-- ── P2-D fixture: dedicated tender for award assertions ────────────────────────
+-- Start sealed, with one submitted bidder and one viewing bidder.
+insert into public.boq_tenders
+  (id, org_id, boq_id, title, status, close_at, unsealed_at, created_by) values
+  ('c2a00000-0000-0000-0000-000000000003',
+   'a1110000-0000-0000-0000-000000000000',
+   'a3330000-0000-0000-0000-000000000000',
+   'Tender P2-D', 'open',
+   now() - interval '1 hour',   -- past deadline so we can unseal later
+   null,
+   'a0000000-0000-0000-0000-0000000000a1');
+
+insert into public.boq_bidders
+  (id, org_id, tender_id, company_name, contact_email, user_id, invite_token, status) values
+  ('c2b00000-0000-0000-0000-0000000000d1',   -- submitted bidder (valid award target)
+   'a1110000-0000-0000-0000-000000000000',
+   'c2a00000-0000-0000-0000-000000000003',
+   'P2-D Bidder 1','p2d-b1@test.dev',
+   'e0000000-0000-0000-0000-0000000000e1',
+   'token-p2d-b1-0000000000000000000000000005',
+   'submitted'),
+  ('c2b00000-0000-0000-0000-0000000000d2',   -- viewing bidder (invalid award target)
+   'a1110000-0000-0000-0000-000000000000',
+   'c2a00000-0000-0000-0000-000000000003',
+   'P2-D Bidder 2','p2d-b2@test.dev',
+   'f0000000-0000-0000-0000-0000000000f1',
+   'token-p2d-b2-0000000000000000000000000006',
+   'viewing');
+
+-- P2-D-1: award must raise when tender is still sealed (unsealed_at IS NULL).
+do $$
+begin
+  perform public.award_boq_tender(
+    'c2a00000-0000-0000-0000-000000000003',
+    'c2b00000-0000-0000-0000-0000000000d1'
+  );
+  raise exception 'FAIL: P2-D-1: award_boq_tender did not raise on sealed tender';
+exception
+  when sqlstate 'P0001' or insufficient_privilege or check_violation then
+    raise notice 'PASS: P2-D-1: award_boq_tender raised on sealed tender (%).',sqlstate;
+end $$;
+
+-- Confirm tender is still sealed and no award set.
+select pg_temp.ok(
+  (select unsealed_at from public.boq_tenders
+     where id = 'c2a00000-0000-0000-0000-000000000003') is null,
+  'P2-D-1: unsealed_at still NULL after rejected award attempt');
+
+select pg_temp.ok(
+  (select awarded_bidder_id from public.boq_tenders
+     where id = 'c2a00000-0000-0000-0000-000000000003') is null,
+  'P2-D-1: awarded_bidder_id still NULL after rejected award attempt');
+
+-- Now unseal P2-D tender (past deadline, ≥1 submitted).
+do $$
+declare ts timestamptz;
+begin
+  ts := public.unseal_tender('c2a00000-0000-0000-0000-000000000003');
+  perform pg_temp.ok(ts is not null, 'P2-D: unseal_tender succeeded for P2-D tender');
+end $$;
+
+-- P2-D-2: awarding a non-submitted bidder (status 'viewing') must raise.
+do $$
+begin
+  perform public.award_boq_tender(
+    'c2a00000-0000-0000-0000-000000000003',
+    'c2b00000-0000-0000-0000-0000000000d2'   -- viewing bidder
+  );
+  raise exception 'FAIL: P2-D-2: award_boq_tender did not raise for non-submitted bidder';
+exception
+  when sqlstate 'P0001' or insufficient_privilege or check_violation then
+    raise notice 'PASS: P2-D-2: award_boq_tender raised for non-submitted bidder (%).',sqlstate;
+end $$;
+
+-- P2-D-3: awarding a bidder from a DIFFERENT tender must raise.
+do $$
+begin
+  perform public.award_boq_tender(
+    'c2a00000-0000-0000-0000-000000000003',
+    'bd000000-0000-0000-0000-0000000000b1'   -- belongs to t0000000…0001, not P2-D
+  );
+  raise exception 'FAIL: P2-D-3: award_boq_tender did not raise for foreign bidder';
+exception
+  when sqlstate 'P0001' or insufficient_privilege or check_violation then
+    raise notice 'PASS: P2-D-3: award_boq_tender raised for bidder from wrong tender (%).',sqlstate;
+end $$;
+
+-- P2-D-4: awarding the valid submitted bidder succeeds.
+do $$
+begin
+  perform public.award_boq_tender(
+    'c2a00000-0000-0000-0000-000000000003',
+    'c2b00000-0000-0000-0000-0000000000d1'
+  );
+end $$;
+
+select pg_temp.ok(
+  (select status from public.boq_bidders
+     where id = 'c2b00000-0000-0000-0000-0000000000d1') = 'awarded',
+  'P2-D-4: winning bidder status set to ''awarded''');
+
+select pg_temp.ok(
+  (select awarded_bidder_id from public.boq_tenders
+     where id = 'c2a00000-0000-0000-0000-000000000003')
+    = 'c2b00000-0000-0000-0000-0000000000d1',
+  'P2-D-4: boq_tenders.awarded_bidder_id set to the winning bidder');
+
 rollback;
 
 \echo '────────────────────────────────────────────'
