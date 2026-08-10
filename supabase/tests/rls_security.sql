@@ -79,6 +79,15 @@ insert into public.boq_tenders (id, org_id, boq_id, title, status) values
 insert into public.boq_bidders (id, org_id, tender_id, company_name, contact_email, invite_token, user_id, status) values
   ('a3370000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a3360000-0000-0000-0000-000000000000','Contractor A Ltd','contractor-a@test.dev','tok-a337','a0000000-0000-0000-0000-0000000000a2','invited');
 
+-- Piece 3 (award→delivery bridge): a separate AWARDED tender on BOQ A, won by
+-- contractor a2, with one priced line — exercises export_award_to_project.
+insert into public.boq_tenders (id, org_id, boq_id, title, status, unsealed_at, awarded_bidder_id) values
+  ('a3390000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a3330000-0000-0000-0000-000000000000','Awarded Tender','awarded', now(), 'a33a0000-0000-0000-0000-000000000000');
+insert into public.boq_bidders (id, org_id, tender_id, company_name, contact_email, invite_token, user_id, status, submitted_at) values
+  ('a33a0000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a3390000-0000-0000-0000-000000000000','Winner A Ltd','contractor-a@test.dev','tok-a33a','a0000000-0000-0000-0000-0000000000a2','submitted', now());
+insert into public.boq_bid_items (org_id, bidder_id, boq_item_id, rate_cents, no_bid) values
+  ('a1110000-0000-0000-0000-000000000000','a33a0000-0000-0000-0000-000000000000','a3350000-0000-0000-0000-000000000000',300,false);
+
 -- ── Tenant isolation: user A sees only org A ─────────────────────────────────
 set role authenticated;
 set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
@@ -204,6 +213,52 @@ select pg_temp.ok((select count(*) from public.boq_tenders where id = 'a3380000-
   'role-split: contractor CANNOT see a tender they were not invited to');
 select pg_temp.ok((select count(*) from public.tender_bill_lines('a3360000-0000-0000-0000-000000000000')) = 1,
   'role-split: contractor can still price via tender_bill_lines (budget rate omitted)');
+
+reset role;
+reset request.jwt.claims;
+
+-- ── Piece 3: award→delivery bridge — auth guard + idempotency ─────────────────
+-- export_award_to_project() converts an awarded tender into a project + costed
+-- tasks assigned to the winner. Guard must reject non-staff (the guard coalesces
+-- is_org_admin()/org_role(), both NULL for a non-member); export is idempotent.
+set role authenticated;
+
+-- Outsider (user B, not a member of org A) cannot export org A's awarded tender.
+set request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-0000000000b1","role":"authenticated","aal":"aal1"}';
+do $$
+begin
+  perform public.export_award_to_project('a3390000-0000-0000-0000-000000000000', null, 'Hack');
+  raise exception 'FAIL: bridge: an outsider exported an awarded tender';
+exception when others then
+  if position('not authorised' in SQLERRM) > 0 then raise notice 'PASS: bridge: outsider blocked from export.';
+  else raise; end if;
+end $$;
+
+-- Staff (user A, owner) exports → project created, winner enrolled as contractor.
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+do $$
+declare v_proj uuid;
+begin
+  select public.export_award_to_project('a3390000-0000-0000-0000-000000000000', null, 'Delivery A') into v_proj;
+  perform pg_temp.ok(v_proj is not null, 'bridge: staff export returns a project id');
+  perform pg_temp.ok(
+    (select awarded_project_id from public.boq_tenders where id = 'a3390000-0000-0000-0000-000000000000') = v_proj,
+    'bridge: tender linked to the delivery project');
+  perform pg_temp.ok(
+    exists (select 1 from public.project_members
+            where project_id = v_proj and user_id = 'a0000000-0000-0000-0000-0000000000a2' and role = 'contractor'),
+    'bridge: winner enrolled as project contractor');
+end $$;
+
+-- Second export is blocked (idempotent).
+do $$
+begin
+  perform public.export_award_to_project('a3390000-0000-0000-0000-000000000000', null, 'Again');
+  raise exception 'FAIL: bridge: second export was not blocked';
+exception when others then
+  if position('already exported' in SQLERRM) > 0 then raise notice 'PASS: bridge: second export blocked (idempotent).';
+  else raise; end if;
+end $$;
 
 reset role;
 reset request.jwt.claims;
