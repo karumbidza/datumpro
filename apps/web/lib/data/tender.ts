@@ -1,0 +1,246 @@
+import { createClient } from '@/lib/supabase/server';
+import type { BidderStatus, TenderStatus } from '@datumpro/shared/domain';
+
+// PostgREST returns numeric as string; coerce everything through Number at the
+// boundary so the app always deals in plain numbers.
+const n = (v: number | string | null | undefined): number => Number(v ?? 0) || 0;
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface BidderRow {
+  id: string;
+  companyName: string;
+  contactEmail: string;
+  status: BidderStatus;
+  submittedAt: string | null;
+  userId: string | null;
+}
+
+export interface OwnerTenderView {
+  id: string;
+  title: string;
+  status: TenderStatus;
+  closeAt: string | null;
+  unsealedAt: string | null;
+  bidders: BidderRow[];
+}
+
+export interface BidLine {
+  itemId: string;
+  description: string;
+  uom: string | null;
+  qty: number;
+}
+
+export interface BidSection {
+  sectionId: string;
+  name: string;
+  items: BidLine[];
+}
+
+/** myRates keyed by boq_item_id */
+export interface BidWorkspace {
+  tenderId: string;
+  title: string;
+  status: TenderStatus;
+  closeAt: string | null;
+  bidderId: string;
+  bidderStatus: BidderStatus;
+  companyName: string;
+  sections: BidSection[];
+  myRates: Record<string, { rateCents: number; noBid: boolean; note: string | null }>;
+}
+
+// ---------------------------------------------------------------------------
+// Functions
+// ---------------------------------------------------------------------------
+
+/** Returns the latest tender for a given BOQ (scoped to org), with its invited
+ *  bidder list. Returns null when no tender exists or RLS blocks access. */
+export async function getTenderForOwner(
+  orgId: string,
+  boqId: string,
+): Promise<OwnerTenderView | null> {
+  const supabase = await createClient();
+
+  const { data: tender } = await supabase
+    .from('boq_tenders')
+    .select('id, title, status, close_at, unsealed_at')
+    .eq('org_id', orgId)
+    .eq('boq_id', boqId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!tender) return null;
+
+  type TenderRow = {
+    id: string;
+    title: string;
+    status: TenderStatus;
+    close_at: string | null;
+    unsealed_at: string | null;
+  };
+
+  const t = tender as unknown as TenderRow;
+
+  const { data: bidders } = await supabase
+    .from('boq_bidders')
+    .select('id, company_name, contact_email, status, submitted_at, user_id')
+    .eq('tender_id', t.id)
+    .order('invited_at', { ascending: true });
+
+  type BidderDbRow = {
+    id: string;
+    company_name: string;
+    contact_email: string;
+    status: BidderStatus;
+    submitted_at: string | null;
+    user_id: string | null;
+  };
+
+  const mappedBidders: BidderRow[] = ((bidders ?? []) as unknown as BidderDbRow[]).map((b) => ({
+    id: b.id,
+    companyName: b.company_name,
+    contactEmail: b.contact_email,
+    status: b.status,
+    submittedAt: b.submitted_at,
+    userId: b.user_id,
+  }));
+
+  return {
+    id: t.id,
+    title: t.title,
+    status: t.status,
+    closeAt: t.close_at,
+    unsealedAt: t.unsealed_at,
+    bidders: mappedBidders,
+  };
+}
+
+/** Returns the full bid workspace for a bidder identified by their invite token.
+ *  Includes the bill-of-quantities line items (no budget rates) and any rates
+ *  the bidder has already saved. Returns null when the token is invalid or RLS
+ *  blocks access. */
+export async function getBidWorkspace(token: string): Promise<BidWorkspace | null> {
+  const supabase = await createClient();
+
+  // 1. Resolve bidder by invite token (RLS boq_bidders_self_read scopes this).
+  const { data: bidder } = await supabase
+    .from('boq_bidders')
+    .select('id, tender_id, company_name, status')
+    .eq('invite_token', token)
+    .maybeSingle();
+
+  if (!bidder) return null;
+
+  type BidderSelf = {
+    id: string;
+    tender_id: string;
+    company_name: string;
+    status: BidderStatus;
+  };
+
+  const b = bidder as unknown as BidderSelf;
+
+  // 2. Load the tender header.
+  const { data: tender } = await supabase
+    .from('boq_tenders')
+    .select('id, title, status, close_at')
+    .eq('id', b.tender_id)
+    .maybeSingle();
+
+  if (!tender) return null;
+
+  type TenderHeader = {
+    id: string;
+    title: string;
+    status: TenderStatus;
+    close_at: string | null;
+  };
+
+  const t = tender as unknown as TenderHeader;
+
+  // 3. Load bill lines via SECURITY DEFINER function (no budget rate exposed).
+  const { data: lines } = await supabase.rpc('tender_bill_lines', {
+    p_tender_id: b.tender_id,
+  });
+
+  type BillLine = {
+    section_id: string;
+    section_name: string;
+    section_position: number;
+    item_id: string;
+    description: string;
+    uom: string | null;
+    qty: number | string | null;
+    item_position: number;
+  };
+
+  // Group into sections ordered by section_position, items by item_position.
+  const sectionMap = new Map<string, { meta: { name: string; position: number }; items: BillLine[] }>();
+
+  for (const row of (lines ?? []) as unknown as BillLine[]) {
+    if (!sectionMap.has(row.section_id)) {
+      sectionMap.set(row.section_id, {
+        meta: { name: row.section_name, position: row.section_position },
+        items: [],
+      });
+    }
+    sectionMap.get(row.section_id)!.items.push(row);
+  }
+
+  const sections: BidSection[] = Array.from(sectionMap.entries())
+    .sort(([, a], [, b]) => a.meta.position - b.meta.position)
+    .map(([sectionId, { meta, items }]) => ({
+      sectionId,
+      name: meta.name,
+      items: items
+        .slice()
+        .sort((a, c) => a.item_position - c.item_position)
+        .map((row) => ({
+          itemId: row.item_id,
+          description: row.description,
+          uom: row.uom,
+          qty: n(row.qty),
+        })),
+    }));
+
+  // 4. Load this bidder's existing rates (RLS scopes to own rows).
+  const { data: rateRows } = await supabase
+    .from('boq_bid_items')
+    .select('boq_item_id, rate_cents, no_bid, note')
+    .eq('bidder_id', b.id);
+
+  type RateRow = {
+    boq_item_id: string;
+    rate_cents: number | string | null;
+    no_bid: boolean | null;
+    note: string | null;
+  };
+
+  const myRates: Record<string, { rateCents: number; noBid: boolean; note: string | null }> = {};
+  for (const r of (rateRows ?? []) as unknown as RateRow[]) {
+    myRates[r.boq_item_id] = {
+      rateCents: n(r.rate_cents),
+      noBid: !!r.no_bid,
+      note: r.note,
+    };
+  }
+
+  return {
+    tenderId: t.id,
+    title: t.title,
+    status: t.status,
+    closeAt: t.close_at,
+    bidderId: b.id,
+    bidderStatus: b.status,
+    companyName: b.company_name,
+    sections,
+    myRates,
+  };
+}
+
+// Phase 2: listBidderTotals(...) — post-unseal comparison. Not implemented in Phase 1.

@@ -121,6 +121,13 @@ export function BoqBuilder({ boq, canEdit }: { boq: BoqDetail; canEdit: boolean 
         <div className="flex items-center gap-2">
           {pending && <span className="text-xs text-zinc-400">Saving…</span>}
           {canEdit && (
+            <Link href={`/boq/${boq.id}/tender`}>
+              <Button variant="secondary" size="sm">
+                Put out to tender
+              </Button>
+            </Link>
+          )}
+          {canEdit && (
             <Link href={`/boq/${boq.id}/import`}>
               <Button variant="secondary" size="sm">
                 Import Excel
