@@ -263,6 +263,10 @@ export interface CompareBidder {
   varianceCents: number;
   variancePct: number;
   rank: number;
+  pricedLines: number;
+  totalLines: number;
+  coveragePct: number;
+  isComplete: boolean;
   rates: Record<string, { rateCents: number; amountCents: number; noBid: boolean }>;
 }
 export interface TenderComparison {
@@ -403,10 +407,12 @@ export async function getTenderComparison(
   }
 
   // 5. Build CompareBidder entries (unsorted — rank assigned after sort).
+  const totalLines = qtyMap.size;
   const unsortedBidders: Omit<CompareBidder, 'rank'>[] = biddersData.map((bd) => {
     const rows = bidItemsByBidder.get(bd.id) ?? [];
     const rates: CompareBidder['rates'] = {};
     let totalCents = 0;
+    let pricedLines = 0;
     for (const row of rows) {
       const noBid = !!row.no_bid;
       const rateCents = n(row.rate_cents);
@@ -414,10 +420,24 @@ export async function getTenderComparison(
       const amountCents = noBid ? 0 : Math.round(qty * rateCents);
       rates[row.boq_item_id] = { rateCents, amountCents, noBid };
       totalCents += amountCents;
+      if (!noBid && row.rate_cents != null) pricedLines += 1;
     }
     const varianceCents = totalCents - budgetTotalCents;
     const variancePct = budgetTotalCents > 0 ? varianceCents / budgetTotalCents : 0;
-    return { bidderId: bd.id, companyName: bd.company_name, totalCents, varianceCents, variancePct, rates };
+    const coveragePct = totalLines > 0 ? pricedLines / totalLines : 1;
+    const isComplete = pricedLines === totalLines;
+    return {
+      bidderId: bd.id,
+      companyName: bd.company_name,
+      totalCents,
+      varianceCents,
+      variancePct,
+      pricedLines,
+      totalLines,
+      coveragePct,
+      isComplete,
+      rates,
+    };
   });
 
   // 6. Sort ascending by totalCents, assign rank.
