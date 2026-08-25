@@ -239,8 +239,12 @@ set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"
 do $$
 declare v_proj uuid;
 begin
-  select public.export_award_to_project('a3390000-0000-0000-0000-000000000000', null, 'Delivery A') into v_proj;
+  select (public.export_award_to_project('a3390000-0000-0000-0000-000000000000', null, 'Delivery A')->>'project_id')::uuid
+    into v_proj;
   perform pg_temp.ok(v_proj is not null, 'bridge: staff export returns a project id');
+  perform pg_temp.ok(
+    (select project_id from public.boqs where id = 'a3330000-0000-0000-0000-000000000000') = v_proj,
+    'bridge: standalone BOQ linked to the delivery project on export');
   perform pg_temp.ok(
     (select awarded_project_id from public.boq_tenders where id = 'a3390000-0000-0000-0000-000000000000') = v_proj,
     'bridge: tender linked to the delivery project');
@@ -833,6 +837,77 @@ begin
 exception when others then
   if position('already generated' in SQLERRM) > 0 then raise notice 'PASS: gen: double generate blocked.';
   else raise; end if;
+end $$;
+reset role;
+reset request.jwt.claims;
+
+-- Assigning a generated task must NOT wipe its bill lines: the reassignment-
+-- cleanup trigger (set_task_pending_on_assign) now keeps boq_item_id subtasks
+-- and clears only personal-plan lines. Contractor a2 is enrolled, then assigned.
+insert into public.project_members (org_id, project_id, user_id, role) values
+  ('a1110000-0000-0000-0000-000000000000','a4220000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000a2','contractor');
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+do $$
+declare v_task uuid;
+begin
+  select t.id into v_task from public.tasks t
+    where t.project_id = 'a4220000-0000-0000-0000-000000000000'
+      and t.boq_section_id = 'a4341000-0000-0000-0000-000000000000';
+  update public.tasks set assignee_id = 'a0000000-0000-0000-0000-0000000000a2' where id = v_task;
+  perform pg_temp.ok(
+    (select count(*) from public.task_subtasks where task_id = v_task and boq_item_id is not null) = 2,
+    'assign: BOQ-generated subtasks survive assignment');
+  perform pg_temp.ok(
+    (select acceptance_status from public.tasks where id = v_task) = 'pending',
+    'assign: acceptance goes pending for the contractor as before');
+  -- roll the assignment back for the reprice test below (fresh unassigned task)
+  update public.tasks set assignee_id = null, acceptance_status = null where id = v_task;
+end $$;
+reset role;
+reset request.jwt.claims;
+
+-- ── Project↔BOQ: award repricing of pre-generated tasks ───────────────────────
+-- Reuses the a4… fixtures: BOQ Gen is linked to Gen Project and holds generated
+-- unassigned tasks. A tender awarded to contractor a2 must take REPRICE mode:
+-- assign the winner, move priced lines to bid rates, keep no-bid lines at
+-- budget, and never create a new project.
+insert into public.boq_tenders (id, org_id, boq_id, title, status, unsealed_at) values
+  ('a4360000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a4330000-0000-0000-0000-000000000000','Gen Tender','awarded', now());
+insert into public.boq_bidders (id, org_id, tender_id, company_name, contact_email, invite_token, user_id, status, submitted_at) values
+  ('a4370000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a4360000-0000-0000-0000-000000000000','Winner A Ltd','contractor-a@test.dev','tok-a437','a0000000-0000-0000-0000-0000000000a2','submitted', now());
+update public.boq_tenders set awarded_bidder_id = 'a4370000-0000-0000-0000-000000000000'
+  where id = 'a4360000-0000-0000-0000-000000000000';
+-- Winner prices Excavate (400/unit); no-bids Backfill (stays at budget;
+-- rate_cents is NOT NULL so a no-bid row carries 0 + the flag).
+insert into public.boq_bid_items (org_id, bidder_id, boq_item_id, rate_cents, no_bid) values
+  ('a1110000-0000-0000-0000-000000000000','a4370000-0000-0000-0000-000000000000','a4350000-0000-0000-0000-000000000000',400,false),
+  ('a1110000-0000-0000-0000-000000000000','a4370000-0000-0000-0000-000000000000','a4351000-0000-0000-0000-000000000000',0,true);
+
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+do $$
+declare v jsonb;
+begin
+  select public.export_award_to_project('a4360000-0000-0000-0000-000000000000', null, null) into v;
+  perform pg_temp.ok(v->>'mode' = 'repriced', 'reprice: linked BOQ with tasks takes reprice mode');
+  perform pg_temp.ok((v->>'project_id')::uuid = 'a4220000-0000-0000-0000-000000000000',
+    'reprice: no new project — the linked project is used');
+  perform pg_temp.ok((v->>'budget_kept_lines')::int = 1, 'reprice: no-bid line kept at budget, reported');
+  perform pg_temp.ok(
+    (select cost_cents from public.task_subtasks where boq_item_id = 'a4350000-0000-0000-0000-000000000000') = 4000,
+    'reprice: priced line moved to bid rate (10×400)');
+  perform pg_temp.ok(
+    (select cost_cents from public.task_subtasks where boq_item_id = 'a4351000-0000-0000-0000-000000000000') = 400,
+    'reprice: no-bid line still at budget (4×100)');
+  perform pg_temp.ok(
+    exists (select 1 from public.tasks
+            where project_id = 'a4220000-0000-0000-0000-000000000000'
+              and boq_section_id = 'a4341000-0000-0000-0000-000000000000'
+              and assignee_id = 'a0000000-0000-0000-0000-0000000000a2'
+              and acceptance_status = 'accepted'
+              and awarded_cost_cents = 4400),
+    'reprice: task assigned to winner, accepted, cost locked to subtask sum');
 end $$;
 reset role;
 reset request.jwt.claims;
