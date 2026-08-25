@@ -194,7 +194,14 @@ export default async function TenderPage({
                       View delivery project{awardedProjectName ? `: ${awardedProjectName}` : ''} →
                     </Link>
                   ) : (
-                    <StartDelivery tenderId={tender.id} boqId={boqId} projects={projects} />
+                    <StartDelivery
+                      tenderId={tender.id}
+                      boqId={boqId}
+                      projects={projects}
+                      linkedProject={
+                        boq?.projectId ? { id: boq.projectId, name: boq.projectName ?? 'the linked project' } : null
+                      }
+                    />
                   )}
                 </div>
               )}

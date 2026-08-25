@@ -30,7 +30,15 @@ const cell =
   'w-full bg-transparent px-2.5 py-2 text-sm outline-none focus:bg-white focus:ring-1 focus:ring-inset focus:ring-brand-500 dark:focus:bg-zinc-950';
 const numCell = `${cell} text-right font-mono tabular-nums`;
 
-export function BoqBuilder({ boq, canEdit }: { boq: BoqDetail; canEdit: boolean }) {
+export function BoqBuilder({
+  boq,
+  canEdit,
+  projectTasksGenerated = false,
+}: {
+  boq: BoqDetail;
+  canEdit: boolean;
+  projectTasksGenerated?: boolean;
+}) {
   const router = useRouter();
   const [sections, setSections] = useState<Section[]>(() =>
     boq.sections.map((s) => ({ id: s.id, name: s.name, parentId: s.parentId })),
@@ -256,6 +264,14 @@ export function BoqBuilder({ boq, canEdit }: { boq: BoqDetail; canEdit: boolean 
             <Badge tone={STATUS_TONE[status] ?? 'neutral'}>{BOQ_STATUS_LABELS[status] ?? status}</Badge>
           </div>
           {meta && <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">{meta}</p>}
+          {boq.projectId && (
+            <Link
+              href={`/projects/${boq.projectId}/boq`}
+              className="mt-0.5 inline-block text-xs text-brand-600 hover:underline dark:text-brand-500"
+            >
+              Project: {boq.projectName ?? 'view project'} →
+            </Link>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {pending && <span className="text-xs text-zinc-400">Saving…</span>}
@@ -280,6 +296,22 @@ export function BoqBuilder({ boq, canEdit }: { boq: BoqDetail; canEdit: boolean 
           )}
         </div>
       </div>
+
+      {/* Linked + approved + tasks not yet generated → point at the one place
+          that generates them (the project BOQ tab). */}
+      {boq.projectId && status === 'approved' && !projectTasksGenerated && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-brand-200 bg-brand-50 px-3 py-2 dark:border-brand-900 dark:bg-brand-950/30">
+          <p className="text-sm text-brand-700 dark:text-brand-400">
+            Bill approved — generate this project&apos;s tasks from it.
+          </p>
+          <Link
+            href={`/projects/${boq.projectId}/boq`}
+            className="text-sm font-medium text-brand-600 hover:underline dark:text-brand-500"
+          >
+            Generate tasks →
+          </Link>
+        </div>
+      )}
 
       {/* the bill */}
       <div className="mt-4 overflow-x-auto rounded-lg border border-zinc-300 dark:border-zinc-700">
