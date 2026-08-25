@@ -13,6 +13,8 @@ import {
   deleteItem,
   moveItem,
   duplicateBoq,
+  addSectionDep,
+  removeSectionDep,
 } from '../actions';
 import {
   BOQ_UNITS,
@@ -27,8 +29,9 @@ import { fmtMoney } from '@/lib/money';
 import { Button } from '@/components/ui/button';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 
-type Item = { id: string; sectionId: string; itemNo: string | null; description: string; uom: string; qty: number; rateCents: number };
+type Item = { id: string; sectionId: string; itemNo: string | null; description: string; uom: string; qty: number; rateCents: number; durationDays: number | null };
 type Section = { id: string; name: string; parentId: string | null };
+type Dep = { sectionId: string; dependsOnId: string };
 
 const STATUS_TONE: Record<BoqStatus, BadgeTone> = { draft: 'amber', approved: 'green', archived: 'faint' };
 const TENDER_TONE: Partial<Record<TenderStatus, BadgeTone>> = { open: 'blue', closed: 'amber', awarded: 'green' };
@@ -67,8 +70,11 @@ export function BoqBuilder({
       uom: it.uom ?? '',
       qty: it.qty,
       rateCents: it.budgetRateCents,
+      durationDays: it.durationDays,
     })),
   );
+  const [deps, setDeps] = useState<Dep[]>(() => boq.deps.map((d) => ({ sectionId: d.sectionId, dependsOnId: d.dependsOnId })));
+  const [depError, setDepError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const cur = boq.currency;
   const status = (boq.status as BoqStatus) ?? 'draft';
@@ -79,9 +85,27 @@ export function BoqBuilder({
   const sectionTotal = (sid: string): number =>
     itemsOf(sid).reduce((a, it) => a + itemTotal(it), 0) + childSections(sid).reduce((a, c) => a + sectionTotal(c.id), 0);
   const grand = items.reduce((a, it) => a + itemTotal(it), 0);
+  const sectionDays = (sid: string): number =>
+    itemsOf(sid).reduce((a, it) => a + (it.durationDays ?? 0), 0) +
+    childSections(sid).reduce((a, c) => a + sectionDays(c.id), 0);
+
+  const onAddDep = (sectionId: string, dependsOnId: string) => {
+    if (!dependsOnId) return;
+    setDepError(null);
+    start(async () => {
+      const res = await addSectionDep(boq.id, sectionId, dependsOnId);
+      if (res && 'error' in res) setDepError(res.error);
+      else setDeps((p) => [...p, { sectionId, dependsOnId }]);
+    });
+  };
+  const onRemoveDep = (sectionId: string, dependsOnId: string) =>
+    start(async () => {
+      await removeSectionDep(boq.id, sectionId, dependsOnId);
+      setDeps((p) => p.filter((d) => !(d.sectionId === sectionId && d.dependsOnId === dependsOnId)));
+    });
 
   // ── mutations (local state first, persisted via server actions) ─────────────
-  const persistItem = (id: string, p: { description?: string; uom?: string | null; qty?: number; budgetRateCents?: number }) =>
+  const persistItem = (id: string, p: { description?: string; uom?: string | null; qty?: number; budgetRateCents?: number; durationDays?: number | null }) =>
     start(() => updateItem(boq.id, id, p).then(() => {}));
   const patchLocal = (id: string, up: (it: Item) => Item) => setItems((prev) => prev.map((it) => (it.id === id ? up(it) : it)));
 
@@ -93,7 +117,7 @@ export function BoqBuilder({
   const onAddItem = (sectionId: string) =>
     start(async () => {
       const res = await addItem(boq.id, sectionId);
-      if ('id' in res) setItems((p) => [...p, { id: res.id, sectionId, itemNo: null, description: '', uom: '', qty: 0, rateCents: 0 }]);
+      if ('id' in res) setItems((p) => [...p, { id: res.id, sectionId, itemNo: null, description: '', uom: '', qty: 0, rateCents: 0, durationDays: null }]);
     });
   const onDeleteItem = (id: string) =>
     start(async () => {
@@ -145,7 +169,7 @@ export function BoqBuilder({
     out.push(
       <tr key={`s-${s.id}`} className="bg-zinc-50 dark:bg-zinc-900/50" onDragOver={allowDrop} onDrop={canEdit ? (e) => onDropInto(e, s.id) : undefined}>
         <td className={`${rowB} ${colB} px-2.5 py-2 text-center font-mono text-xs font-bold text-zinc-500`}>{number}</td>
-        <td className={`${rowB} ${colB} py-1.5 pr-2`} colSpan={4}>
+        <td className={`${rowB} ${colB} py-1.5 pr-2`} colSpan={5}>
           <div className="flex items-center gap-2" style={{ paddingLeft: depth * 18 }}>
             <input
               defaultValue={s.name}
@@ -155,9 +179,52 @@ export function BoqBuilder({
               onBlur={(e) => start(() => renameSection(boq.id, s.id, e.target.value.trim() || 'Untitled section').then(() => {}))}
               className="min-w-[150px] flex-1 rounded bg-transparent px-1 py-1 text-sm font-semibold outline-none focus:ring-1 focus:ring-brand-500 disabled:text-zinc-700 dark:disabled:text-zinc-300"
             />
+            {sectionDays(s.id) > 0 && (
+              <span className="whitespace-nowrap font-mono text-xs text-zinc-400">~{sectionDays(s.id)}d</span>
+            )}
             <span className="whitespace-nowrap font-mono text-xs text-zinc-400">
               {my.length + kids.length} entr{my.length + kids.length === 1 ? 'y' : 'ies'}
             </span>
+          </div>
+          {/* Programme links: "this section starts after …" chips + picker. */}
+          <div className="mt-0.5 flex flex-wrap items-center gap-1.5" style={{ paddingLeft: depth * 18 + 4 }}>
+            {deps
+              .filter((d) => d.sectionId === s.id)
+              .map((d) => (
+                <span
+                  key={d.dependsOnId}
+                  className="inline-flex items-center gap-1 rounded bg-zinc-200/70 px-1.5 py-0.5 text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+                >
+                  after {sections.find((x) => x.id === d.dependsOnId)?.name ?? 'section'}
+                  {canEdit && (
+                    <button
+                      type="button"
+                      aria-label="Remove link"
+                      onClick={() => onRemoveDep(s.id, d.dependsOnId)}
+                      className="rounded px-0.5 hover:text-red-600"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </span>
+              ))}
+            {canEdit && sections.length > 1 && (
+              <select
+                value=""
+                aria-label="Starts after section"
+                onChange={(e) => onAddDep(s.id, e.target.value)}
+                className="rounded border border-dashed border-zinc-300 bg-transparent px-1 py-0.5 text-[11px] text-zinc-500 dark:border-zinc-700"
+              >
+                <option value="">+ starts after…</option>
+                {sections
+                  .filter((x) => x.id !== s.id && !deps.some((d) => d.sectionId === s.id && d.dependsOnId === x.id))
+                  .map((x) => (
+                    <option key={x.id} value={x.id}>
+                      {x.name}
+                    </option>
+                  ))}
+              </select>
+            )}
           </div>
         </td>
         <td className={`${rowB} px-2.5 py-2 text-right font-mono text-sm font-bold tabular-nums text-brand-600 dark:text-brand-500`}>
@@ -247,6 +314,23 @@ export function BoqBuilder({
               className={numCell}
             />
           </td>
+          <td className={`${rowB} ${colB} p-0`}>
+            <input
+              defaultValue={it.durationDays != null ? String(it.durationDays) : ''}
+              disabled={!canEdit}
+              inputMode="numeric"
+              placeholder="—"
+              aria-label="Duration in working days"
+              title="Estimated working days for this line (rolls up into the task's agreed timeline)"
+              onBlur={(e) => {
+                const raw = e.target.value.trim();
+                const durationDays = raw === '' ? null : Math.max(0, Math.round(Number(raw) || 0));
+                patchLocal(it.id, (x) => ({ ...x, durationDays }));
+                persistItem(it.id, { durationDays });
+              }}
+              className={numCell}
+            />
+          </td>
           <td className={`${rowB} px-2.5 py-2 text-right font-mono text-sm tabular-nums`}>{fmtMoney(itemTotal(it), cur)}</td>
           <td className={`${rowB} px-1 text-center`}>
             {canEdit && (
@@ -268,7 +352,7 @@ export function BoqBuilder({
       out.push(
         <tr key={`add-${s.id}`}>
           <td className={`${rowB} ${colB}`} />
-          <td className={`${rowB} py-1.5`} colSpan={6}>
+          <td className={`${rowB} py-1.5`} colSpan={7}>
             <div className="flex gap-2" style={{ paddingLeft: (depth + 1) * 18 + 10 }}>
               <button type="button" onClick={() => onAddItem(s.id)} className="inline-flex items-center gap-1 rounded border border-dashed border-zinc-300 px-2.5 py-1 text-xs font-medium text-zinc-500 transition hover:border-brand-500 hover:text-brand-600 dark:border-zinc-700">
                 + Add item
@@ -361,6 +445,12 @@ export function BoqBuilder({
         </div>
       )}
 
+      {depError && (
+        <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
+          {depError}
+        </p>
+      )}
+
       {/* the bill */}
       <div className="mt-4 overflow-x-auto rounded-lg border border-zinc-300 dark:border-zinc-700">
         <table className="w-full min-w-[720px] border-collapse text-sm">
@@ -370,6 +460,7 @@ export function BoqBuilder({
             <col className="w-24" />
             <col className="w-24" />
             <col className="w-28" />
+            <col className="w-16" />
             <col className="w-32" />
             <col className="w-9" />
           </colgroup>
@@ -380,6 +471,7 @@ export function BoqBuilder({
               <th className={`${colB} border-b border-zinc-300 px-2.5 py-2.5 text-left font-semibold dark:border-zinc-700`}>Unit</th>
               <th className={`${colB} border-b border-zinc-300 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700`}>Qty</th>
               <th className={`${colB} border-b border-zinc-300 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700`}>Budget/Est</th>
+              <th className={`${colB} border-b border-zinc-300 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700`} title="Working days per line — the agreed timeline rolls up from these">Days</th>
               <th className={`${colB} border-b border-zinc-300 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700`}>Total</th>
               <th className="border-b border-zinc-300 dark:border-zinc-700" />
             </tr>
@@ -388,7 +480,7 @@ export function BoqBuilder({
             {bodyRows}
             {topSections.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-10 text-center text-sm text-zinc-500 dark:text-zinc-400">
+                <td colSpan={8} className="px-3 py-10 text-center text-sm text-zinc-500 dark:text-zinc-400">
                   Blank bill. Add a section — like <b>Preliminaries</b> or <b>Earthworks</b> — then add priced items or sub-sections.
                 </td>
               </tr>
@@ -396,7 +488,7 @@ export function BoqBuilder({
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-zinc-300 bg-zinc-100 font-semibold dark:border-zinc-700 dark:bg-zinc-800/70">
-              <td className="px-2.5 py-3" colSpan={5}>
+              <td className="px-2.5 py-3" colSpan={6}>
                 Bill total
                 <span className="ml-2 font-mono text-xs font-medium text-zinc-500 dark:text-zinc-400">
                   {items.length} items · {topSections.length} section{topSections.length === 1 ? '' : 's'}

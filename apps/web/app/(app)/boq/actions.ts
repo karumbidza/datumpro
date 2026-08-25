@@ -143,6 +143,7 @@ export interface ItemPatch {
   qty?: number;
   budgetRateCents?: number;
   itemType?: BoqItemType;
+  durationDays?: number | null;
 }
 
 export async function updateItem(boqId: string, itemId: string, patch: ItemPatch): Promise<Err | void> {
@@ -158,6 +159,12 @@ export async function updateItem(boqId: string, itemId: string, patch: ItemPatch
   if (patch.itemType !== undefined) {
     if (!BOQ_ITEM_TYPES.includes(patch.itemType)) return { error: 'Invalid item type.' };
     row.item_type = patch.itemType;
+  }
+  if (patch.durationDays !== undefined) {
+    row.duration_days =
+      patch.durationDays !== null && Number.isFinite(patch.durationDays)
+        ? Math.min(3650, Math.max(0, Math.round(patch.durationDays)))
+        : null;
   }
   if (Object.keys(row).length === 0) return;
 
@@ -196,6 +203,38 @@ export async function moveItem(boqId: string, itemId: string, targetSectionId: s
   revalidatePath(`/boq/${boqId}`);
 }
 
+/** Link two sections: `sectionId` starts after `dependsOnId`. Same-bill and
+ *  acyclic are enforced by the DB trigger; its message is surfaced verbatim. */
+export async function addSectionDep(
+  boqId: string,
+  sectionId: string,
+  dependsOnId: string,
+): Promise<Err | void> {
+  const { supabase, orgId } = await requireOrg();
+  const { error } = await supabase
+    .from('boq_section_deps')
+    .insert({ org_id: orgId, section_id: sectionId, depends_on_id: dependsOnId });
+  if (error) return { error: error.message };
+  await touchBoq(supabase, boqId);
+  revalidatePath(`/boq/${boqId}`);
+}
+
+export async function removeSectionDep(
+  boqId: string,
+  sectionId: string,
+  dependsOnId: string,
+): Promise<Err | void> {
+  const { supabase } = await requireOrg();
+  const { error } = await supabase
+    .from('boq_section_deps')
+    .delete()
+    .eq('section_id', sectionId)
+    .eq('depends_on_id', dependsOnId);
+  if (error) return { error: error.message };
+  await touchBoq(supabase, boqId);
+  revalidatePath(`/boq/${boqId}`);
+}
+
 /** Deep-copy a bill (header + sections + items) into a fresh draft — the "similar
  *  job, slightly different scope" flow. Returns the new bill's id. */
 export async function duplicateBoq(boqId: string): Promise<Ok<{ id: string }> | Err> {
@@ -205,7 +244,7 @@ export async function duplicateBoq(boqId: string): Promise<Ok<{ id: string }> | 
     .from('boqs')
     .select(
       'name, boq_type, client_id, client_name, industry, reference, location, boq_date, currency, is_template, ' +
-        'boq_sections(id, parent_id, name, position, boq_items(description, uom, qty, budget_rate_cents, item_type, position))',
+        'boq_sections(id, parent_id, name, position, boq_items(description, uom, qty, budget_rate_cents, item_type, position, duration_days))',
     )
     .eq('id', boqId)
     .eq('org_id', orgId)
@@ -219,6 +258,7 @@ export async function duplicateBoq(boqId: string): Promise<Ok<{ id: string }> | 
     budget_rate_cents: number | string | null;
     item_type: BoqItemType;
     position: number;
+    duration_days: number | null;
   };
   type Src = {
     name: string;
@@ -293,10 +333,21 @@ export async function duplicateBoq(boqId: string): Promise<Ok<{ id: string }> | 
           budget_rate_cents: it.budget_rate_cents,
           item_type: it.item_type,
           position: it.position,
+          duration_days: it.duration_days,
         })),
       );
     }
   }
+
+  // Pass 4: copy programme links between the copied sections.
+  const { data: deps } = await supabase
+    .from('boq_section_deps')
+    .select('section_id, depends_on_id')
+    .in('section_id', Object.keys(idMap));
+  const depRows = ((deps ?? []) as { section_id: string; depends_on_id: string }[])
+    .filter((d) => idMap[d.section_id] && idMap[d.depends_on_id])
+    .map((d) => ({ org_id: orgId, section_id: idMap[d.section_id], depends_on_id: idMap[d.depends_on_id] }));
+  if (depRows.length) await supabase.from('boq_section_deps').insert(depRows);
 
   revalidatePath('/boq');
   return { id: newId };

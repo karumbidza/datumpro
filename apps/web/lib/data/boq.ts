@@ -78,6 +78,13 @@ export interface BoqItem {
   itemType: BoqItemType;
   position: number;
   amountCents: number;
+  durationDays: number | null;
+}
+
+/** "sectionId starts after dependsOnId" — the bill's programme links. */
+export interface BoqSectionDep {
+  sectionId: string;
+  dependsOnId: string;
 }
 
 /** A section can be a sub-topic of another via parentId (null = top level). The
@@ -108,6 +115,7 @@ export interface BoqDetail {
   tenderStatus: TenderStatus | null;
   sections: BoqSection[];
   items: BoqItem[];
+  deps: BoqSectionDep[];
 }
 
 /** One bill with its sections (nestable) and priced items, both flat. Returns
@@ -120,7 +128,7 @@ export async function getBoqDetail(orgId: string, boqId: string): Promise<BoqDet
       'id, name, boq_type, client_name, industry, reference, location, boq_date, currency, status, ' +
         'project_id, projects(name), boq_tenders(status, created_at), ' +
         'boq_sections(id, name, position, parent_id, ' +
-        'boq_items(id, item_no, description, uom, qty, budget_rate_cents, item_type, position, amount_cents))',
+        'boq_items(id, item_no, description, uom, qty, budget_rate_cents, item_type, position, amount_cents, duration_days))',
     )
     .eq('id', boqId)
     .eq('org_id', orgId)
@@ -137,6 +145,7 @@ export async function getBoqDetail(orgId: string, boqId: string): Promise<BoqDet
     item_type: BoqItemType;
     position: number;
     amount_cents: number | string | null;
+    duration_days: number | null;
   };
   type SectionRow = { id: string; name: string; position: number; parent_id: string | null; boq_items: ItemRow[] | null };
   type BoqRow = {
@@ -181,8 +190,23 @@ export async function getBoqDetail(orgId: string, boqId: string): Promise<BoqDet
         itemType: it.item_type,
         position: it.position,
         amountCents: n(it.amount_cents),
+        durationDays: it.duration_days,
       });
     }
+  }
+
+  // Programme links — a second query keeps the embed simple (boq_section_deps has
+  // two FKs into boq_sections, which makes PostgREST embedding ambiguous).
+  let deps: BoqSectionDep[] = [];
+  if (sections.length > 0) {
+    const { data: depRows } = await supabase
+      .from('boq_section_deps')
+      .select('section_id, depends_on_id')
+      .in('section_id', sections.map((s) => s.id));
+    deps = ((depRows ?? []) as { section_id: string; depends_on_id: string }[]).map((d) => ({
+      sectionId: d.section_id,
+      dependsOnId: d.depends_on_id,
+    }));
   }
 
   // Latest tender wins; only surface live states (a draft/cancelled tender reads
@@ -210,6 +234,7 @@ export async function getBoqDetail(orgId: string, boqId: string): Promise<BoqDet
     tenderStatus,
     sections,
     items,
+    deps,
   };
 }
 
