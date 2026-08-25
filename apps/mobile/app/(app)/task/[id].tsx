@@ -3,7 +3,7 @@ import { BrandLoader } from '../../../components/brand-loader';
 import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { getTask, getTaskPermissions, type TaskDetail, type TaskPermissions } from '../../../lib/data/tasks';
+import { getTask, getTaskPermissions, listUnfinishedPredecessors, type TaskDetail, type TaskPermissions, type PredecessorHint } from '../../../lib/data/tasks';
 import { getTaskConversationId, getUnreadCount } from '../../../lib/data/chat';
 import { TaskPhotos } from '../../../components/task-photos';
 import { TaskExtensions } from '../../../components/task-extensions';
@@ -35,6 +35,7 @@ export default function TaskDetailScreen() {
   const [bidStatus, setBidStatus] = useState<TenderStatus | null>(null);
   const [taskDocs, setTaskDocs] = useState<TaskDoc[]>([]);
   const [unread, setUnread] = useState(0);
+  const [waitingOn, setWaitingOn] = useState<PredecessorHint[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -49,7 +50,7 @@ export default function TaskDetailScreen() {
     }
     // Everything below depends only on the task — fetch it all in parallel
     // instead of one round-trip at a time.
-    const [perms, subs, media, conv, planStepsMap, role, bid, docs] = await Promise.all([
+    const [perms, subs, media, conv, planStepsMap, role, bid, docs, preds] = await Promise.all([
       getTaskPermissions(t.orgId, t.projectId, t.assigneeId),
       listSubtasks(String(id)),
       listSubtaskPhotos(String(id)),
@@ -58,7 +59,9 @@ export default function TaskDetailScreen() {
       myOrgRole(t.orgId),
       myBidStatus(String(id)),
       listTaskDocuments(String(id)),
+      t.status === 'todo' ? listUnfinishedPredecessors(String(id)) : Promise.resolve([]),
     ]);
+    setWaitingOn(preds);
     setBidStatus(bid);
     setTaskDocs(docs);
     setPerms(perms);
@@ -165,6 +168,15 @@ export default function TaskDetailScreen() {
           </>
         )}
       </View>
+
+      {!isBidder && task.status === 'todo' && waitingOn.length > 0 && (
+        <View style={styles.waitingOn}>
+          <Ionicons name="time-outline" size={14} color={colors.muted} />
+          <Text style={styles.waitingOnText}>
+            Waiting on: {waitingOn.map((w) => w.title).join(', ')} — this task can start once they finish.
+          </Text>
+        </View>
+      )}
 
       {!isBidder && (
         <>
@@ -300,6 +312,17 @@ const makeStyles = (c: Colors) =>
     muted: { color: c.muted, fontFamily: font.body },
     title: { fontSize: 23, fontFamily: font.displayBold, color: c.text },
     badges: { flexDirection: 'row', gap: 8 },
+    waitingOn: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 6,
+      backgroundColor: c.sunk,
+      borderRadius: radius.md,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      marginTop: 8,
+    },
+    waitingOnText: { flex: 1, fontFamily: font.body, fontSize: 12, color: c.muted },
     progressRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     pct: { fontSize: 13, fontFamily: font.display, color: c.text, width: 42, textAlign: 'right' },
     elapsed: { fontSize: 11, fontFamily: font.body, color: c.subtle, marginTop: -4 },
