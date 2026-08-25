@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import type { BoqItemType, BoqType } from '@datumpro/shared/domain';
+import type { BoqItemType, BoqType, TenderStatus } from '@datumpro/shared/domain';
 
 // PostgREST returns numeric as string and bigint as number-or-string depending on
 // size; coerce everything through Number at the boundary so the app deals in plain
@@ -94,6 +94,9 @@ export interface BoqDetail {
   boqDate: string | null;
   currency: string;
   status: string;
+  /** Latest tender's status, so the bill can show "Out to tender" etc. Null when
+   *  the bill has never been put out to tender. */
+  tenderStatus: TenderStatus | null;
   sections: BoqSection[];
   items: BoqItem[];
 }
@@ -106,6 +109,7 @@ export async function getBoqDetail(orgId: string, boqId: string): Promise<BoqDet
     .from('boqs')
     .select(
       'id, name, boq_type, client_name, industry, reference, location, boq_date, currency, status, ' +
+        'boq_tenders(status, created_at), ' +
         'boq_sections(id, name, position, parent_id, ' +
         'boq_items(id, item_no, description, uom, qty, budget_rate_cents, item_type, position, amount_cents))',
     )
@@ -137,6 +141,7 @@ export async function getBoqDetail(orgId: string, boqId: string): Promise<BoqDet
     boq_date: string | null;
     currency: string;
     status: string;
+    boq_tenders: { status: string; created_at: string }[] | null;
     boq_sections: SectionRow[] | null;
   };
 
@@ -169,6 +174,15 @@ export async function getBoqDetail(orgId: string, boqId: string): Promise<BoqDet
     }
   }
 
+  // Latest tender wins; only surface live states (a draft/cancelled tender reads
+  // as "not out to tender").
+  const latestTender = (b.boq_tenders ?? [])
+    .slice()
+    .sort((a, c) => c.created_at.localeCompare(a.created_at))[0];
+  const liveTender = new Set(['open', 'closed', 'awarded']);
+  const tenderStatus =
+    latestTender && liveTender.has(latestTender.status) ? (latestTender.status as TenderStatus) : null;
+
   return {
     id: b.id,
     name: b.name,
@@ -180,6 +194,7 @@ export async function getBoqDetail(orgId: string, boqId: string): Promise<BoqDet
     boqDate: b.boq_date,
     currency: b.currency,
     status: b.status,
+    tenderStatus,
     sections,
     items,
   };

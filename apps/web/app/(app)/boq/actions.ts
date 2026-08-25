@@ -175,6 +175,27 @@ export async function deleteItem(boqId: string, itemId: string): Promise<Err | v
   revalidatePath(`/boq/${boqId}`);
 }
 
+/** Move an item into another section (drag-and-drop reorganising). Appends it at
+ *  the end of the target section. Same-org is enforced by RLS + the composite FK. */
+export async function moveItem(boqId: string, itemId: string, targetSectionId: string): Promise<Err | void> {
+  const { supabase } = await requireOrg();
+  const { data: last } = await supabase
+    .from('boq_items')
+    .select('position')
+    .eq('section_id', targetSectionId)
+    .order('position', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const position = ((last as { position: number } | null)?.position ?? -1) + 1;
+  const { error } = await supabase
+    .from('boq_items')
+    .update({ section_id: targetSectionId, position })
+    .eq('id', itemId);
+  if (error) return { error: error.message };
+  await touchBoq(supabase, boqId);
+  revalidatePath(`/boq/${boqId}`);
+}
+
 /** Deep-copy a bill (header + sections + items) into a fresh draft — the "similar
  *  job, slightly different scope" flow. Returns the new bill's id. */
 export async function duplicateBoq(boqId: string): Promise<Ok<{ id: string }> | Err> {

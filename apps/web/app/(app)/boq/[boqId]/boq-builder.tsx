@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, type ReactElement } from 'react';
+import { useState, useTransition, type DragEvent, type ReactElement } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { BoqDetail } from '@/lib/data/boq';
@@ -11,9 +11,18 @@ import {
   addItem,
   updateItem,
   deleteItem,
+  moveItem,
   duplicateBoq,
 } from '../actions';
-import { BOQ_UNITS, BOQ_TYPE_LABELS, BOQ_STATUS_LABELS, isKnownUnit, type BoqStatus } from '@datumpro/shared/domain';
+import {
+  BOQ_UNITS,
+  BOQ_TYPE_LABELS,
+  BOQ_STATUS_LABELS,
+  TENDER_STATUS_LABELS,
+  isKnownUnit,
+  type BoqStatus,
+  type TenderStatus,
+} from '@datumpro/shared/domain';
 import { fmtMoney } from '@/lib/money';
 import { Button } from '@/components/ui/button';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
@@ -22,6 +31,12 @@ type Item = { id: string; sectionId: string; itemNo: string | null; description:
 type Section = { id: string; name: string; parentId: string | null };
 
 const STATUS_TONE: Record<BoqStatus, BadgeTone> = { draft: 'amber', approved: 'green', archived: 'faint' };
+const TENDER_TONE: Partial<Record<TenderStatus, BadgeTone>> = { open: 'blue', closed: 'amber', awarded: 'green' };
+const TENDER_BADGE: Partial<Record<TenderStatus, string>> = {
+  open: 'Out to tender',
+  closed: 'Tender closed',
+  awarded: 'Awarded',
+};
 const UOM_LIST = 'boq-uom-list';
 
 const rowB = 'border-b border-zinc-200 dark:border-zinc-800';
@@ -95,6 +110,22 @@ export function BoqBuilder({ boq, canEdit }: { boq: BoqDetail; canEdit: boolean 
       if ('id' in res) router.push(`/boq/${res.id}`);
     });
 
+  // ── drag an item into another section ───────────────────────────────────────
+  const onMoveItem = (itemId: string, targetSectionId: string) => {
+    setItems((prev) => {
+      const it = prev.find((x) => x.id === itemId);
+      if (!it || it.sectionId === targetSectionId) return prev;
+      return [...prev.filter((x) => x.id !== itemId), { ...it, sectionId: targetSectionId }];
+    });
+    start(() => moveItem(boq.id, itemId, targetSectionId).then(() => {}));
+  };
+  const onDropInto = (e: DragEvent, targetSectionId: string) => {
+    e.preventDefault();
+    const id = e.dataTransfer.getData('text/item');
+    if (id) onMoveItem(id, targetSectionId);
+  };
+  const allowDrop = canEdit ? (e: DragEvent) => e.preventDefault() : undefined;
+
   const meta = [BOQ_TYPE_LABELS[boq.boqType], boq.industry, boq.clientName, boq.reference, boq.boqDate].filter(Boolean).join(' · ');
 
   // ── recursive render → an array of <tr> ─────────────────────────────────────
@@ -104,7 +135,7 @@ export function BoqBuilder({ boq, canEdit }: { boq: BoqDetail; canEdit: boolean 
     const out: ReactElement[] = [];
 
     out.push(
-      <tr key={`s-${s.id}`} className="bg-zinc-50 dark:bg-zinc-900/50">
+      <tr key={`s-${s.id}`} className="bg-zinc-50 dark:bg-zinc-900/50" onDragOver={allowDrop} onDrop={canEdit ? (e) => onDropInto(e, s.id) : undefined}>
         <td className={`${rowB} ${colB} px-2.5 py-2 text-center font-mono text-xs font-bold text-zinc-500`}>{number}</td>
         <td className={`${rowB} ${colB} py-1.5 pr-2`} colSpan={4}>
           <div className="flex items-center gap-2" style={{ paddingLeft: depth * 18 }}>
@@ -137,8 +168,20 @@ export function BoqBuilder({ boq, canEdit }: { boq: BoqDetail; canEdit: boolean 
     my.forEach((it, j) => {
       const badUnit = !isKnownUnit(it.uom);
       out.push(
-        <tr key={`i-${it.id}`} className="group hover:bg-brand-50/40 dark:hover:bg-brand-600/5">
-          <td className={`${rowB} ${colB} px-2.5 py-2 text-center font-mono text-xs text-zinc-400`}>
+        <tr key={`i-${it.id}`} className="group hover:bg-brand-50/40 dark:hover:bg-brand-600/5" onDragOver={allowDrop} onDrop={canEdit ? (e) => onDropInto(e, s.id) : undefined}>
+          <td
+            className={`${rowB} ${colB} px-2.5 py-2 text-center font-mono text-xs text-zinc-400 ${canEdit ? 'cursor-grab active:cursor-grabbing' : ''}`}
+            draggable={canEdit}
+            onDragStart={
+              canEdit
+                ? (e) => {
+                    e.dataTransfer.setData('text/item', it.id);
+                    e.dataTransfer.effectAllowed = 'move';
+                  }
+                : undefined
+            }
+            title={canEdit ? 'Drag to move to another section' : undefined}
+          >
             {it.itemNo ? it.itemNo : `${number}.${j + 1}`}
           </td>
           <td className={`${rowB} ${colB} p-0`}>
@@ -254,6 +297,11 @@ export function BoqBuilder({ boq, canEdit }: { boq: BoqDetail; canEdit: boolean 
           <div className="flex items-center gap-2">
             <h1 className="truncate text-2xl font-semibold tracking-tight">{boq.name}</h1>
             <Badge tone={STATUS_TONE[status] ?? 'neutral'}>{BOQ_STATUS_LABELS[status] ?? status}</Badge>
+            {boq.tenderStatus && (
+              <Badge tone={TENDER_TONE[boq.tenderStatus] ?? 'blue'}>
+                {TENDER_BADGE[boq.tenderStatus] ?? TENDER_STATUS_LABELS[boq.tenderStatus]}
+              </Badge>
+            )}
           </div>
           {meta && <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">{meta}</p>}
         </div>
