@@ -177,6 +177,12 @@ export default async function TaskBoardPage({
     projEnd ? parseDate(projEnd) : null,
   );
 
+  // Closed (signed-off) tasks sink to the bottom so the active work stays in view.
+  // Stable sort keeps the existing order within each group.
+  const orderedTasks = [...tasks].sort(
+    (a, b) => Number(a.status === 'done') - Number(b.status === 'done'),
+  );
+
   return (
     <PageContainer width="6xl" className="flex flex-col gap-8">
       <LiveRefresh
@@ -232,10 +238,11 @@ export default async function TaskBoardPage({
           hint="Create the first task — assign it directly or put it out to tender."
         />
       ) : (
-        <div>
-          {/* Header row — shares the grid template so columns align with rows. */}
+        <div className="max-h-[calc(100dvh-18rem)] overflow-y-auto pr-1">
+          {/* Frozen header row — sticky within the scroll area; shares the grid
+              template so columns align with rows. */}
           <div
-            className="grid items-center px-4 pb-2 text-[10px] font-medium uppercase tracking-[0.05em] text-zinc-400 dark:text-zinc-500"
+            className="sticky top-0 z-10 grid items-center border-b border-zinc-200 bg-white/85 px-4 pb-2 pt-1 text-[10px] font-medium uppercase tracking-[0.05em] text-zinc-400 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/85 dark:text-zinc-500"
             style={GRID_STYLE}
           >
             <div>Task / assignee</div>
@@ -246,8 +253,8 @@ export default async function TaskBoardPage({
             <div />
           </div>
 
-          <div className="flex flex-col gap-2">
-            {tasks.map((t) => {
+          <div className="flex flex-col gap-2 pt-2">
+            {orderedTasks.map((t) => {
               // A todo task with unfinished predecessors reads as Blocked; one out
               // to tender reads as "Bidding" (never a bare "Unassigned").
               const tendering = !t.assignee_id && tenderingIds.has(t.id);
