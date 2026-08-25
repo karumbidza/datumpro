@@ -768,6 +768,75 @@ select pg_temp.ok(
     = 'c2b00000-0000-0000-0000-0000000000d1',
   'P2-D-4: boq_tenders.awarded_bidder_id set to the winning bidder');
 
+-- ── Project↔BOQ: generate_tasks_from_boq — guards, numbering, budget pricing ──
+-- Fixtures use the a4… range (BOQ A a333… is consumed by the Piece-3 export
+-- test above). Nested section + imported item_no exercise depth-first numbering
+-- and the item_no-preferred subtask titles.
+reset role;
+reset request.jwt.claims;
+insert into public.boqs (id, org_id, name) values
+  ('a4330000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','BOQ Gen');
+insert into public.boq_sections (id, org_id, boq_id, name, position) values
+  ('a4340000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a4330000-0000-0000-0000-000000000000','Substructure', 0);
+insert into public.boq_sections (id, org_id, boq_id, name, position, parent_id) values
+  ('a4341000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a4330000-0000-0000-0000-000000000000','Groundworks', 0,
+   'a4340000-0000-0000-0000-000000000000');
+insert into public.boq_items (id, org_id, section_id, description, uom, qty, budget_rate_cents, item_no) values
+  ('a4350000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a4341000-0000-0000-0000-000000000000','Excavate','m³',10,250,'1.6'),
+  ('a4351000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a4341000-0000-0000-0000-000000000000','Backfill','m³',4,100,null);
+insert into public.projects (id, org_id, name) values
+  ('a4220000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','Gen Project');
+
+set role authenticated;
+-- Outsider (org B member) blocked by the coalesced guard.
+set request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-0000000000b1","role":"authenticated","aal":"aal1"}';
+do $$
+begin
+  perform public.generate_tasks_from_boq('a4330000-0000-0000-0000-000000000000','a4220000-0000-0000-0000-000000000000');
+  raise exception 'FAIL: gen: outsider generated tasks';
+exception when others then
+  if position('not authorised' in SQLERRM) > 0 then raise notice 'PASS: gen: outsider blocked.';
+  else raise; end if;
+end $$;
+
+-- Staff generates: 1 task (only the sub-section holds items), numbered depth-
+-- first, unassigned, subtasks priced at budget with item_no preferred, BOQ linked.
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+do $$
+declare v jsonb;
+begin
+  select public.generate_tasks_from_boq('a4330000-0000-0000-0000-000000000000','a4220000-0000-0000-0000-000000000000') into v;
+  perform pg_temp.ok((v->>'tasks')::int = 1 and (v->>'subtasks')::int = 2, 'gen: 1 task / 2 subtasks created');
+  perform pg_temp.ok((v->>'total_cents')::bigint = 2900, 'gen: total = 10×250 + 4×100');
+  perform pg_temp.ok(
+    exists (select 1 from public.tasks
+            where project_id = 'a4220000-0000-0000-0000-000000000000'
+              and title = '1.1. Groundworks' and assignee_id is null
+              and boq_section_id = 'a4341000-0000-0000-0000-000000000000'),
+    'gen: task titled from depth-first numbering, unassigned, traced to section');
+  perform pg_temp.ok(
+    exists (select 1 from public.task_subtasks
+            where boq_item_id = 'a4350000-0000-0000-0000-000000000000'
+              and title like '1.6 Excavate%' and cost_cents = 2500),
+    'gen: subtask keeps imported item_no + budget pricing');
+  perform pg_temp.ok(
+    (select project_id from public.boqs where id = 'a4330000-0000-0000-0000-000000000000')
+      = 'a4220000-0000-0000-0000-000000000000',
+    'gen: BOQ linked to the project');
+end $$;
+
+-- Second generate is blocked (idempotent).
+do $$
+begin
+  perform public.generate_tasks_from_boq('a4330000-0000-0000-0000-000000000000','a4220000-0000-0000-0000-000000000000');
+  raise exception 'FAIL: gen: double generate not blocked';
+exception when others then
+  if position('already generated' in SQLERRM) > 0 then raise notice 'PASS: gen: double generate blocked.';
+  else raise; end if;
+end $$;
+reset role;
+reset request.jwt.claims;
+
 rollback;
 
 \echo '────────────────────────────────────────────'
