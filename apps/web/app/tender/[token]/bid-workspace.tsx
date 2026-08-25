@@ -6,7 +6,8 @@ import { TENDER_STATUS_LABELS, BIDDER_STATUS_LABELS } from '@datumpro/shared/dom
 import type { TenderStatus, BidderStatus } from '@datumpro/shared/domain';
 import { fmtMoney } from '@/lib/money';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
-import { saveBidRate, submitBid } from './actions';
+import { saveBidRate, submitBid, signOutToSwitch } from './actions';
+import { ExcelRoundtrip, type RoundtripLine } from './excel-roundtrip';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -60,7 +61,15 @@ const BIDDER_TONE: Record<BidderStatus, BadgeTone> = {
 // Component
 // ---------------------------------------------------------------------------
 
-export function BidWorkspaceView({ ws, token }: { ws: BidWorkspace; token: string }) {
+export function BidWorkspaceView({
+  ws,
+  token,
+  viewerEmail,
+}: {
+  ws: BidWorkspace;
+  token: string;
+  viewerEmail: string | null;
+}) {
   const [sections, setSections] = useState<LocalSection[]>(() =>
     ws.sections.map((s: BidSection) => ({
       sectionId: s.sectionId,
@@ -144,6 +153,32 @@ export function BidWorkspaceView({ ws, token }: { ws: BidWorkspace; token: strin
   // Submit
   // ---------------------------------------------------------------------------
 
+  // Excel round-trip: flat view of the bill with the current draft values.
+  const roundtripLines: RoundtripLine[] = sections.flatMap((s, si) =>
+    s.items.map((it, ii) => ({
+      itemId: it.itemId,
+      itemNo: `${si + 1}.${ii + 1}`,
+      section: s.name,
+      description: it.description,
+      uom: it.uom,
+      qty: it.qty,
+      rateCents: it.rateCents,
+      durationDays: it.durationDays,
+    })),
+  );
+  const applyUploaded = (saved: { itemId: string; rateCents: number; durationDays: number | null }[]) => {
+    const byId = new Map(saved.map((l) => [l.itemId, l]));
+    setSections((prev) =>
+      prev.map((s) => ({
+        ...s,
+        items: s.items.map((it) => {
+          const up = byId.get(it.itemId);
+          return up ? { ...it, rateCents: up.rateCents, durationDays: up.durationDays } : it;
+        }),
+      })),
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!window.confirm('Submit your bid? You cannot change it afterwards.')) return;
@@ -206,6 +241,32 @@ export function BidWorkspaceView({ ws, token }: { ws: BidWorkspace; token: strin
           </form>
         )}
       </div>
+
+      {/* Who is bidding — the access was authenticated even though no sign-in
+          screen appeared (the browser already had the matching session). */}
+      {viewerEmail && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg bg-zinc-100 px-4 py-2.5 text-sm text-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-300">
+          <span>
+            Bidding as <span className="font-medium">{viewerEmail}</span>
+          </span>
+          <form action={signOutToSwitch}>
+            <input type="hidden" name="token" value={token} />
+            <button type="submit" className="text-brand-600 hover:underline dark:text-brand-500">
+              Not you? Switch account
+            </button>
+          </form>
+        </div>
+      )}
+
+      {!closed && (
+        <ExcelRoundtrip
+          token={token}
+          tenderId={ws.tenderId}
+          title={ws.title}
+          lines={roundtripLines}
+          onApplied={applyUploaded}
+        />
+      )}
 
       {/* Status banners */}
       {ws.bidderStatus === 'submitted' && (

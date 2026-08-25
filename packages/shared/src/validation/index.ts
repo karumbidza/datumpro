@@ -258,3 +258,19 @@ export const saveBidRateSchema = z.object({
   durationDays: z.number().int().min(0).max(3650).optional().nullable(),
 });
 export type SaveBidRateInput = z.infer<typeof saveBidRateSchema>;
+
+/** Bulk save from the Excel round-trip — the RPC re-validates every line. */
+export const saveBidLinesSchema = z.object({
+  token: z.string().min(10),
+  lines: z
+    .array(
+      z.object({
+        itemId: z.string().uuid(),
+        rateCents: z.number().int().min(0),
+        durationDays: z.number().int().min(0).max(3650).optional().nullable(),
+      }),
+    )
+    .min(1)
+    .max(2000),
+});
+export type SaveBidLinesInput = z.infer<typeof saveBidLinesSchema>;

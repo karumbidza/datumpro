@@ -155,6 +155,13 @@ export async function resendBidInvite(formData: FormData): Promise<void> {
     } | null;
 
     if (b && b.status !== 'withdrawn' && b.invite_token) {
+      // Resend ROTATES the link: the RPC issues a fresh token (staff-guarded),
+      // so a stale forwarded email goes dead. Falls back to the current token
+      // only if rotation is refused (e.g. already submitted — UI hides those).
+      const { data: rotated } = await supabase.rpc('rotate_bid_invite_token', {
+        p_bidder_id: bidderId,
+      });
+      const token = (rotated as unknown as string | null) ?? b.invite_token;
       try {
         const [{ data: org }, { data: tender }] = await Promise.all([
           supabase.from('organizations').select('name').eq('id', orgId).single(),
@@ -162,7 +169,7 @@ export async function resendBidInvite(formData: FormData): Promise<void> {
         ]);
         const orgName = (org as { name?: string } | null)?.name ?? 'DatumPro';
         const tenderTitle = (tender as { title?: string } | null)?.title ?? 'Tender';
-        const acceptUrl = `${appUrl()}/tender/${b.invite_token}`;
+        const acceptUrl = `${appUrl()}/tender/${token}`;
         const { subject, html } = tenderInviteEmail({
           orgName,
           tenderTitle,

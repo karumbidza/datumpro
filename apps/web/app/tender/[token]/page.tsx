@@ -70,7 +70,7 @@ export default async function TenderPage({
 
   return (
     <PageContainer width="6xl">
-      <BidWorkspaceView ws={ws} token={token} />
+      <BidWorkspaceView ws={ws} token={token} viewerEmail={user.email ?? null} />
     </PageContainer>
   );
 }

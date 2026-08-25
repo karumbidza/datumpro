@@ -1,8 +1,9 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { saveBidRateSchema } from '@datumpro/shared/validation';
+import { saveBidRateSchema, saveBidLinesSchema } from '@datumpro/shared/validation';
 
 /** Resolve the signed-in user's bidder row by invite token.
  *  NEVER accepts a bidder id from the client — always derived server-side.
@@ -54,6 +55,41 @@ export async function saveBidRate(input: unknown): Promise<{ error?: string }> {
 
   revalidatePath(`/tender/${token}`);
   return {};
+}
+
+/** Bulk-save an Excel upload. The RPC re-validates everything server-side:
+ *  token + bound account, tender open, every line belongs to THIS bill, value
+ *  ranges, duplicates, and a rolling-hour rate limit. All-or-nothing. */
+export async function saveBidLines(
+  input: unknown,
+): Promise<{ saved?: number; error?: string }> {
+  const parsed = saveBidLinesSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues.map((i) => i.message).join(', ') };
+  }
+  const { token, lines } = parsed.data;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc('save_bid_lines', {
+    p_token: token,
+    p_lines: lines.map((l) => ({
+      item_id: l.itemId,
+      rate_cents: l.rateCents,
+      duration_days: l.durationDays ?? null,
+    })),
+  });
+  if (error) return { error: error.message };
+
+  revalidatePath(`/tender/${token}`);
+  return { saved: (data as { saved?: number } | null)?.saved ?? lines.length };
+}
+
+/** "Not you?" — drop the session and come back to this invite's sign-in. */
+export async function signOutToSwitch(formData: FormData): Promise<void> {
+  const token = String(formData.get('token') ?? '');
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  redirect(`/sign-in?next=${encodeURIComponent(`/tender/${token}`)}`);
 }
 
 /** Submit the sealed bid. Calls the `submit_boq_bid` RPC which enforces:
