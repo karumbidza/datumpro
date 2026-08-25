@@ -322,3 +322,45 @@ export async function getProjectBoq(orgId: string, projectId: string): Promise<P
     tenderStatus: tenders[0]?.status ?? null,
   };
 }
+
+export interface BoqGeneratedTask {
+  id: string;
+  title: string;
+  status: string;
+  assigneeId: string | null;
+  acceptanceStatus: string | null;
+}
+
+/** The tasks generated from a bill, in section order — the bulk-assign list. */
+export async function listBoqGeneratedTasks(
+  orgId: string,
+  projectId: string,
+  boqId: string,
+): Promise<BoqGeneratedTask[]> {
+  const supabase = await createClient();
+  const { data: secs } = await supabase.from('boq_sections').select('id').eq('boq_id', boqId).eq('org_id', orgId);
+  const sectionIds = ((secs ?? []) as { id: string }[]).map((s) => s.id);
+  if (sectionIds.length === 0) return [];
+
+  const { data } = await supabase
+    .from('tasks')
+    .select('id, title, status, assignee_id, acceptance_status')
+    .eq('project_id', projectId)
+    .in('boq_section_id', sectionIds)
+    .order('created_at', { ascending: true });
+
+  type Row = {
+    id: string;
+    title: string;
+    status: string;
+    assignee_id: string | null;
+    acceptance_status: string | null;
+  };
+  return ((data ?? []) as Row[]).map((t) => ({
+    id: t.id,
+    title: t.title,
+    status: t.status,
+    assigneeId: t.assignee_id,
+    acceptanceStatus: t.acceptance_status,
+  }));
+}

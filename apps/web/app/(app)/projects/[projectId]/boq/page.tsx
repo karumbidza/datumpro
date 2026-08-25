@@ -4,11 +4,13 @@ import { getAuthUser } from '@/lib/data/org';
 import { getProject } from '@/lib/data/projects';
 import { myOrgRole } from '@/lib/data/tasks';
 import { myProjectRole } from '@/lib/data/members';
-import { getProjectBoq, listUnlinkedBoqs } from '@/lib/data/boq';
+import { getProjectBoq, listUnlinkedBoqs, listBoqGeneratedTasks, type BoqGeneratedTask } from '@/lib/data/boq';
+import { listOrgMembers } from '@/lib/data/org-members';
 import { PageContainer } from '@/components/shell/page-container';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { BoqTabControls } from './boq-tab-controls';
+import { BulkAssign } from './bulk-assign';
 
 export default async function ProjectBoqPage({
   params,
@@ -34,6 +36,22 @@ export default async function ProjectBoqPage({
 
   const boq = await getProjectBoq(project.org_id, projectId);
   const unlinked = boq ? [] : await listUnlinkedBoqs(project.org_id);
+
+  // Bulk-assign data: the generated section-tasks + active contractor options.
+  let generatedTasks: BoqGeneratedTask[] = [];
+  let contractors: { userId: string; name: string }[] = [];
+  let memberNames: Record<string, string> = {};
+  if (boq?.tasksGenerated) {
+    const [tasks, members] = await Promise.all([
+      listBoqGeneratedTasks(project.org_id, projectId, boq.id),
+      listOrgMembers(project.org_id),
+    ]);
+    generatedTasks = tasks;
+    contractors = members
+      .filter((m) => m.status === 'active' && m.memberType === 'contractor')
+      .map((m) => ({ userId: m.userId, name: m.name }));
+    memberNames = Object.fromEntries(members.map((m) => [m.userId, m.name]));
+  }
 
   return (
     <PageContainer width="xl">
@@ -80,15 +98,23 @@ export default async function ProjectBoqPage({
           )}
 
           {boq.tasksGenerated ? (
-            <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-300">
-              Tasks were generated from this bill —{' '}
-              <Link
-                href={`/projects/${projectId}/tasks`}
-                className="font-medium text-brand-600 hover:underline dark:text-brand-500"
-              >
-                view tasks →
-              </Link>
-            </p>
+            <>
+              <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-300">
+                Tasks were generated from this bill —{' '}
+                <Link
+                  href={`/projects/${projectId}/tasks`}
+                  className="font-medium text-brand-600 hover:underline dark:text-brand-500"
+                >
+                  view tasks →
+                </Link>
+              </p>
+              <BulkAssign
+                projectId={projectId}
+                tasks={generatedTasks}
+                contractors={contractors}
+                memberNames={memberNames}
+              />
+            </>
           ) : (
             <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-300">
               No tasks generated yet. Generating creates one task per section with budget-priced

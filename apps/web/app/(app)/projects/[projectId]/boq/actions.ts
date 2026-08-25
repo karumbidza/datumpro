@@ -80,6 +80,40 @@ export async function generateBoqTasks(formData: FormData): Promise<void> {
   redirect(`/projects/${projectId}/tasks`);
 }
 
+/** Bulk-assign generated tasks to one contractor. The assignee is enrolled as a
+ *  project contractor first (idempotent, mirroring the award export), so the
+ *  pending-acceptance trigger fires for them; each task then flows through the
+ *  normal accept → plan → approval chain. RLS restricts the task update to
+ *  admin/PM. Bill-generated subtasks survive the assignment (trigger keeps
+ *  boq_item_id lines). */
+export async function bulkAssignBoqTasks(formData: FormData): Promise<void> {
+  const { supabase, orgId } = await requireOrg();
+  const projectId = String(formData.get('projectId') ?? '');
+  const assigneeId = String(formData.get('assigneeId') ?? '');
+  const taskIds = formData.getAll('taskIds').map(String).filter(Boolean);
+  if (!assigneeId) redirect(`/projects/${projectId}/boq?genError=${encodeURIComponent('Pick a contractor.')}`);
+  if (taskIds.length === 0)
+    redirect(`/projects/${projectId}/boq?genError=${encodeURIComponent('Tick at least one task.')}`);
+
+  const { error: me } = await supabase
+    .from('project_members')
+    .upsert(
+      { org_id: orgId, project_id: projectId, user_id: assigneeId, role: 'contractor' },
+      { onConflict: 'project_id,user_id', ignoreDuplicates: true },
+    );
+  if (me) redirect(`/projects/${projectId}/boq?genError=${encodeURIComponent(me.message)}`);
+
+  const { error } = await supabase
+    .from('tasks')
+    .update({ assignee_id: assigneeId })
+    .eq('project_id', projectId)
+    .in('id', taskIds);
+  if (error) redirect(`/projects/${projectId}/boq?genError=${encodeURIComponent(error.message)}`);
+
+  revalidatePath(`/projects/${projectId}/boq`);
+  revalidatePath(`/projects/${projectId}/tasks`);
+}
+
 /** Detach the bill. Generated tasks stay — they are real work; only the link goes. */
 export async function unlinkBoq(formData: FormData): Promise<void> {
   const { supabase } = await requireOrg();
