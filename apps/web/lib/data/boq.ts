@@ -63,6 +63,7 @@ export async function listBoqs(orgId: string): Promise<BoqListRow[]> {
 export interface BoqItem {
   id: string;
   sectionId: string;
+  itemNo: string | null;
   description: string;
   uom: string | null;
   qty: number;
@@ -106,7 +107,7 @@ export async function getBoqDetail(orgId: string, boqId: string): Promise<BoqDet
     .select(
       'id, name, boq_type, client_name, industry, reference, location, boq_date, currency, status, ' +
         'boq_sections(id, name, position, parent_id, ' +
-        'boq_items(id, description, uom, qty, budget_rate_cents, item_type, position, amount_cents))',
+        'boq_items(id, item_no, description, uom, qty, budget_rate_cents, item_type, position, amount_cents))',
     )
     .eq('id', boqId)
     .eq('org_id', orgId)
@@ -115,6 +116,7 @@ export async function getBoqDetail(orgId: string, boqId: string): Promise<BoqDet
 
   type ItemRow = {
     id: string;
+    item_no: string | null;
     description: string;
     uom: string | null;
     qty: number | string | null;
@@ -155,6 +157,7 @@ export async function getBoqDetail(orgId: string, boqId: string): Promise<BoqDet
       items.push({
         id: it.id,
         sectionId: s.id,
+        itemNo: it.item_no,
         description: it.description,
         uom: it.uom,
         qty: n(it.qty),
