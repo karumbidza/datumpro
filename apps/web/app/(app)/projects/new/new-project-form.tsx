@@ -17,6 +17,7 @@ import {
 } from '@datumpro/shared/domain';
 import type { ClientOption } from '@/lib/data/clients';
 import type { CalendarOption } from '@/lib/data/calendars';
+import type { UnlinkedBoqOption } from '@/lib/data/boq';
 import { inputClass, labelClass } from '@/components/ui/form';
 
 type Member = { userId: string; name: string };
@@ -31,6 +32,7 @@ export function NewProjectForm({
   teamOptions,
   currentUserId,
   defaultCalendarId,
+  boqs,
 }: {
   clients: ClientOption[];
   calendars: CalendarOption[];
@@ -38,6 +40,7 @@ export function NewProjectForm({
   teamOptions: Member[];
   currentUserId: string;
   defaultCalendarId: string;
+  boqs: UnlinkedBoqOption[];
 }) {
   const [state, formAction] = useActionState(createProject, {});
   const supabase = useMemo(() => createClient(), []);
@@ -54,6 +57,8 @@ export function NewProjectForm({
   const [calendarId, setCalendarId] = useState(defaultCalendarId);
   const [currency, setCurrency] = useState<string>('USD');
   const [teamIds, setTeamIds] = useState<string[]>([]);
+  const [boqMode, setBoqMode] = useState<'none' | 'existing' | 'create'>('none');
+  const [boqId, setBoqId] = useState('');
 
   // Inline "New client" sub-form.
   const [newOpen, setNewOpen] = useState(false);
@@ -406,6 +411,56 @@ export function NewProjectForm({
         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
           Added as contributors — the manager and you are on the project automatically.
         </p>
+      </div>
+
+      {/* Bill of Quantities — none / start from an existing bill / draft one now */}
+      <div>
+        <label className={labelClass}>Bill of Quantities</label>
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              ['none', 'No BOQ'],
+              ['existing', 'Use existing BOQ'],
+              ['create', 'Create BOQ now'],
+            ] as const
+          ).map(([mode, label]) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setBoqMode(mode)}
+              disabled={mode === 'existing' && boqs.length === 0}
+              className={`rounded-md px-3 py-1.5 text-sm transition ${
+                boqMode === mode
+                  ? 'bg-brand-600 text-white'
+                  : 'border border-zinc-300 text-zinc-600 hover:border-brand-400 disabled:opacity-40 dark:border-zinc-600 dark:text-zinc-300'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <input type="hidden" name="boqMode" value={boqMode} />
+        {boqMode === 'existing' && (
+          <div className="mt-2">
+            <select name="boqId" required value={boqId} onChange={(e) => setBoqId(e.target.value)} className={inputClass}>
+              <option value="">Choose a bill…</option>
+              {boqs.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name} · {b.itemCount} items · {b.currency} {(b.totalCents / 100).toLocaleString()}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              Tasks are generated from its sections at your budget rates — unassigned, ready for contractors.
+            </p>
+          </div>
+        )}
+        {boqMode === 'create' && (
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            A draft bill is created with this project&apos;s name, client and currency — you&apos;ll land in the
+            builder. Generate tasks from the project&apos;s BOQ tab when the bill is approved.
+          </p>
+        )}
       </div>
 
       {/* Template (out of scope to apply yet) */}

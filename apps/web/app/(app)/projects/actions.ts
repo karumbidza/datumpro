@@ -42,6 +42,8 @@ export async function createProject(_prev: FormState, formData: FormData): Promi
     currency: String(formData.get('currency') ?? ''),
     contractValueCents: Number.isFinite(dollars) ? Math.round(dollars * 100) : 0,
     templateId: (formData.get('templateId') as string) || undefined,
+    boqMode: String(formData.get('boqMode') ?? 'none'),
+    boqId: (formData.get('boqId') as string) || undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues.map((i) => i.message).join(', ') };
@@ -111,6 +113,40 @@ export async function createProject(_prev: FormState, formData: FormData): Promi
   }
 
   revalidatePath('/projects');
+
+  // BOQ step (spec 2026-08-25): "existing" generates unassigned budget-priced
+  // tasks now; "create" opens a fresh draft bill linked to the project — tasks
+  // are generated later from the project BOQ tab once the bill is approved.
+  // Generation failure never rolls the project back; the BOQ tab shows the
+  // error with a retry.
+  if (d.boqMode === 'existing' && d.boqId) {
+    const { error: genErr } = await supabase.rpc('generate_tasks_from_boq', {
+      p_boq_id: d.boqId,
+      p_project_id: projectId,
+    });
+    if (genErr) redirect(`/projects/${projectId}/boq?genError=${encodeURIComponent(genErr.message)}`);
+    redirect(`/projects/${projectId}/setup`);
+  }
+  if (d.boqMode === 'create') {
+    const { data: nb, error: boqErr } = await supabase
+      .from('boqs')
+      .insert({
+        org_id: orgId,
+        name: d.name,
+        boq_type: 'measured',
+        client_id: d.clientId,
+        currency: d.currency,
+        project_id: projectId,
+        created_by: user.id,
+      })
+      .select('id')
+      .single();
+    if (boqErr || !nb)
+      redirect(
+        `/projects/${projectId}/boq?genError=${encodeURIComponent(boqErr?.message ?? 'Could not create the BOQ.')}`,
+      );
+    redirect(`/boq/${(nb as { id: string }).id}`);
+  }
   redirect(`/projects/${projectId}/setup`);
 }
 

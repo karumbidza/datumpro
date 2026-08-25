@@ -227,13 +227,14 @@ export async function startDelivery(formData: FormData): Promise<void> {
   const projectName = String(formData.get('projectName') ?? '');
   const projectId = String(formData.get('projectId') ?? '');
 
-  const { data: newProjectId, error } = await supabase.rpc('export_award_to_project', {
+  const { data: result, error } = await supabase.rpc('export_award_to_project', {
     p_tender_id: tenderId,
     p_project_id: mode === 'existing' && projectId ? projectId : null,
     p_new_project_name: mode === 'new' ? projectName : null,
   });
   if (error) throw new Error(error.message);
-  const projId = newProjectId as unknown as string;
+  const res = result as unknown as { project_id: string; mode: string; skipped_tasks: string[] };
+  const projId = res.project_id;
 
   // Best-effort: notify the winning contractor.
   try {

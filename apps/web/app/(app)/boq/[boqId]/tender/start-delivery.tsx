@@ -9,14 +9,35 @@ interface Props {
   tenderId: string;
   boqId: string;
   projects: { id: string; name: string }[];
+  linkedProject?: { id: string; name: string } | null;
 }
 
 /** Export the awarded tender into a delivery project — either a fresh project
- *  or an existing one. Reveals an inline form matching the sibling invite forms. */
-export function StartDelivery({ tenderId, boqId, projects }: Props) {
+ *  or an existing one. Reveals an inline form matching the sibling invite forms.
+ *  A BOQ already linked to a project skips the picker: the winner is assigned to
+ *  that project's tasks and prices move to the winning bid (the RPC ignores the
+ *  mode/name params in that case). */
+export function StartDelivery({ tenderId, boqId, projects, linkedProject = null }: Props) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<'new' | 'existing'>('new');
   const hasProjects = projects.length > 0;
+
+  if (linkedProject) {
+    return (
+      <form action={startDelivery}>
+        <input type="hidden" name="tenderId" value={tenderId} />
+        <input type="hidden" name="boqId" value={boqId} />
+        <input type="hidden" name="mode" value="new" />
+        <p className="mb-2 text-sm text-zinc-600 dark:text-zinc-300">
+          This bill belongs to <span className="font-medium">{linkedProject.name}</span>. The winner is
+          assigned to its tasks and prices move to the winning bid.
+        </p>
+        <Button type="submit" size="sm">
+          Assign winner to {linkedProject.name} →
+        </Button>
+      </form>
+    );
+  }
 
   if (!open) {
     return (

@@ -70,6 +70,7 @@ export default async function BoqIndexPage() {
                 <th className="px-4 py-2.5 font-semibold">Bill</th>
                 <th className="px-4 py-2.5 font-semibold">Industry</th>
                 <th className="px-4 py-2.5 font-semibold">Status</th>
+                <th className="px-4 py-2.5 font-semibold">Project</th>
                 <th className="px-4 py-2.5 text-right font-semibold">Items</th>
                 <th className="px-4 py-2.5 text-right font-semibold">Total</th>
               </tr>
@@ -96,6 +97,19 @@ export default async function BoqIndexPage() {
                     <Badge tone={STATUS_TONE[(b.status as BoqStatus)] ?? 'neutral'}>
                       {BOQ_STATUS_LABELS[(b.status as BoqStatus)] ?? b.status}
                     </Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    {b.projectId ? (
+                      // z-10 lifts this link above the row's stretched anchor.
+                      <Link
+                        href={`/projects/${b.projectId}`}
+                        className="relative z-10 text-brand-600 hover:underline dark:text-brand-500"
+                      >
+                        {b.projectName}
+                      </Link>
+                    ) : (
+                      <span className="text-zinc-400">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-zinc-600 dark:text-zinc-300">{b.itemCount}</td>
                   <td className="px-4 py-3 text-right font-medium tabular-nums">{fmtMoney(b.totalCents, b.currency)}</td>
