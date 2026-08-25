@@ -136,6 +136,7 @@ export function BoqImporter({ boqId, currency }: { boqId: string; currency: stri
   const [roles, setRoles] = useState<Role[]>([]);
   const [sectionMode, setSectionMode] = useState<'auto' | 'column'>('auto');
   const [rows, setRows] = useState<Row[]>([]);
+  const [replace, setReplace] = useState(false);
   const [pending, start] = useTransition();
 
   const grid = sheets[sheetIndex]?.grid ?? [];
@@ -259,7 +260,7 @@ export function BoqImporter({ boqId, currency }: { boqId: string; currency: stri
           qty = r.qty;
           rateCents = Math.round(r.rate * 100);
         }
-        cur.items.push({ description: r.description, uom: r.unit || null, qty, rateCents });
+        cur.items.push({ itemNo: r.itemNo || null, description: r.description, uom: r.unit || null, qty, rateCents });
       }
     }
     return out.filter((s) => s.items.length > 0 || s.name !== 'Imported items');
@@ -269,7 +270,7 @@ export function BoqImporter({ boqId, currency }: { boqId: string; currency: stri
     setError(null);
     const sections = toSections();
     start(async () => {
-      const res = await importBoqRows(boqId, sections);
+      const res = await importBoqRows(boqId, sections, { replace });
       if (res.error) setError(res.error);
       else router.push(`/boq/${boqId}`);
     });
@@ -444,6 +445,7 @@ export function BoqImporter({ boqId, currency }: { boqId: string; currency: stri
           <thead>
             <tr className="bg-zinc-100 text-left text-[11px] uppercase tracking-wide text-zinc-500 dark:bg-zinc-800/70 dark:text-zinc-400">
               <th className="border-b border-r border-zinc-300 px-2 py-2 dark:border-zinc-700">Kind</th>
+              <th className="border-b border-r border-zinc-300 px-2 py-2 dark:border-zinc-700">No.</th>
               <th className="border-b border-r border-zinc-300 px-2 py-2 dark:border-zinc-700">Description</th>
               <th className="border-b border-r border-zinc-300 px-2 py-2 dark:border-zinc-700">Unit</th>
               <th className="border-b border-r border-zinc-300 px-2 py-2 text-right dark:border-zinc-700">Qty</th>
@@ -470,6 +472,15 @@ export function BoqImporter({ boqId, currency }: { boqId: string; currency: stri
                       <option value="item">Item</option>
                       <option value="skip">Skip</option>
                     </select>
+                  </td>
+                  <td className="border-b border-r border-zinc-200 p-0 dark:border-zinc-800">
+                    <input
+                      value={isSection ? '' : r.itemNo}
+                      disabled={disabled}
+                      placeholder={isSection ? '' : '—'}
+                      onChange={(e) => setRow(i, { itemNo: e.target.value })}
+                      className="w-16 bg-transparent px-2 py-1.5 font-mono text-xs outline-none focus:ring-1 focus:ring-inset focus:ring-brand-500"
+                    />
                   </td>
                   <td className="border-b border-r border-zinc-200 p-0 dark:border-zinc-800">
                     <input
@@ -525,6 +536,16 @@ export function BoqImporter({ boqId, currency }: { boqId: string; currency: stri
           </tbody>
         </table>
       </div>
+
+      <label className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
+        <input
+          type="checkbox"
+          checked={replace}
+          onChange={(e) => setReplace(e.target.checked)}
+          className="h-4 w-4 rounded border-zinc-300 text-brand-600 focus:ring-brand-500 dark:border-zinc-600"
+        />
+        Replace the bill’s existing contents — clears its current sections &amp; items before importing
+      </label>
 
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="sm" onClick={() => setStep('map')}>

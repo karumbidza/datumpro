@@ -18,7 +18,7 @@ import { fmtMoney } from '@/lib/money';
 import { Button } from '@/components/ui/button';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 
-type Item = { id: string; sectionId: string; description: string; uom: string; qty: number; rateCents: number };
+type Item = { id: string; sectionId: string; itemNo: string | null; description: string; uom: string; qty: number; rateCents: number };
 type Section = { id: string; name: string; parentId: string | null };
 
 const STATUS_TONE: Record<BoqStatus, BadgeTone> = { draft: 'amber', approved: 'green', archived: 'faint' };
@@ -39,6 +39,7 @@ export function BoqBuilder({ boq, canEdit }: { boq: BoqDetail; canEdit: boolean 
     boq.items.map((it) => ({
       id: it.id,
       sectionId: it.sectionId,
+      itemNo: it.itemNo,
       description: it.description,
       uom: it.uom ?? '',
       qty: it.qty,
@@ -69,7 +70,7 @@ export function BoqBuilder({ boq, canEdit }: { boq: BoqDetail; canEdit: boolean 
   const onAddItem = (sectionId: string) =>
     start(async () => {
       const res = await addItem(boq.id, sectionId);
-      if ('id' in res) setItems((p) => [...p, { id: res.id, sectionId, description: '', uom: '', qty: 0, rateCents: 0 }]);
+      if ('id' in res) setItems((p) => [...p, { id: res.id, sectionId, itemNo: null, description: '', uom: '', qty: 0, rateCents: 0 }]);
     });
   const onDeleteItem = (id: string) =>
     start(async () => {
@@ -138,7 +139,7 @@ export function BoqBuilder({ boq, canEdit }: { boq: BoqDetail; canEdit: boolean 
       out.push(
         <tr key={`i-${it.id}`} className="group hover:bg-brand-50/40 dark:hover:bg-brand-600/5">
           <td className={`${rowB} ${colB} px-2.5 py-2 text-center font-mono text-xs text-zinc-400`}>
-            {number}.{j + 1}
+            {it.itemNo ? it.itemNo : `${number}.${j + 1}`}
           </td>
           <td className={`${rowB} ${colB} p-0`}>
             <input

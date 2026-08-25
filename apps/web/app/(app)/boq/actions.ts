@@ -282,6 +282,7 @@ export async function duplicateBoq(boqId: string): Promise<Ok<{ id: string }> | 
 }
 
 export interface ImportItem {
+  itemNo?: string | null;
   description: string;
   uom: string | null;
   qty: number;
@@ -298,12 +299,20 @@ export interface ImportSection {
 export async function importBoqRows(
   boqId: string,
   sections: ImportSection[],
+  opts?: { replace?: boolean },
 ): Promise<Ok<{ sections: number; items: number }> | Err> {
   const { supabase, orgId } = await requireOrg();
 
   const totalItems = sections.reduce((a, s) => a + s.items.length, 0);
   if (totalItems === 0) return { error: 'Nothing to import — no priced items were found.' };
   if (totalItems > 2000) return { error: 'That sheet has over 2000 items — split it and import in parts.' };
+
+  // Replace: clear the bill's existing sections (items cascade) before importing,
+  // so re-importing a corrected file doesn't stack on top of the old contents.
+  if (opts?.replace) {
+    const { error: de } = await supabase.from('boq_sections').delete().eq('boq_id', boqId);
+    if (de) return { error: de.message };
+  }
 
   const { data: last } = await supabase
     .from('boq_sections')
@@ -328,6 +337,7 @@ export async function importBoqRows(
       const rows = s.items.map((it, i) => ({
         org_id: orgId,
         section_id: (ns as { id: string }).id,
+        item_no: it.itemNo ? it.itemNo.trim().slice(0, 32) || null : null,
         description: (it.description || '').slice(0, 500),
         uom: it.uom ? it.uom.trim().slice(0, 24) || null : null,
         qty: Number.isFinite(it.qty) ? Math.max(0, it.qty) : 0,
