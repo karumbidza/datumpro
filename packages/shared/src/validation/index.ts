@@ -68,24 +68,33 @@ export const paymentRequestSchema = z.object({
 });
 export type PaymentRequestInput = z.infer<typeof paymentRequestSchema>;
 
-export const createProjectSchema = z.object({
-  name: z.string().trim().min(2).max(160),
-  // `code` is auto-generated server-side (collision-safe) — never trusted from the client.
-  type: z.enum(PROJECT_TYPES).default('construction'),
-  constructionType: z.enum(CONSTRUCTION_TYPES),
-  description: z.string().trim().max(2000).optional().or(z.literal('')),
-  priority: z.enum(TASK_PRIORITIES).default('medium'),
-  clientId: z.string().uuid(),
-  managerId: z.string().uuid(),
-  teamMemberIds: z.array(z.string().uuid()).max(100).default([]),
-  startDate: z.string().date(),
-  durationValue: z.number().int().positive().max(3650),
-  durationUnit: z.enum(DURATION_UNITS).default('weeks'),
-  calendarId: z.string().uuid(),
-  currency: z.enum(CURRENCIES),
-  contractValueCents: z.number().int().nonnegative().default(0),
-  templateId: z.string().uuid().optional().nullable(),
-});
+export const createProjectSchema = z
+  .object({
+    name: z.string().trim().min(2).max(160),
+    // `code` is auto-generated server-side (collision-safe) — never trusted from the client.
+    type: z.enum(PROJECT_TYPES).default('construction'),
+    constructionType: z.enum(CONSTRUCTION_TYPES),
+    description: z.string().trim().max(2000).optional().or(z.literal('')),
+    priority: z.enum(TASK_PRIORITIES).default('medium'),
+    clientId: z.string().uuid(),
+    managerId: z.string().uuid(),
+    teamMemberIds: z.array(z.string().uuid()).max(100).default([]),
+    startDate: z.string().date(),
+    durationValue: z.number().int().positive().max(3650),
+    durationUnit: z.enum(DURATION_UNITS).default('weeks'),
+    calendarId: z.string().uuid(),
+    currency: z.enum(CURRENCIES),
+    contractValueCents: z.number().int().nonnegative().default(0),
+    templateId: z.string().uuid().optional().nullable(),
+    // BOQ step: start the project from an existing bill (tasks generated at
+    // budget rates), draft a new linked bill, or neither.
+    boqMode: z.enum(['none', 'existing', 'create']).default('none'),
+    boqId: z.string().uuid().optional().nullable(),
+  })
+  .refine((d) => d.boqMode !== 'existing' || !!d.boqId, {
+    message: 'Pick the BOQ to use for this project.',
+    path: ['boqId'],
+  });
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 
 /** Invitee profile setup on the invite-acceptance screen (snag spec §1.3).
