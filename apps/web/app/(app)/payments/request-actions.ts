@@ -3,7 +3,6 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { paymentRequestSchema } from '@datumpro/shared/validation';
-import { logAudit } from '@/lib/audit';
 
 type Result = { ok: boolean; error?: string };
 
@@ -74,26 +73,13 @@ export async function requestPayment(formData: FormData): Promise<Result> {
   return { ok: true };
 }
 
-async function managerUpdate(
-  id: string,
-  patch: Record<string, unknown>,
-  projectId: string,
-): Promise<Result & { orgId?: string }> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('contractor_payment_requests')
-    .update(patch)
-    .eq('id', id)
-    .select('org_id')
-    .single();
-  if (error) return { ok: false, error: error.message };
-  revalidatePath(`/projects/${projectId}/finance`);
-  revalidatePath('/payments');
-  return { ok: true, orgId: (data as { org_id: string } | null)?.org_id };
-}
-
-// approvePaymentRequest retired — payment approval now runs through the shared
-// two-step chain (decideApprovalStep + finalize_approval flips requested→approved).
+// approvePaymentRequest retired — payment approval runs through the shared two-step
+// chain (decideApprovalStep + finalize_approval flips requested→approved).
+//
+// reject/pay are DB-enforced transitions (Phase 1b): they go through SECURITY
+// DEFINER RPCs that validate state + authority + segregation of duties and write
+// their own audit event. The client never sets status/reviewer/payer directly —
+// a generic UPDATE of those columns is rejected by the database.
 
 export async function rejectPaymentRequest(formData: FormData): Promise<Result> {
   const supabase = await createClient();
@@ -103,23 +89,18 @@ export async function rejectPaymentRequest(formData: FormData): Promise<Result> 
   if (!user) return { ok: false, error: 'Not signed in.' };
   const id = String(formData.get('id') ?? '');
   const projectId = String(formData.get('projectId') ?? '');
-  const res = await managerUpdate(
-    id,
-    {
-      status: 'rejected',
-      reviewed_by: user.id,
-      reviewed_at: new Date().toISOString(),
-      review_note: (formData.get('reviewNote') as string) || null,
-    },
-    projectId,
-  );
-  if (res.ok && res.orgId) {
-    await logAudit({ orgId: res.orgId, actorId: user.id, entityType: 'contractor_payment_request', entityId: id, action: 'payment.rejected' });
-  }
-  return res;
+  const { error } = await supabase.rpc('reject_payment_request', {
+    p_id: id,
+    p_note: (formData.get('reviewNote') as string) || null,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/projects/${projectId}/finance`);
+  revalidatePath('/payments');
+  return { ok: true };
 }
 
-/** Mark a request paid, attach a POP, and sync a linked draw to paid. */
+/** Mark a request paid: the DB requires it to be approved, the payer to hold pay
+ *  authority and to be neither the contractor nor an approver, and a POP. */
 export async function markPaymentRequestPaid(formData: FormData): Promise<Result> {
   const supabase = await createClient();
   const {
@@ -129,25 +110,14 @@ export async function markPaymentRequestPaid(formData: FormData): Promise<Result
 
   const id = String(formData.get('id') ?? '');
   const projectId = String(formData.get('projectId') ?? '');
-  const reference = (formData.get('reference') as string) || null;
-  const popPath = (formData.get('popPath') as string) || null;
-  const popName = (formData.get('popName') as string) || null;
-  const paidAt = new Date().toISOString();
-
-  const res = await managerUpdate(
-    id,
-    {
-      status: 'paid',
-      paid_at: paidAt,
-      paid_by: user.id,
-      paid_reference: reference,
-      pop_path: popPath,
-      pop_name: popName,
-    },
-    projectId,
-  );
-  if (res.ok && res.orgId) {
-    await logAudit({ orgId: res.orgId, actorId: user.id, entityType: 'contractor_payment_request', entityId: id, action: 'payment.marked_paid' });
-  }
-  return res;
+  const { error } = await supabase.rpc('pay_payment_request', {
+    p_id: id,
+    p_pop_path: (formData.get('popPath') as string) || null,
+    p_pop_name: (formData.get('popName') as string) || null,
+    p_reference: (formData.get('reference') as string) || null,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/projects/${projectId}/finance`);
+  revalidatePath('/payments');
+  return { ok: true };
 }
