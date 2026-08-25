@@ -11,16 +11,17 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { BoqTabControls } from './boq-tab-controls';
 import { BulkAssign } from './bulk-assign';
+import { SchedulePanel } from './schedule-panel';
 
 export default async function ProjectBoqPage({
   params,
   searchParams,
 }: {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ genError?: string }>;
+  searchParams: Promise<{ genError?: string; notice?: string }>;
 }) {
   const { projectId } = await params;
-  const { genError } = await searchParams;
+  const { genError, notice } = await searchParams;
 
   const user = await getAuthUser();
   if (!user) redirect('/sign-in');
@@ -60,6 +61,11 @@ export default async function ProjectBoqPage({
       {genError && (
         <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
           {genError}
+        </p>
+      )}
+      {notice && (
+        <p className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700 dark:border-green-900 dark:bg-green-950/40 dark:text-green-400">
+          {notice}
         </p>
       )}
 
@@ -108,6 +114,7 @@ export default async function ProjectBoqPage({
                   view tasks →
                 </Link>
               </p>
+              <SchedulePanel projectId={projectId} boqId={boq.id} defaultStartDate={project.start_date} />
               <BulkAssign
                 projectId={projectId}
                 tasks={generatedTasks}

@@ -121,6 +121,12 @@ export function Comparison({ data, boqId, canManage }: Props) {
                           {fmtVariancePct(variancePct)}
                         </span>
                       </div>
+                      {bidder.totalDays > 0 && (
+                        <span className="font-mono tabular-nums text-[11px] normal-case text-zinc-500 dark:text-zinc-400">
+                          ~{bidder.totalDays}d work
+                          {bidder.programmeDays != null ? ` · ~${bidder.programmeDays}d programme` : ''}
+                        </span>
+                      )}
                       {showAwardForm && (
                         <form
                           action={awardTender}

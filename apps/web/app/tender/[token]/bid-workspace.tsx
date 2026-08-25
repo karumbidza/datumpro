@@ -19,6 +19,8 @@ interface LocalItem {
   qty: number;
   /** Rate in CENTS as stored in the DB. */
   rateCents: number;
+  /** Proposed working days for this line (sealed with the rate). */
+  durationDays: number | null;
 }
 
 interface LocalSection {
@@ -69,6 +71,7 @@ export function BidWorkspaceView({ ws, token }: { ws: BidWorkspace; token: strin
         uom: it.uom,
         qty: it.qty,
         rateCents: ws.myRates[it.itemId]?.rateCents ?? 0,
+        durationDays: ws.myRates[it.itemId]?.durationDays ?? null,
       })),
     })),
   );
@@ -90,12 +93,16 @@ export function BidWorkspaceView({ ws, token }: { ws: BidWorkspace; token: strin
     s.items.reduce((a, it) => a + itemTotal(it), 0);
   const grand = sections.reduce((a, s) => a + sectionTotal(s), 0);
   const itemCount = sections.reduce((a, s) => a + s.items.length, 0);
+  const totalDays = sections.reduce(
+    (a, s) => a + s.items.reduce((b, it) => b + (it.durationDays ?? 0), 0),
+    0,
+  );
 
   // ---------------------------------------------------------------------------
   // Patch helpers
   // ---------------------------------------------------------------------------
 
-  const patchRate = (sectionId: string, itemId: string, rateCents: number) =>
+  const patchItem = (sectionId: string, itemId: string, up: Partial<LocalItem>) =>
     setSections((prev) =>
       prev.map((s) =>
         s.sectionId !== sectionId
@@ -103,17 +110,33 @@ export function BidWorkspaceView({ ws, token }: { ws: BidWorkspace; token: strin
           : {
               ...s,
               items: s.items.map((it) =>
-                it.itemId !== itemId ? it : { ...it, rateCents },
+                it.itemId !== itemId ? it : { ...it, ...up },
               ),
             },
       ),
     );
 
+  // The upsert writes the whole line, so rate and days always travel together —
+  // whichever cell blurred, the other keeps its current value.
+  const lineOf = (sectionId: string, itemId: string) =>
+    sections.find((s) => s.sectionId === sectionId)?.items.find((it) => it.itemId === itemId);
+
   const onRateBlur = (sectionId: string, itemId: string, raw: string) => {
     const rateCents = Math.round((Number(raw) || 0) * 100);
-    patchRate(sectionId, itemId, rateCents);
+    const durationDays = lineOf(sectionId, itemId)?.durationDays ?? null;
+    patchItem(sectionId, itemId, { rateCents });
     startTransition(async () => {
-      await saveBidRate({ token, boqItemId: itemId, rateCents });
+      await saveBidRate({ token, boqItemId: itemId, rateCents, durationDays });
+    });
+  };
+
+  const onDaysBlur = (sectionId: string, itemId: string, raw: string) => {
+    const trimmed = raw.trim();
+    const durationDays = trimmed === '' ? null : Math.max(0, Math.round(Number(trimmed) || 0));
+    const rateCents = lineOf(sectionId, itemId)?.rateCents ?? 0;
+    patchItem(sectionId, itemId, { durationDays });
+    startTransition(async () => {
+      await saveBidRate({ token, boqItemId: itemId, rateCents, durationDays });
     });
   };
 
@@ -213,6 +236,7 @@ export function BidWorkspaceView({ ws, token }: { ws: BidWorkspace; token: strin
             <col className="w-20" />
             <col className="w-24" />
             <col className="w-28" />
+            <col className="w-16" />
             <col className="w-32" />
           </colgroup>
           <thead>
@@ -232,6 +256,12 @@ export function BidWorkspaceView({ ws, token }: { ws: BidWorkspace; token: strin
               <th className="border-b border-r border-zinc-300 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700">
                 Your rate
               </th>
+              <th
+                className="border-b border-r border-zinc-300 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700"
+                title="Your proposed working days for this line"
+              >
+                Days
+              </th>
               <th className="border-b border-zinc-300 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700">
                 Your total
               </th>
@@ -249,12 +279,13 @@ export function BidWorkspaceView({ ws, token }: { ws: BidWorkspace; token: strin
                 itemTotal={itemTotal}
                 sectionTotal={sectionTotal(s)}
                 onRateBlur={onRateBlur}
+                onDaysBlur={onDaysBlur}
               />
             ))}
             {sections.length === 0 && (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className="px-3 py-10 text-center text-sm text-zinc-500 dark:text-zinc-400"
                 >
                   No items in this bill of quantities.
@@ -264,11 +295,12 @@ export function BidWorkspaceView({ ws, token }: { ws: BidWorkspace; token: strin
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-zinc-300 bg-zinc-100 font-semibold dark:border-zinc-700 dark:bg-zinc-800/70">
-              <td className="px-2.5 py-3" colSpan={5}>
+              <td className="px-2.5 py-3" colSpan={6}>
                 Bid total
                 <span className="ml-2 font-mono text-xs font-medium text-zinc-500 dark:text-zinc-400">
                   {itemCount} item{itemCount === 1 ? '' : 's'} ·{' '}
                   {sections.length} section{sections.length === 1 ? '' : 's'}
+                  {totalDays > 0 ? ` · ~${totalDays} working days proposed` : ''}
                 </span>
               </td>
               <td className="border-l border-zinc-300 px-2.5 py-3 text-right tabular-nums text-brand-600 dark:border-zinc-700 dark:text-brand-500">
@@ -295,6 +327,7 @@ function SectionRows({
   itemTotal,
   sectionTotal,
   onRateBlur,
+  onDaysBlur,
 }: {
   index: number;
   section: LocalSection;
@@ -303,6 +336,7 @@ function SectionRows({
   itemTotal: (it: LocalItem) => number;
   sectionTotal: number;
   onRateBlur: (sectionId: string, itemId: string, raw: string) => void;
+  onDaysBlur: (sectionId: string, itemId: string, raw: string) => void;
 }) {
   const rowBorder = 'border-b border-zinc-200 dark:border-zinc-800';
   const colBorder = 'border-r border-zinc-200 dark:border-zinc-800';
@@ -316,7 +350,7 @@ function SectionRows({
         >
           {index + 1}
         </td>
-        <td className={`${rowBorder} ${colBorder} px-2.5 py-2`} colSpan={3}>
+        <td className={`${rowBorder} ${colBorder} px-2.5 py-2`} colSpan={4}>
           <span className="text-sm font-semibold">{section.name}</span>
           <span className="ml-2 font-mono text-xs text-zinc-400">
             {section.items.length} item{section.items.length === 1 ? '' : 's'}
@@ -364,6 +398,19 @@ function SectionRows({
               placeholder="0.00"
               aria-label="Your rate"
               onBlur={(e) => onRateBlur(section.sectionId, it.itemId, e.target.value)}
+              className={numCell}
+            />
+          </td>
+          {/* Proposed days — editable only while open */}
+          <td className={`${rowBorder} ${colBorder} p-0`}>
+            <input
+              key={`d-${it.itemId}`}
+              defaultValue={it.durationDays != null ? String(it.durationDays) : ''}
+              disabled={closed}
+              inputMode="numeric"
+              placeholder="—"
+              aria-label="Your proposed working days"
+              onBlur={(e) => onDaysBlur(section.sectionId, it.itemId, e.target.value)}
               className={numCell}
             />
           </td>

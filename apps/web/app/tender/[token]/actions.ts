@@ -31,7 +31,7 @@ export async function saveBidRate(input: unknown): Promise<{ error?: string }> {
   if (!parsed.success) {
     return { error: parsed.error.issues.map((i) => i.message).join(', ') };
   }
-  const { token, boqItemId, rateCents, noBid, note } = parsed.data;
+  const { token, boqItemId, rateCents, noBid, note, durationDays } = parsed.data;
 
   const supabase = await createClient();
   const bidder = await resolveBidder(supabase, token);
@@ -45,6 +45,7 @@ export async function saveBidRate(input: unknown): Promise<{ error?: string }> {
       rate_cents: rateCents,
       no_bid: noBid ?? false,
       note: note ?? null,
+      duration_days: durationDays ?? null,
     },
     { onConflict: 'bidder_id,boq_item_id' },
   );

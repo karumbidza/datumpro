@@ -254,5 +254,7 @@ export const saveBidRateSchema = z.object({
   rateCents: z.number().int().min(0),
   noBid: z.boolean().optional(),
   note: z.string().trim().max(500).optional().nullable(),
+  /** Proposed working days for this line — sealed with the rate. */
+  durationDays: z.number().int().min(0).max(3650).optional().nullable(),
 });
 export type SaveBidRateInput = z.infer<typeof saveBidRateSchema>;

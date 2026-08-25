@@ -114,6 +114,38 @@ export async function bulkAssignBoqTasks(formData: FormData): Promise<void> {
   revalidatePath(`/projects/${projectId}/tasks`);
 }
 
+/** Run the programme scheduler: no-predecessor tasks start on the given date
+ *  (concurrent), successors chain off their predecessors, ends come from each
+ *  task's agreed duration in working days. Only 'todo' tasks are rewritten. */
+export async function scheduleTasks(formData: FormData): Promise<void> {
+  const { supabase } = await requireOrg();
+  const projectId = String(formData.get('projectId') ?? '');
+  const boqId = String(formData.get('boqId') ?? '');
+  const startDate = String(formData.get('startDate') ?? '');
+  const { data, error } = await supabase.rpc('schedule_boq_tasks', {
+    p_project_id: projectId,
+    p_boq_id: boqId,
+    p_start_date: startDate,
+  });
+  if (error) redirect(`/projects/${projectId}/boq?genError=${encodeURIComponent(error.message)}`);
+
+  const res = data as unknown as {
+    scheduled: number;
+    frozen: number;
+    missing_duration: string[];
+    project_end: string | null;
+  };
+  const bits = [`${res.scheduled} task${res.scheduled === 1 ? '' : 's'} scheduled`];
+  if (res.frozen > 0) bits.push(`${res.frozen} already started (kept)`);
+  if (res.project_end) bits.push(`finishes ${res.project_end}`);
+  if (res.missing_duration.length > 0)
+    bits.push(`no duration set: ${res.missing_duration.join(', ')}`);
+  revalidatePath(`/projects/${projectId}/boq`);
+  revalidatePath(`/projects/${projectId}/tasks`);
+  revalidatePath(`/projects/${projectId}`);
+  redirect(`/projects/${projectId}/boq?notice=${encodeURIComponent(bits.join(' · '))}`);
+}
+
 /** Detach the bill. Generated tasks stay — they are real work; only the link goes. */
 export async function unlinkBoq(formData: FormData): Promise<void> {
   const { supabase } = await requireOrg();
