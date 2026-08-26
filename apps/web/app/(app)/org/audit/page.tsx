@@ -4,6 +4,7 @@ import { getActiveContext } from '@/lib/data/org';
 import { can } from '@datumpro/shared/access';
 import { PageContainer } from '@/components/shell/page-container';
 import { PageHeader } from '@/components/ui/page-header';
+import { theadRowClass, thClass } from '@/components/ui/table';
 import { Card } from '@/components/ui/card';
 
 /** "member.role_changed" → "member · role changed". Best-effort humaniser. */
@@ -60,11 +61,11 @@ export default async function AuditPage() {
           <p className="p-4 text-sm text-zinc-500 dark:text-zinc-400">No activity recorded yet.</p>
         ) : (
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-zinc-200 text-xs uppercase text-zinc-400 dark:text-zinc-500 dark:border-zinc-800">
-              <tr>
-                <th className="px-4 py-2">When</th>
-                <th className="px-4 py-2">Who</th>
-                <th className="px-4 py-2">Action</th>
+            <thead>
+              <tr className={theadRowClass}>
+                <th className={thClass}>When</th>
+                <th className={thClass}>Who</th>
+                <th className={thClass}>Action</th>
               </tr>
             </thead>
             <tbody>

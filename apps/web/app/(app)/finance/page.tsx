@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { PageContainer } from '@/components/shell/page-container';
 import { PageHeader } from '@/components/ui/page-header';
+import { theadRowClass, thClass } from '@/components/ui/table';
 import { redirect } from 'next/navigation';
 import { getActiveContext } from '@/lib/data/org';
 import { can } from '@datumpro/shared/access';
@@ -93,13 +94,13 @@ export default async function OrgFinancePage() {
           <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
             <table className="w-full min-w-[760px] text-sm">
               <thead>
-                <tr className="border-b border-zinc-100 text-left text-xs uppercase tracking-wide text-zinc-400 dark:text-zinc-500 dark:border-zinc-800">
-                  <th className="px-4 py-2.5 font-medium">Project</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Budget</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Committed</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Paid</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Outstanding</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Pending</th>
+                <tr className={theadRowClass}>
+                  <th className={thClass}>Project</th>
+                  <th className={`${thClass} text-right`}>Budget</th>
+                  <th className={`${thClass} text-right`}>Committed</th>
+                  <th className={`${thClass} text-right`}>Paid</th>
+                  <th className={`${thClass} text-right`}>Outstanding</th>
+                  <th className={`${thClass} text-right`}>Pending</th>
                 </tr>
               </thead>
               <tbody>

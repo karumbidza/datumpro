@@ -6,6 +6,7 @@ import { listMyTenderInvites } from '@/lib/data/tender';
 import { ContractorTenderPortal } from './contractor-portal';
 import { PageContainer } from '@/components/shell/page-container';
 import { PageHeader } from '@/components/ui/page-header';
+import { theadRowClass, thClass } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -69,12 +70,12 @@ export default async function BoqIndexPage() {
         <div className="mt-6 overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
           <table className="w-full min-w-[640px] text-sm">
             <thead>
-              <tr className="border-b border-zinc-200 text-left text-xs uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
-                <th className="px-4 py-2.5 font-semibold">Bill</th>
-                <th className="px-4 py-2.5 font-semibold">Industry</th>
-                <th className="px-4 py-2.5 font-semibold">Status</th>
-                <th className="px-4 py-2.5 text-right font-semibold">Items</th>
-                <th className="px-4 py-2.5 text-right font-semibold">Total</th>
+              <tr className={theadRowClass}>
+                <th className={thClass}>Bill</th>
+                <th className={thClass}>Industry</th>
+                <th className={thClass}>Status</th>
+                <th className={`${thClass} text-right`}>Items</th>
+                <th className={`${thClass} text-right`}>Total</th>
               </tr>
             </thead>
             <tbody>
