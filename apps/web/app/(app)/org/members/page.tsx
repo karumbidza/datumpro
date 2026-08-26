@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import { PageContainer } from '@/components/shell/page-container';
+import { PageHeader } from '@/components/ui/page-header';
 import { redirect } from 'next/navigation';
 import { getActiveContext } from '@/lib/data/org';
 import { listProjects } from '@/lib/data/projects';
@@ -49,14 +49,17 @@ export default async function OrgMembersPage({
 
   return (
     <PageContainer width="3xl">
-      <Link href="/org" className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
-        ← Organization
-      </Link>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight">{ctx.active.name} · Members</h1>
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">
-        Add everyone — staff and contractors — to your organisation once, here. Then assign them to the
-        projects they work on (with a project role like Contractor or PM).
-      </p>
+      <PageHeader
+        backHref="/org"
+        backLabel="Organization"
+        title={<>{ctx.active.name} · Members</>}
+        subtitle={
+          <>
+            Add everyone — staff and contractors — to your organisation once, here. Then assign them to the
+            projects they work on (with a project role like Contractor or PM).
+          </>
+        }
+      />
 
       {notice && (
         <p

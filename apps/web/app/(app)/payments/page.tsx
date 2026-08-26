@@ -1,34 +1,22 @@
 import Link from 'next/link';
 import { PageContainer } from '@/components/shell/page-container';
+import { PageHeader } from '@/components/ui/page-header';
 import { redirect } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { listMyOwed } from '@/lib/data/owed';
 import { Card, CardTitle, CardValue } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { formatUsd, PAYMENT_REQUEST_STATUS_LABEL, type PaymentRequestStatus } from '@datumpro/shared/domain';
+import { PAYMENT_REQUEST_TONE, CONTRACTOR_DOC_TONE } from '@/components/ui/tones';
+import { formatUsd, PAYMENT_REQUEST_STATUS_LABEL } from '@datumpro/shared/domain';
 import { listMyPaymentRequests } from '@/lib/data/payment-requests';
 import { RequestPaymentForm, type RequestTask } from '@/components/payments/request-payment-form';
 import {
   CONTRACTOR_DOC_TYPE_LABEL,
   CONTRACTOR_DOC_STATUS_LABEL,
-  type ContractorDocStatus,
 } from '@datumpro/shared/domain';
 import { listMyDocuments, listMyOrgs } from '@/lib/data/contractor-documents';
 import { UploadDocumentForm } from '@/components/documents/upload-document-form';
 import { LiveRefresh } from '@/components/live-refresh';
-
-const REQ_TONE: Record<PaymentRequestStatus, 'neutral' | 'blue' | 'green' | 'amber'> = {
-  requested: 'amber',
-  approved: 'blue',
-  paid: 'green',
-  rejected: 'neutral',
-};
-
-const DOC_TONE: Record<ContractorDocStatus, 'neutral' | 'blue' | 'green' | 'amber'> = {
-  submitted: 'amber',
-  verified: 'green',
-  rejected: 'neutral',
-};
 
 export default async function MyPaymentsPage() {
   const user = await getAuthUser();
@@ -55,14 +43,17 @@ export default async function MyPaymentsPage() {
       <LiveRefresh
         subscriptions={[{ table: 'contractor_payment_requests', filter: `contractor_id=eq.${user.id}` }]}
       />
-      <Link href="/dashboard" className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
-        ← Dashboard
-      </Link>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight">Finance</h1>
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">
-        Your overall statement — what you&apos;re owed across your approved plans. You can also raise a
-        payment request from each task&apos;s Payment tab.
-      </p>
+      <PageHeader
+        backHref="/dashboard"
+        backLabel="Dashboard"
+        title="Finance"
+        subtitle={
+          <>
+            Your overall statement — what you&apos;re owed across your approved plans. You can also raise a
+            payment request from each task&apos;s Payment tab.
+          </>
+        }
+      />
 
       <section className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Card>
@@ -159,7 +150,7 @@ export default async function MyPaymentsPage() {
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
                     <span className="text-sm font-semibold tabular-nums">{formatUsd(r.amountCents)}</span>
-                    <Badge tone={REQ_TONE[r.status]}>{PAYMENT_REQUEST_STATUS_LABEL[r.status]}</Badge>
+                    <Badge tone={PAYMENT_REQUEST_TONE[r.status]}>{PAYMENT_REQUEST_STATUS_LABEL[r.status]}</Badge>
                   </div>
                 </div>
                 {r.status === 'rejected' && r.reviewNote && (
@@ -222,7 +213,7 @@ export default async function MyPaymentsPage() {
                     <p className="mt-0.5 text-xs text-red-500">Rejected — “{d.reviewNote}”</p>
                   )}
                 </div>
-                <Badge tone={DOC_TONE[d.status]}>{CONTRACTOR_DOC_STATUS_LABEL[d.status]}</Badge>
+                <Badge tone={CONTRACTOR_DOC_TONE[d.status]}>{CONTRACTOR_DOC_STATUS_LABEL[d.status]}</Badge>
               </div>
             ))}
           </div>

@@ -1,20 +1,15 @@
 import Link from 'next/link';
 import { PageContainer } from '@/components/shell/page-container';
+import { PageHeader } from '@/components/ui/page-header';
+import { theadRowClass, thClass } from '@/components/ui/table';
 import { redirect } from 'next/navigation';
 import { getActiveContext } from '@/lib/data/org';
 import { can } from '@datumpro/shared/access';
 import { orgContractorFinance } from '@/lib/data/finance-portfolio';
 import { Card, CardTitle, CardValue } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { formatUsd } from '@datumpro/shared/domain';
-
-const STATUS_TONE: Record<string, 'neutral' | 'blue' | 'green' | 'amber'> = {
-  active: 'blue',
-  planning: 'neutral',
-  on_hold: 'amber',
-  completed: 'green',
-  archived: 'neutral',
-};
+import { PROJECT_STATUS_TONE } from '@/components/ui/tones';
+import { formatUsd, type ProjectStatus } from '@datumpro/shared/domain';
 
 /** Org-wide finance hub — the portfolio contractor-payments view for owners,
  *  admins, finance and delivery PMs. Gated here and by RLS. Per-project detail
@@ -34,13 +29,12 @@ export default async function OrgFinancePage() {
 
   return (
     <PageContainer width="6xl">
-      <Link href="/dashboard" className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
-        ← Dashboard
-      </Link>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight">Finance</h1>
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">
-        Contractor payments across every project in {ctx.active.name}.
-      </p>
+      <PageHeader
+        backHref="/dashboard"
+        backLabel="Dashboard"
+        title="Finance"
+        subtitle={<>Contractor payments across every project in {ctx.active.name}.</>}
+      />
 
       <section className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Card>
@@ -93,13 +87,13 @@ export default async function OrgFinancePage() {
           <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
             <table className="w-full min-w-[760px] text-sm">
               <thead>
-                <tr className="border-b border-zinc-100 text-left text-xs uppercase tracking-wide text-zinc-400 dark:text-zinc-500 dark:border-zinc-800">
-                  <th className="px-4 py-2.5 font-medium">Project</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Budget</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Committed</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Paid</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Outstanding</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Pending</th>
+                <tr className={theadRowClass}>
+                  <th className={thClass}>Project</th>
+                  <th className={`${thClass} text-right`}>Budget</th>
+                  <th className={`${thClass} text-right`}>Committed</th>
+                  <th className={`${thClass} text-right`}>Paid</th>
+                  <th className={`${thClass} text-right`}>Outstanding</th>
+                  <th className={`${thClass} text-right`}>Pending</th>
                 </tr>
               </thead>
               <tbody>
@@ -116,7 +110,7 @@ export default async function OrgFinancePage() {
                         {p.name}
                       </Link>
                       <span className="ml-2 align-middle">
-                        <Badge tone={STATUS_TONE[p.status] ?? 'neutral'}>
+                        <Badge tone={PROJECT_STATUS_TONE[p.status as ProjectStatus] ?? 'neutral'}>
                           {p.status.replace('_', ' ')}
                         </Badge>
                       </span>

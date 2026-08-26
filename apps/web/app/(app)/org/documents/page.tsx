@@ -1,25 +1,19 @@
-import Link from 'next/link';
 import { PageContainer } from '@/components/shell/page-container';
+import { PageHeader } from '@/components/ui/page-header';
 import { redirect } from 'next/navigation';
 import { can } from '@datumpro/shared/access';
 import {
   CONTRACTOR_DOC_TYPE_LABEL,
   CONTRACTOR_DOC_STATUS_LABEL,
-  type ContractorDocStatus,
 } from '@datumpro/shared/domain';
 import { getActiveContext } from '@/lib/data/org';
 import { listOrgDocuments, type ContractorDocumentRow } from '@/lib/data/contractor-documents';
 import { ReviewDocument } from '@/components/documents/review-document';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { CONTRACTOR_DOC_TONE } from '@/components/ui/tones';
 
 export const dynamic = 'force-dynamic';
-
-const DOC_TONE: Record<ContractorDocStatus, 'neutral' | 'blue' | 'green' | 'amber'> = {
-  submitted: 'amber',
-  verified: 'green',
-  rejected: 'neutral',
-};
 
 export default async function OrgDocumentsPage() {
   const ctx = await getActiveContext();
@@ -40,14 +34,17 @@ export default async function OrgDocumentsPage() {
 
   return (
     <PageContainer width="3xl">
-      <Link href="/org" className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
-        ← Organization
-      </Link>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight">Contractor documents</h1>
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">
-        Tax clearances and company documents your contractors have filed
-        {pending > 0 ? ` · ${pending} awaiting review` : ''}.
-      </p>
+      <PageHeader
+        backHref="/org"
+        backLabel="Organization"
+        title="Contractor documents"
+        subtitle={
+          <>
+            Tax clearances and company documents your contractors have filed
+            {pending > 0 ? ` · ${pending} awaiting review` : ''}.
+          </>
+        }
+      />
 
       {docs.length === 0 ? (
         <Card className="mt-6">
@@ -80,7 +77,7 @@ export default async function OrgDocumentsPage() {
                             )}
                           </p>
                         </div>
-                        <Badge tone={DOC_TONE[d.status]}>{CONTRACTOR_DOC_STATUS_LABEL[d.status]}</Badge>
+                        <Badge tone={CONTRACTOR_DOC_TONE[d.status]}>{CONTRACTOR_DOC_STATUS_LABEL[d.status]}</Badge>
                       </div>
                       <ReviewDocument id={d.id} status={d.status} />
                     </li>

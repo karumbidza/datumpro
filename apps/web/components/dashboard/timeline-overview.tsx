@@ -124,8 +124,8 @@ function StatusBadge({ state }: { state: BarState }) {
     { show: state.isDone, text: 'Done', cls: 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400' },
     { show: state.isBlocked, text: 'Blocked', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400' },
     { show: state.isOverdue, text: 'Overdue', cls: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400' },
-    { show: state.isPending, text: 'Review', cls: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400' },
-    { show: state.isActive, text: 'Active', cls: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400' },
+    { show: state.isPending, text: 'Review', cls: 'bg-brand-50 text-brand-600 dark:bg-brand-600/15 dark:text-brand-500' },
+    { show: state.isActive, text: 'Active', cls: 'bg-brand-50 text-brand-600 dark:bg-brand-600/15 dark:text-brand-500' },
   ];
   const hit = map.find((m) => m.show);
   const cls = hit?.cls ?? 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400';

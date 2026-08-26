@@ -1,15 +1,9 @@
 import Link from 'next/link';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { SLA_TONE } from '@/components/ui/tones';
+import type { TaskSlaStatus } from '@datumpro/shared/domain';
 import type { MyTaskItem } from '@/lib/data/home';
-
-const SLA_TONE: Record<string, 'neutral' | 'green' | 'amber'> = {
-  on_track: 'green',
-  at_risk: 'amber',
-  breached: 'amber',
-  pending_signoff: 'neutral',
-  blocked: 'amber',
-};
 
 const SLA_LABEL: Record<string, string> = {
   on_track: 'On track',
@@ -57,7 +51,7 @@ export function MyTasksCard({ tasks }: { tasks: MyTaskItem[] }) {
                     </p>
                   </div>
                   {SLA_LABEL[t.slaStatus] && (
-                    <Badge tone={SLA_TONE[t.slaStatus] ?? 'neutral'}>{SLA_LABEL[t.slaStatus]}</Badge>
+                    <Badge tone={SLA_TONE[t.slaStatus as TaskSlaStatus] ?? 'neutral'}>{SLA_LABEL[t.slaStatus]}</Badge>
                   )}
                 </Link>
               </li>

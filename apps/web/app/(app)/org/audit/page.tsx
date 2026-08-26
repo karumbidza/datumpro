@@ -1,9 +1,10 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveContext } from '@/lib/data/org';
 import { can } from '@datumpro/shared/access';
 import { PageContainer } from '@/components/shell/page-container';
+import { PageHeader } from '@/components/ui/page-header';
+import { theadRowClass, thClass } from '@/components/ui/table';
 import { Card } from '@/components/ui/card';
 
 /** "member.role_changed" → "member · role changed". Best-effort humaniser. */
@@ -48,24 +49,23 @@ export default async function AuditPage() {
 
   return (
     <PageContainer width="3xl">
-      <Link href="/org" className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
-        ← Organisation
-      </Link>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight">Audit log</h1>
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">
-        Who did what — the last 200 consequential actions in this organisation. Read-only and tamper-evident.
-      </p>
+      <PageHeader
+        backHref="/org"
+        backLabel="Organisation"
+        title="Audit log"
+        subtitle="Who did what — the last 200 consequential actions in this organisation. Read-only and tamper-evident."
+      />
 
       <Card className="mt-6 overflow-x-auto p-0">
         {rows.length === 0 ? (
           <p className="p-4 text-sm text-zinc-500 dark:text-zinc-400">No activity recorded yet.</p>
         ) : (
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-zinc-200 text-xs uppercase text-zinc-400 dark:text-zinc-500 dark:border-zinc-800">
-              <tr>
-                <th className="px-4 py-2">When</th>
-                <th className="px-4 py-2">Who</th>
-                <th className="px-4 py-2">Action</th>
+            <thead>
+              <tr className={theadRowClass}>
+                <th className={thClass}>When</th>
+                <th className={thClass}>Who</th>
+                <th className={thClass}>Action</th>
               </tr>
             </thead>
             <tbody>

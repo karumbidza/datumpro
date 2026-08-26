@@ -4,23 +4,16 @@ import { getAuthUser, getActiveContext } from '@/lib/data/org';
 import { getBoqDetail } from '@/lib/data/boq';
 import { getTenderForOwner, getTenderComparison, getTenderOwnerExtras, listOrgProjects } from '@/lib/data/tender';
 import { listOrgMembers } from '@/lib/data/org-members';
-import { TENDER_STATUS_LABELS, type TenderStatus } from '@datumpro/shared/domain';
+import { TENDER_STATUS_LABELS } from '@datumpro/shared/domain';
 import { PageContainer } from '@/components/shell/page-container';
-import { Badge, type BadgeTone } from '@/components/ui/badge';
+import { Badge } from '@/components/ui/badge';
+import { TENDER_STATUS_TONE } from '@/components/ui/tones';
 import { Button } from '@/components/ui/button';
 import { BiddersPanel, type ContractorOption } from './bidders-panel';
 import { CreateTenderForm } from './create-tender-form';
 import { closeTender, unsealTender } from './actions';
 import { Comparison } from './comparison';
 import { StartDelivery } from './start-delivery';
-
-const STATUS_TONE: Record<TenderStatus, BadgeTone> = {
-  draft: 'faint',
-  open: 'blue',
-  closed: 'amber',
-  awarded: 'green',
-  cancelled: 'red',
-};
 
 export default async function TenderPage({
   params,
@@ -92,7 +85,7 @@ export default async function TenderPage({
             <>
               <span className="text-zinc-400">·</span>
               <span className="text-lg font-medium text-zinc-700 dark:text-zinc-300">{tender.title}</span>
-              <Badge tone={STATUS_TONE[tender.status] ?? 'neutral'}>
+              <Badge tone={TENDER_STATUS_TONE[tender.status] ?? 'neutral'}>
                 {TENDER_STATUS_LABELS[tender.status] ?? tender.status}
               </Badge>
             </>

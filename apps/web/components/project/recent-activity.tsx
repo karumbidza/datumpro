@@ -33,7 +33,7 @@ export function RecentActivity({ items, projectId }: { items: ProjectActivityRow
           <p className="text-sm text-zinc-600 dark:text-zinc-400">No recent activity</p>
         </div>
       ) : (
-        <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+        <div className="max-h-[26rem] divide-y divide-zinc-200 overflow-y-auto dark:divide-zinc-800">
           {items.map((item) => (
             <Link
               key={item.id}

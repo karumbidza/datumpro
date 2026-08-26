@@ -1,11 +1,12 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import { BIDDER_STATUS_LABELS, type BidderStatus } from '@datumpro/shared/domain';
+import { BIDDER_STATUS_LABELS } from '@datumpro/shared/domain';
 import type { BidderRow } from '@/lib/data/tender';
 import { inviteBidder, resendBidInvite, revokeBidder } from './actions';
 import { Button } from '@/components/ui/button';
-import { Badge, type BadgeTone } from '@/components/ui/badge';
+import { Badge } from '@/components/ui/badge';
+import { BIDDER_STATUS_TONE } from '@/components/ui/tones';
 import { FormError } from '@/components/ui/form-error';
 import { inputClass, labelClass } from '@/components/ui/form';
 import { SubmitButton } from '@/components/ui/submit-button';
@@ -23,13 +24,6 @@ interface Props {
   contractors: ContractorOption[];
   canManage: boolean;
 }
-
-const BIDDER_TONE: Record<BidderStatus, BadgeTone> = {
-  invited: 'blue',
-  viewing: 'amber',
-  submitted: 'green',
-  withdrawn: 'faint',
-};
 
 /** Invite form — toggles between "From contractors" and "New by email". */
 function InviteForm({
@@ -217,7 +211,7 @@ export function BiddersPanel({ tenderId, boqId, bidders, contractors, canManage 
                     <td className="px-4 py-3 font-medium">{b.companyName}</td>
                     <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{b.contactEmail}</td>
                     <td className="px-4 py-3">
-                      <Badge tone={BIDDER_TONE[b.status] ?? 'neutral'}>
+                      <Badge tone={BIDDER_STATUS_TONE[b.status] ?? 'neutral'}>
                         {BIDDER_STATUS_LABELS[b.status] ?? b.status}
                       </Badge>
                     </td>

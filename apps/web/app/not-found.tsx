@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 export default function NotFound() {
   return (
@@ -7,11 +8,8 @@ export default function NotFound() {
       <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
         We couldn’t find that page. It may have moved, or you may not have access to it.
       </p>
-      <Link
-        href="/dashboard"
-        className="mt-5 rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
-      >
-        Back to dashboard
+      <Link href="/dashboard" className="mt-5">
+        <Button>Back to dashboard</Button>
       </Link>
     </main>
   );

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { PageContainer } from '@/components/shell/page-container';
+import { PageHeader } from '@/components/ui/page-header';
 import { redirect, notFound } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { getProject } from '@/lib/data/projects';
@@ -68,14 +69,17 @@ export default async function ProjectTeamPage({
   return (
     <PageContainer width="3xl">
       <LiveRefresh subscriptions={[{ table: 'project_members', filter: `project_id=eq.${projectId}` }]} />
-      <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
-        ← {project.name}
-      </Link>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight">Team</h1>
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">
-        Members added here see only this project. Company owners, admins and finance see every
-        project automatically.
-      </p>
+      <PageHeader
+        backHref={`/projects/${projectId}`}
+        backLabel={project.name}
+        title="Team"
+        subtitle={
+          <>
+            Members added here see only this project. Company owners, admins and finance see every
+            project automatically.
+          </>
+        }
+      />
 
       {notice && (
         <p

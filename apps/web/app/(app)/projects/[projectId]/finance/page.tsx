@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import { PageContainer } from '@/components/shell/page-container';
+import { PageHeader } from '@/components/ui/page-header';
 import { redirect, notFound } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { getProject } from '@/lib/data/projects';
@@ -13,15 +13,9 @@ import { stepsByEntity } from '@/lib/data/approvals';
 import { LiveRefresh } from '@/components/live-refresh';
 import { Card, CardTitle, CardValue } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { PAYMENT_REQUEST_TONE } from '@/components/ui/tones';
 import { can, type OrgRole } from '@datumpro/shared/access';
-import { formatUsd, PAYMENT_REQUEST_STATUS_LABEL, type PaymentRequestStatus } from '@datumpro/shared/domain';
-
-const REQ_TONE: Record<PaymentRequestStatus, 'neutral' | 'blue' | 'green' | 'amber'> = {
-  requested: 'amber',
-  approved: 'blue',
-  paid: 'green',
-  rejected: 'neutral',
-};
+import { formatUsd, PAYMENT_REQUEST_STATUS_LABEL } from '@datumpro/shared/domain';
 
 export default async function FinancePage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
@@ -52,10 +46,7 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
           { table: 'approvals', filter: `org_id=eq.${project.org_id}` },
         ]}
       />
-      <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
-        ← {project.name}
-      </Link>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight">Finance</h1>
+      <PageHeader backHref={`/projects/${projectId}`} backLabel={project.name} title="Finance" />
 
       <section className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Card><CardTitle>Budget</CardTitle><CardValue>{formatUsd(budgetCents)}</CardValue></Card>
@@ -110,7 +101,7 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
                     </div>
                     <div className="flex shrink-0 items-center gap-3">
                       <span className="text-sm font-semibold tabular-nums">{formatUsd(r.amountCents)}</span>
-                      <Badge tone={REQ_TONE[r.status]}>{PAYMENT_REQUEST_STATUS_LABEL[r.status]}</Badge>
+                      <Badge tone={PAYMENT_REQUEST_TONE[r.status]}>{PAYMENT_REQUEST_STATUS_LABEL[r.status]}</Badge>
                     </div>
                   </div>
                   {r.status === 'paid' && (

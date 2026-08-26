@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { PageContainer } from '@/components/shell/page-container';
+import { PageHeader } from '@/components/ui/page-header';
 import { redirect, notFound } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { getProject } from '@/lib/data/projects';
@@ -23,14 +24,17 @@ export default async function ProjectSetupPage({
 
   return (
     <PageContainer width="xl">
-      <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
-        ← {project.name}
-      </Link>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight">Project setup</h1>
-      <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-        {pct}% complete
-        {outstanding > 0 ? ` · ${outstanding} item${outstanding === 1 ? '' : 's'} outstanding` : ' · all done 🎉'}
-      </p>
+      <PageHeader
+        backHref={`/projects/${projectId}`}
+        backLabel={project.name}
+        title="Project setup"
+        subtitle={
+          <>
+            {pct}% complete
+            {outstanding > 0 ? ` · ${outstanding} item${outstanding === 1 ? '' : 's'} outstanding` : ' · all done 🎉'}
+          </>
+        }
+      />
 
       <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
         <div className="h-2 rounded-full bg-brand-600 transition-all" style={{ width: `${pct}%` }} />
