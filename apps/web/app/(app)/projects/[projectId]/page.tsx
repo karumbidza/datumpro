@@ -6,10 +6,11 @@ import { LiveRefresh } from '@/components/live-refresh';
 import { getProject } from '@/lib/data/projects';
 import { getDashboardData } from '@/lib/data/dashboard';
 import { getProjectProgress, getProgressHistory } from '@/lib/data/subtasks';
-import { listProjectActivity } from '@/lib/data/tasks';
+import { listProjectActivityFull } from '@/lib/data/tasks';
+import { listProjectMembers } from '@/lib/data/members';
 import { TimelineOverview } from '@/components/dashboard/timeline-overview';
 import { ProgressTrend } from '@/components/dashboard/progress-trend';
-import { RecentActivity } from '@/components/project/recent-activity';
+import { ActivityPanel } from '@/components/project/activity-panel';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PRIORITY_TONE } from '@/components/ui/tones';
@@ -28,11 +29,12 @@ export default async function ProjectOverviewPage({
   const project = await getProject(projectId);
   if (!project) notFound();
 
-  const [{ tasks }, projectPct, history, activity] = await Promise.all([
+  const [{ tasks }, projectPct, history, activity, members] = await Promise.all([
     getDashboardData(project.org_id, projectId),
     getProjectProgress(projectId),
     getProgressHistory(projectId),
-    listProjectActivity(projectId),
+    listProjectActivityFull(projectId),
+    listProjectMembers(projectId),
   ]);
 
   return (
@@ -85,7 +87,11 @@ export default async function ProjectOverviewPage({
 
       <TimelineOverview tasks={tasks} />
 
-      <RecentActivity items={activity} projectId={projectId} />
+      <ActivityPanel
+        items={activity}
+        members={members.map((m) => ({ userId: m.userId, name: m.name }))}
+        projectId={projectId}
+      />
     </PageContainer>
   );
 }

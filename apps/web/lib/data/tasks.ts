@@ -25,6 +25,8 @@ export interface TaskActivityRow {
 export interface ProjectActivityRow extends TaskActivityRow {
   taskId: string;
   taskTitle: string;
+  /** Actor id — null for system events. Used to filter the full activity view by person. */
+  userId: string | null;
 }
 
 export interface ExtensionRequestRow {
@@ -262,9 +264,19 @@ export async function listProjectActivity(projectId: string, limit = 10): Promis
     message: r.message,
     createdAt: r.created_at,
     userName: r.user_id ? (names.get(r.user_id) ?? 'Member') : 'System',
+    userId: r.user_id,
     taskId: r.task_id,
     taskTitle: titles.get(r.task_id) ?? 'Task',
   }));
+}
+
+/** The full activity window for the drill-down view (modal + /activity page).
+ *  Filtering by type/person and day-grouping happen client-side off this window. */
+export async function listProjectActivityFull(
+  projectId: string,
+  limit = 100,
+): Promise<ProjectActivityRow[]> {
+  return listProjectActivity(projectId, limit);
 }
 
 /** Extension requests on a task, newest first, with requester names. */
