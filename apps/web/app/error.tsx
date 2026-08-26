@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { captureException } from '@/lib/observability/sentry';
+import { Button } from '@/components/ui/button';
 
 /** Route-segment error boundary. Reports the error, then offers a retry. */
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
@@ -16,12 +17,9 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
         An unexpected error interrupted this page. You can try again — if it keeps happening, let us
         know.
       </p>
-      <button
-        onClick={reset}
-        className="mt-5 rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
-      >
+      <Button onClick={reset} className="mt-5">
         Try again
-      </button>
+      </Button>
     </main>
   );
 }

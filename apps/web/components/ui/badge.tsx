@@ -8,6 +8,9 @@ const TONES = {
   amber: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
   orange: 'bg-orange-50 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400',
   red: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400',
+  // Roles (owner/admin) and "variation" categories that sit outside the
+  // priority/status colour language.
+  purple: 'bg-purple-50 text-purple-700 dark:bg-purple-500/15 dark:text-purple-400',
 } as const;
 
 export type BadgeTone = keyof typeof TONES;

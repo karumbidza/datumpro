@@ -5,6 +5,7 @@ import { listBoqs } from '@/lib/data/boq';
 import { listMyTenderInvites } from '@/lib/data/tender';
 import { ContractorTenderPortal } from './contractor-portal';
 import { PageContainer } from '@/components/shell/page-container';
+import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -31,21 +32,23 @@ export default async function BoqIndexPage() {
   const canEdit = ['owner', 'admin', 'pm'].includes(ctx.active.role);
 
   return (
-    <PageContainer width="5xl">
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Bills of Quantities</h1>
-          <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
+    <PageContainer width="6xl">
+      <PageHeader
+        title="Bills of Quantities"
+        subtitle={
+          <>
             Bills of quantities for{' '}
             <span className="font-medium text-brand-600 dark:text-brand-500">{ctx.active.name}</span>.
-          </p>
-        </div>
-        {canEdit && (
-          <Link href="/boq/new">
-            <Button>New BOQ</Button>
-          </Link>
-        )}
-      </div>
+          </>
+        }
+        actions={
+          canEdit ? (
+            <Link href="/boq/new">
+              <Button>New BOQ</Button>
+            </Link>
+          ) : undefined
+        }
+      />
 
       {boqs.length === 0 ? (
         <div className="mt-8 rounded-lg border border-zinc-200 dark:border-zinc-800">

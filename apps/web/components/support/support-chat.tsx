@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { Button } from '@/components/ui/button';
 
 type Msg = {
   id: string;
@@ -119,13 +120,9 @@ export function SupportChat({ orgId }: { orgId: string }) {
           placeholder="Message support…"
           className="min-h-0 flex-1 resize-y rounded-lg border border-zinc-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-zinc-800"
         />
-        <button
-          type="submit"
-          disabled={sending || !body.trim()}
-          className="rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
-        >
+        <Button type="submit" disabled={sending || !body.trim()}>
           Send
-        </button>
+        </Button>
       </form>
     </div>
   );

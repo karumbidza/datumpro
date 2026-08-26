@@ -11,6 +11,7 @@ import { getProjectSchedule, type ProjectSchedule } from '@/lib/data/scheduling'
 import { progressForTasks, getProjectProgress } from '@/lib/data/subtasks';
 import { tenderingTaskIds } from '@/lib/data/tenders';
 import { Button } from '@/components/ui/button';
+import { ListHeader } from '@/components/ui/list-header';
 import { ChevronRight } from '@/components/icons';
 import { parseDate, formatDayMonth } from '@/lib/date';
 import type { TaskStatus, TaskPriority } from '@datumpro/shared/domain';
@@ -240,19 +241,15 @@ export default async function TaskBoardPage({
       ) : (
         <div>
           {/* Frozen header row — sticky to the scrolling <main>, so the list uses
-              the full height and the header stays put while rows scroll under it.
-              Shares the grid template so columns align with rows. */}
-          <div
-            className="sticky top-0 z-10 grid items-center border-b border-zinc-200 bg-white/90 px-4 pb-2 pt-2 text-[10px] font-medium uppercase tracking-[0.05em] text-zinc-400 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90 dark:text-zinc-500"
-            style={GRID_STYLE}
-          >
+              the full height and the header stays put while rows scroll under it. */}
+          <ListHeader style={GRID_STYLE}>
             <div>Task / assignee</div>
             <div>Progress</div>
             <div className="text-right">%</div>
             <div className="text-center">Priority</div>
             <div className="text-center">Status</div>
             <div />
-          </div>
+          </ListHeader>
 
           <div className="flex flex-col gap-2 pt-2">
             {orderedTasks.map((t) => {

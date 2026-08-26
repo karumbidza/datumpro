@@ -5,6 +5,7 @@ import { can } from '@datumpro/shared/access';
 import { listProjectsOverview } from '@/lib/data/projects-overview';
 import { getActiveContext, getAuthUser } from '@/lib/data/org';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FolderOpen } from '@/components/icons';
 import { ProjectOverviewCard } from '@/components/projects/project-overview-card';
@@ -22,21 +23,21 @@ export default async function ProjectsPage() {
 
   return (
     <PageContainer width="6xl">
-      <header className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
-          {projects.length > 0 && (
-            <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
-              {projects.length} project{projects.length === 1 ? '' : 's'} · {portfolioPct}% overall progress
-            </p>
-          )}
-        </div>
-        {canCreate && (
-          <Link href="/projects/new">
-            <Button>New project</Button>
-          </Link>
-        )}
-      </header>
+      <PageHeader
+        title="Projects"
+        subtitle={
+          projects.length > 0
+            ? `${projects.length} project${projects.length === 1 ? '' : 's'} · ${portfolioPct}% overall progress`
+            : undefined
+        }
+        actions={
+          canCreate ? (
+            <Link href="/projects/new">
+              <Button>New project</Button>
+            </Link>
+          ) : undefined
+        }
+      />
 
       {projects.length === 0 ? (
         <EmptyState
