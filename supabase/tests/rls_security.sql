@@ -89,20 +89,9 @@ insert into public.boq_tenders (id, org_id, boq_id, title, status) values
   ('a3380000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a3330000-0000-0000-0000-000000000000','Tender A2 (contractor not invited)','open');
 insert into public.boq_bidders (id, org_id, tender_id, company_name, contact_email, invite_token, user_id, status) values
   ('a3370000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a3360000-0000-0000-0000-000000000000','Contractor A Ltd','contractor-a@test.dev','tok-a337','a0000000-0000-0000-0000-0000000000a2','invited');
-
--- Piece 3 (award→delivery bridge): a separate AWARDED tender on BOQ A, won by
--- contractor a2, with one priced line — exercises export_award_to_project.
--- boq_tenders.awarded_bidder_id ⇄ boq_bidders.tender_id form a circular FK, so
--- seed the tender first with no winner, add the winning bidder, then set the
--- winner (mirrors the real award flow; awarded_bidder_id is un-guarded, RPC-gated).
-insert into public.boq_tenders (id, org_id, boq_id, title, status, unsealed_at) values
-  ('a3390000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a3330000-0000-0000-0000-000000000000','Awarded Tender','awarded', now());
-insert into public.boq_bidders (id, org_id, tender_id, company_name, contact_email, invite_token, user_id, status, submitted_at) values
-  ('a33a0000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a3390000-0000-0000-0000-000000000000','Winner A Ltd','contractor-a@test.dev','tok-a33a','a0000000-0000-0000-0000-0000000000a2','submitted', now());
-update public.boq_tenders set awarded_bidder_id = 'a33a0000-0000-0000-0000-000000000000'
-  where id = 'a3390000-0000-0000-0000-000000000000';
-insert into public.boq_bid_items (org_id, bidder_id, boq_item_id, rate_cents, no_bid) values
-  ('a1110000-0000-0000-0000-000000000000','a33a0000-0000-0000-0000-000000000000','a3350000-0000-0000-0000-000000000000',300,false);
+-- NB: the AWARDED tender (a339) for the Piece 3 award-bridge tests is seeded
+-- later — after the role-split assertions — so it doesn't skew their tender
+-- counts (which are written for org A's two original open tenders).
 
 -- ── Tenant isolation: user A sees only org A ─────────────────────────────────
 set role authenticated;
@@ -232,6 +221,20 @@ select pg_temp.ok((select count(*) from public.tender_bill_lines('a3360000-0000-
 
 reset role;
 reset request.jwt.claims;
+
+-- Seed the AWARDED tender now (as superuser, RLS bypassed) — after the role-split
+-- assertions so it doesn't inflate their counts. boq_tenders.awarded_bidder_id ⇄
+-- boq_bidders.tender_id form a circular FK, so seed the tender with no winner,
+-- add the winning bidder, then set the winner (mirrors the real award flow;
+-- awarded_bidder_id is un-guarded — RPC-gated — so the update is safe).
+insert into public.boq_tenders (id, org_id, boq_id, title, status, unsealed_at) values
+  ('a3390000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a3330000-0000-0000-0000-000000000000','Awarded Tender','awarded', now());
+insert into public.boq_bidders (id, org_id, tender_id, company_name, contact_email, invite_token, user_id, status, submitted_at) values
+  ('a33a0000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a3390000-0000-0000-0000-000000000000','Winner A Ltd','contractor-a@test.dev','tok-a33a','a0000000-0000-0000-0000-0000000000a2','submitted', now());
+update public.boq_tenders set awarded_bidder_id = 'a33a0000-0000-0000-0000-000000000000'
+  where id = 'a3390000-0000-0000-0000-000000000000';
+insert into public.boq_bid_items (org_id, bidder_id, boq_item_id, rate_cents, no_bid) values
+  ('a1110000-0000-0000-0000-000000000000','a33a0000-0000-0000-0000-000000000000','a3350000-0000-0000-0000-000000000000',300,false);
 
 -- ── Piece 3: award→delivery bridge — auth guard + idempotency ─────────────────
 -- export_award_to_project() converts an awarded tender into a project + costed
