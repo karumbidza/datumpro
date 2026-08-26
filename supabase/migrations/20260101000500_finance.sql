@@ -24,7 +24,12 @@ create type public.payment_method   as enum ('paynow', 'bank_transfer', 'cash', 
 create type public.payment_status   as enum ('pending', 'confirmed', 'failed', 'refunded');
 create type public.pop_status       as enum ('submitted', 'verified', 'rejected');
 create type public.paynow_status    as enum ('created', 'sent', 'paid', 'cancelled', 'failed');
-create type public.variation_status as enum ('draft', 'approved', 'rejected');
+-- 'submitted' is appended (last, to match production's enum order) so that
+-- 20260101002000's `alter type … add value if not exists 'submitted'` is a no-op
+-- on a fresh apply. Postgres forbids ADDing an enum value and USING it in the same
+-- transaction (SQLSTATE 55P04), which broke `supabase db reset` / CI. Inert on any
+-- already-migrated database (this migration won't re-run there).
+create type public.variation_status as enum ('draft', 'approved', 'rejected', 'submitted');
 create type public.schedule_status  as enum ('pending', 'invoiced', 'paid');
 
 -- ── Budget / Bill of Quantities ──────────────────────────────────────────────
