@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import { PageContainer } from '@/components/shell/page-container';
+import { PageHeader } from '@/components/ui/page-header';
 import { redirect } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { NewReportForm } from './new-report-form';
@@ -19,10 +19,11 @@ export default async function NewReportPage({
 
   return (
     <PageContainer width="xl">
-      <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
-        ← Back to project
-      </Link>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight">New site report</h1>
+      <PageHeader
+        backHref={`/projects/${projectId}`}
+        backLabel="Back to project"
+        title="New site report"
+      />
 
       <Card className="mt-6">
         <NewReportForm projectId={projectId} today={today} />

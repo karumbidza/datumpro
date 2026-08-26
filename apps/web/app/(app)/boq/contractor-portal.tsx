@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { PageContainer } from '@/components/shell/page-container';
+import { PageHeader } from '@/components/ui/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -14,13 +15,15 @@ function fmtDate(iso: string | null): string {
 export function ContractorTenderPortal({ invites, orgName }: { invites: MyTenderInvite[]; orgName: string }) {
   return (
     <PageContainer width="5xl">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Tenders</h1>
-        <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
-          Tenders you&apos;ve been invited to price for{' '}
-          <span className="font-medium text-brand-600 dark:text-brand-500">{orgName}</span>.
-        </p>
-      </div>
+      <PageHeader
+        title="Tenders"
+        subtitle={
+          <>
+            Tenders you&apos;ve been invited to price for{' '}
+            <span className="font-medium text-brand-600 dark:text-brand-500">{orgName}</span>.
+          </>
+        }
+      />
 
       {invites.length === 0 ? (
         <div className="mt-8 rounded-lg border border-zinc-200 dark:border-zinc-800">

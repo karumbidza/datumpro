@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { PageContainer } from '@/components/shell/page-container';
+import { PageHeader } from '@/components/ui/page-header';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { getAuthUser } from '@/lib/data/org';
@@ -38,10 +39,10 @@ export default async function SupportPage({
 
   return (
     <PageContainer width="3xl">
-      <h1 className="text-2xl font-semibold tracking-tight">Support</h1>
-      <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-        Message the DatumPro team. We&apos;ll reply right here.
-      </p>
+      <PageHeader
+        title="Support"
+        subtitle={<>Message the DatumPro team. We&apos;ll reply right here.</>}
+      />
 
       {!configured ? (
         <p className="mt-8 text-sm text-zinc-500 dark:text-zinc-400">Support chat isn&apos;t available right now.</p>

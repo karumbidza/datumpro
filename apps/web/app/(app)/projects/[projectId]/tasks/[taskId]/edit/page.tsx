@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { PageContainer } from '@/components/shell/page-container';
+import { PageHeader } from '@/components/ui/page-header';
 import { redirect, notFound } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { getTask } from '@/lib/data/tasks';
@@ -26,10 +27,11 @@ export default async function EditTaskPage({
 
   return (
     <PageContainer width="xl">
-      <Link href={`/projects/${projectId}/tasks/${taskId}`} className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
-        ← {task.title}
-      </Link>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight">Edit task</h1>
+      <PageHeader
+        backHref={`/projects/${projectId}/tasks/${taskId}`}
+        backLabel={task.title}
+        title="Edit task"
+      />
 
       <Card className="mt-6">
         <form action={updateTask} className="space-y-4">

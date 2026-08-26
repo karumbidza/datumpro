@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import { PageContainer } from '@/components/shell/page-container';
+import { PageHeader } from '@/components/ui/page-header';
 import { redirect, notFound } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { getProject } from '@/lib/data/projects';
@@ -52,10 +52,7 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
           { table: 'approvals', filter: `org_id=eq.${project.org_id}` },
         ]}
       />
-      <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
-        ← {project.name}
-      </Link>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight">Finance</h1>
+      <PageHeader backHref={`/projects/${projectId}`} backLabel={project.name} title="Finance" />
 
       <section className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Card><CardTitle>Budget</CardTitle><CardValue>{formatUsd(budgetCents)}</CardValue></Card>

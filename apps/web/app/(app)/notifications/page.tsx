@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { PageContainer } from '@/components/shell/page-container';
+import { PageHeader } from '@/components/ui/page-header';
 import { redirect } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { listNotifications } from '@/lib/data/notifications';
@@ -30,10 +31,10 @@ export default async function NotificationsPage() {
     <PageContainer width="3xl">
       <LiveRefresh subscriptions={[{ table: 'notifications', filter: `user_id=eq.${user.id}` }]} />
       <MarkReadOnMount />
-      <h1 className="text-2xl font-semibold tracking-tight">Notifications</h1>
-      <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-        Task assignments, acceptances, and updates that need your attention.
-      </p>
+      <PageHeader
+        title="Notifications"
+        subtitle="Task assignments, acceptances, and updates that need your attention."
+      />
 
       {items.length === 0 ? (
         <EmptyState className="mt-4" icon={Bell} title="You're all caught up" hint="New task assignments and updates will land here." />

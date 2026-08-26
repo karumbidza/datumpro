@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { PageContainer } from '@/components/shell/page-container';
+import { PageHeader } from '@/components/ui/page-header';
 import { redirect } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { listMyOwed } from '@/lib/data/owed';
@@ -55,14 +56,17 @@ export default async function MyPaymentsPage() {
       <LiveRefresh
         subscriptions={[{ table: 'contractor_payment_requests', filter: `contractor_id=eq.${user.id}` }]}
       />
-      <Link href="/dashboard" className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
-        ← Dashboard
-      </Link>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight">Finance</h1>
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">
-        Your overall statement — what you&apos;re owed across your approved plans. You can also raise a
-        payment request from each task&apos;s Payment tab.
-      </p>
+      <PageHeader
+        backHref="/dashboard"
+        backLabel="Dashboard"
+        title="Finance"
+        subtitle={
+          <>
+            Your overall statement — what you&apos;re owed across your approved plans. You can also raise a
+            payment request from each task&apos;s Payment tab.
+          </>
+        }
+      />
 
       <section className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Card>

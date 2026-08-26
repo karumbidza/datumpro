@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { PageContainer } from '@/components/shell/page-container';
+import { PageHeader } from '@/components/ui/page-header';
 import { redirect, notFound } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { getProject } from '@/lib/data/projects';
@@ -32,13 +33,12 @@ export default async function ProjectSettingsPage({
 
   return (
     <PageContainer width="3xl">
-      <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
-        ← {project.name}
-      </Link>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight">Settings</h1>
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">
-        Manage this project — its team and its setup.
-      </p>
+      <PageHeader
+        backHref={`/projects/${projectId}`}
+        backLabel={project.name}
+        title="Settings"
+        subtitle="Manage this project — its team and its setup."
+      />
 
       <section className="mt-8 space-y-4">
         <Link href={`/projects/${projectId}/setup`} className="block">

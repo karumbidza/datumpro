@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import { PageContainer } from '@/components/shell/page-container';
+import { PageHeader } from '@/components/ui/page-header';
 import { redirect } from 'next/navigation';
 import { getActiveContext, getAuthUser } from '@/lib/data/org';
 import { listClients } from '@/lib/data/clients';
@@ -35,13 +35,16 @@ export default async function NewProjectPage() {
 
   return (
     <PageContainer width="xl">
-      <Link href="/projects" className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
-        ← Projects
-      </Link>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight">New project</h1>
-      <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
-        In organisation: <span className="font-medium text-brand-600 dark:text-brand-500">{ctx.active.name}</span>
-      </p>
+      <PageHeader
+        backHref="/projects"
+        backLabel="Projects"
+        title="New project"
+        subtitle={
+          <>
+            In organisation: <span className="font-medium text-brand-600 dark:text-brand-500">{ctx.active.name}</span>
+          </>
+        }
+      />
 
       <Card className="mt-6">
         <NewProjectForm

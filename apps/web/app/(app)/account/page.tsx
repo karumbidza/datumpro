@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { PageContainer } from '@/components/shell/page-container';
+import { PageHeader } from '@/components/ui/page-header';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveContext, getAuthUser } from '@/lib/data/org';
@@ -33,13 +34,12 @@ export default async function AccountPage() {
 
   return (
     <PageContainer width="xl">
-      <Link href="/dashboard" className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
-        ← Dashboard
-      </Link>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight">Account</h1>
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">
-        Your display name is shown on tasks, chat, and your team roster.
-      </p>
+      <PageHeader
+        backHref="/dashboard"
+        backLabel="Dashboard"
+        title="Account"
+        subtitle="Your display name is shown on tasks, chat, and your team roster."
+      />
 
       <Card className="mt-6">
         <CardTitle>Profile</CardTitle>

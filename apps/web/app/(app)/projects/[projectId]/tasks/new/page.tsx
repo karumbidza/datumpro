@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import { PageContainer } from '@/components/shell/page-container';
+import { PageHeader } from '@/components/ui/page-header';
 import { redirect, notFound } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { getProject } from '@/lib/data/projects';
@@ -34,10 +34,11 @@ export default async function NewTaskPage({
 
   return (
     <PageContainer width="xl">
-      <Link href={`/projects/${projectId}/tasks`} className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
-        ← Tasks
-      </Link>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight">New task</h1>
+      <PageHeader
+        backHref={`/projects/${projectId}/tasks`}
+        backLabel="Tasks"
+        title="New task"
+      />
 
       <Card className="mt-6">
         <NewTaskForm

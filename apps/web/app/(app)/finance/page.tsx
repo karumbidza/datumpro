@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { PageContainer } from '@/components/shell/page-container';
+import { PageHeader } from '@/components/ui/page-header';
 import { redirect } from 'next/navigation';
 import { getActiveContext } from '@/lib/data/org';
 import { can } from '@datumpro/shared/access';
@@ -34,13 +35,12 @@ export default async function OrgFinancePage() {
 
   return (
     <PageContainer width="6xl">
-      <Link href="/dashboard" className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
-        ← Dashboard
-      </Link>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight">Finance</h1>
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">
-        Contractor payments across every project in {ctx.active.name}.
-      </p>
+      <PageHeader
+        backHref="/dashboard"
+        backLabel="Dashboard"
+        title="Finance"
+        subtitle={<>Contractor payments across every project in {ctx.active.name}.</>}
+      />
 
       <section className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Card>

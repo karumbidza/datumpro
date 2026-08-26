@@ -5,6 +5,7 @@ import { listCalendarTasks } from '@/lib/data/project-calendar';
 import { ProjectCalendar } from '@/components/project/project-calendar';
 import { LiveRefresh } from '@/components/live-refresh';
 import { PageContainer } from '@/components/shell/page-container';
+import { PageHeader } from '@/components/ui/page-header';
 
 export default async function ProjectCalendarPage({
   params,
@@ -24,12 +25,10 @@ export default async function ProjectCalendarPage({
   return (
     <PageContainer width="6xl" className="space-y-8">
       <LiveRefresh subscriptions={[{ table: 'tasks', filter: `project_id=eq.${projectId}` }]} />
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Calendar</h1>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          {project.name} — tasks by scheduled date
-        </p>
-      </header>
+      <PageHeader
+        title="Calendar"
+        subtitle={<>{project.name} — tasks by scheduled date</>}
+      />
       <ProjectCalendar tasks={tasks} projectId={projectId} />
     </PageContainer>
   );
