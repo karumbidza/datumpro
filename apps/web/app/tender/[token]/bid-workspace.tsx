@@ -3,9 +3,9 @@
 import { useState, useTransition } from 'react';
 import type { BidWorkspace, BidSection } from '@/lib/data/tender';
 import { TENDER_STATUS_LABELS, BIDDER_STATUS_LABELS } from '@datumpro/shared/domain';
-import type { TenderStatus, BidderStatus } from '@datumpro/shared/domain';
 import { fmtMoney } from '@/lib/money';
-import { Badge, type BadgeTone } from '@/components/ui/badge';
+import { Badge } from '@/components/ui/badge';
+import { TENDER_STATUS_TONE, BIDDER_STATUS_TONE } from '@/components/ui/tones';
 import { saveBidRate, submitBid } from './actions';
 
 // ---------------------------------------------------------------------------
@@ -38,21 +38,6 @@ const numCell = `${cell} text-right font-mono tabular-nums`;
 // ---------------------------------------------------------------------------
 // Status badge mapping
 // ---------------------------------------------------------------------------
-
-const TENDER_TONE: Record<TenderStatus, BadgeTone> = {
-  draft: 'neutral',
-  open: 'green',
-  closed: 'amber',
-  awarded: 'blue',
-  cancelled: 'red',
-};
-
-const BIDDER_TONE: Record<BidderStatus, BadgeTone> = {
-  invited: 'neutral',
-  viewing: 'blue',
-  submitted: 'green',
-  withdrawn: 'faint',
-};
 
 // ---------------------------------------------------------------------------
 // Component
@@ -157,10 +142,10 @@ export function BidWorkspaceView({ ws, token }: { ws: BidWorkspace; token: strin
             {ws.title}
           </h1>
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
-            <Badge tone={TENDER_TONE[ws.status] ?? 'neutral'}>
+            <Badge tone={TENDER_STATUS_TONE[ws.status] ?? 'neutral'}>
               {TENDER_STATUS_LABELS[ws.status] ?? ws.status}
             </Badge>
-            <Badge tone={BIDDER_TONE[ws.bidderStatus] ?? 'neutral'}>
+            <Badge tone={BIDDER_STATUS_TONE[ws.bidderStatus] ?? 'neutral'}>
               {BIDDER_STATUS_LABELS[ws.bidderStatus] ?? ws.bidderStatus}
             </Badge>
             <span className="text-xs text-zinc-500 dark:text-zinc-400">
