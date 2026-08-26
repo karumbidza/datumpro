@@ -33,6 +33,17 @@ begin
   end if;
 end $$;
 
+-- Platform baseline: hosted Supabase grants anon/authenticated/service_role the
+-- default table GRANTs via ALTER DEFAULT PRIVILEGES, and RLS (per-role policies,
+-- or their absence for anon) is what actually gates access. A bare local/CI
+-- stack that only replays these migrations doesn't apply those platform default
+-- privileges, so table access would be denied before RLS is ever reached.
+-- Establish the same baseline here so the suite exercises RLS, not raw grants —
+-- this mirrors production and matches the anon-holds-grants model asserted below.
+grant usage on schema public to anon, authenticated, service_role;
+grant all on all tables in schema public to anon, authenticated, service_role;
+grant all on all sequences in schema public to anon, authenticated, service_role;
+
 -- ── Seed (as superuser, RLS bypassed) ────────────────────────────────────────
 -- Org A and Org B: two separate tenants (no MFA). Org M: requires MFA.
 insert into auth.users (id, email) values
