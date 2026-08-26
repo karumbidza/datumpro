@@ -35,3 +35,6 @@ bid panel redesign/
 # Downloaded OAuth / service-account credential files — never commit
 client_secret*.json
 *-credentials.json
+
+# Codex CLI local config (untracked)
+.codex/
