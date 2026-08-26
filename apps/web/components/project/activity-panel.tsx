@@ -5,23 +5,26 @@ import Link from 'next/link';
 import { Activity, ChevronRight, X } from '@/components/icons';
 import { ActivityPreview } from './activity-preview';
 import { ActivityFeed, type ActivityFeedMember } from './activity-feed';
+import { activityPreviewCount } from './activity-format';
 import type { ProjectActivityRow } from '@/lib/data/tasks';
-
-const PREVIEW_COUNT = 5;
 
 /* Recent Activity on the project overview: a slim preview of the latest events
  * with a drill-down into the full log — an overlay modal that is also the real
- * /activity page (for shared/refreshed links and mobile). */
+ * /activity page (for shared/refreshed links and mobile). The preview length
+ * adapts to the timeline's height (driven by taskCount) so the stack stays uniform. */
 export function ActivityPanel({
   items,
   members,
   projectId,
+  taskCount,
 }: {
   items: ProjectActivityRow[];
   members: ActivityFeedMember[];
   projectId: string;
+  taskCount: number;
 }) {
   const [open, setOpen] = useState(false);
+  const previewCount = activityPreviewCount(taskCount);
 
   useEffect(() => {
     if (!open) return;
@@ -45,7 +48,7 @@ export function ActivityPanel({
             Recent activity
           </h2>
         </div>
-        {items.length > PREVIEW_COUNT && (
+        {items.length > previewCount && (
           <button
             type="button"
             onClick={() => setOpen(true)}
@@ -57,7 +60,7 @@ export function ActivityPanel({
         )}
       </div>
 
-      <ActivityPreview items={items.slice(0, PREVIEW_COUNT)} projectId={projectId} />
+      <ActivityPreview items={items.slice(0, previewCount)} projectId={projectId} />
 
       {open && (
         <div

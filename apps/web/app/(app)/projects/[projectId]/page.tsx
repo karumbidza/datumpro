@@ -91,6 +91,7 @@ export default async function ProjectOverviewPage({
         items={activity}
         members={members.map((m) => ({ userId: m.userId, name: m.name }))}
         projectId={projectId}
+        taskCount={tasks.length}
       />
     </PageContainer>
   );

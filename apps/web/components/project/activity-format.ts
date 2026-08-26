@@ -24,6 +24,24 @@ export function dotClass(type: string): string {
   return ACTIVITY_DOT[type] ?? 'bg-zinc-400 dark:bg-zinc-500';
 }
 
+/* Keep the Recent Activity preview sized so the Timeline + Activity stack stays
+ * roughly uniform in height regardless of task count. The Timeline body is capped
+ * at 480px (54px rows), so a project with ~9+ tasks maxes the timeline and just
+ * scrolls — there we show the fewest activity rows (3); shorter timelines get more
+ * rows to fill the slack, up to 5. Task count fully determines timeline height. */
+const TIMELINE_MAX_H = 480;
+const TIMELINE_ROW_H = 54;
+const ACTIVITY_ROW_H = 34;
+const MIN_PREVIEW = 3;
+const MAX_PREVIEW = 5;
+
+export function activityPreviewCount(taskCount: number): number {
+  const timelineH = Math.min(taskCount * TIMELINE_ROW_H, TIMELINE_MAX_H);
+  const slack = TIMELINE_MAX_H - timelineH; // px the timeline falls short of its max
+  const count = MIN_PREVIEW + Math.round(slack / ACTIVITY_ROW_H);
+  return Math.max(MIN_PREVIEW, Math.min(count, MAX_PREVIEW));
+}
+
 export function typeLabel(type: string): string {
   return ACTIVITY_LABELS[type] ?? type.replace(/_/g, ' ');
 }
