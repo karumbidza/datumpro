@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { ChevronRight } from '@/components/icons';
 import type { PendingApproval, ApprovalKind } from '@/lib/data/home';
 
@@ -20,10 +21,10 @@ const DOT: Record<ApprovalKind, string> = {
   extension: 'bg-amber-400',
   variation: 'bg-purple-400',
 };
-const CHIP: Record<ApprovalKind, string> = {
-  signoff: 'bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400',
-  extension: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
-  variation: 'bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400',
+const KIND_TONE: Record<ApprovalKind, BadgeTone> = {
+  signoff: 'blue',
+  extension: 'amber',
+  variation: 'purple',
 };
 
 const ACTIONS: Record<ApprovalKind, { primary: string; secondary: string }> = {
@@ -76,8 +77,8 @@ export function ApprovalsInbox({ items }: { items: PendingApproval[] }) {
                 aria-expanded={open}
               >
                 <span className={`size-2 shrink-0 rounded-full ${DOT[t.kind]}`} />
-                <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${CHIP[t.kind]}`}>
-                  {KIND_LABEL[t.kind]}
+                <span className="shrink-0">
+                  <Badge tone={KIND_TONE[t.kind]}>{KIND_LABEL[t.kind]}</Badge>
                 </span>
                 <span className="shrink-0 truncate text-sm font-medium">{t.title}</span>
                 <span className="min-w-0 flex-1 truncate text-xs text-zinc-500 dark:text-zinc-400">
