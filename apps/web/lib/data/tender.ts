@@ -50,7 +50,7 @@ export interface BidWorkspace {
   bidderStatus: BidderStatus;
   companyName: string;
   sections: BidSection[];
-  myRates: Record<string, { rateCents: number; noBid: boolean; note: string | null }>;
+  myRates: Record<string, { rateCents: number; noBid: boolean; note: string | null; durationDays: number | null }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -211,7 +211,7 @@ export async function getBidWorkspace(token: string): Promise<BidWorkspace | nul
   // 4. Load this bidder's existing rates (RLS scopes to own rows).
   const { data: rateRows } = await supabase
     .from('boq_bid_items')
-    .select('boq_item_id, rate_cents, no_bid, note')
+    .select('boq_item_id, rate_cents, no_bid, note, duration_days')
     .eq('bidder_id', b.id);
 
   type RateRow = {
@@ -219,14 +219,16 @@ export async function getBidWorkspace(token: string): Promise<BidWorkspace | nul
     rate_cents: number | string | null;
     no_bid: boolean | null;
     note: string | null;
+    duration_days: number | null;
   };
 
-  const myRates: Record<string, { rateCents: number; noBid: boolean; note: string | null }> = {};
+  const myRates: Record<string, { rateCents: number; noBid: boolean; note: string | null; durationDays: number | null }> = {};
   for (const r of (rateRows ?? []) as unknown as RateRow[]) {
     myRates[r.boq_item_id] = {
       rateCents: n(r.rate_cents),
       noBid: !!r.no_bid,
       note: r.note,
+      durationDays: r.duration_days,
     };
   }
 
@@ -267,7 +269,13 @@ export interface CompareBidder {
   totalLines: number;
   coveragePct: number;
   isComplete: boolean;
-  rates: Record<string, { rateCents: number; amountCents: number; noBid: boolean }>;
+  /** Sum of the bidder's proposed working days across priced lines (0 = none given). */
+  totalDays: number;
+  /** Forward-pass programme length over the bill's section links using this
+   *  bidder's durations — a working-day count, calendar-agnostic. Null when the
+   *  bidder gave no durations. */
+  programmeDays: number | null;
+  rates: Record<string, { rateCents: number; amountCents: number; noBid: boolean; durationDays: number | null }>;
 }
 export interface TenderComparison {
   tenderId: string;
@@ -349,6 +357,7 @@ export async function getTenderComparison(
 
   // Build sections, compute budget amounts, collect flat item qty map.
   const qtyMap = new Map<string, number>();
+  const sectionOfItem = new Map<string, string>();
   let budgetTotalCents = 0;
 
   const sections: CompareSection[] = (boq.boq_sections ?? [])
@@ -365,10 +374,26 @@ export async function getTenderComparison(
           const budgetRateCents = n(it.budget_rate_cents);
           const budgetAmountCents = Math.round(qty * budgetRateCents);
           qtyMap.set(it.id, qty);
+          sectionOfItem.set(it.id, s.id);
           budgetTotalCents += budgetAmountCents;
           return { itemId: it.id, description: it.description, uom: it.uom, qty, budgetRateCents, budgetAmountCents };
         }),
     }));
+
+  // Programme links for this bill — drive the per-bidder programme length.
+  const sectionIds = sections.map((s) => s.sectionId);
+  let sectionDeps: { section_id: string; depends_on_id: string }[] = [];
+  if (sectionIds.length > 0) {
+    const { data: depRows } = await supabase
+      .from('boq_section_deps')
+      .select('section_id, depends_on_id')
+      .in('section_id', sectionIds);
+    sectionDeps = (depRows ?? []) as { section_id: string; depends_on_id: string }[];
+  }
+  const depsOf = new Map<string, string[]>();
+  for (const d of sectionDeps) {
+    depsOf.set(d.section_id, [...(depsOf.get(d.section_id) ?? []), d.depends_on_id]);
+  }
 
   // 3. Load submitted bidders.
   const { data: biddersRaw } = await supabase
@@ -387,13 +412,14 @@ export async function getTenderComparison(
     boq_item_id: string;
     rate_cents: number | string | null;
     no_bid: boolean | null;
+    duration_days: number | null;
   };
 
   let bidItemRows: BidItemRow[] = [];
   if (bidderIds.length > 0) {
     const { data: bidItemsRaw } = await supabase
       .from('boq_bid_items')
-      .select('bidder_id, boq_item_id, rate_cents, no_bid')
+      .select('bidder_id, boq_item_id, rate_cents, no_bid, duration_days')
       .in('bidder_id', bidderIds);
     bidItemRows = (bidItemsRaw ?? []) as unknown as BidItemRow[];
   }
@@ -413,14 +439,37 @@ export async function getTenderComparison(
     const rates: CompareBidder['rates'] = {};
     let totalCents = 0;
     let pricedLines = 0;
+    const secDays = new Map<string, number>();
+    let totalDays = 0;
     for (const row of rows) {
       const noBid = !!row.no_bid;
       const rateCents = n(row.rate_cents);
       const qty = qtyMap.get(row.boq_item_id) ?? 0;
       const amountCents = noBid ? 0 : Math.round(qty * rateCents);
-      rates[row.boq_item_id] = { rateCents, amountCents, noBid };
+      const durationDays = noBid ? null : row.duration_days;
+      rates[row.boq_item_id] = { rateCents, amountCents, noBid, durationDays };
       totalCents += amountCents;
       if (!noBid && row.rate_cents != null) pricedLines += 1;
+      if (durationDays != null) {
+        totalDays += durationDays;
+        const sec = sectionOfItem.get(row.boq_item_id);
+        if (sec) secDays.set(sec, (secDays.get(sec) ?? 0) + durationDays);
+      }
+    }
+    // Programme length: longest dependency path, days additive (cycles are
+    // rejected at link creation, so plain memoised recursion is safe).
+    let programmeDays: number | null = null;
+    if (totalDays > 0) {
+      const memo = new Map<string, number>();
+      const finish = (sid: string): number => {
+        const hit = memo.get(sid);
+        if (hit !== undefined) return hit;
+        const preds = depsOf.get(sid) ?? [];
+        const v = (secDays.get(sid) ?? 0) + (preds.length ? Math.max(...preds.map(finish)) : 0);
+        memo.set(sid, v);
+        return v;
+      };
+      programmeDays = Math.max(0, ...sections.map((s) => finish(s.sectionId)));
     }
     const varianceCents = totalCents - budgetTotalCents;
     const variancePct = budgetTotalCents > 0 ? varianceCents / budgetTotalCents : 0;
@@ -436,6 +485,8 @@ export async function getTenderComparison(
       totalLines,
       coveragePct,
       isComplete,
+      totalDays,
+      programmeDays,
       rates,
     };
   });

@@ -10,7 +10,11 @@ export const dynamic = 'force-dynamic';
  */
 
 const PULSE_URL = process.env.PULSE_URL;
-const SECRET = process.env.ADMIN_ADAPTER_SECRET;
+// Distinct from ADMIN_ADAPTER_SECRET (the inbound admin control-plane secret) so a
+// leak of the support-forwarding token can't drive privileged member mutations.
+// Falls back to ADMIN_ADAPTER_SECRET until SUPPORT_BRIDGE_SECRET is provisioned
+// (and Pulse is updated to accept it for the support channel).
+const SECRET = process.env.SUPPORT_BRIDGE_SECRET ?? process.env.ADMIN_ADAPTER_SECRET;
 
 async function authorize(orgId: string) {
   if (!PULSE_URL || !SECRET) {

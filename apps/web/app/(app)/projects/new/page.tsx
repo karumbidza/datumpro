@@ -5,6 +5,7 @@ import { getActiveContext, getAuthUser } from '@/lib/data/org';
 import { listClients } from '@/lib/data/clients';
 import { listWorkCalendars } from '@/lib/data/calendars';
 import { listOrgMembers } from '@/lib/data/org-members';
+import { listUnlinkedBoqs } from '@/lib/data/boq';
 import { NewProjectForm } from './new-project-form';
 import { Card } from '@/components/ui/card';
 
@@ -16,10 +17,11 @@ export default async function NewProjectPage() {
   if (!ctx?.active) redirect('/orgs/new');
   const orgId = ctx.active.orgId;
 
-  const [clients, calendars, members] = await Promise.all([
+  const [clients, calendars, members, boqs] = await Promise.all([
     listClients(orgId),
     listWorkCalendars(orgId),
     listOrgMembers(orgId),
+    listUnlinkedBoqs(orgId),
   ]);
   // Only people who can actually run a project may be its PM — owners, admins,
   // and project managers. (Contractors/clients/viewers are blocked from the PM
@@ -54,6 +56,7 @@ export default async function NewProjectPage() {
           teamOptions={teamOptions}
           currentUserId={user.id}
           defaultCalendarId={defaultCalendarId}
+          boqs={boqs}
         />
       </Card>
     </PageContainer>

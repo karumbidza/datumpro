@@ -239,8 +239,12 @@ set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"
 do $$
 declare v_proj uuid;
 begin
-  select public.export_award_to_project('a3390000-0000-0000-0000-000000000000', null, 'Delivery A') into v_proj;
+  select (public.export_award_to_project('a3390000-0000-0000-0000-000000000000', null, 'Delivery A')->>'project_id')::uuid
+    into v_proj;
   perform pg_temp.ok(v_proj is not null, 'bridge: staff export returns a project id');
+  perform pg_temp.ok(
+    (select project_id from public.boqs where id = 'a3330000-0000-0000-0000-000000000000') = v_proj,
+    'bridge: standalone BOQ linked to the delivery project on export');
   perform pg_temp.ok(
     (select awarded_project_id from public.boq_tenders where id = 'a3390000-0000-0000-0000-000000000000') = v_proj,
     'bridge: tender linked to the delivery project');
@@ -767,6 +771,239 @@ select pg_temp.ok(
      where id = 'c2a00000-0000-0000-0000-000000000003')
     = 'c2b00000-0000-0000-0000-0000000000d1',
   'P2-D-4: boq_tenders.awarded_bidder_id set to the winning bidder');
+
+-- ── Project↔BOQ: generate_tasks_from_boq — guards, numbering, budget pricing ──
+-- Fixtures use the a4… range (BOQ A a333… is consumed by the Piece-3 export
+-- test above). Nested section + imported item_no exercise depth-first numbering
+-- and the item_no-preferred subtask titles.
+reset role;
+reset request.jwt.claims;
+insert into public.boqs (id, org_id, name) values
+  ('a4330000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','BOQ Gen');
+insert into public.boq_sections (id, org_id, boq_id, name, position) values
+  ('a4340000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a4330000-0000-0000-0000-000000000000','Substructure', 0);
+insert into public.boq_sections (id, org_id, boq_id, name, position, parent_id) values
+  ('a4341000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a4330000-0000-0000-0000-000000000000','Groundworks', 0,
+   'a4340000-0000-0000-0000-000000000000');
+insert into public.boq_items (id, org_id, section_id, description, uom, qty, budget_rate_cents, item_no) values
+  ('a4350000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a4341000-0000-0000-0000-000000000000','Excavate','m³',10,250,'1.6'),
+  ('a4351000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a4341000-0000-0000-0000-000000000000','Backfill','m³',4,100,null);
+insert into public.projects (id, org_id, name) values
+  ('a4220000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','Gen Project');
+
+set role authenticated;
+-- Outsider (org B member) blocked by the coalesced guard.
+set request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-0000000000b1","role":"authenticated","aal":"aal1"}';
+do $$
+begin
+  perform public.generate_tasks_from_boq('a4330000-0000-0000-0000-000000000000','a4220000-0000-0000-0000-000000000000');
+  raise exception 'FAIL: gen: outsider generated tasks';
+exception when others then
+  if position('not authorised' in SQLERRM) > 0 then raise notice 'PASS: gen: outsider blocked.';
+  else raise; end if;
+end $$;
+
+-- Staff generates: 1 task (only the sub-section holds items), numbered depth-
+-- first, unassigned, subtasks priced at budget with item_no preferred, BOQ linked.
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+do $$
+declare v jsonb;
+begin
+  select public.generate_tasks_from_boq('a4330000-0000-0000-0000-000000000000','a4220000-0000-0000-0000-000000000000') into v;
+  perform pg_temp.ok((v->>'tasks')::int = 1 and (v->>'subtasks')::int = 2, 'gen: 1 task / 2 subtasks created');
+  perform pg_temp.ok((v->>'total_cents')::bigint = 2900, 'gen: total = 10×250 + 4×100');
+  perform pg_temp.ok(
+    exists (select 1 from public.tasks
+            where project_id = 'a4220000-0000-0000-0000-000000000000'
+              and title = '1.1. Groundworks' and assignee_id is null
+              and boq_section_id = 'a4341000-0000-0000-0000-000000000000'),
+    'gen: task titled from depth-first numbering, unassigned, traced to section');
+  perform pg_temp.ok(
+    exists (select 1 from public.task_subtasks
+            where boq_item_id = 'a4350000-0000-0000-0000-000000000000'
+              and title like '1.6 Excavate%' and cost_cents = 2500),
+    'gen: subtask keeps imported item_no + budget pricing');
+  perform pg_temp.ok(
+    (select project_id from public.boqs where id = 'a4330000-0000-0000-0000-000000000000')
+      = 'a4220000-0000-0000-0000-000000000000',
+    'gen: BOQ linked to the project');
+end $$;
+
+-- Second generate is blocked (idempotent).
+do $$
+begin
+  perform public.generate_tasks_from_boq('a4330000-0000-0000-0000-000000000000','a4220000-0000-0000-0000-000000000000');
+  raise exception 'FAIL: gen: double generate not blocked';
+exception when others then
+  if position('already generated' in SQLERRM) > 0 then raise notice 'PASS: gen: double generate blocked.';
+  else raise; end if;
+end $$;
+reset role;
+reset request.jwt.claims;
+
+-- Assigning a generated task must NOT wipe its bill lines: the reassignment-
+-- cleanup trigger (set_task_pending_on_assign) now keeps boq_item_id subtasks
+-- and clears only personal-plan lines. Contractor a2 is enrolled, then assigned.
+insert into public.project_members (org_id, project_id, user_id, role) values
+  ('a1110000-0000-0000-0000-000000000000','a4220000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000a2','contractor');
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+do $$
+declare v_task uuid;
+begin
+  select t.id into v_task from public.tasks t
+    where t.project_id = 'a4220000-0000-0000-0000-000000000000'
+      and t.boq_section_id = 'a4341000-0000-0000-0000-000000000000';
+  update public.tasks set assignee_id = 'a0000000-0000-0000-0000-0000000000a2' where id = v_task;
+  perform pg_temp.ok(
+    (select count(*) from public.task_subtasks where task_id = v_task and boq_item_id is not null) = 2,
+    'assign: BOQ-generated subtasks survive assignment');
+  perform pg_temp.ok(
+    (select acceptance_status from public.tasks where id = v_task) = 'pending',
+    'assign: acceptance goes pending for the contractor as before');
+  -- roll the assignment back for the reprice test below (fresh unassigned task)
+  update public.tasks set assignee_id = null, acceptance_status = null where id = v_task;
+end $$;
+reset role;
+reset request.jwt.claims;
+
+-- ── Project↔BOQ: award repricing of pre-generated tasks ───────────────────────
+-- Reuses the a4… fixtures: BOQ Gen is linked to Gen Project and holds generated
+-- unassigned tasks. A tender awarded to contractor a2 must take REPRICE mode:
+-- assign the winner, move priced lines to bid rates, keep no-bid lines at
+-- budget, and never create a new project.
+insert into public.boq_tenders (id, org_id, boq_id, title, status, unsealed_at) values
+  ('a4360000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a4330000-0000-0000-0000-000000000000','Gen Tender','awarded', now());
+insert into public.boq_bidders (id, org_id, tender_id, company_name, contact_email, invite_token, user_id, status, submitted_at) values
+  ('a4370000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a4360000-0000-0000-0000-000000000000','Winner A Ltd','contractor-a@test.dev','tok-a437','a0000000-0000-0000-0000-0000000000a2','submitted', now());
+update public.boq_tenders set awarded_bidder_id = 'a4370000-0000-0000-0000-000000000000'
+  where id = 'a4360000-0000-0000-0000-000000000000';
+-- Winner prices Excavate (400/unit); no-bids Backfill (stays at budget;
+-- rate_cents is NOT NULL so a no-bid row carries 0 + the flag).
+insert into public.boq_bid_items (org_id, bidder_id, boq_item_id, rate_cents, no_bid) values
+  ('a1110000-0000-0000-0000-000000000000','a4370000-0000-0000-0000-000000000000','a4350000-0000-0000-0000-000000000000',400,false),
+  ('a1110000-0000-0000-0000-000000000000','a4370000-0000-0000-0000-000000000000','a4351000-0000-0000-0000-000000000000',0,true);
+
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+do $$
+declare v jsonb;
+begin
+  select public.export_award_to_project('a4360000-0000-0000-0000-000000000000', null, null) into v;
+  perform pg_temp.ok(v->>'mode' = 'repriced', 'reprice: linked BOQ with tasks takes reprice mode');
+  perform pg_temp.ok((v->>'project_id')::uuid = 'a4220000-0000-0000-0000-000000000000',
+    'reprice: no new project — the linked project is used');
+  perform pg_temp.ok((v->>'budget_kept_lines')::int = 1, 'reprice: no-bid line kept at budget, reported');
+  perform pg_temp.ok(
+    (select cost_cents from public.task_subtasks where boq_item_id = 'a4350000-0000-0000-0000-000000000000') = 4000,
+    'reprice: priced line moved to bid rate (10×400)');
+  perform pg_temp.ok(
+    (select cost_cents from public.task_subtasks where boq_item_id = 'a4351000-0000-0000-0000-000000000000') = 400,
+    'reprice: no-bid line still at budget (4×100)');
+  perform pg_temp.ok(
+    exists (select 1 from public.tasks
+            where project_id = 'a4220000-0000-0000-0000-000000000000'
+              and boq_section_id = 'a4341000-0000-0000-0000-000000000000'
+              and assignee_id = 'a0000000-0000-0000-0000-0000000000a2'
+              and acceptance_status = 'accepted'
+              and awarded_cost_cents = 4400),
+    'reprice: task assigned to winner, accepted, cost locked to subtask sum');
+end $$;
+reset role;
+reset request.jwt.claims;
+
+-- ── BOQ programme: durations, dependencies, scheduler, bill-line guard ────────
+-- Fresh a7… fixtures: bill with A (2+3d), B (4d, after A), C (2d, independent).
+reset role; reset request.jwt.claims;
+insert into public.boqs (id, org_id, name) values
+  ('a7330000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','BOQ Prog');
+insert into public.boq_sections (id, org_id, boq_id, name, position) values
+  ('a7340000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a7330000-0000-0000-0000-000000000000','A Substructure', 0),
+  ('a7341000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a7330000-0000-0000-0000-000000000000','B Superstructure', 1),
+  ('a7342000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a7330000-0000-0000-0000-000000000000','C Siteworks', 2);
+insert into public.boq_items (id, org_id, section_id, description, qty, budget_rate_cents, duration_days) values
+  ('a7350000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a7340000-0000-0000-0000-000000000000','Excavate',1,100,2),
+  ('a7351000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a7340000-0000-0000-0000-000000000000','Concrete',1,100,3),
+  ('a7352000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a7341000-0000-0000-0000-000000000000','Brickwork',1,100,4),
+  ('a7353000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a7342000-0000-0000-0000-000000000000','Paving',1,100,2);
+insert into public.boq_section_deps (org_id, section_id, depends_on_id) values
+  ('a1110000-0000-0000-0000-000000000000','a7341000-0000-0000-0000-000000000000','a7340000-0000-0000-0000-000000000000');
+insert into public.projects (id, org_id, name) values
+  ('a7220000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','Prog Project');
+
+-- Cycle guard on the dep table itself.
+do $$
+begin
+  insert into public.boq_section_deps (org_id, section_id, depends_on_id) values
+    ('a1110000-0000-0000-0000-000000000000','a7340000-0000-0000-0000-000000000000','a7341000-0000-0000-0000-000000000000');
+  raise exception 'FAIL: prog: dependency cycle accepted';
+exception when others then
+  if position('loop' in SQLERRM) > 0 then raise notice 'PASS: prog: dependency cycle rejected.';
+  else raise; end if;
+end $$;
+
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+do $$
+declare v jsonb; v_a_end date; v_b_start date; v_b_end date; v_c_start date;
+begin
+  perform public.generate_tasks_from_boq('a7330000-0000-0000-0000-000000000000','a7220000-0000-0000-0000-000000000000');
+  perform pg_temp.ok(
+    (select agreed_duration_days from public.tasks where boq_section_id = 'a7340000-0000-0000-0000-000000000000') = 5,
+    'prog: durations roll up (2+3 = 5 days)');
+  perform pg_temp.ok(
+    exists (select 1 from public.task_dependencies d
+            join public.tasks ts on ts.id = d.successor_id
+            join public.tasks tp on tp.id = d.predecessor_id
+            where ts.boq_section_id = 'a7341000-0000-0000-0000-000000000000'
+              and tp.boq_section_id = 'a7340000-0000-0000-0000-000000000000'),
+    'prog: section link copied to task_dependencies');
+
+  select public.schedule_boq_tasks('a7220000-0000-0000-0000-000000000000','a7330000-0000-0000-0000-000000000000', current_date) into v;
+  perform pg_temp.ok((v->>'scheduled')::int = 3, 'prog: scheduler placed all 3 tasks');
+  select planned_end_date into v_a_end from public.tasks where boq_section_id = 'a7340000-0000-0000-0000-000000000000';
+  select planned_start_date, planned_end_date into v_b_start, v_b_end from public.tasks where boq_section_id = 'a7341000-0000-0000-0000-000000000000';
+  select planned_start_date into v_c_start from public.tasks where boq_section_id = 'a7342000-0000-0000-0000-000000000000';
+  perform pg_temp.ok(v_c_start = current_date, 'prog: independent section starts day one (concurrent)');
+  perform pg_temp.ok(v_b_start = v_a_end + 1 and v_b_end = v_b_start + 3,
+    'prog: dependent section chains after its predecessor');
+  perform pg_temp.ok(
+    (select due_date from public.tasks where boq_section_id = 'a7341000-0000-0000-0000-000000000000') = v_b_end,
+    'prog: due_date = planned end (SLA)');
+end $$;
+reset role; reset request.jwt.claims;
+
+-- Bill-line guard: the assignee can tick, but never delete or reprice bill lines.
+insert into public.project_members (org_id, project_id, user_id, role) values
+  ('a1110000-0000-0000-0000-000000000000','a7220000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000a2','contractor');
+update public.tasks set assignee_id = 'a0000000-0000-0000-0000-0000000000a2'
+  where boq_section_id = 'a7340000-0000-0000-0000-000000000000';
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+do $$
+declare v_line uuid;
+begin
+  select id into v_line from public.task_subtasks where boq_item_id = 'a7350000-0000-0000-0000-000000000000';
+  begin
+    delete from public.task_subtasks where id = v_line;
+    raise exception 'FAIL: prog guard: contractor deleted a bill line';
+  exception when others then
+    if position('variation' in SQLERRM) > 0 then raise notice 'PASS: prog guard: bill-line delete blocked.';
+    else raise; end if;
+  end;
+  begin
+    update public.task_subtasks set cost_cents = 1 where id = v_line;
+    raise exception 'FAIL: prog guard: contractor repriced a bill line';
+  exception when others then
+    if position('fixed scope' in SQLERRM) > 0 then raise notice 'PASS: prog guard: bill-line reprice blocked.';
+    else raise; end if;
+  end;
+  update public.task_subtasks set is_done = true, done_at = now() where id = v_line;
+  perform pg_temp.ok(
+    (select is_done from public.task_subtasks where id = v_line) = true,
+    'prog guard: contractor can still tick a bill line done');
+end $$;
+reset role; reset request.jwt.claims;
 
 rollback;
 

@@ -155,6 +155,13 @@ export async function resendBidInvite(formData: FormData): Promise<void> {
     } | null;
 
     if (b && b.status !== 'withdrawn' && b.invite_token) {
+      // Resend ROTATES the link: the RPC issues a fresh token (staff-guarded),
+      // so a stale forwarded email goes dead. Falls back to the current token
+      // only if rotation is refused (e.g. already submitted — UI hides those).
+      const { data: rotated } = await supabase.rpc('rotate_bid_invite_token', {
+        p_bidder_id: bidderId,
+      });
+      const token = (rotated as unknown as string | null) ?? b.invite_token;
       try {
         const [{ data: org }, { data: tender }] = await Promise.all([
           supabase.from('organizations').select('name').eq('id', orgId).single(),
@@ -162,7 +169,7 @@ export async function resendBidInvite(formData: FormData): Promise<void> {
         ]);
         const orgName = (org as { name?: string } | null)?.name ?? 'DatumPro';
         const tenderTitle = (tender as { title?: string } | null)?.title ?? 'Tender';
-        const acceptUrl = `${appUrl()}/tender/${b.invite_token}`;
+        const acceptUrl = `${appUrl()}/tender/${token}`;
         const { subject, html } = tenderInviteEmail({
           orgName,
           tenderTitle,
@@ -227,13 +234,14 @@ export async function startDelivery(formData: FormData): Promise<void> {
   const projectName = String(formData.get('projectName') ?? '');
   const projectId = String(formData.get('projectId') ?? '');
 
-  const { data: newProjectId, error } = await supabase.rpc('export_award_to_project', {
+  const { data: result, error } = await supabase.rpc('export_award_to_project', {
     p_tender_id: tenderId,
     p_project_id: mode === 'existing' && projectId ? projectId : null,
     p_new_project_name: mode === 'new' ? projectName : null,
   });
   if (error) throw new Error(error.message);
-  const projId = newProjectId as unknown as string;
+  const res = result as unknown as { project_id: string; mode: string; skipped_tasks: string[] };
+  const projId = res.project_id;
 
   // Best-effort: notify the winning contractor.
   try {

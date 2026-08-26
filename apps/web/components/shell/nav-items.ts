@@ -52,6 +52,7 @@ export function computeNav(
     ];
     if (manages) {
       items.push({ name: 'Finance', href: `/projects/${id}/finance`, icon: DollarSign });
+      items.push({ name: 'BOQ', href: `/projects/${id}/boq`, icon: FileText });
     }
     items.push({ name: 'Chat', href: `/projects/${id}/chat`, icon: MessageSquare });
     if (manages) {

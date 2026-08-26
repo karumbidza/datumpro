@@ -197,3 +197,30 @@ export async function getTask(id: string): Promise<TaskDetail | null> {
     awardedCostCents: t.awarded_cost_cents,
   };
 }
+
+export interface PredecessorHint {
+  id: string;
+  title: string;
+  status: string;
+}
+
+/** Unfinished predecessors of a task — the reason a todo task can't start yet.
+ *  The DB start-gate enforces the rule; this just explains it to the crew. */
+export async function listUnfinishedPredecessors(taskId: string): Promise<PredecessorHint[]> {
+  const { data: deps } = await supabase
+    .from('task_dependencies')
+    .select('predecessor_id')
+    .eq('successor_id', taskId);
+  const ids = ((deps ?? []) as { predecessor_id: string }[]).map((d) => d.predecessor_id);
+  if (ids.length === 0) return [];
+  const { data: preds } = await supabase
+    .from('tasks')
+    .select('id, title, status')
+    .in('id', ids)
+    .neq('status', 'done');
+  return ((preds ?? []) as { id: string; title: string; status: string }[]).map((t) => ({
+    id: t.id,
+    title: t.title,
+    status: t.status,
+  }));
+}

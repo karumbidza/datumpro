@@ -117,6 +117,18 @@ export function Sidebar({ projects, orgs, activeOrgId, email, canManageMembers, 
 
 /** Company name that expands into an org switcher. Each org is its own tiny form
  *  posting to setActiveOrg (a server action that flips the cookie + redirects). */
+/** The hat you wear in an org — owners/admins read by role, everyone else by
+ *  member type, so a "contractor here, owner there" account can tell them apart. */
+function membershipLabel(o: OrgMembershipSummary): string {
+  if (o.role === 'owner') return 'Owner';
+  if (o.role === 'admin') return 'Admin';
+  if (o.role === 'pm') return 'PM';
+  if (o.memberType === 'contractor') return 'Contractor';
+  if (o.memberType === 'client') return 'Client';
+  if (o.memberType === 'viewer') return 'Viewer';
+  return 'Staff';
+}
+
 function OrgSwitcher({ orgs, activeOrgId }: { orgs: OrgMembershipSummary[]; activeOrgId: string }) {
   const [open, setOpen] = useState(false);
   const active = orgs.find((o) => o.orgId === activeOrgId);
@@ -144,7 +156,12 @@ function OrgSwitcher({ orgs, activeOrgId }: { orgs: OrgMembershipSummary[]; acti
                   className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800"
                 >
                   <span className="min-w-0 truncate text-zinc-700 dark:text-zinc-200">{o.name}</span>
-                  {o.orgId === activeOrgId && <Check size={14} className="shrink-0 text-brand-600" />}
+                  <span className="flex shrink-0 items-center gap-1.5">
+                    <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                      {membershipLabel(o)}
+                    </span>
+                    {o.orgId === activeOrgId && <Check size={14} className="shrink-0 text-brand-600" />}
+                  </span>
                 </button>
               </form>
             ))}
