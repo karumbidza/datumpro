@@ -81,10 +81,15 @@ insert into public.boq_bidders (id, org_id, tender_id, company_name, contact_ema
 
 -- Piece 3 (award→delivery bridge): a separate AWARDED tender on BOQ A, won by
 -- contractor a2, with one priced line — exercises export_award_to_project.
-insert into public.boq_tenders (id, org_id, boq_id, title, status, unsealed_at, awarded_bidder_id) values
-  ('a3390000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a3330000-0000-0000-0000-000000000000','Awarded Tender','awarded', now(), 'a33a0000-0000-0000-0000-000000000000');
+-- boq_tenders.awarded_bidder_id ⇄ boq_bidders.tender_id form a circular FK, so
+-- seed the tender first with no winner, add the winning bidder, then set the
+-- winner (mirrors the real award flow; awarded_bidder_id is un-guarded, RPC-gated).
+insert into public.boq_tenders (id, org_id, boq_id, title, status, unsealed_at) values
+  ('a3390000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a3330000-0000-0000-0000-000000000000','Awarded Tender','awarded', now());
 insert into public.boq_bidders (id, org_id, tender_id, company_name, contact_email, invite_token, user_id, status, submitted_at) values
   ('a33a0000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a3390000-0000-0000-0000-000000000000','Winner A Ltd','contractor-a@test.dev','tok-a33a','a0000000-0000-0000-0000-0000000000a2','submitted', now());
+update public.boq_tenders set awarded_bidder_id = 'a33a0000-0000-0000-0000-000000000000'
+  where id = 'a3390000-0000-0000-0000-000000000000';
 insert into public.boq_bid_items (org_id, bidder_id, boq_item_id, rate_cents, no_bid) values
   ('a1110000-0000-0000-0000-000000000000','a33a0000-0000-0000-0000-000000000000','a3350000-0000-0000-0000-000000000000',300,false);
 
