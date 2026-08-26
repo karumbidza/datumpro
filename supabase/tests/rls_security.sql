@@ -1029,6 +1029,28 @@ begin
 end $$;
 reset role; reset request.jwt.claims;
 
+-- ── award_tender: per-task tender award must set tasks.plan_approved_at past the
+--    phase-1 guard_workflow_transition (regression for 20260826000010 — the RPC
+--    must set app.workflow_ctx, like finalize_approval / export_award_to_project).
+--    Reuses org A (a111…), project A (a222…) and owner user A (a000…a1) as PM.
+insert into public.project_members (org_id, project_id, user_id, role) values
+  ('a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000a2','contractor');
+insert into public.tasks (id, org_id, project_id, title) values
+  ('a5000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','Award Tender Task');
+insert into public.task_tender_invites (id, org_id, project_id, task_id, contractor_id, status, invited_at) values
+  ('a5000000-0000-0000-0000-000000000002','a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000',
+   'a5000000-0000-0000-0000-000000000001','a0000000-0000-0000-0000-0000000000a2','submitted', now());
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+select public.award_tender('a5000000-0000-0000-0000-000000000001','a0000000-0000-0000-0000-0000000000a2');
+select pg_temp.ok(
+  (select plan_approved_at is not null and assignee_id = 'a0000000-0000-0000-0000-0000000000a2'
+     from public.tasks where id = 'a5000000-0000-0000-0000-000000000001'),
+  'award_tender: winner assigned + plan approved (workflow_ctx set past the phase-1 guard)');
+select pg_temp.ok(
+  (select status from public.task_tender_invites where id = 'a5000000-0000-0000-0000-000000000002') = 'awarded',
+  'award_tender: winning invite marked awarded');
+reset request.jwt.claims;
+
 rollback;
 
 \echo '────────────────────────────────────────────'
