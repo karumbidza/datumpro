@@ -26,11 +26,11 @@ import {
 import { fmtMoney } from '@/lib/money';
 import { Button } from '@/components/ui/button';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
+import { BOQ_STATUS_TONE } from '@/components/ui/tones';
 
 type Item = { id: string; sectionId: string; itemNo: string | null; description: string; uom: string; qty: number; rateCents: number };
 type Section = { id: string; name: string; parentId: string | null };
 
-const STATUS_TONE: Record<BoqStatus, BadgeTone> = { draft: 'amber', approved: 'green', archived: 'faint' };
 const TENDER_TONE: Partial<Record<TenderStatus, BadgeTone>> = { open: 'blue', closed: 'amber', awarded: 'green' };
 const TENDER_BADGE: Partial<Record<TenderStatus, string>> = {
   open: 'Out to tender',
@@ -296,7 +296,7 @@ export function BoqBuilder({ boq, canEdit }: { boq: BoqDetail; canEdit: boolean 
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <h1 className="truncate text-2xl font-semibold tracking-tight">{boq.name}</h1>
-            <Badge tone={STATUS_TONE[status] ?? 'neutral'}>{BOQ_STATUS_LABELS[status] ?? status}</Badge>
+            <Badge tone={BOQ_STATUS_TONE[status] ?? 'neutral'}>{BOQ_STATUS_LABELS[status] ?? status}</Badge>
             {boq.tenderStatus && (
               <Badge tone={TENDER_TONE[boq.tenderStatus] ?? 'blue'}>
                 {TENDER_BADGE[boq.tenderStatus] ?? TENDER_STATUS_LABELS[boq.tenderStatus]}

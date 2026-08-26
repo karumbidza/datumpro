@@ -3,14 +3,7 @@ import type { ProjectOverview, OverviewMilestone } from '@/lib/data/projects-ove
 import { Badge } from '@/components/ui/badge';
 import { ChevronRight } from '@/components/icons';
 import { formatUsd, PROJECT_STATUS_LABELS } from '@datumpro/shared/domain';
-
-const STATUS_TONE = {
-  active: 'green',
-  planning: 'blue',
-  on_hold: 'amber',
-  completed: 'neutral',
-  archived: 'neutral',
-} as const;
+import { PROJECT_STATUS_TONE } from '@/components/ui/tones';
 
 /* Priority chip — shown only when it deviates from the 'medium' default, so the
  * list stays quiet until priority actually says something. */
@@ -92,7 +85,7 @@ export function ProjectOverviewCard({ project: p }: { project: ProjectOverview }
       <div className="hidden w-24 shrink-0 text-right text-xs tabular-nums text-zinc-400 dark:text-zinc-500 md:block">
         {formatUsd(p.contractValueCents)}
       </div>
-      <Badge tone={STATUS_TONE[p.status]}>{PROJECT_STATUS_LABELS[p.status]}</Badge>
+      <Badge tone={PROJECT_STATUS_TONE[p.status]}>{PROJECT_STATUS_LABELS[p.status]}</Badge>
       <ChevronRight size={16} className="hidden shrink-0 text-zinc-300 group-hover:text-zinc-500 sm:block" />
 
       {/* Hover popover — timeline + milestones */}

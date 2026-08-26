@@ -13,15 +13,9 @@ import { stepsByEntity } from '@/lib/data/approvals';
 import { LiveRefresh } from '@/components/live-refresh';
 import { Card, CardTitle, CardValue } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { PAYMENT_REQUEST_TONE } from '@/components/ui/tones';
 import { can, type OrgRole } from '@datumpro/shared/access';
-import { formatUsd, PAYMENT_REQUEST_STATUS_LABEL, type PaymentRequestStatus } from '@datumpro/shared/domain';
-
-const REQ_TONE: Record<PaymentRequestStatus, 'neutral' | 'blue' | 'green' | 'amber'> = {
-  requested: 'amber',
-  approved: 'blue',
-  paid: 'green',
-  rejected: 'neutral',
-};
+import { formatUsd, PAYMENT_REQUEST_STATUS_LABEL } from '@datumpro/shared/domain';
 
 export default async function FinancePage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
@@ -107,7 +101,7 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
                     </div>
                     <div className="flex shrink-0 items-center gap-3">
                       <span className="text-sm font-semibold tabular-nums">{formatUsd(r.amountCents)}</span>
-                      <Badge tone={REQ_TONE[r.status]}>{PAYMENT_REQUEST_STATUS_LABEL[r.status]}</Badge>
+                      <Badge tone={PAYMENT_REQUEST_TONE[r.status]}>{PAYMENT_REQUEST_STATUS_LABEL[r.status]}</Badge>
                     </div>
                   </div>
                   {r.status === 'paid' && (

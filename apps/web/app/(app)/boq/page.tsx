@@ -8,13 +8,12 @@ import { PageContainer } from '@/components/shell/page-container';
 import { PageHeader } from '@/components/ui/page-header';
 import { theadRowClass, thClass } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Badge, type BadgeTone } from '@/components/ui/badge';
+import { Badge } from '@/components/ui/badge';
+import { BOQ_STATUS_TONE } from '@/components/ui/tones';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FileText } from '@/components/icons';
 import { BOQ_STATUS_LABELS, type BoqStatus } from '@datumpro/shared/domain';
 import { fmtMoney } from '@/lib/money';
-
-const STATUS_TONE: Record<BoqStatus, BadgeTone> = { draft: 'amber', approved: 'green', archived: 'faint' };
 
 export default async function BoqIndexPage() {
   const user = await getAuthUser();
@@ -97,7 +96,7 @@ export default async function BoqIndexPage() {
                   </td>
                   <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400">{b.industry ?? '—'}</td>
                   <td className="px-4 py-3">
-                    <Badge tone={STATUS_TONE[(b.status as BoqStatus)] ?? 'neutral'}>
+                    <Badge tone={BOQ_STATUS_TONE[(b.status as BoqStatus)] ?? 'neutral'}>
                       {BOQ_STATUS_LABELS[(b.status as BoqStatus)] ?? b.status}
                     </Badge>
                   </td>

@@ -8,15 +8,8 @@ import { can } from '@datumpro/shared/access';
 import { orgContractorFinance } from '@/lib/data/finance-portfolio';
 import { Card, CardTitle, CardValue } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { formatUsd } from '@datumpro/shared/domain';
-
-const STATUS_TONE: Record<string, 'neutral' | 'blue' | 'green' | 'amber'> = {
-  active: 'blue',
-  planning: 'neutral',
-  on_hold: 'amber',
-  completed: 'green',
-  archived: 'neutral',
-};
+import { PROJECT_STATUS_TONE } from '@/components/ui/tones';
+import { formatUsd, type ProjectStatus } from '@datumpro/shared/domain';
 
 /** Org-wide finance hub — the portfolio contractor-payments view for owners,
  *  admins, finance and delivery PMs. Gated here and by RLS. Per-project detail
@@ -117,7 +110,7 @@ export default async function OrgFinancePage() {
                         {p.name}
                       </Link>
                       <span className="ml-2 align-middle">
-                        <Badge tone={STATUS_TONE[p.status] ?? 'neutral'}>
+                        <Badge tone={PROJECT_STATUS_TONE[p.status as ProjectStatus] ?? 'neutral'}>
                           {p.status.replace('_', ' ')}
                         </Badge>
                       </span>

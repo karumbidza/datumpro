@@ -5,21 +5,15 @@ import { can } from '@datumpro/shared/access';
 import {
   CONTRACTOR_DOC_TYPE_LABEL,
   CONTRACTOR_DOC_STATUS_LABEL,
-  type ContractorDocStatus,
 } from '@datumpro/shared/domain';
 import { getActiveContext } from '@/lib/data/org';
 import { listOrgDocuments, type ContractorDocumentRow } from '@/lib/data/contractor-documents';
 import { ReviewDocument } from '@/components/documents/review-document';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { CONTRACTOR_DOC_TONE } from '@/components/ui/tones';
 
 export const dynamic = 'force-dynamic';
-
-const DOC_TONE: Record<ContractorDocStatus, 'neutral' | 'blue' | 'green' | 'amber'> = {
-  submitted: 'amber',
-  verified: 'green',
-  rejected: 'neutral',
-};
 
 export default async function OrgDocumentsPage() {
   const ctx = await getActiveContext();
@@ -83,7 +77,7 @@ export default async function OrgDocumentsPage() {
                             )}
                           </p>
                         </div>
-                        <Badge tone={DOC_TONE[d.status]}>{CONTRACTOR_DOC_STATUS_LABEL[d.status]}</Badge>
+                        <Badge tone={CONTRACTOR_DOC_TONE[d.status]}>{CONTRACTOR_DOC_STATUS_LABEL[d.status]}</Badge>
                       </div>
                       <ReviewDocument id={d.id} status={d.status} />
                     </li>
