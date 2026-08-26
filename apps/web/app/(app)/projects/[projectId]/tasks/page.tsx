@@ -238,11 +238,12 @@ export default async function TaskBoardPage({
           hint="Create the first task — assign it directly or put it out to tender."
         />
       ) : (
-        <div className="max-h-[calc(100dvh-18rem)] overflow-y-auto pr-1">
-          {/* Frozen header row — sticky within the scroll area; shares the grid
-              template so columns align with rows. */}
+        <div>
+          {/* Frozen header row — sticky to the scrolling <main>, so the list uses
+              the full height and the header stays put while rows scroll under it.
+              Shares the grid template so columns align with rows. */}
           <div
-            className="sticky top-0 z-10 grid items-center border-b border-zinc-200 bg-white/85 px-4 pb-2 pt-1 text-[10px] font-medium uppercase tracking-[0.05em] text-zinc-400 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/85 dark:text-zinc-500"
+            className="sticky top-0 z-10 grid items-center border-b border-zinc-200 bg-white/90 px-4 pb-2 pt-2 text-[10px] font-medium uppercase tracking-[0.05em] text-zinc-400 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90 dark:text-zinc-500"
             style={GRID_STYLE}
           >
             <div>Task / assignee</div>

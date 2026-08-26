@@ -7,7 +7,6 @@ import { getProject } from '@/lib/data/projects';
 import { getDashboardData } from '@/lib/data/dashboard';
 import { getProjectProgress, getProgressHistory } from '@/lib/data/subtasks';
 import { listProjectActivity } from '@/lib/data/tasks';
-import { StatCards } from '@/components/dashboard/stat-cards';
 import { TimelineOverview } from '@/components/dashboard/timeline-overview';
 import { ProgressTrend } from '@/components/dashboard/progress-trend';
 import { RecentActivity } from '@/components/project/recent-activity';
@@ -29,7 +28,7 @@ export default async function ProjectOverviewPage({
   const project = await getProject(projectId);
   if (!project) notFound();
 
-  const [{ counts, tasks }, projectPct, history, activity] = await Promise.all([
+  const [{ tasks }, projectPct, history, activity] = await Promise.all([
     getDashboardData(project.org_id, projectId),
     getProjectProgress(projectId),
     getProgressHistory(projectId),
@@ -83,8 +82,6 @@ export default async function ProjectOverviewPage({
           </Link>
         </div>
       </header>
-
-      <StatCards counts={counts} />
 
       <TimelineOverview tasks={tasks} />
 
