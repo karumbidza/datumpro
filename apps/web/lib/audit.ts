@@ -1,4 +1,5 @@
 import 'server-only';
+import { headers } from 'next/headers';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export interface AuditEntry {
@@ -9,6 +10,25 @@ export interface AuditEntry {
   action: string;
   before?: unknown;
   after?: unknown;
+  /** Optional human explanation (e.g. a rejection note or payment reference). */
+  reason?: string | null;
+}
+
+/** Best-effort request context for the audit trail. Returns nulls outside a
+ *  request scope (e.g. a background job) rather than throwing. */
+async function requestContext(): Promise<{ ip: string | null; userAgent: string | null; requestId: string | null }> {
+  try {
+    const h = await headers();
+    const xff = h.get('x-forwarded-for');
+    const ip = (xff ? xff.split(',')[0]?.trim() : null) || h.get('x-real-ip') || null;
+    return {
+      ip,
+      userAgent: h.get('user-agent'),
+      requestId: h.get('x-request-id') ?? h.get('x-vercel-id'),
+    };
+  } catch {
+    return { ip: null, userAgent: null, requestId: null };
+  }
 }
 
 /** Append an entry to the tamper-evident `audit_logs` table via the service role
@@ -21,6 +41,7 @@ export interface AuditEntry {
 export async function logAudit(entry: AuditEntry): Promise<boolean> {
   try {
     const admin = createAdminClient();
+    const ctx = await requestContext();
     const { error } = await admin.from('audit_logs').insert({
       org_id: entry.orgId,
       actor_id: entry.actorId,
@@ -29,6 +50,10 @@ export async function logAudit(entry: AuditEntry): Promise<boolean> {
       action: entry.action,
       before: (entry.before ?? null) as never,
       after: (entry.after ?? null) as never,
+      ip: ctx.ip,
+      user_agent: ctx.userAgent,
+      request_id: ctx.requestId,
+      reason: entry.reason ?? null,
     });
     if (error) {
       await reportAuditFailure(entry, error.message);
