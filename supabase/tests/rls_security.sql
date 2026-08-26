@@ -33,6 +33,17 @@ begin
   end if;
 end $$;
 
+-- Platform baseline: hosted Supabase grants anon/authenticated/service_role the
+-- default table GRANTs via ALTER DEFAULT PRIVILEGES, and RLS (per-role policies,
+-- or their absence for anon) is what actually gates access. A bare local/CI
+-- stack that only replays these migrations doesn't apply those platform default
+-- privileges, so table access would be denied before RLS is ever reached.
+-- Establish the same baseline here so the suite exercises RLS, not raw grants —
+-- this mirrors production and matches the anon-holds-grants model asserted below.
+grant usage on schema public to anon, authenticated, service_role;
+grant all on all tables in schema public to anon, authenticated, service_role;
+grant all on all sequences in schema public to anon, authenticated, service_role;
+
 -- ── Seed (as superuser, RLS bypassed) ────────────────────────────────────────
 -- Org A and Org B: two separate tenants (no MFA). Org M: requires MFA.
 insert into auth.users (id, email) values
@@ -78,15 +89,9 @@ insert into public.boq_tenders (id, org_id, boq_id, title, status) values
   ('a3380000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a3330000-0000-0000-0000-000000000000','Tender A2 (contractor not invited)','open');
 insert into public.boq_bidders (id, org_id, tender_id, company_name, contact_email, invite_token, user_id, status) values
   ('a3370000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a3360000-0000-0000-0000-000000000000','Contractor A Ltd','contractor-a@test.dev','tok-a337','a0000000-0000-0000-0000-0000000000a2','invited');
-
--- Piece 3 (award→delivery bridge): a separate AWARDED tender on BOQ A, won by
--- contractor a2, with one priced line — exercises export_award_to_project.
-insert into public.boq_tenders (id, org_id, boq_id, title, status, unsealed_at, awarded_bidder_id) values
-  ('a3390000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a3330000-0000-0000-0000-000000000000','Awarded Tender','awarded', now(), 'a33a0000-0000-0000-0000-000000000000');
-insert into public.boq_bidders (id, org_id, tender_id, company_name, contact_email, invite_token, user_id, status, submitted_at) values
-  ('a33a0000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a3390000-0000-0000-0000-000000000000','Winner A Ltd','contractor-a@test.dev','tok-a33a','a0000000-0000-0000-0000-0000000000a2','submitted', now());
-insert into public.boq_bid_items (org_id, bidder_id, boq_item_id, rate_cents, no_bid) values
-  ('a1110000-0000-0000-0000-000000000000','a33a0000-0000-0000-0000-000000000000','a3350000-0000-0000-0000-000000000000',300,false);
+-- NB: the AWARDED tender (a339) for the Piece 3 award-bridge tests is seeded
+-- later — after the role-split assertions — so it doesn't skew their tender
+-- counts (which are written for org A's two original open tenders).
 
 -- ── Tenant isolation: user A sees only org A ─────────────────────────────────
 set role authenticated;
@@ -216,6 +221,20 @@ select pg_temp.ok((select count(*) from public.tender_bill_lines('a3360000-0000-
 
 reset role;
 reset request.jwt.claims;
+
+-- Seed the AWARDED tender now (as superuser, RLS bypassed) — after the role-split
+-- assertions so it doesn't inflate their counts. boq_tenders.awarded_bidder_id ⇄
+-- boq_bidders.tender_id form a circular FK, so seed the tender with no winner,
+-- add the winning bidder, then set the winner (mirrors the real award flow;
+-- awarded_bidder_id is un-guarded — RPC-gated — so the update is safe).
+insert into public.boq_tenders (id, org_id, boq_id, title, status, unsealed_at) values
+  ('a3390000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a3330000-0000-0000-0000-000000000000','Awarded Tender','awarded', now());
+insert into public.boq_bidders (id, org_id, tender_id, company_name, contact_email, invite_token, user_id, status, submitted_at) values
+  ('a33a0000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a3390000-0000-0000-0000-000000000000','Winner A Ltd','contractor-a@test.dev','tok-a33a','a0000000-0000-0000-0000-0000000000a2','submitted', now());
+update public.boq_tenders set awarded_bidder_id = 'a33a0000-0000-0000-0000-000000000000'
+  where id = 'a3390000-0000-0000-0000-000000000000';
+insert into public.boq_bid_items (org_id, bidder_id, boq_item_id, rate_cents, no_bid) values
+  ('a1110000-0000-0000-0000-000000000000','a33a0000-0000-0000-0000-000000000000','a3350000-0000-0000-0000-000000000000',300,false);
 
 -- ── Piece 3: award→delivery bridge — auth guard + idempotency ─────────────────
 -- export_award_to_project() converts an awarded tender into a project + costed
@@ -361,7 +380,7 @@ insert into auth.users (id, email) values
 
 -- Tender on Org A's BOQ (inserted as superuser — RLS bypassed).
 insert into public.boq_tenders (id, org_id, boq_id, title, status, unsealed_at, created_by) values
-  ('t0000000-0000-0000-0000-000000000001',
+  ('d0000000-0000-0000-0000-000000000001',
    'a1110000-0000-0000-0000-000000000000',
    'a3330000-0000-0000-0000-000000000000',
    'Tender T1', 'open', null,
@@ -372,14 +391,14 @@ insert into public.boq_bidders
   (id, org_id, tender_id, company_name, contact_email, user_id, invite_token, status) values
   ('bd000000-0000-0000-0000-0000000000b1',
    'a1110000-0000-0000-0000-000000000000',
-   't0000000-0000-0000-0000-000000000001',
+   'd0000000-0000-0000-0000-000000000001',
    'Bidder X Ltd','bidder-x@test.dev',
    'e0000000-0000-0000-0000-0000000000e1',
    'token-x-00000000000000000000000000000001',
    'submitted'),
   ('bd000000-0000-0000-0000-0000000000b2',
    'a1110000-0000-0000-0000-000000000000',
-   't0000000-0000-0000-0000-000000000001',
+   'd0000000-0000-0000-0000-000000000001',
    'Bidder Y Ltd','bidder-y@test.dev',
    'f0000000-0000-0000-0000-0000000000f1',
    'token-y-00000000000000000000000000000002',
@@ -387,12 +406,12 @@ insert into public.boq_bidders
 
 -- One bid item per bidder for the existing boq_item (a335…).
 insert into public.boq_bid_items (id, org_id, bidder_id, boq_item_id, rate_cents) values
-  ('bi000000-0000-0000-0000-000000000001',
+  ('b1000000-0000-0000-0000-000000000001',
    'a1110000-0000-0000-0000-000000000000',
    'bd000000-0000-0000-0000-0000000000b1',
    'a3350000-0000-0000-0000-000000000000',
    300),
-  ('bi000000-0000-0000-0000-000000000002',
+  ('b1000000-0000-0000-0000-000000000002',
    'a1110000-0000-0000-0000-000000000000',
    'bd000000-0000-0000-0000-0000000000b2',
    'a3350000-0000-0000-0000-000000000000',
@@ -417,7 +436,7 @@ reset request.jwt.claims;
 -- Unseal the tender (as superuser).
 update public.boq_tenders
    set unsealed_at = now()
- where id = 't0000000-0000-0000-0000-000000000001';
+ where id = 'd0000000-0000-0000-0000-000000000001';
 
 set role authenticated;
 set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
@@ -434,7 +453,7 @@ reset role;
 reset request.jwt.claims;
 
 -- Re-seal for remaining tests.
-update public.boq_tenders set unsealed_at = null where id = 't0000000-0000-0000-0000-000000000001';
+update public.boq_tenders set unsealed_at = null where id = 'd0000000-0000-0000-0000-000000000001';
 
 -- ── Invariant 2: Bidder isolation + no budget_rate_cents ──────────────────────
 -- Bidder Y (status 'viewing') can call tender_bill_lines and sees lines (>0).
@@ -444,7 +463,7 @@ set role authenticated;
 set request.jwt.claims = '{"sub":"f0000000-0000-0000-0000-0000000000f1","role":"authenticated","aal":"aal1"}';
 
 select pg_temp.ok(
-  (select count(*) from public.tender_bill_lines('t0000000-0000-0000-0000-000000000001')) > 0,
+  (select count(*) from public.tender_bill_lines('d0000000-0000-0000-0000-000000000001')) > 0,
   'tender-bidder: bidder Y sees bill lines via tender_bill_lines');
 
 select pg_temp.ok(
@@ -480,12 +499,12 @@ set request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-0000000000b1","role":"
 
 select pg_temp.ok(
   (select count(*) from public.boq_tenders
-     where id = 't0000000-0000-0000-0000-000000000001') = 0,
+     where id = 'd0000000-0000-0000-0000-000000000001') = 0,
   'tender-tenant: org B user sees 0 rows in boq_tenders for org A tender');
 
 select pg_temp.ok(
   (select count(*) from public.boq_bidders
-     where tender_id = 't0000000-0000-0000-0000-000000000001') = 0,
+     where tender_id = 'd0000000-0000-0000-0000-000000000001') = 0,
   'tender-tenant: org B user sees 0 rows in boq_bidders for org A tender');
 
 select pg_temp.ok(
@@ -579,10 +598,13 @@ insert into public.boq_bidders
    'token-p2a-b2-0000000000000000000000000002',
    'viewing');        -- NOT submitted → gate should block
 
--- P2-A assertions (superuser role — RPCs are SECURITY DEFINER and check auth
--- internally; calling as superuser exercises the eligibility logic directly).
+-- P2-A..D assertions. unseal_tender / award_boq_tender are SECURITY DEFINER but
+-- were hardened (008900) to require an org admin via auth.uid() — calling as a
+-- bare superuser now raises 'not authorised'. Set user A (org A owner) as the
+-- caller identity; stay on the superuser role so the interleaved fixture seeding
+-- still bypasses RLS (auth.uid() reads the JWT GUC regardless of session role).
 reset role;
-reset request.jwt.claims;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
 
 select pg_temp.ok(
   public.tender_unseal_eligible('c2a00000-0000-0000-0000-000000000001') = false,
@@ -761,10 +783,12 @@ begin
   );
 end $$;
 
+-- award marks the TENDER (status + awarded_bidder_id); the bidder row is not
+-- restatused (bidder_status has no 'awarded' value), so it stays 'submitted'.
 select pg_temp.ok(
   (select status from public.boq_bidders
-     where id = 'c2b00000-0000-0000-0000-0000000000d1') = 'awarded',
-  'P2-D-4: winning bidder status set to ''awarded''');
+     where id = 'c2b00000-0000-0000-0000-0000000000d1') = 'submitted',
+  'P2-D-4: winning bidder row remains ''submitted'' (award marks the tender, not the bidder)');
 
 select pg_temp.ok(
   (select awarded_bidder_id from public.boq_tenders
@@ -1004,6 +1028,28 @@ begin
     'prog guard: contractor can still tick a bill line done');
 end $$;
 reset role; reset request.jwt.claims;
+
+-- ── award_tender: per-task tender award must set tasks.plan_approved_at past the
+--    phase-1 guard_workflow_transition (regression for 20260826000010 — the RPC
+--    must set app.workflow_ctx, like finalize_approval / export_award_to_project).
+--    Reuses org A (a111…), project A (a222…) and owner user A (a000…a1) as PM.
+insert into public.project_members (org_id, project_id, user_id, role) values
+  ('a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000a2','contractor');
+insert into public.tasks (id, org_id, project_id, title) values
+  ('a5000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','Award Tender Task');
+insert into public.task_tender_invites (id, org_id, project_id, task_id, contractor_id, status, invited_at) values
+  ('a5000000-0000-0000-0000-000000000002','a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000',
+   'a5000000-0000-0000-0000-000000000001','a0000000-0000-0000-0000-0000000000a2','submitted', now());
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+select public.award_tender('a5000000-0000-0000-0000-000000000001','a0000000-0000-0000-0000-0000000000a2');
+select pg_temp.ok(
+  (select plan_approved_at is not null and assignee_id = 'a0000000-0000-0000-0000-0000000000a2'
+     from public.tasks where id = 'a5000000-0000-0000-0000-000000000001'),
+  'award_tender: winner assigned + plan approved (workflow_ctx set past the phase-1 guard)');
+select pg_temp.ok(
+  (select status from public.task_tender_invites where id = 'a5000000-0000-0000-0000-000000000002') = 'awarded',
+  'award_tender: winning invite marked awarded');
+reset request.jwt.claims;
 
 rollback;
 
