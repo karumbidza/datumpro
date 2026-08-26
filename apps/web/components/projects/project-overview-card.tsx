@@ -5,6 +5,11 @@ import { ChevronRight } from '@/components/icons';
 import { formatUsd, PROJECT_STATUS_LABELS } from '@datumpro/shared/domain';
 import { PROJECT_STATUS_TONE } from '@/components/ui/tones';
 
+/* Shared column track — the row and its frozen ListHeader use the same style so
+ * columns line up: Project · Progress · % · Value · Status · chevron. */
+const GRID_TEMPLATE = '200px minmax(150px,1fr) 52px 104px 96px 16px';
+export const PROJECT_ROW_GRID = { gridTemplateColumns: GRID_TEMPLATE, gap: '16px' } as const;
+
 /* Priority chip — shown only when it deviates from the 'medium' default, so the
  * list stays quiet until priority actually says something. */
 const PRIORITY_CHIP: Record<string, { label: string; cls: string } | undefined> = {
@@ -31,10 +36,11 @@ export function ProjectOverviewCard({ project: p }: { project: ProjectOverview }
   return (
     <Link
       href={`/projects/${p.id}`}
-      className="group relative flex items-center gap-4 rounded-lg border border-zinc-200 bg-white px-4 py-3 transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700"
+      style={PROJECT_ROW_GRID}
+      className="group relative grid items-center rounded-lg border border-zinc-200 bg-white px-4 py-3 transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700"
     >
       {/* Name / client */}
-      <div className="w-40 shrink-0">
+      <div className="min-w-0">
         <span className="flex items-center gap-1.5">
           <h2 className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{p.name}</h2>
           {PRIORITY_CHIP[p.priority] && (
@@ -49,7 +55,7 @@ export function ProjectOverviewCard({ project: p }: { project: ProjectOverview }
       </div>
 
       {/* Progress bar with milestone markers */}
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0">
         <div className="relative h-2 rounded-full bg-zinc-100 dark:bg-zinc-800">
           <div
             className="absolute left-0 top-0 h-2 rounded-full bg-brand-500"
@@ -77,16 +83,20 @@ export function ProjectOverviewCard({ project: p }: { project: ProjectOverview }
       </div>
 
       {/* Completion % */}
-      <div className="w-12 shrink-0 text-right text-sm font-semibold tabular-nums text-zinc-900 dark:text-white">
+      <div className="text-right text-sm font-semibold tabular-nums text-zinc-900 dark:text-white">
         {p.completionPct}%
       </div>
 
-      {/* Status + contract (contract hidden on small) */}
-      <div className="hidden w-24 shrink-0 text-right text-xs tabular-nums text-zinc-400 dark:text-zinc-500 md:block">
+      {/* Contract value */}
+      <div className="text-right text-xs tabular-nums text-zinc-400 dark:text-zinc-500">
         {formatUsd(p.contractValueCents)}
       </div>
-      <Badge tone={PROJECT_STATUS_TONE[p.status]}>{PROJECT_STATUS_LABELS[p.status]}</Badge>
-      <ChevronRight size={16} className="hidden shrink-0 text-zinc-300 group-hover:text-zinc-500 sm:block" />
+
+      {/* Status */}
+      <div className="min-w-0">
+        <Badge tone={PROJECT_STATUS_TONE[p.status]}>{PROJECT_STATUS_LABELS[p.status]}</Badge>
+      </div>
+      <ChevronRight size={16} className="shrink-0 text-zinc-300 group-hover:text-zinc-500" />
 
       {/* Hover popover — timeline + milestones */}
       <div className="pointer-events-none absolute right-4 top-full z-10 mt-1 w-64 rounded-lg border border-zinc-200 bg-white p-3 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 dark:border-zinc-700 dark:bg-zinc-900">
