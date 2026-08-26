@@ -88,7 +88,8 @@ export function Sidebar({ projects, orgs, activeOrgId, email, canManageMembers, 
         )}
       </nav>
 
-      <div className="border-t border-zinc-200 p-3 dark:border-zinc-800">
+      <div className="p-2">
+        <div className="rounded-lg bg-zinc-50 p-2 dark:bg-zinc-800/40">
         <OrgSwitcher orgs={orgs} activeOrgId={activeOrgId} />
         <div className="mt-1 flex items-center justify-between gap-2">
           <Link
@@ -109,6 +110,7 @@ export function Sidebar({ projects, orgs, activeOrgId, email, canManageMembers, 
               <LogOut size={14} />
             </button>
           </form>
+        </div>
         </div>
       </div>
     </aside>
@@ -203,13 +205,13 @@ function ProjectSwitcher({
   const label = activeProject?.name ?? 'All projects';
 
   return (
-    <div className="relative flex h-[70px] items-center border-b border-zinc-200 px-3 dark:border-zinc-800">
+    <div className="relative flex items-center px-2 pt-2.5">
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-between rounded-md p-2 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800"
       >
         <span className="flex min-w-0 items-center gap-3">
-          <BrandMark size={32} />
+          <BrandMark size={28} />
           <span className="min-w-0">
             <span className="block truncate text-sm font-semibold text-zinc-900 dark:text-white">
               {label}
