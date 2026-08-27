@@ -1,23 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
-import { parsePaymentTerms, type PaymentTerms } from '@datumpro/shared/domain';
 
 export const MEDIA_BUCKET = 'project-media';
-
-export type QuoteStatus = 'invited' | 'submitted' | 'declined' | 'awarded' | 'not_selected';
-
-export interface QuoteRow {
-  id: string;
-  taskId: string;
-  contractorId: string;
-  contractorName: string | null;
-  status: QuoteStatus;
-  costCents: number | null;
-  proposedStart: string | null;
-  proposedEnd: string | null;
-  justification: string | null;
-  paymentTerms: PaymentTerms;
-  quoteUrl: string | null;
-}
 
 export interface TaskMediaRow {
   id: string;
@@ -56,50 +39,6 @@ async function signedUrlMap(paths: (string | null)[]): Promise<Map<string, strin
     if (item.signedUrl && item.path) map.set(item.path, item.signedUrl);
   }
   return map;
-}
-
-/** Quotes on a task the caller is allowed to see. RLS enforces cost
- *  confidentiality: staff & the project PM see every quote; a contractor sees
- *  only their own; everyone else sees none. */
-export async function listTaskQuotes(taskId: string): Promise<QuoteRow[]> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from('task_quotes')
-    .select(
-      'id, task_id, contractor_id, status, cost_cents, proposed_start, proposed_end, justification, payment_terms, quote_path, created_at',
-    )
-    .eq('task_id', taskId)
-    .order('created_at', { ascending: true });
-
-  const rows = (data ?? []) as {
-    id: string;
-    task_id: string;
-    contractor_id: string;
-    status: QuoteStatus;
-    cost_cents: number | null;
-    proposed_start: string | null;
-    proposed_end: string | null;
-    justification: string | null;
-    payment_terms: unknown;
-    quote_path: string | null;
-  }[];
-
-  const names = await nameMap(rows.map((r) => r.contractor_id));
-  const urls = await signedUrlMap(rows.map((r) => r.quote_path));
-
-  return rows.map((r) => ({
-    id: r.id,
-    taskId: r.task_id,
-    contractorId: r.contractor_id,
-    contractorName: names.get(r.contractor_id) ?? null,
-    status: r.status,
-    costCents: r.cost_cents,
-    proposedStart: r.proposed_start,
-    proposedEnd: r.proposed_end,
-    justification: r.justification,
-    paymentTerms: parsePaymentTerms(r.payment_terms),
-    quoteUrl: r.quote_path ? urls.get(r.quote_path) ?? null : null,
-  }));
 }
 
 /** Media attached to a task, with batched signed URLs and names. */

@@ -101,18 +101,6 @@ export function extensionDecisionEmail(opts: {
   };
 }
 
-export function quoteAwardedEmail(opts: { taskTitle: string; orgName: string; url: string }) {
-  return {
-    subject: `You won the work: ${opts.taskTitle}`,
-    html: layout({
-      heading: 'Quote awarded',
-      intro: `${opts.orgName} awarded you the task <strong>${opts.taskTitle}</strong>. You now have access to its private discussion and payment schedule.`,
-      ctaLabel: 'Open task',
-      ctaHref: opts.url,
-    }),
-  };
-}
-
 export function slaEmail(opts: {
   taskTitle: string;
   kind: 'at_risk' | 'breached';
