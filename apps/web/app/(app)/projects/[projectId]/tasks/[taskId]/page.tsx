@@ -14,7 +14,7 @@ import { listProjectMembers, myProjectRole } from '@/lib/data/members';
 import { listChatRoster } from '@/lib/data/chat-roster';
 import { getProjectSchedule } from '@/lib/data/scheduling';
 import { listTaskMedia, listSubtaskMedia } from '@/lib/data/quotes';
-import { listTenderInvites, listBidLinesByContractor, listTaskDocuments } from '@/lib/data/tenders';
+import { listTenderInvites, listTaskDocuments } from '@/lib/data/tenders';
 import { getTaskConversationId, listMessages, othersMaxReadSeq } from '@/lib/data/chat';
 import { TenderPanel } from '@/components/task/tender-panel';
 import { BidPanel } from '@/components/task/bid-panel';
@@ -60,7 +60,6 @@ export default async function TaskDetailPage({
     activity,
     schedule,
     tenderInvites,
-    bidLinesMap,
     completionMedia,
     extensions,
     subtasks,
@@ -76,7 +75,6 @@ export default async function TaskDetailPage({
     listTaskActivity(taskId),
     getProjectSchedule(projectId),
     listTenderInvites(taskId),
-    listBidLinesByContractor(taskId),
     listTaskMedia(taskId, 'completion'),
     listExtensionRequests(taskId),
     listSubtasks(taskId),
@@ -322,7 +320,6 @@ export default async function TaskDetailPage({
           taskId={taskId}
           projectId={projectId}
           invites={tenderInvites}
-          bidLines={Object.fromEntries(bidLinesMap)}
           bidDocs={docsByBidder}
           availableContractors={contractors.filter((c) => !invitedIds.has(c.userId))}
           canManage={canManage}
@@ -442,11 +439,10 @@ export default async function TaskDetailPage({
             taskId={taskId}
             projectId={projectId}
             orgId={task.org_id}
-            bidLines={subtasks}
+            bidPriceCents={myInvite?.bidPriceCents ?? null}
+            worksNotes={myInvite?.worksNotes ?? null}
             docs={myBidDocs}
             submitted={myInvite?.status === 'submitted'}
-            taskStart={task.planned_start_date}
-            taskEnd={task.planned_end_date ?? task.due_date}
           />
         </div>
       )}
