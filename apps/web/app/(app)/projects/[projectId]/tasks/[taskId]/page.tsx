@@ -469,6 +469,7 @@ export default async function TaskDetailPage({
             planSubmittedAt={task.plan_submitted_at}
             planApprovedAt={task.plan_approved_at}
             awardedCostCents={task.awarded_cost_cents}
+            worksNotes={task.works_notes}
             planSteps={planSteps}
             variationSteps={variationSteps}
             viewerRole={orgRole ?? ''}

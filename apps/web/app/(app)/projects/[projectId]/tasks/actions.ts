@@ -396,6 +396,43 @@ export async function acceptTask(formData: FormData) {
   revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
 }
 
+/** Accept a directly-assigned task by naming ONE price and describing the works —
+ *  and lock it. Whole-task pricing: no subtask breakdown, no separate approval.
+ *  The awarded value + lock are set by a definer RPC that re-checks the caller is
+ *  the pending assignee. */
+export async function acceptAndPriceTask(_prev: FormState, formData: FormData): Promise<FormState> {
+  const { supabase, user } = await requireUser();
+  const taskId = String(formData.get('taskId') ?? '');
+  const priceRaw = String(formData.get('price') ?? '').trim();
+  const worksNotes = String(formData.get('worksNotes') ?? '').trim();
+  const price = Number(priceRaw);
+  if (!priceRaw || !Number.isFinite(price) || price < 0) return { error: 'Enter the task price.' };
+  if (worksNotes.length < 3) return { error: 'Describe the works to be done.' };
+
+  const task = await loadTask(supabase, taskId);
+  if (!task) return { error: 'Task not found.' };
+
+  const { error } = await supabase.rpc('accept_and_price_task', {
+    p_task_id: taskId,
+    p_price_cents: Math.round(price * 100),
+    p_works_notes: worksNotes,
+  });
+  if (error) return { error: error.message };
+
+  await logActivity(supabase, task, user.id, 'status', 'Accepted & priced the task');
+  await notifyProjectManagers(supabase, {
+    orgId: task.org_id,
+    projectId: task.project_id,
+    type: 'task_accepted',
+    title: 'Task accepted & priced',
+    body: `“${task.title}” was accepted and priced.`,
+    link: `/projects/${task.project_id}/tasks/${taskId}`,
+    entityId: taskId,
+  });
+  revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
+  return {};
+}
+
 /** Contractor declines an assigned task — it returns to the PM (unassigned). */
 export async function declineTask(formData: FormData) {
   const { supabase, user } = await requireUser();
