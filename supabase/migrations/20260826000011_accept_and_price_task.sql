@@ -10,6 +10,9 @@ alter table public.tasks add column if not exists works_notes text;
 -- Accept + price + lock, in one definer call. The awarded value and the lock
 -- flag (plan_approved_at) are normally set only by finalize_approval, so this
 -- runs SECURITY DEFINER and re-checks that the caller is the pending assignee.
+-- plan_approved_at is protected by guard_workflow_transition (20260826000002),
+-- so this vetted approval path sets app.workflow_ctx to the task's org before
+-- the write, exactly like finalize_approval / award_tender / export_award_to_project.
 create or replace function public.accept_and_price_task(
   p_task_id uuid,
   p_price_cents bigint,
@@ -17,14 +20,15 @@ create or replace function public.accept_and_price_task(
 ) returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   v_assignee uuid;
   v_status text;
+  v_org uuid;
 begin
-  select assignee_id, acceptance_status
-    into v_assignee, v_status
+  select assignee_id, acceptance_status, org_id
+    into v_assignee, v_status, v_org
     from public.tasks
    where id = p_task_id;
 
@@ -41,6 +45,7 @@ begin
     raise exception 'A valid task price is required';
   end if;
 
+  perform set_config('app.workflow_ctx', v_org::text, true);
   update public.tasks
      set acceptance_status = 'accepted',
          accepted_at       = now(),
