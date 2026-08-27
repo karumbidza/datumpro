@@ -1029,6 +1029,11 @@ begin
 end $$;
 reset role; reset request.jwt.claims;
 
+-- ── Guarded-column writers (see docs/DB-WORKFLOW-GUARDS.md). Any SECURITY DEFINER
+--    RPC that changes a guarded workflow column (tasks.plan_approved_at, etc.) must
+--    set app.workflow_ctx first, and MUST be exercised here — CI's happy path won't
+--    catch a writer that this suite never calls. Add a case when you add a writer.
+
 -- ── award_tender: per-task tender award must set tasks.plan_approved_at past the
 --    phase-1 guard_workflow_transition (regression for 20260826000010 — the RPC
 --    must set app.workflow_ctx, like finalize_approval / export_award_to_project).
