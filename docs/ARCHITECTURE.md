@@ -27,6 +27,16 @@ RLS cheap into the thousands of orgs.
 > are bound by RLS regardless; the service role bypasses RLS by design and is used
 > server-side only.
 
+### Workflow-transition guards
+Beyond row *visibility*, a few "workflow outcome" columns (`tasks.plan_approved_at`,
+`task_subtasks.variation_status`, `task_extension_requests.status`) are protected by a
+`BEFORE UPDATE` trigger so they can only *change* inside a vetted `SECURITY DEFINER`
+RPC that sets the transaction-local `app.workflow_ctx` GUC. A client — or even the
+service role via a direct `PATCH` — cannot self-approve, because PostgREST can't set a
+per-request GUC. **Writing a function that changes one of these columns? Read
+[`DB-WORKFLOW-GUARDS.md`](./DB-WORKFLOW-GUARDS.md) first** — miss the GUC and it fails
+at runtime with `protected workflow column(s) …`, which the happy-path tests can hide.
+
 ### Scale beyond this
 If per-request membership lookups ever become the bottleneck, the next step is a
 **custom access-token hook** that bakes org memberships/roles into the JWT, so RLS
