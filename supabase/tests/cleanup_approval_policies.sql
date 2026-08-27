@@ -14,6 +14,16 @@ begin;
 create or replace function pg_temp.ok(cond boolean, label text) returns void language plpgsql as $$
 begin if cond then raise notice 'PASS: %', label; else raise exception 'FAIL: %', label; end if; end $$;
 
+-- Seed a fresh org first — creating an org seeds its live approval_policies, so
+-- the global checks below have data. On an empty CI database (supabase db reset)
+-- no policies exist until an org is created; this test was first validated against
+-- the live DB, which already had orgs.
+insert into auth.users (id,email) values ('99990000-0000-0000-0000-000000000000','cleanup@t.dev');
+set role authenticated;
+set request.jwt.claims = '{"sub":"99990000-0000-0000-0000-000000000000","role":"authenticated","aal":"aal1"}';
+insert into public.organizations (id,name,require_mfa) values ('99991111-0000-0000-0000-000000000000','CleanupOrg',false);
+reset role; reset request.jwt.claims;
+
 -- 1. No request/variation policies remain anywhere.
 select pg_temp.ok(
   (select count(*) from public.approval_policies where entity_type in ('request','variation')) = 0,
@@ -25,12 +35,7 @@ select pg_temp.ok(
   and (select count(*) from public.approval_policies where entity_type='task_plan') > 0,
   '2: wired policies (payment/task_plan) untouched');
 
--- 3. A new org seeds only the 4 live entity types.
-insert into auth.users (id,email) values ('99990000-0000-0000-0000-000000000000','cleanup@t.dev');
-set role authenticated;
-set request.jwt.claims = '{"sub":"99990000-0000-0000-0000-000000000000","role":"authenticated","aal":"aal1"}';
-insert into public.organizations (id,name,require_mfa) values ('99991111-0000-0000-0000-000000000000','CleanupOrg',false);
-reset role; reset request.jwt.claims;
+-- 3. The new org seeds only the 4 live entity types.
 select pg_temp.ok(
   (select string_agg(distinct entity_type, ',' order by entity_type)
      from public.approval_policies where org_id='99991111-0000-0000-0000-000000000000')

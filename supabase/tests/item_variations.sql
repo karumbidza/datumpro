@@ -48,7 +48,12 @@ insert into public.projects (id,org_id,name) values ('a2220000-0000-0000-0000-00
 insert into public.project_members (org_id,project_id,user_id,role) values ('a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','c0000000-0000-0000-0000-000000000000','contractor');
 insert into public.tasks (id,org_id,project_id,title,assignee_id) values ('a3330000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','T','c0000000-0000-0000-0000-000000000000');
 insert into public.task_subtasks (id,org_id,task_id,title,cost_cents,created_by) values ('a4440000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a3330000-0000-0000-0000-000000000000','base',8000,'c0000000-0000-0000-0000-000000000000');
+-- Simulate the app's approved lock. plan_approved_at is guarded
+-- (guard_workflow_transition) — authorise this fixture write, then clear the GUC
+-- so any later guard checks are enforced. See docs/DB-WORKFLOW-GUARDS.md.
+select set_config('app.workflow_ctx','a1110000-0000-0000-0000-000000000000', true);
 update public.tasks set plan_approved_at=now(), awarded_cost_cents=8000 where id='a3330000-0000-0000-0000-000000000000';
+select set_config('app.workflow_ctx','', true);
 insert into public.task_subtasks (id,org_id,task_id,title,cost_cents,created_by,variation_reason_code,variation_reason)
   values ('a4450000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a3330000-0000-0000-0000-000000000000','extra',2000,'c0000000-0000-0000-0000-000000000000','site_condition','rock encountered');
 select pg_temp.ok(
