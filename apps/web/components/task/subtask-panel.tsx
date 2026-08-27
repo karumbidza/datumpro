@@ -6,7 +6,7 @@ import { SubmitButton } from '@/components/ui/submit-button';
 import { FormError, type FormState } from '@/components/ui/form-error';
 import { ApprovalChain } from '@/components/approvals/approval-chain';
 import {
-  acceptTask,
+  acceptAndPriceTask,
   declineTask,
   returnTask,
   addSubtask,
@@ -80,6 +80,7 @@ export function SubtaskPanel({
   planSubmittedAt,
   planApprovedAt,
   awardedCostCents,
+  worksNotes,
   planSteps,
   variationSteps,
   viewerRole,
@@ -107,6 +108,8 @@ export function SubtaskPanel({
   planSubmittedAt: string | null;
   planApprovedAt: string | null;
   awardedCostCents: number | null;
+  /** The contractor's description of the works to be done, captured at accept time. */
+  worksNotes: string | null;
   planSteps: ApprovalStep[];
   /** task_variation approval chains, keyed by the variation subtask's id. */
   variationSteps: Record<string, ApprovalStep[]>;
@@ -134,6 +137,7 @@ export function SubtaskPanel({
   const [blockerOpen, setBlockerOpen] = useState(false); // raise-blocker modal
   const [extensionOpen, setExtensionOpen] = useState(false); // extension request form
   const [planErr, submitPlanAction] = useActionState(submitPlan, {} as FormState);
+  const [acceptErr, acceptAndPriceAction] = useActionState(acceptAndPriceTask, {} as FormState);
   const [submitState, submitTaskAction] = useActionState(submitTask, {} as FormState);
   const [blockerState, raiseBlockerAction] = useActionState(raiseBlocker, {} as FormState);
   const [extErr, requestExtensionAction] = useActionState(requestExtension, {} as FormState);
@@ -175,8 +179,13 @@ export function SubtaskPanel({
   const canTick = isAssignee && started && (planLocked || !usesPlanFlow);
   // Start is available once the plan is approved (or non-plan), the task hasn't
   // begun, isn't blocked by predecessors, and has at least one step to work.
+  // A locked whole-task price has no step checklist, so it can start with zero
+  // subtasks; legacy non-plan tasks still need at least one step to work.
   const canStartTask =
-    isAssignee && taskStatus === 'todo' && !blockedByDeps && (planLocked || !usesPlanFlow) && subtasks.length > 0;
+    isAssignee &&
+    taskStatus === 'todo' &&
+    !blockedByDeps &&
+    (planLocked || (!usesPlanFlow && subtasks.length > 0));
   // Submit / raise-blocker live at the foot of the plan once work has commenced.
   const canWorkflow = isAssignee && started;
   const planComplete = counted.length === 0 || counted.every((s) => s.isDone);
@@ -187,29 +196,54 @@ export function SubtaskPanel({
   // a step can't begin before the task window and can't be backdated.
   const startMin = [taskStart, todayIso].filter((d): d is string => !!d).sort().at(-1);
 
-  // ── Acceptance decision — shown to the assignee while pending ──
+  // ── Acceptance + pricing — the assignee names ONE price for the whole task
+  //    and describes the works; accepting LOCKS the price (no subtask
+  //    breakdown, no separate approval step). ──
   if (acceptanceStatus === 'pending' && isAssignee) {
     return (
       <Card>
-        <CardTitle>Accept this task?</CardTitle>
+        <CardTitle>Accept &amp; price this task</CardTitle>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Review the task, then accept to plan your work and price it — or decline to send it back to the
-          project manager.
+          Name your price for the whole task and describe the works you&apos;ll do. Accepting locks the
+          price — or decline to send it back to the project manager.
         </p>
         {!declineOpen ? (
-          <div className="mt-3 flex gap-2">
-            <form action={acceptTask}>
-              <input type="hidden" name="taskId" value={taskId} />
-              <SubmitButton pendingText="Accepting…">Accept task</SubmitButton>
-            </form>
-            <button
-              type="button"
-              onClick={() => setDeclineOpen(true)}
-              className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-200"
-            >
-              Decline
-            </button>
-          </div>
+          <form action={acceptAndPriceAction} className="mt-4 space-y-3.5">
+            <input type="hidden" name="taskId" value={taskId} />
+            <div>
+              <label className={stepLabel}>Task price ($)</label>
+              <input
+                name="price"
+                type="number"
+                min="0"
+                step="0.01"
+                required
+                placeholder="0.00"
+                className={`${numField} w-full max-w-[220px] text-right`}
+              />
+            </div>
+            <div>
+              <label className={stepLabel}>Works to be done</label>
+              <textarea
+                name="worksNotes"
+                rows={4}
+                required
+                placeholder="Describe what you'll do to complete this task…"
+                className={`${field} h-auto w-full py-2 leading-relaxed`}
+              />
+            </div>
+            <FormError error={acceptErr.error} />
+            <div className="flex items-center gap-2 pt-1">
+              <SubmitButton pendingText="Accepting…">Accept &amp; lock price</SubmitButton>
+              <button
+                type="button"
+                onClick={() => setDeclineOpen(true)}
+                className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-200"
+              >
+                Decline
+              </button>
+            </div>
+          </form>
         ) : (
           <form action={declineTask} className="mt-3 space-y-2">
             <input type="hidden" name="taskId" value={taskId} />
@@ -266,6 +300,18 @@ export function SubtaskPanel({
           <span className="font-semibold tabular-nums text-brand-700 dark:text-brand-300">
             {formatUsd(awardedCostCents ?? 0)}
           </span>
+        </div>
+      )}
+
+      {/* ── WORKS TO BE DONE (contractor's scope, captured at accept time) ── */}
+      {planLocked && worksNotes && (
+        <div className="mt-3 rounded-md border border-zinc-100 px-3 py-2.5 dark:border-zinc-800">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+            Works to be done
+          </p>
+          <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
+            {worksNotes}
+          </p>
         </div>
       )}
 
@@ -465,6 +511,11 @@ export function SubtaskPanel({
             </p>
           )}
 
+          {/* Progress bar + step checklist — only for tasks that HAVE steps
+              (BOQ-generated or legacy). A whole-task locked price has none, so
+              it goes straight from Start to Submit-for-sign-off. */}
+          {(counted.length > 0 || !usesPlanFlow) && (
+          <>
           <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
             <div className="h-2 rounded-full bg-brand-600 transition-all" style={{ width: `${pct}%` }} />
           </div>
@@ -617,6 +668,8 @@ export function SubtaskPanel({
               </li>
             )}
           </ul>
+          </>
+          )}
 
           {/* Legacy/internal tasks keep a simple (uncosted) add-step form. */}
           {!usesPlanFlow && canTick && (
@@ -744,7 +797,7 @@ export function SubtaskPanel({
           {/* Variations column */}
           {planLocked && (openVariations.length > 0 || canAddVariation) && (
             <div>
-              <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Variations</p>
+              <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Additional works</p>
 
               {openVariations.map((v) => (
                 <div key={v.id} className="mt-2 rounded-md border border-zinc-100 p-2 dark:border-zinc-800">
@@ -776,7 +829,7 @@ export function SubtaskPanel({
                     onClick={() => setVariationOpen(true)}
                     className="mt-2 text-[11px] font-medium text-brand-600 dark:text-brand-400 hover:underline"
                   >
-                    + Add a variation (needs approval)
+                    + Request additional works
                   </button>
                 ) : (
                   <form
@@ -785,33 +838,35 @@ export function SubtaskPanel({
                   >
                     <input type="hidden" name="taskId" value={taskId} />
                     <div>
-                      <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Extra step</label>
-                      <input name="title" required placeholder="e.g. Additional rockbreaking" className={`${inputClass} w-full`} />
+                      <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
+                        Additional works
+                      </label>
+                      <input
+                        name="title"
+                        required
+                        placeholder="e.g. Extra rockbreaking to south footing"
+                        className={`${inputClass} w-full`}
+                      />
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Duration</label>
-                        <input name="estQty" type="number" min="0" step="0.5" className={`${inputClass} w-full`} />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Unit</label>
-                        <select name="estUnit" defaultValue="days" className={`${inputClass} w-full`}>
-                          <option value="hours">hours</option>
-                          <option value="days">day(s)</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Start</label>
-                        <input type="date" name="plannedStartDate" min={startMin} max={taskEnd ?? undefined} className={`${inputClass} w-full`} />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Cost ($)</label>
-                        <input name="cost" type="number" min="0" step="0.01" className={`${inputClass} w-full`} />
-                      </div>
+                    <div>
+                      <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
+                        Extra cost ($)
+                      </label>
+                      <input
+                        name="cost"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        required
+                        className={`${inputClass} w-full max-w-[160px] text-right`}
+                      />
                     </div>
+                    <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
+                      Goes to the project manager for approval; if approved it adds to the awarded value.
+                    </p>
                     <div className="flex gap-2">
                       <SubmitButton variant="secondary" pendingText="Sending…">
-                        Submit variation
+                        Submit for approval
                       </SubmitButton>
                       <button type="button" onClick={() => setVariationOpen(false)} className="text-sm text-zinc-500 dark:text-zinc-400 hover:underline">
                         Cancel

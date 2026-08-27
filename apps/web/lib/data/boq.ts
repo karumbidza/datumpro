@@ -364,6 +364,7 @@ export async function getProjectBoq(orgId: string, projectId: string): Promise<P
 
 export interface BoqGeneratedTask {
   id: string;
+  boqSectionId: string | null;
   title: string;
   status: string;
   assigneeId: string | null;
@@ -383,13 +384,14 @@ export async function listBoqGeneratedTasks(
 
   const { data } = await supabase
     .from('tasks')
-    .select('id, title, status, assignee_id, acceptance_status')
+    .select('id, boq_section_id, title, status, assignee_id, acceptance_status')
     .eq('project_id', projectId)
     .in('boq_section_id', sectionIds)
     .order('created_at', { ascending: true });
 
   type Row = {
     id: string;
+    boq_section_id: string | null;
     title: string;
     status: string;
     assignee_id: string | null;
@@ -397,6 +399,7 @@ export async function listBoqGeneratedTasks(
   };
   return ((data ?? []) as Row[]).map((t) => ({
     id: t.id,
+    boqSectionId: t.boq_section_id,
     title: t.title,
     status: t.status,
     assigneeId: t.assignee_id,

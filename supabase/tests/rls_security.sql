@@ -1051,6 +1051,21 @@ select pg_temp.ok(
   'award_tender: winning invite marked awarded');
 reset request.jwt.claims;
 
+-- ── accept_and_price_task: whole-task pricing must set plan_approved_at past the
+--    phase-1 guard (regression for 20260826000011 — the contractor's accept-&-lock
+--    RPC must set app.workflow_ctx). The pending assignee (contractor a2) accepts.
+insert into public.tasks (id, org_id, project_id, title, assignee_id, acceptance_status) values
+  ('a5000000-0000-0000-0000-000000000003','a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000',
+   'Whole-price Task','a0000000-0000-0000-0000-0000000000a2','pending');
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+select public.accept_and_price_task('a5000000-0000-0000-0000-000000000003', 250000, 'Full works description');
+select pg_temp.ok(
+  (select acceptance_status = 'accepted' and plan_approved_at is not null
+          and awarded_cost_cents = 250000 and works_notes = 'Full works description'
+     from public.tasks where id = 'a5000000-0000-0000-0000-000000000003'),
+  'accept_and_price_task: accepted + priced + plan locked (workflow_ctx set past the phase-1 guard)');
+reset request.jwt.claims;
+
 rollback;
 
 \echo '────────────────────────────────────────────'
