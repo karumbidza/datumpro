@@ -138,8 +138,12 @@ export async function scheduleTasks(formData: FormData): Promise<void> {
   const bits = [`${res.scheduled} task${res.scheduled === 1 ? '' : 's'} scheduled`];
   if (res.frozen > 0) bits.push(`${res.frozen} already started (kept)`);
   if (res.project_end) bits.push(`finishes ${res.project_end}`);
-  if (res.missing_duration.length > 0)
-    bits.push(`no duration set: ${res.missing_duration.join(', ')}`);
+  if (res.missing_duration.length > 0) {
+    const n = res.missing_duration.length;
+    // Just the count — listing every title makes a wall of text. The Days column
+    // in the bill shows which lines still need a duration.
+    bits.push(`${n} task${n === 1 ? '' : 's'} skipped — no duration set`);
+  }
   revalidatePath(`/projects/${projectId}/boq`);
   revalidatePath(`/projects/${projectId}/tasks`);
   revalidatePath(`/projects/${projectId}`);

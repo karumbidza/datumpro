@@ -37,6 +37,7 @@ interface RawTask {
   planned_start_date: string | null;
   planned_end_date: string | null;
   due_date: string | null;
+  awarded_cost_cents: number | null;
 }
 
 function taskDuration(t: RawTask): number {
@@ -52,7 +53,7 @@ export async function getProjectSchedule(projectId: string): Promise<ProjectSche
 
   const { data: taskData } = await supabase
     .from('tasks')
-    .select('id, org_id, title, status, planned_start_date, planned_end_date, due_date')
+    .select('id, org_id, title, status, planned_start_date, planned_end_date, due_date, awarded_cost_cents')
     .eq('project_id', projectId);
   const tasks = (taskData ?? []) as RawTask[];
   if (tasks.length === 0) return null;
@@ -70,15 +71,13 @@ export async function getProjectSchedule(projectId: string): Promise<ProjectSche
   const privileged =
     orgRole === 'owner' || orgRole === 'admin' || orgRole === 'finance' || projectRoleValue === 'pm';
 
+  // Cost weight = the task's locked awarded value (set by accept_and_price_task /
+  // award_tender / the BOQ export). Was previously read from the orphaned
+  // task_quotes table, so cost-weighting never actually engaged.
   const costByTask = new Map<string, number>();
   if (privileged) {
-    const { data: awarded } = await supabase
-      .from('task_quotes')
-      .select('task_id, cost_cents')
-      .eq('project_id', projectId)
-      .eq('status', 'awarded');
-    for (const q of (awarded ?? []) as { task_id: string; cost_cents: number | null }[]) {
-      if (q.cost_cents && q.cost_cents > 0) costByTask.set(q.task_id, q.cost_cents);
+    for (const t of tasks) {
+      if (t.awarded_cost_cents && t.awarded_cost_cents > 0) costByTask.set(t.id, t.awarded_cost_cents);
     }
   }
 
