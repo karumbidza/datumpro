@@ -585,14 +585,24 @@ export async function removeTaskDocument(formData: FormData) {
   revalidatePath(`/projects/${projectId}/tasks/${taskId}`);
 }
 
-/** A tender invitee seals their bid (their bid-scoped plan must be fully priced). */
-export async function submitBid(formData: FormData) {
+/** A tender invitee seals their bid: ONE whole-task price + a works note. */
+export async function submitBid(_prev: FormState, formData: FormData): Promise<FormState> {
   const { supabase } = await requireUser();
   const taskId = String(formData.get('taskId') ?? '');
   const projectId = String(formData.get('projectId') ?? '');
-  const { error } = await supabase.rpc('submit_tender_bid', { p_task_id: taskId });
-  if (error) throw new Error(error.message);
+  const priceRaw = String(formData.get('price') ?? '').trim();
+  const worksNotes = String(formData.get('worksNotes') ?? '').trim();
+  const price = Number(priceRaw);
+  if (!priceRaw || !Number.isFinite(price) || price < 0) return { error: 'Enter your bid price.' };
+  if (worksNotes.length < 3) return { error: 'Describe the works to be done.' };
+  const { error } = await supabase.rpc('submit_tender_bid', {
+    p_task_id: taskId,
+    p_price_cents: Math.round(price * 100),
+    p_works_notes: worksNotes,
+  });
+  if (error) return { error: error.message };
   revalidatePath(`/projects/${projectId}/tasks/${taskId}`);
+  return {};
 }
 
 export async function updateSubtask(formData: FormData) {

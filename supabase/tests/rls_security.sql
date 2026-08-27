@@ -1044,13 +1044,23 @@ insert into public.tasks (id, org_id, project_id, title) values
   ('a5000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','Award Tender Task');
 insert into public.task_tender_invites (id, org_id, project_id, task_id, contractor_id, status, invited_at) values
   ('a5000000-0000-0000-0000-000000000002','a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000',
-   'a5000000-0000-0000-0000-000000000001','a0000000-0000-0000-0000-0000000000a2','submitted', now());
+   'a5000000-0000-0000-0000-000000000001','a0000000-0000-0000-0000-0000000000a2','invited', now());
+-- The contractor seals a whole-task bid: one price + a works note (20260826000012).
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+select public.submit_tender_bid('a5000000-0000-0000-0000-000000000001', 180000, 'Tender works description');
+select pg_temp.ok(
+  (select status = 'submitted' and bid_price_cents = 180000
+     from public.task_tender_invites where id = 'a5000000-0000-0000-0000-000000000002'),
+  'submit_tender_bid: whole-task price + note sealed on the invite');
+reset request.jwt.claims;
+-- The PM awards; the winner's bid price + note lock onto the task.
 set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
 select public.award_tender('a5000000-0000-0000-0000-000000000001','a0000000-0000-0000-0000-0000000000a2');
 select pg_temp.ok(
   (select plan_approved_at is not null and assignee_id = 'a0000000-0000-0000-0000-0000000000a2'
+          and awarded_cost_cents = 180000 and works_notes = 'Tender works description'
      from public.tasks where id = 'a5000000-0000-0000-0000-000000000001'),
-  'award_tender: winner assigned + plan approved (workflow_ctx set past the phase-1 guard)');
+  'award_tender: winner assigned + plan approved + bid price/note locked (workflow_ctx set past the phase-1 guard)');
 select pg_temp.ok(
   (select status from public.task_tender_invites where id = 'a5000000-0000-0000-0000-000000000002') = 'awarded',
   'award_tender: winning invite marked awarded');

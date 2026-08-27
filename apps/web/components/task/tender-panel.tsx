@@ -5,7 +5,7 @@ import { Card, CardTitle } from '@/components/ui/card';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { formatUsd } from '@datumpro/shared/domain';
 import { awardTender, inviteTenderContractors, withdrawTenderInvite } from '@/app/(app)/projects/[projectId]/tasks/actions';
-import type { TenderInvite, BidLine, TaskDoc } from '@/lib/data/tenders';
+import type { TenderInvite, TaskDoc } from '@/lib/data/tenders';
 
 const STATUS_LABEL: Record<TenderInvite['status'], { label: string; cls: string }> = {
   invited: { label: 'Not submitted', cls: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400' },
@@ -19,7 +19,6 @@ export function TenderPanel({
   taskId,
   projectId,
   invites,
-  bidLines,
   bidDocs,
   availableContractors,
   canManage,
@@ -28,8 +27,6 @@ export function TenderPanel({
   taskId: string;
   projectId: string;
   invites: TenderInvite[];
-  /** Each contractor's competing plan, keyed by contractorId. */
-  bidLines: Record<string, BidLine[]>;
   /** Each contractor's BoQ/invoice docs, keyed by contractorId. */
   bidDocs: Record<string, TaskDoc[]>;
   availableContractors: { userId: string; name: string }[];
@@ -72,7 +69,6 @@ export function TenderPanel({
       <ul className="mt-3 space-y-2">
         {invites.map((inv) => {
           const meta = STATUS_LABEL[inv.status];
-          const lines = bidLines[inv.contractorId] ?? [];
           const expandable = inv.status === 'submitted' || inv.status === 'awarded';
           return (
             <li key={inv.id} className="rounded-md border border-zinc-200 dark:border-zinc-800">
@@ -87,8 +83,8 @@ export function TenderPanel({
                   <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${meta.cls}`}>{meta.label}</span>
                 </button>
                 {expandable && (
-                  <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
-                    {inv.bidLineCount} step{inv.bidLineCount === 1 ? '' : 's'} · {formatUsd(inv.bidTotalCents)}
+                  <span className="text-xs font-semibold tabular-nums text-zinc-600 dark:text-zinc-300">
+                    {formatUsd(inv.bidPriceCents ?? 0)}
                   </span>
                 )}
                 {!decided && inv.status !== 'awarded' && (
@@ -105,17 +101,16 @@ export function TenderPanel({
 
               {expandable && open === inv.contractorId && (
                 <div className="border-t border-zinc-100 px-3 py-2 dark:border-zinc-800">
-                  <ul className="space-y-1">
-                    {lines.map((l) => (
-                      <li key={l.id} className="flex items-center justify-between gap-2 text-sm">
-                        <span className="truncate text-zinc-700 dark:text-zinc-200">{l.title}</span>
-                        <span className="flex-shrink-0 text-[11px] tabular-nums text-zinc-400 dark:text-zinc-500">
-                          {l.estQty ? `${l.estQty}${l.estUnit === 'hours' ? 'h' : 'd'}` : ''}
-                          {l.plannedStartDate ? ` · ${l.plannedStartDate}` : ''} · {formatUsd(l.costCents)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                  {inv.worksNotes && (
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+                        Works to be done
+                      </p>
+                      <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-zinc-700 dark:text-zinc-200">
+                        {inv.worksNotes}
+                      </p>
+                    </div>
+                  )}
                   {(bidDocs[inv.contractorId] ?? []).length > 0 && (
                     <ul className="mt-2 space-y-1">
                       {(bidDocs[inv.contractorId] ?? []).map((d) => (
@@ -129,7 +124,7 @@ export function TenderPanel({
                     </ul>
                   )}
                   <div className="mt-2 flex items-center justify-between border-t border-zinc-100 pt-2 dark:border-zinc-800">
-                    <span className="text-sm font-semibold tabular-nums">Total {formatUsd(inv.bidTotalCents)}</span>
+                    <span className="text-sm font-semibold tabular-nums">Bid {formatUsd(inv.bidPriceCents ?? 0)}</span>
                     {!decided && inv.status === 'submitted' && (
                       <form action={awardTender}>
                         <input type="hidden" name="taskId" value={taskId} />
