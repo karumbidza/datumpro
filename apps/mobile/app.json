@@ -3,7 +3,7 @@
     "name": "DatumPro Field",
     "slug": "datumpro-field",
     "scheme": "datumpro",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "orientation": "default",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
