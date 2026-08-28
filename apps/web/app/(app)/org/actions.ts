@@ -145,3 +145,30 @@ export async function setApprovalPolicy(formData: FormData) {
   await logAudit({ orgId, actorId: user.id, entityType: 'organization', entityId: orgId, action: 'approval_policy.set', after: { secondApprover: second } });
   revalidatePath('/org');
 }
+
+const MATRIX_ENTITY_TYPES = ['task_plan', 'task_variation', 'extension', 'payment', 'request'] as const;
+
+/** Set the per-entity-type approval matrix (role chains + thresholds). Step 1 is
+ *  always PM. RPC is SECURITY DEFINER and re-checks org-admin. */
+export async function setApprovalMatrix(formData: FormData) {
+  const orgId = String(formData.get('orgId') ?? '');
+  if (!orgId) throw new Error('Missing organisation');
+
+  const rows = MATRIX_ENTITY_TYPES.map((et) => {
+    const extra_roles = [String(formData.get(`${et}_step2`) ?? 'none'), String(formData.get(`${et}_step3`) ?? 'none')]
+      .filter((r) => r && r !== 'none');
+    const dollars = Number(formData.get(`${et}_threshold`) ?? 0);
+    const min_amount_cents = Number.isFinite(dollars) && dollars > 0 ? Math.round(dollars * 100) : 0;
+    return { entity_type: et, extra_roles, min_amount_cents };
+  });
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/sign-in');
+
+  const { error } = await supabase.rpc('set_org_approval_matrix', { p_org_id: orgId, p_rows: rows });
+  if (error) throw new Error(error.message);
+
+  await logAudit({ orgId, actorId: user.id, entityType: 'organization', entityId: orgId, action: 'approval_matrix.set', after: { rows } });
+  revalidatePath('/org');
+}

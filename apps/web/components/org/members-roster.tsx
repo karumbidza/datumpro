@@ -10,7 +10,10 @@ import {
   assignMemberToProject,
   deactivateOrgMember,
   reactivateOrgMember,
+  sendMemberPasswordReset,
 } from '@/app/(app)/org/members/actions';
+import { MemberDocuments } from '@/components/org/member-documents';
+import type { ContractorDocRow } from '@/lib/data/contractor-documents';
 
 const inputClass =
   'rounded-md border border-zinc-200 bg-transparent px-2 py-1 text-xs outline-none focus:border-brand-500 dark:border-zinc-800';
@@ -34,12 +37,16 @@ export function MembersRoster({
   projects,
   meId,
   isAdmin,
+  docsByContractor = new Map(),
+  canReviewDocs = false,
 }: {
   orgId: string;
   members: Member[];
   projects: { id: string; name: string }[];
   meId: string;
   isAdmin: boolean;
+  docsByContractor?: Map<string, ContractorDocRow[]>;
+  canReviewDocs?: boolean;
 }) {
   return (
     <div className="space-y-2">
@@ -83,6 +90,12 @@ export function MembersRoster({
                   <Badge tone={typeTone(m.memberType)}>{MEMBER_TYPE_META[m.memberType].label}</Badge>
                 )}
 
+                {['owner', 'admin', 'pm'].includes(m.role) && (
+                  <span className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+                    can approve
+                  </span>
+                )}
+
                 {disabled && <Badge tone="neutral">disabled</Badge>}
 
                 {editable && !disabled && (
@@ -123,6 +136,16 @@ export function MembersRoster({
                     </SubmitButton>
                   </form>
                 )}
+
+                {editable && !disabled && (
+                  <form action={sendMemberPasswordReset}>
+                    <input type="hidden" name="orgId" value={orgId} />
+                    <input type="hidden" name="userId" value={m.userId} />
+                    <SubmitButton variant="ghost" pendingText="Sending…">
+                      Reset password
+                    </SubmitButton>
+                  </form>
+                )}
               </div>
             </div>
 
@@ -159,6 +182,12 @@ export function MembersRoster({
                   </SubmitButton>
                 </form>
               </details>
+            )}
+
+            {m.memberType === 'contractor' && (
+              <div className="mt-2 w-full border-t border-zinc-100 pt-2 dark:border-zinc-800">
+                <MemberDocuments docs={docsByContractor.get(m.userId) ?? []} canReview={canReviewDocs} />
+              </div>
             )}
           </Card>
         );
