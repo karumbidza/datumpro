@@ -64,6 +64,7 @@ export const PAYMENT_REQUEST_TONE: Record<PaymentRequestStatus, BadgeTone> = {
   approved: 'blue',
   paid: 'green',
   rejected: 'neutral',
+  cancelled: 'neutral',
 };
 
 export const CONTRACTOR_DOC_TONE: Record<ContractorDocStatus, BadgeTone> = {
