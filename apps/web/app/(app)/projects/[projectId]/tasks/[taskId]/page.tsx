@@ -172,7 +172,7 @@ export default async function TaskDetailPage({
         {task.status === 'blocked' && canManage && (
           <form action={resolveBlocker}>
             <input type="hidden" name="taskId" value={taskId} />
-            <Button type="submit">Resolve blocker (resume, credit deadline)</Button>
+            <Button type="submit">Resolve blocker</Button>
           </form>
         )}
       </div>

@@ -320,7 +320,7 @@ export function BoqBuilder({
               inputMode="numeric"
               placeholder="—"
               aria-label="Duration in working days"
-              title="Estimated working days for this line (rolls up into the task's agreed timeline)"
+              title="Working days"
               onBlur={(e) => {
                 const raw = e.target.value.trim();
                 const durationDays = raw === '' ? null : Math.max(0, Math.round(Number(raw) || 0));
@@ -470,7 +470,7 @@ export function BoqBuilder({
               <th className={`${colB} border-b border-zinc-300 px-2.5 py-2.5 text-left font-semibold dark:border-zinc-700`}>Unit</th>
               <th className={`${colB} border-b border-zinc-300 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700`}>Qty</th>
               <th className={`${colB} border-b border-zinc-300 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700`}>Budget/Est</th>
-              <th className={`${colB} border-b border-zinc-300 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700`} title="Working days per line — the agreed timeline rolls up from these">Days</th>
+              <th className={`${colB} border-b border-zinc-300 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700`} title="Working days">Days</th>
               <th className={`${colB} border-b border-zinc-300 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700`}>Total</th>
               <th className="border-b border-zinc-300 dark:border-zinc-700" />
             </tr>

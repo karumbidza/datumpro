@@ -304,7 +304,7 @@ export function BidWorkspaceView({
               </th>
               <th
                 className="border-b border-r border-zinc-300 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700"
-                title="Your proposed working days for this line"
+                title="Working days"
               >
                 Days
               </th>

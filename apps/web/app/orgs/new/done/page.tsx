@@ -10,10 +10,10 @@ export default async function OrgCreatedPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-6 py-12">
       <Card>
-        <p className="text-xs font-medium uppercase tracking-wide text-brand-600 dark:text-brand-400">Step 2 of 2 · You&apos;re set up</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-brand-600 dark:text-brand-400">You&apos;re set up</p>
         <h1 className="mt-1 text-lg font-semibold tracking-tight">Your company is ready</h1>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Two quick things get your team working. You can also do these later from the dashboard.
+          Two quick things get your team working — or do them later from the dashboard.
         </p>
 
         <div className="mt-6 space-y-3">

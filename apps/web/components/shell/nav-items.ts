@@ -77,7 +77,7 @@ export function computeNav(
         : []),
     ...(canManageMembers
       ? [
-          { name: 'Organization', href: '/org', icon: Building },
+          { name: 'Org setup', href: '/org', icon: Building },
           { name: 'Support', href: '/support', icon: MessageCircle },
         ]
       : []),

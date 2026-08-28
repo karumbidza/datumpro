@@ -66,10 +66,10 @@ export function SupportChat({ orgId }: { orgId: string }) {
         setBody('');
         setError(null);
       } else {
-        setError('Could not send. Please try again.');
+        setError('Couldn’t send. Try again.');
       }
     } catch {
-      setError('Could not send. Please try again.');
+      setError('Couldn’t send. Try again.');
     } finally {
       setSending(false);
     }

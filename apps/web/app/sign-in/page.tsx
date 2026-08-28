@@ -2,12 +2,27 @@
 
 import { use, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { passwordIssue } from '@datumpro/shared/validation';
+import { PASSWORD_MIN_LENGTH, passwordIssue } from '@datumpro/shared/validation';
 import { ForgotPasswordFlow } from './forgot-password-flow';
 
+// 48px min tap target (h-12) — comfortable for thumbs, per the mobile-first form spec.
 const fieldClass =
-  'flex h-11 w-full items-center gap-2.5 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 transition focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/15 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100';
+  'flex h-12 w-full items-center gap-2.5 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 transition focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/15 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100';
 const inputClass = 'flex-1 bg-transparent outline-none placeholder:text-zinc-400';
+
+/** Actionable, specific email-format check for inline validation on blur —
+ *  "missing an @", "missing a domain" — never a generic "invalid input". */
+function emailProblem(value: string): string | null {
+  const v = value.trim();
+  if (v === '') return null; // empty is handled by `required`, not flagged on blur
+  const at = v.lastIndexOf('@');
+  if (at <= 0) return 'This email is missing the part before the “@”.';
+  if (at === v.length - 1) return 'This email is missing a domain after the “@”.';
+  const domain = v.slice(at + 1);
+  if (!domain.includes('.') || domain.startsWith('.') || domain.endsWith('.'))
+    return 'This email’s domain looks incomplete (e.g. company.com).';
+  return null;
+}
 
 /** Shown when someone tries to "Create account" with an email that already
  *  exists — the #1 real-world signup confusion (see auth debug 2026-08-03). */
@@ -37,6 +52,14 @@ export default function SignInPage({
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: 'error' | 'info'; text: string } | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [capsOn, setCapsOn] = useState(false);
+  const [pwFocused, setPwFocused] = useState(false);
+
+  // Live password-length feedback, only surfaced once the field is in play
+  // (focused or typed into) so a returning sign-in stays uncluttered.
+  const pwLongEnough = password.length >= PASSWORD_MIN_LENGTH;
+  const showPwRule = pwFocused || password.length > 0;
 
   async function passwordSignIn(e: React.FormEvent) {
     e.preventDefault();
@@ -121,7 +144,7 @@ export default function SignInPage({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-mark.svg" alt="DatumPro" className="mb-6 h-12 w-12 rounded-xl shadow-sm" />
           <h1 className="font-display text-2xl font-semibold leading-[1.2] tracking-[-0.02em] text-zinc-900 dark:text-white">
-            {view === 'forgot' ? 'Reset your password' : fromInvite ? 'Accept your invitation' : 'Welcome back'}
+            {view === 'forgot' ? 'Reset your password' : fromInvite ? 'Accept your invitation' : 'Sign in'}
           </h1>
           <p className="mt-2 max-w-[340px] text-sm text-zinc-500 dark:text-zinc-400">
             {view === 'forgot' ? (
@@ -145,7 +168,7 @@ export default function SignInPage({
             type="button"
             onClick={() => oauth('google')}
             disabled={busy}
-            className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-white text-sm font-semibold text-zinc-900 transition hover:border-zinc-300 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-900"
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-white text-sm font-semibold text-zinc-900 transition hover:border-zinc-300 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-900"
           >
             <GoogleIcon />
             Continue with Google
@@ -161,18 +184,29 @@ export default function SignInPage({
 
         <form onSubmit={passwordSignIn} className="mt-[18px] flex flex-col gap-3">
             <div>
-              <label className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Work email</label>
+              <label htmlFor="email" className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                Work email
+              </label>
               <div className={fieldClass}>
                 <MailIcon />
                 <input
+                  id="email"
                   type="email"
                   required
+                  autoFocus={!fromInvite}
+                  autoComplete="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (emailError) setEmailError(null); // clear as they correct it
+                  }}
+                  onBlur={(e) => setEmailError(emailProblem(e.target.value))}
+                  aria-invalid={emailError ? true : undefined}
                   placeholder="you@company.com"
                   className={inputClass}
                 />
               </div>
+              {emailError && <p className="mt-1.5 text-xs text-red-500">{emailError}</p>}
             </div>
             <div>
               <div className="mb-1.5 flex items-baseline justify-between">
@@ -191,10 +225,16 @@ export default function SignInPage({
               <div className={fieldClass}>
                 <LockIcon />
                 <input
+                  id="password"
                   type={showPassword ? 'text' : 'password'}
                   required
+                  autoFocus={fromInvite}
+                  autoComplete={fromInvite ? 'new-password' : 'current-password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  onFocus={() => setPwFocused(true)}
+                  onBlur={() => setPwFocused(false)}
+                  onKeyUp={(e) => setCapsOn(e.getModifierState('CapsLock'))}
                   placeholder="••••••••"
                   className={inputClass}
                 />
@@ -207,6 +247,17 @@ export default function SignInPage({
                   {showPassword ? <EyeOffIcon /> : <EyeIcon />}
                 </button>
               </div>
+              {showPwRule && (
+                <p
+                  className={`mt-1.5 flex items-center gap-1.5 text-xs ${
+                    pwLongEnough ? 'text-green-600 dark:text-green-400' : 'text-zinc-500 dark:text-zinc-400'
+                  }`}
+                >
+                  <CheckIcon filled={pwLongEnough} />
+                  At least {PASSWORD_MIN_LENGTH} characters
+                </p>
+              )}
+              {capsOn && <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">Caps Lock is on.</p>}
             </div>
 
             <div className="mt-1 flex gap-2.5">
@@ -216,14 +267,14 @@ export default function SignInPage({
                     type="button"
                     onClick={signUp}
                     disabled={busy}
-                    className="h-11 flex-1 rounded-lg bg-brand-500 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
+                    className="h-12 flex-1 rounded-lg bg-brand-500 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
                   >
                     {busy ? 'Creating…' : 'Create account'}
                   </button>
                   <button
                     type="submit"
                     disabled={busy}
-                    className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-900"
+                    className="h-12 rounded-lg border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-900"
                   >
                     {busy ? '…' : 'I have an account'}
                   </button>
@@ -233,7 +284,7 @@ export default function SignInPage({
                   <button
                     type="submit"
                     disabled={busy}
-                    className="h-11 flex-1 rounded-lg bg-brand-500 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
+                    className="h-12 flex-1 rounded-lg bg-brand-500 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
                   >
                     {busy ? '…' : 'Sign in'}
                   </button>
@@ -241,7 +292,7 @@ export default function SignInPage({
                     type="button"
                     onClick={signUp}
                     disabled={busy}
-                    className="h-11 rounded-lg border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-900"
+                    className="h-12 rounded-lg border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-900"
                   >
                     Create account
                   </button>
@@ -301,6 +352,23 @@ function GoogleIcon() {
       <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z" />
       <path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84Z" />
       <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38Z" />
+    </svg>
+  );
+}
+
+function CheckIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      className={`h-3.5 w-3.5 flex-none ${filled ? '' : 'opacity-40'}`}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M20 6 9 17l-5-5" />
     </svg>
   );
 }
