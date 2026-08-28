@@ -94,55 +94,39 @@ export async function listMyTenderInvites(): Promise<MyTenderInvite[]> {
   });
 }
 
-/** My invite status for one task, or null if I'm not an invitee. */
-export async function myBidStatus(taskId: string): Promise<TenderStatus | null> {
+/** My sealed bid on one task: the invite status plus the price + works notes I've
+ *  already entered (null when not yet submitted). `status` is null if I'm not an
+ *  invitee. */
+export interface MyBid {
+  status: TenderStatus;
+  bidPriceCents: number | null;
+  worksNotes: string | null;
+}
+
+/** My bid for one task, or null if I'm not an invitee. Reads back the whole-task
+ *  price + notes so the form can prefill an already-submitted bid. */
+export async function myBid(taskId: string): Promise<MyBid | null> {
   const user = await currentUser();
   if (!user) return null;
   const { data } = await supabase
     .from('task_tender_invites')
-    .select('status')
+    .select('status, bid_price_cents, works_notes')
     .eq('task_id', taskId)
     .eq('contractor_id', user.id)
     .maybeSingle();
-  return (data as { status: TenderStatus } | null)?.status ?? null;
+  const row = data as { status: TenderStatus; bid_price_cents: number | null; works_notes: string | null } | null;
+  if (!row) return null;
+  return { status: row.status, bidPriceCents: row.bid_price_cents, worksNotes: row.works_notes };
 }
 
-/** Add a line to my sealed bid (bid_contractor_id set to me; RLS enforces it). */
-export async function addBidStep(params: {
-  taskId: string;
-  orgId: string;
-  title: string;
-  costCents?: number;
-  estQty?: number | null;
-  estUnit?: 'hours' | 'days' | null;
-  plannedStartDate?: string | null;
-}): Promise<void> {
-  const user = await currentUser();
-  if (!user) throw new Error('Not signed in');
-  const { data: last } = await supabase
-    .from('task_subtasks')
-    .select('position')
-    .eq('task_id', params.taskId)
-    .order('position', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const position = ((last as { position: number } | null)?.position ?? -1) + 1;
-  const { error } = await supabase.from('task_subtasks').insert({
-    org_id: params.orgId,
-    task_id: params.taskId,
-    title: params.title,
-    cost_cents: Math.max(0, Math.round(params.costCents ?? 0)),
-    est_qty: params.estQty ?? null,
-    est_unit: params.estUnit ?? null,
-    planned_start_date: params.plannedStartDate ?? null,
-    bid_contractor_id: user.id,
-    position,
+/** Submit (or update) my whole-task sealed bid: one price + a works note. The RPC
+ *  writes both onto my invite row and raises if the price is null/negative or the
+ *  notes are blank. Editable until the PM decides. */
+export async function submitBid(taskId: string, priceCents: number, worksNotes: string): Promise<void> {
+  const { error } = await supabase.rpc('submit_tender_bid', {
+    p_task_id: taskId,
+    p_price_cents: priceCents,
+    p_works_notes: worksNotes,
   });
-  if (error) throw new Error(error.message);
-}
-
-/** Seal my bid — the DB checks every line is priced/dated. */
-export async function submitBid(taskId: string): Promise<void> {
-  const { error } = await supabase.rpc('submit_tender_bid', { p_task_id: taskId });
   if (error) throw new Error(error.message);
 }
