@@ -36,7 +36,7 @@ export default async function NewProjectPage() {
   const defaultCalendarId = calendars.find((c) => c.isDefault)?.id ?? calendars[0]?.id ?? '';
 
   return (
-    <PageContainer width="xl">
+    <PageContainer width="4xl">
       <PageHeader
         backHref="/projects"
         backLabel="Projects"
