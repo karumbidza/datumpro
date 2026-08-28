@@ -217,6 +217,10 @@ async function resolveDisplayName(userId: string, email: string | null): Promise
     .select('display_name')
     .eq('id', userId)
     .maybeSingle();
-  const name = (data as { display_name: string | null } | null)?.display_name;
+  // Older owners were seeded with display_name = their email (before setup asked
+  // for a name). Treat an email-shaped value as unset so we never greet with a
+  // full address — fall back to the local part.
+  const raw = (data as { display_name: string | null } | null)?.display_name;
+  const name = raw && !raw.includes('@') ? raw : null;
   return name || email?.split('@')[0] || 'there';
 }

@@ -38,14 +38,39 @@ export function passwordIssue(password: string): string | null {
 
 /** Company profile captured by the onboarding setup wizard. `name` is the only
  *  required field; the rest are an on-record profile that adds credibility. */
+/** Optional email: blank → undefined, otherwise must look like an email. Used for
+ *  the company contact address (distinct from the owner's login email). */
+const optionalEmail = z
+  .string()
+  .trim()
+  .max(160)
+  .optional()
+  .transform((v) => (v && v.length > 0 ? v : undefined))
+  .refine((v) => v === undefined || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), {
+    message: 'Enter a valid company email.',
+  });
+
 export const createOrgSchema = z.object({
   name: z.string().trim().min(2).max(120),
   legalName: optionalText(160),
   country: optionalText(64), // ISO-2 or free text (e.g. "KE" or "Kenya")
   sector: optionalText(64),
   registrationNumber: optionalText(64),
+  contactEmail: optionalEmail,
+  contactPhone: optionalText(40),
 });
 export type CreateOrgInput = z.infer<typeof createOrgSchema>;
+
+/** Full payload of the company setup wizard: the company profile plus the owner's
+ *  display name (which seeds profiles.display_name so the app greets them by name,
+ *  not their email) and an explicit Terms & Privacy acceptance that must be true. */
+export const orgSetupSchema = createOrgSchema.extend({
+  fullName: z.string().trim().min(2, 'Enter your full name.').max(120),
+  termsAccepted: z.literal(true, {
+    errorMap: () => ({ message: 'Accept the Terms and Privacy Policy to continue.' }),
+  }),
+});
+export type OrgSetupInput = z.infer<typeof orgSetupSchema>;
 
 export const inviteMemberSchema = z.object({
   email: z.string().trim().email(),
