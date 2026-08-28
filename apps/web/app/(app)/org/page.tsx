@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { PageContainer } from '@/components/shell/page-container';
 import { PageHeader } from '@/components/ui/page-header';
@@ -14,14 +13,18 @@ import { createClient } from '@/lib/supabase/server';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { SubmitButton } from '@/components/ui/submit-button';
-import { Users, DollarSign, FileText, ChevronRight, ShieldAlert } from '@/components/icons';
+import { ChevronRight, ShieldAlert } from '@/components/icons';
 import { inputClass } from '@/components/ui/form';
+import { MembersPanel } from '@/components/org/members-panel';
+import { listOrgContractorDocuments } from '@/lib/data/contractor-documents';
+import { listProjects } from '@/lib/data/projects';
 
 const TABS = [
   { key: 'general', label: 'General' },
   { key: 'security', label: 'Security' },
   { key: 'policies', label: 'Policies' },
   { key: 'domains', label: 'Domains' },
+  { key: 'members', label: 'Members' },
   { key: 'integrations', label: 'Integrations' },
 ] as const;
 type TabKey = (typeof TABS)[number]['key'];
@@ -29,7 +32,16 @@ type TabKey = (typeof TABS)[number]['key'];
 export default async function OrgPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; derror?: string; dok?: string }>;
+  searchParams: Promise<{
+    tab?: string;
+    derror?: string;
+    dok?: string;
+    error?: string;
+    invited?: string;
+    resent?: string;
+    assigned?: string;
+    reset?: string;
+  }>;
 }) {
   const ctx = await getActiveContext();
   if (!ctx) redirect('/sign-in');
@@ -38,28 +50,38 @@ export default async function OrgPage({
   if (!can(ctx.active.role, 'member:manage')) redirect('/dashboard');
 
   const orgId = ctx.active.orgId;
-  const { tab, derror, dok } = await searchParams;
+  const { tab, derror, dok, error, invited, resent, assigned, reset } = await searchParams;
   const activeTab: TabKey = (TABS.some((t) => t.key === tab) ? tab : 'general') as TabKey;
-  const canViewFinance = can(ctx.active.role, 'finance:view');
+  const memberNotice = error
+    ? { kind: 'error' as const, text: decodeURIComponent(error) }
+    : invited ? { kind: 'ok' as const, text: 'Invitation sent.' }
+    : resent ? { kind: 'ok' as const, text: 'Invitation re-sent.' }
+    : assigned ? { kind: 'ok' as const, text: 'Member assigned to the project.' }
+    : reset ? { kind: 'ok' as const, text: 'Password-reset email sent.' }
+    : null;
   // Reviewing contractor compliance docs is a staff (owner/admin/finance) concern.
   const canReviewDocs = can(ctx.active.role, 'payment:record');
 
   const supabase = await createClient();
-  const [members, invitations, secondApprover, { data: orgRow }, { data: domains }] = await Promise.all([
-    listOrgMembers(orgId),
-    listPendingInvitations(orgId),
-    getOrgSecondApprover(orgId),
-    supabase
-      .from('organizations')
-      .select('require_mfa, legal_name, sector, country, registration_number')
-      .eq('id', orgId)
-      .single(),
-    supabase
-      .from('org_domains')
-      .select('id, domain, verified_at, verification_token')
-      .eq('org_id', orgId)
-      .order('created_at', { ascending: true }),
-  ]);
+  const [members, invitations, secondApprover, { data: orgRow }, { data: domains }, projectRows, docsByContractor] =
+    await Promise.all([
+      listOrgMembers(orgId),
+      listPendingInvitations(orgId),
+      getOrgSecondApprover(orgId),
+      supabase
+        .from('organizations')
+        .select('require_mfa, legal_name, sector, country, registration_number')
+        .eq('id', orgId)
+        .single(),
+      supabase
+        .from('org_domains')
+        .select('id, domain, verified_at, verification_token')
+        .eq('org_id', orgId)
+        .order('created_at', { ascending: true }),
+      listProjects().catch(() => []),
+      listOrgContractorDocuments(orgId),
+    ]);
+  const projects = projectRows.map((p) => ({ id: p.id, name: p.name }));
   const org = (orgRow ?? {}) as {
     require_mfa?: boolean;
     legal_name?: string | null;
@@ -309,49 +331,42 @@ export default async function OrgPage({
           </Card>
         )}
 
+        {activeTab === 'members' && (
+          <>
+            {memberNotice && (
+              <p className={`rounded-md px-3 py-2 text-sm ${memberNotice.kind === 'error'
+                ? 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400'
+                : 'bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400'}`}>
+                {memberNotice.text}
+              </p>
+            )}
+            <Link href="/org/audit" className="block">
+              <Card className="transition-colors hover:border-zinc-300 dark:hover:border-zinc-700">
+                <div className="flex items-center gap-4">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+                    <ShieldAlert size={20} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">Audit log</p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">Who did what — a read-only record of consequential actions</p>
+                  </div>
+                  <ChevronRight size={18} className="shrink-0 text-zinc-400 dark:text-zinc-500" />
+                </div>
+              </Card>
+            </Link>
+            <MembersPanel
+              orgId={orgId} meId={ctx.userId} members={members} invitations={invitations}
+              projects={projects} docsByContractor={docsByContractor} canReviewDocs={canReviewDocs}
+            />
+          </>
+        )}
+
         {activeTab === 'integrations' && (
           <ComingSoon
             title="Integrations"
             body="Connect DatumPro to the tools you already use — accounting (Xero, QuickBooks), cloud storage and webhooks. Coming soon."
           />
         )}
-      </section>
-
-      {/* Persistent quick-links to the related org areas (navigation, not settings) */}
-      <section className="mt-8">
-        <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Manage</h2>
-        <div className="space-y-3">
-          <ManageLink
-            href="/org/members"
-            icon={<Users size={20} />}
-            title="Members & invitations"
-            desc={`${members.length} member${members.length === 1 ? '' : 's'}${
-              invitations.length > 0 ? ` · ${invitations.length} pending invite${invitations.length === 1 ? '' : 's'}` : ''
-            }`}
-          />
-          <ManageLink
-            href="/org/audit"
-            icon={<ShieldAlert size={20} />}
-            title="Audit log"
-            desc="Who did what — a read-only record of consequential actions"
-          />
-          {canViewFinance && (
-            <ManageLink
-              href="/finance"
-              icon={<DollarSign size={20} />}
-              title="Finance"
-              desc="Budgets, invoices and payments across every project"
-            />
-          )}
-          {canReviewDocs && (
-            <ManageLink
-              href="/org/documents"
-              icon={<FileText size={20} />}
-              title="Contractor documents"
-              desc="Tax clearances & company documents to review"
-            />
-          )}
-        </div>
       </section>
     </PageContainer>
   );
@@ -390,31 +405,3 @@ function ComingSoon({ title, body }: { title: string; body: string }) {
   );
 }
 
-function ManageLink({
-  href,
-  icon,
-  title,
-  desc,
-}: {
-  href: string;
-  icon: ReactNode;
-  title: string;
-  desc: string;
-}) {
-  return (
-    <Link href={href} className="block">
-      <Card className="transition-colors hover:border-zinc-300 dark:hover:border-zinc-700">
-        <div className="flex items-center gap-4">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
-            {icon}
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium">{title}</p>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">{desc}</p>
-          </div>
-          <ChevronRight size={18} className="shrink-0 text-zinc-400 dark:text-zinc-500" />
-        </div>
-      </Card>
-    </Link>
-  );
-}

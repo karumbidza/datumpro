@@ -11,19 +11,19 @@ import { sendEmail } from '@/lib/email/resend';
 import { inviteEmail, appUrl } from '@/lib/email/templates';
 import { logAudit } from '@/lib/audit';
 
-const MEMBERS = '/org/members';
+const MEMBERS = '/org?tab=members';
 
 /** Redirect back to the Members page with an inline error banner. Server-action
  *  throws surface as a full-page error boundary, so every expected failure goes
  *  through here instead — the page shows the message and stays usable. */
 function fail(message: string): never {
-  redirect(`${MEMBERS}?error=${encodeURIComponent(message)}`);
+  redirect(`${MEMBERS}&error=${encodeURIComponent(message)}`);
 }
 
 /** Redirect back on success (revalidate + clean/flagged URL clears stale errors). */
 function done(flag?: string): never {
   revalidatePath(MEMBERS);
-  redirect(flag ? `${MEMBERS}?${flag}=1` : MEMBERS);
+  redirect(flag ? `${MEMBERS}&${flag}=1` : MEMBERS);
 }
 
 async function requireUser() {
@@ -173,6 +173,48 @@ export async function reactivateOrgMember(formData: FormData) {
   if (error) fail(error.message);
   await logAudit({ orgId, actorId: user.id, entityType: 'org_member', entityId: userId, action: 'member.reactivated' });
   done();
+}
+
+/** Admin-triggered password reset: emails the member a Supabase recovery link so
+ *  they set their own password. The admin never sees or sets it. member:manage is
+ *  enforced by RLS on org_members (the caller must be able to read the target); we
+ *  only email an address that belongs to a member of this org. */
+export async function sendMemberPasswordReset(formData: FormData) {
+  const orgId = String(formData.get('orgId') ?? '');
+  const userId = String(formData.get('userId') ?? '');
+  const { supabase, user } = await requireUser();
+
+  const { data: me } = await supabase
+    .from('org_members')
+    .select('role')
+    .eq('org_id', orgId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  const myRole = (me as { role?: string } | null)?.role;
+  if (myRole !== 'owner' && myRole !== 'admin') fail('Only an admin can reset a member’s password.');
+
+  // Resolve the target's email, scoped to this org (a non-member returns no row).
+  const { data: membership } = await supabase
+    .from('org_members')
+    .select('user_id')
+    .eq('org_id', orgId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (!membership) fail('That person is not a member of this organisation.');
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('email')
+    .eq('id', userId)
+    .maybeSingle();
+  const email = (profile as { email?: string | null } | null)?.email ?? null;
+  if (!email) fail('That member has no email on file.');
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email);
+  if (error) fail(error.message);
+
+  await logAudit({ orgId, actorId: user.id, entityType: 'org_member', entityId: userId, action: 'member.password_reset_sent' });
+  redirect(`${MEMBERS}&reset=1`);
 }
 
 /** Assign an existing org member to a project with a project role. RLS
