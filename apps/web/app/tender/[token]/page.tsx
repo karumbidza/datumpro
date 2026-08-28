@@ -36,8 +36,8 @@ export default async function TenderPage({
             <>
               <CardTitle>Wrong account</CardTitle>
               <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-                This invitation was sent to a different email address. Please sign out and sign in
-                with the address that received the tender invite.
+                This invitation was sent to a different email address. Sign out and sign in with the
+                address that received the tender invite.
               </p>
             </>
           ) : isInvalid ? (
@@ -52,7 +52,7 @@ export default async function TenderPage({
             <>
               <CardTitle>Something went wrong</CardTitle>
               <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-                Unable to open this tender invitation. Please try again or contact the project owner.
+                Unable to open this tender invitation. Try again, or contact the project owner.
               </p>
             </>
           )}

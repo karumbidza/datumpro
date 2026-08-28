@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { passwordIssue } from '@datumpro/shared/validation';
+import { PASSWORD_MIN_LENGTH, passwordIssue } from '@datumpro/shared/validation';
 
 const fieldClass =
-  'flex h-11 w-full items-center gap-2.5 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 transition focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/15 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100';
+  'flex h-12 w-full items-center gap-2.5 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 transition focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/15 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100';
 const inputClass = 'flex-1 bg-transparent outline-none placeholder:text-zinc-400';
 const primaryBtn =
-  'h-11 w-full rounded-lg bg-brand-500 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50';
+  'h-12 w-full rounded-lg bg-brand-500 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50';
 
 type Step = 'email' | 'code' | 'password';
 
@@ -34,10 +34,12 @@ export function ForgotPasswordFlow({
   const [email, setEmail] = useState(initialEmail);
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [capsOn, setCapsOn] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: 'error' | 'info'; text: string } | null>(null);
+
+  const pwLongEnough = password.length >= PASSWORD_MIN_LENGTH;
 
   async function sendCode(e?: React.FormEvent) {
     e?.preventDefault();
@@ -92,7 +94,6 @@ export function ForgotPasswordFlow({
     e.preventDefault();
     const pwIssue = passwordIssue(password);
     if (pwIssue) return setMessage({ kind: 'error', text: pwIssue });
-    if (password !== confirm) return setMessage({ kind: 'error', text: 'The two passwords don’t match.' });
     setBusy(true);
     setMessage(null);
     const supabase = createClient();
@@ -203,7 +204,8 @@ export function ForgotPasswordFlow({
                 autoFocus
                 value={password}
                 onChange={(ev) => setPassword(ev.target.value)}
-                placeholder="At least 8 characters"
+                onKeyUp={(ev) => setCapsOn(ev.getModifierState('CapsLock'))}
+                placeholder="••••••••"
                 className={inputClass}
               />
               <button
@@ -215,21 +217,15 @@ export function ForgotPasswordFlow({
                 {showPassword ? <EyeOffIcon /> : <EyeIcon />}
               </button>
             </div>
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Confirm password</label>
-            <div className={fieldClass}>
-              <LockIcon />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                autoComplete="new-password"
-                required
-                value={confirm}
-                onChange={(ev) => setConfirm(ev.target.value)}
-                placeholder="Re-enter password"
-                className={inputClass}
-              />
-            </div>
+            <p
+              className={`mt-1.5 flex items-center gap-1.5 text-xs ${
+                pwLongEnough ? 'text-green-600 dark:text-green-400' : 'text-zinc-500 dark:text-zinc-400'
+              }`}
+            >
+              <CheckIcon filled={pwLongEnough} />
+              At least {PASSWORD_MIN_LENGTH} characters
+            </p>
+            {capsOn && <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">Caps Lock is on.</p>}
           </div>
           <button type="submit" disabled={busy} className={primaryBtn}>
             {busy ? 'Updating…' : 'Update password & sign in'}
@@ -259,6 +255,23 @@ export function ForgotPasswordFlow({
 }
 
 /* ── Icons (mirror the sign-in page set) ─────────────────────────────────────── */
+
+function CheckIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      className={`h-3.5 w-3.5 flex-none ${filled ? '' : 'opacity-40'}`}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
 
 function MailIcon() {
   return (
