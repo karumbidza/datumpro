@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { PAYMENT_REQUEST_TONE, CONTRACTOR_DOC_TONE } from '@/components/ui/tones';
 import { formatUsd, PAYMENT_REQUEST_STATUS_LABEL } from '@datumpro/shared/domain';
 import { listMyPaymentRequests } from '@/lib/data/payment-requests';
+import { withdrawPaymentRequest } from './request-actions';
 import { RequestPaymentForm, type RequestTask } from '@/components/payments/request-payment-form';
 import {
   CONTRACTOR_DOC_TYPE_LABEL,
@@ -153,6 +154,20 @@ export default async function MyPaymentsPage() {
                     <Badge tone={PAYMENT_REQUEST_TONE[r.status]}>{PAYMENT_REQUEST_STATUS_LABEL[r.status]}</Badge>
                   </div>
                 </div>
+                {r.status === 'requested' && (
+                  <form action={withdrawPaymentRequest} className="mt-2">
+                    <input type="hidden" name="id" value={r.id} />
+                    <button
+                      type="submit"
+                      className="text-xs font-medium text-zinc-500 transition hover:text-red-600 hover:underline dark:text-zinc-400 dark:hover:text-red-400"
+                    >
+                      Withdraw request
+                    </button>
+                  </form>
+                )}
+                {r.status === 'cancelled' && (
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Withdrawn — kept on record.</p>
+                )}
                 {r.status === 'rejected' && r.reviewNote && (
                   <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Rejected — “{r.reviewNote}”</p>
                 )}

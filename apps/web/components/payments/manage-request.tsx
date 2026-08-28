@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { rejectPaymentRequest, markPaymentRequestPaid } from '@/app/(app)/payments/request-actions';
 import { ApprovalChain } from '@/components/approvals/approval-chain';
 import type { ApprovalStep } from '@/lib/data/approvals';
+import type { PaymentRequestStatus } from '@datumpro/shared/domain';
 
 const BUCKET = 'project-media';
 
@@ -24,7 +25,7 @@ export function ManageRequest({
   id: string;
   orgId: string;
   projectId: string;
-  status: 'requested' | 'approved' | 'paid' | 'rejected';
+  status: PaymentRequestStatus;
   steps: ApprovalStep[];
   viewerRole: string;
 }) {
@@ -84,7 +85,7 @@ export function ManageRequest({
     }
   }
 
-  if (status === 'paid' || status === 'rejected') return null;
+  if (status === 'paid' || status === 'rejected' || status === 'cancelled') return null;
 
   async function confirmReject() {
     const fd = base();

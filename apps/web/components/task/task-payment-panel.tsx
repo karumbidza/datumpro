@@ -9,6 +9,7 @@ const TONE: Record<PaymentRequestStatus, 'neutral' | 'blue' | 'green' | 'amber'>
   approved: 'blue',
   paid: 'green',
   rejected: 'neutral',
+  cancelled: 'neutral',
 };
 
 /** The task's own payment position + request flow — so the assignee (contractor,

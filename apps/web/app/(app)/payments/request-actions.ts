@@ -48,7 +48,7 @@ export async function requestPayment(formData: FormData): Promise<Result> {
     .eq('task_id', input.taskId)
     .eq('contractor_id', user.id);
   const used = ((reqs ?? []) as { amount_cents: number; status: string }[])
-    .filter((r) => r.status !== 'rejected')
+    .filter((r) => r.status !== 'rejected' && r.status !== 'cancelled')
     .reduce((s, r) => s + r.amount_cents, 0);
   const requestable = (task.awarded_cost_cents ?? 0) - used;
   if (input.amountCents > requestable) {
@@ -71,6 +71,37 @@ export async function requestPayment(formData: FormData): Promise<Result> {
 
   revalidatePath('/payments');
   return { ok: true };
+}
+
+/** The owning contractor withdraws their own still-pending request. This is a
+ *  status change to 'cancelled', never a delete — payment records are permanent
+ *  (ledger). The DB trigger enforces that only a 'requested' row can move here and
+ *  that no money fields change. */
+export async function cancelPaymentRequest(formData: FormData): Promise<Result> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Not signed in.' };
+
+  const id = String(formData.get('id') ?? '');
+  const projectId = String(formData.get('projectId') ?? '');
+  const { error } = await supabase
+    .from('contractor_payment_requests')
+    .update({ status: 'cancelled' })
+    .eq('id', id)
+    .eq('contractor_id', user.id)
+    .eq('status', 'requested');
+  if (error) return { ok: false, error: error.message };
+  if (projectId) revalidatePath(`/projects/${projectId}/finance`);
+  revalidatePath('/payments');
+  return { ok: true };
+}
+
+/** Void wrapper so a plain `<form action>` (server component, no client state) can
+ *  withdraw a request; revalidation refreshes the list. */
+export async function withdrawPaymentRequest(formData: FormData): Promise<void> {
+  await cancelPaymentRequest(formData);
 }
 
 // approvePaymentRequest retired — payment approval runs through the shared two-step

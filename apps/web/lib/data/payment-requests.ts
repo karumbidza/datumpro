@@ -138,7 +138,7 @@ export async function listProjectPaymentRequests(projectId: string): Promise<Pay
     for (const p of profs ?? []) names.set(p.id, p.display_name || p.email || 'Contractor');
   }
   const hydrated = await hydrate(rows, names);
-  const order: Record<PaymentRequestStatus, number> = { requested: 0, approved: 1, paid: 2, rejected: 3 };
+  const order: Record<PaymentRequestStatus, number> = { requested: 0, approved: 1, paid: 2, rejected: 3, cancelled: 4 };
   return hydrated.sort((a, b) => order[a.status] - order[b.status]);
 }
 

@@ -1080,6 +1080,92 @@ select pg_temp.ok(
   'accept_and_price_task: accepted + priced + plan locked (workflow_ctx set past the phase-1 guard)');
 reset request.jwt.claims;
 
+-- ── Ledger delete-protection: committed money + audit trail are permanent ────
+-- The guards are BEFORE DELETE/UPDATE triggers, so they fire regardless of role;
+-- these run as the seeding superuser. Reuses the committed task a500…0003
+-- (accepted + priced + plan-approved above). See 20260826000020.
+reset role;
+
+-- A committed (plan-approved, awarded) task cannot be deleted.
+do $$
+begin
+  delete from public.tasks where id = 'a5000000-0000-0000-0000-000000000003';
+  raise exception 'FAIL: a committed (awarded) task was deleted';
+exception when insufficient_privilege then
+  raise notice 'PASS: ledger: committed task delete blocked';
+end $$;
+select pg_temp.ok(
+  (select count(*) from public.tasks where id = 'a5000000-0000-0000-0000-000000000003') = 1,
+  'ledger: committed task still present after blocked delete');
+
+-- A draft task (no awarded amount, no plan approval) is still freely deletable,
+-- so the guard doesn't over-block ordinary editing.
+insert into public.tasks (id, org_id, project_id, title) values
+  ('a5000000-0000-0000-0000-0000000000d1','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000','Draft task');
+delete from public.tasks where id = 'a5000000-0000-0000-0000-0000000000d1';
+select pg_temp.ok(
+  (select count(*) from public.tasks where id = 'a5000000-0000-0000-0000-0000000000d1') = 0,
+  'ledger: a draft task is still deletable (guard does not over-block)');
+
+-- Payment requests are permanent: an approved one cannot be deleted; a pending
+-- one is withdrawn by a status change to cancelled, never a delete.
+insert into public.contractor_payment_requests
+  (id, org_id, project_id, task_id, contractor_id, title, amount_cents, status) values
+  ('a6000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000','a5000000-0000-0000-0000-000000000003',
+   'a0000000-0000-0000-0000-0000000000a2','Claim 1',100000,'approved'),
+  ('a6000000-0000-0000-0000-000000000002','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000','a5000000-0000-0000-0000-000000000003',
+   'a0000000-0000-0000-0000-0000000000a2','Claim 2',50000,'requested');
+do $$
+begin
+  delete from public.contractor_payment_requests where id = 'a6000000-0000-0000-0000-000000000001';
+  raise exception 'FAIL: an approved payment request was deleted';
+exception when insufficient_privilege then
+  raise notice 'PASS: ledger: approved payment request delete blocked';
+end $$;
+update public.contractor_payment_requests set status = 'cancelled'
+  where id = 'a6000000-0000-0000-0000-000000000002';
+select pg_temp.ok(
+  (select status::text from public.contractor_payment_requests
+     where id = 'a6000000-0000-0000-0000-000000000002') = 'cancelled',
+  'ledger: a pending payment request is withdrawn to cancelled (row kept)');
+select pg_temp.ok(
+  (select count(*) from public.contractor_payment_requests
+     where id in ('a6000000-0000-0000-0000-000000000001','a6000000-0000-0000-0000-000000000002')) = 2,
+  'ledger: both payment requests remain on record');
+
+-- The audit trail is append-only: audit_logs cannot be deleted OR updated.
+insert into public.audit_logs (id, org_id, entity_type, action) values
+  ('a7000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000','ledger_test','created');
+do $$
+begin
+  delete from public.audit_logs where id = 'a7000000-0000-0000-0000-000000000001';
+  raise exception 'FAIL: an audit_logs row was deleted';
+exception when insufficient_privilege then
+  raise notice 'PASS: ledger: audit_logs delete blocked';
+end $$;
+do $$
+begin
+  update public.audit_logs set action = 'tampered' where id = 'a7000000-0000-0000-0000-000000000001';
+  raise exception 'FAIL: an audit_logs row was updated';
+exception when insufficient_privilege then
+  raise notice 'PASS: ledger: audit_logs update blocked';
+end $$;
+
+-- task_activity is append-only too (delete blocked).
+insert into public.task_activity (id, org_id, task_id, type, message) values
+  ('a7000000-0000-0000-0000-000000000002','a1110000-0000-0000-0000-000000000000',
+   'a5000000-0000-0000-0000-000000000003','test','ledger test entry');
+do $$
+begin
+  delete from public.task_activity where id = 'a7000000-0000-0000-0000-000000000002';
+  raise exception 'FAIL: a task_activity row was deleted';
+exception when insufficient_privilege then
+  raise notice 'PASS: ledger: task_activity delete blocked';
+end $$;
+
 rollback;
 
 \echo '────────────────────────────────────────────'
