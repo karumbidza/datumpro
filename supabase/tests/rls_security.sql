@@ -1110,14 +1110,16 @@ select pg_temp.ok(
 
 -- Payment requests are permanent: an approved one cannot be deleted; a pending
 -- one is withdrawn by a status change to cancelled, never a delete.
+-- invoice_path is required by enforce_payment_request_insert; the task
+-- a500…0003 is plan-approved, awarded 250000, and assigned to contractor a2.
 insert into public.contractor_payment_requests
-  (id, org_id, project_id, task_id, contractor_id, title, amount_cents, status) values
+  (id, org_id, project_id, task_id, contractor_id, title, amount_cents, invoice_path, status) values
   ('a6000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000',
    'a2220000-0000-0000-0000-000000000000','a5000000-0000-0000-0000-000000000003',
-   'a0000000-0000-0000-0000-0000000000a2','Claim 1',100000,'approved'),
+   'a0000000-0000-0000-0000-0000000000a2','Claim 1',100000,'inv/claim1.pdf','approved'),
   ('a6000000-0000-0000-0000-000000000002','a1110000-0000-0000-0000-000000000000',
    'a2220000-0000-0000-0000-000000000000','a5000000-0000-0000-0000-000000000003',
-   'a0000000-0000-0000-0000-0000000000a2','Claim 2',50000,'requested');
+   'a0000000-0000-0000-0000-0000000000a2','Claim 2',50000,'inv/claim2.pdf','requested');
 do $$
 begin
   delete from public.contractor_payment_requests where id = 'a6000000-0000-0000-0000-000000000001';
