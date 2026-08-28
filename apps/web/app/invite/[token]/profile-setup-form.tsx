@@ -189,6 +189,7 @@ export function ProfileSetupForm({
         <input
           name="username"
           required
+          autoFocus
           value={username}
           onChange={(e) => {
             setUsernameTouched(true);
