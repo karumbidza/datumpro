@@ -61,6 +61,65 @@ export async function updateCompanyProfile(formData: FormData) {
   revalidatePath('/org');
 }
 
+const LOGO_BUCKET = 'org-logos';
+const LOGO_TYPES = ['image/webp', 'image/jpeg', 'image/png'];
+
+/** Upload (or replace) the organisation's logo. Stored at {orgId}/logo in the
+ *  public org-logos bucket; storage RLS restricts the write to org admins. */
+export async function uploadOrgLogo(formData: FormData) {
+  const orgId = String(formData.get('orgId') ?? '');
+  const file = formData.get('logo');
+  if (!orgId) throw new Error('Missing organisation');
+  if (!(file instanceof File) || file.size === 0) throw new Error('Choose an image to upload');
+  if (!LOGO_TYPES.includes(file.type)) throw new Error('Logo must be a PNG, JPEG or WebP image');
+  if (file.size > 2 * 1024 * 1024) throw new Error('Logo must be under 2 MB');
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect('/sign-in');
+
+  const path = `${orgId}/logo`;
+  const { error: upErr } = await supabase.storage
+    .from(LOGO_BUCKET)
+    .upload(path, file, { upsert: true, contentType: file.type });
+  if (upErr) throw new Error(upErr.message);
+
+  const { error } = await supabase
+    .from('organizations')
+    .update({ logo_path: path, logo_updated_at: new Date().toISOString() })
+    .eq('id', orgId);
+  if (error) throw new Error(error.message);
+
+  await logAudit({ orgId, actorId: user.id, entityType: 'organization', entityId: orgId, action: 'organization.logo_updated', after: { logo_path: path } });
+  revalidatePath('/', 'layout'); // the sidebar switcher shows the logo
+  revalidatePath('/org');
+}
+
+/** Remove the organisation's logo (storage object + stored path). */
+export async function removeOrgLogo(formData: FormData) {
+  const orgId = String(formData.get('orgId') ?? '');
+  if (!orgId) throw new Error('Missing organisation');
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect('/sign-in');
+
+  await supabase.storage.from(LOGO_BUCKET).remove([`${orgId}/logo`]);
+  const { error } = await supabase
+    .from('organizations')
+    .update({ logo_path: null, logo_updated_at: null })
+    .eq('id', orgId);
+  if (error) throw new Error(error.message);
+
+  await logAudit({ orgId, actorId: user.id, entityType: 'organization', entityId: orgId, action: 'organization.logo_removed' });
+  revalidatePath('/', 'layout');
+  revalidatePath('/org');
+}
+
 const SECOND_APPROVERS = ['admin', 'finance', 'pm', 'viewer', 'none'];
 
 /** Set the org-wide second approver (or 'none' for a single PM-only approval).

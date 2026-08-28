@@ -7,7 +7,7 @@ import { can } from '@datumpro/shared/access';
 import { getActiveContext } from '@/lib/data/org';
 import { listOrgMembers, listPendingInvitations } from '@/lib/data/org-members';
 import { getOrgSecondApprover } from '@/lib/data/approvals';
-import { renameOrganization, setApprovalPolicy, updateCompanyProfile } from './actions';
+import { renameOrganization, setApprovalPolicy, updateCompanyProfile, uploadOrgLogo, removeOrgLogo } from './actions';
 import { setOrgMfaRequirement } from './mfa-actions';
 import { addOrgDomain, verifyOrgDomain, removeOrgDomain } from './domain-actions';
 import { createClient } from '@/lib/supabase/server';
@@ -118,6 +118,49 @@ export default async function OrgPage({
                 </div>
                 <Button type="submit">Save</Button>
               </form>
+            </Card>
+
+            <Card>
+              <CardTitle>Logo</CardTitle>
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                Shown in the organisation switcher. PNG, JPEG or WebP up to 2 MB — a square image works best.
+              </p>
+              <div className="mt-3 flex items-center gap-4">
+                <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900">
+                  {ctx.active.logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={ctx.active.logoUrl} alt="" className="size-full object-contain" />
+                  ) : (
+                    <span className="text-lg font-semibold text-zinc-400 dark:text-zinc-600">
+                      {ctx.active.name.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                </span>
+                <div className="flex flex-col gap-2">
+                  <form action={uploadOrgLogo} className="flex items-center gap-2">
+                    <input type="hidden" name="orgId" value={orgId} />
+                    <input
+                      type="file"
+                      name="logo"
+                      accept="image/png,image/jpeg,image/webp"
+                      required
+                      className="block max-w-[13rem] text-xs text-zinc-600 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-zinc-700 hover:file:bg-zinc-200 dark:text-zinc-400 dark:file:bg-zinc-800 dark:file:text-zinc-200"
+                    />
+                    <SubmitButton pendingText="Uploading…">Upload</SubmitButton>
+                  </form>
+                  {ctx.active.logoUrl && (
+                    <form action={removeOrgLogo}>
+                      <input type="hidden" name="orgId" value={orgId} />
+                      <button
+                        type="submit"
+                        className="text-xs text-zinc-500 underline hover:text-red-600 dark:text-zinc-400"
+                      >
+                        Remove logo
+                      </button>
+                    </form>
+                  )}
+                </div>
+              </div>
             </Card>
 
             <Card>

@@ -131,6 +131,23 @@ function membershipLabel(o: OrgMembershipSummary): string {
   return 'Staff';
 }
 
+function OrgAvatar({ org, size = 16 }: { org: OrgMembershipSummary; size?: number }) {
+  return (
+    <span
+      className="flex shrink-0 items-center justify-center overflow-hidden rounded bg-zinc-100 text-[9px] font-semibold uppercase text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+      style={{ width: size, height: size }}
+      aria-hidden
+    >
+      {org.logoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={org.logoUrl} alt="" className="size-full object-cover" />
+      ) : (
+        org.name.charAt(0)
+      )}
+    </span>
+  );
+}
+
 function OrgSwitcher({ orgs, activeOrgId }: { orgs: OrgMembershipSummary[]; activeOrgId: string }) {
   const [open, setOpen] = useState(false);
   const active = orgs.find((o) => o.orgId === activeOrgId);
@@ -157,7 +174,10 @@ function OrgSwitcher({ orgs, activeOrgId }: { orgs: OrgMembershipSummary[]; acti
                   type="submit"
                   className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800"
                 >
-                  <span className="min-w-0 truncate text-zinc-700 dark:text-zinc-200">{o.name}</span>
+                  <span className="flex min-w-0 items-center gap-2">
+                    <OrgAvatar org={o} size={18} />
+                    <span className="min-w-0 truncate text-zinc-700 dark:text-zinc-200">{o.name}</span>
+                  </span>
                   <span className="flex shrink-0 items-center gap-1.5">
                     <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
                       {membershipLabel(o)}
@@ -183,8 +203,9 @@ function OrgSwitcher({ orgs, activeOrgId }: { orgs: OrgMembershipSummary[]; acti
         className="flex w-full items-center justify-between gap-2 rounded px-1 py-0.5 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800"
         title="Switch organisation"
       >
-        <span className="truncate text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
-          {activeName}
+        <span className="flex min-w-0 items-center gap-2">
+          {active && <OrgAvatar org={active} size={18} />}
+          <span className="truncate text-[11px] font-medium text-zinc-600 dark:text-zinc-300">{activeName}</span>
         </span>
         <ChevronDown size={12} className="shrink-0 text-zinc-400 dark:text-zinc-500" />
       </button>
