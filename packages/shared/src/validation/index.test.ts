@@ -46,17 +46,24 @@ describe('createOrgSchema — company profile', () => {
 });
 
 describe('orgSetupSchema — full setup wizard payload', () => {
-  it('accepts a valid payload with owner name and accepted terms', () => {
-    const r = orgSetupSchema.safeParse({ name: 'Acme', fullName: 'Ada Lovelace', termsAccepted: true });
-    expect(r.success).toBe(true);
+  const base = { name: 'Acme', fullName: 'Ada Lovelace', contactPhone: '+263 77 000 0000', termsAccepted: true };
+
+  it('accepts a valid payload with owner name, company phone and accepted terms', () => {
+    expect(orgSetupSchema.safeParse(base).success).toBe(true);
   });
 
   it('requires the owner full name', () => {
-    expect(orgSetupSchema.safeParse({ name: 'Acme', fullName: 'A', termsAccepted: true }).success).toBe(false);
+    expect(orgSetupSchema.safeParse({ ...base, fullName: 'A' }).success).toBe(false);
+  });
+
+  it('requires a valid company phone', () => {
+    expect(orgSetupSchema.safeParse({ ...base, contactPhone: undefined }).success).toBe(false);
+    expect(orgSetupSchema.safeParse({ ...base, contactPhone: '' }).success).toBe(false);
+    expect(orgSetupSchema.safeParse({ ...base, contactPhone: 'call me' }).success).toBe(false);
   });
 
   it('requires terms to be accepted (true)', () => {
-    expect(orgSetupSchema.safeParse({ name: 'Acme', fullName: 'Ada Lovelace' }).success).toBe(false);
-    expect(orgSetupSchema.safeParse({ name: 'Acme', fullName: 'Ada Lovelace', termsAccepted: false }).success).toBe(false);
+    expect(orgSetupSchema.safeParse({ ...base, termsAccepted: undefined }).success).toBe(false);
+    expect(orgSetupSchema.safeParse({ ...base, termsAccepted: false }).success).toBe(false);
   });
 });

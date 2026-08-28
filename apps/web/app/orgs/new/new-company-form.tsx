@@ -31,7 +31,6 @@ export function NewCompanyForm({
   // Step 1 fields
   const [fullName, setFullName] = useState('');
   const [name, setName] = useState('');
-  const [contactEmail, setContactEmail] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [legalName, setLegalName] = useState('');
   const [country, setCountry] = useState('');
@@ -49,7 +48,6 @@ export function NewCompanyForm({
     return {
       name: name.trim(),
       fullName: fullName.trim(),
-      contactEmail: contactEmail.trim(),
       contactPhone: contactPhone.trim(),
       legalName: legalName.trim(),
       country: country.trim(),
@@ -75,8 +73,8 @@ export function NewCompanyForm({
     e.preventDefault();
     if (fullName.trim().length < 2) return setMessage({ kind: 'error', text: 'Enter your full name.' });
     if (name.trim().length < 2) return setMessage({ kind: 'error', text: 'Enter your company name.' });
-    if (contactEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim()))
-      return setMessage({ kind: 'error', text: 'Enter a valid company email, or leave it blank.' });
+    if (!/^\+?[0-9()\-\s]{7,}$/.test(contactPhone.trim()))
+      return setMessage({ kind: 'error', text: 'Enter a company phone number.' });
     if (!terms)
       return setMessage({ kind: 'error', text: 'Accept the Terms and Privacy Policy to continue.' });
 
@@ -257,33 +255,19 @@ export function NewCompanyForm({
           />
         </div>
 
-        <div className="flex gap-3">
-          <div className="flex-1">
-            <label htmlFor="contactEmail" className={labelClass}>
-              Company email {optionalLabel}
-            </label>
-            <input
-              id="contactEmail"
-              type="email"
-              value={contactEmail}
-              onChange={(e) => setContactEmail(e.target.value)}
-              placeholder="hello@acme.com"
-              className={inputClass}
-            />
-          </div>
-          <div className="flex-1">
-            <label htmlFor="contactPhone" className={labelClass}>
-              Company phone {optionalLabel}
-            </label>
-            <input
-              id="contactPhone"
-              type="tel"
-              value={contactPhone}
-              onChange={(e) => setContactPhone(e.target.value)}
-              placeholder="+263 …"
-              className={inputClass}
-            />
-          </div>
+        <div>
+          <label htmlFor="contactPhone" className={labelClass}>
+            Company phone
+          </label>
+          <input
+            id="contactPhone"
+            type="tel"
+            required
+            value={contactPhone}
+            onChange={(e) => setContactPhone(e.target.value)}
+            placeholder="+263 …"
+            className={inputClass}
+          />
         </div>
 
         <details className="rounded-md border border-zinc-200 px-3 py-2 dark:border-zinc-800">
