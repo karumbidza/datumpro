@@ -123,7 +123,6 @@ export interface ContractorDocRow {
   contractorId: string;
   docType: string;
   title: string | null;
-  fileName: string | null;
   status: 'submitted' | 'verified' | 'rejected';
   expiryDate: string | null;
 }
@@ -134,20 +133,22 @@ export async function listOrgContractorDocuments(orgId: string): Promise<Map<str
   const supabase = await createClient();
   const { data } = await supabase
     .from('contractor_documents')
-    .select('id, contractor_id, doc_type, title, file_name, status, expiry_date')
+    .select('id, contractor_id, doc_type, title, status, expiry_date')
     .eq('org_id', orgId)
     .order('created_at', { ascending: false });
   const rows = (data ?? []) as {
     id: string; contractor_id: string; doc_type: string; title: string | null;
-    file_name: string | null; status: 'submitted' | 'verified' | 'rejected'; expiry_date: string | null;
+    status: 'submitted' | 'verified' | 'rejected'; expiry_date: string | null;
   }[];
   const map = new Map<string, ContractorDocRow[]>();
   for (const r of rows) {
     const row: ContractorDocRow = {
       id: r.id, contractorId: r.contractor_id, docType: r.doc_type, title: r.title,
-      fileName: r.file_name, status: r.status, expiryDate: r.expiry_date,
+      status: r.status, expiryDate: r.expiry_date,
     };
-    (map.get(r.contractor_id) ?? map.set(r.contractor_id, []).get(r.contractor_id)!).push(row);
+    let arr = map.get(r.contractor_id);
+    if (!arr) { arr = []; map.set(r.contractor_id, arr); }
+    arr.push(row);
   }
   return map;
 }

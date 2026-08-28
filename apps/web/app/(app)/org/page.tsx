@@ -32,7 +32,16 @@ type TabKey = (typeof TABS)[number]['key'];
 export default async function OrgPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; derror?: string; dok?: string }>;
+  searchParams: Promise<{
+    tab?: string;
+    derror?: string;
+    dok?: string;
+    error?: string;
+    invited?: string;
+    resent?: string;
+    assigned?: string;
+    reset?: string;
+  }>;
 }) {
   const ctx = await getActiveContext();
   if (!ctx) redirect('/sign-in');
@@ -41,8 +50,15 @@ export default async function OrgPage({
   if (!can(ctx.active.role, 'member:manage')) redirect('/dashboard');
 
   const orgId = ctx.active.orgId;
-  const { tab, derror, dok } = await searchParams;
+  const { tab, derror, dok, error, invited, resent, assigned, reset } = await searchParams;
   const activeTab: TabKey = (TABS.some((t) => t.key === tab) ? tab : 'general') as TabKey;
+  const memberNotice = error
+    ? { kind: 'error' as const, text: decodeURIComponent(error) }
+    : invited ? { kind: 'ok' as const, text: 'Invitation sent.' }
+    : resent ? { kind: 'ok' as const, text: 'Invitation re-sent.' }
+    : assigned ? { kind: 'ok' as const, text: 'Member assigned to the project.' }
+    : reset ? { kind: 'ok' as const, text: 'Password-reset email sent.' }
+    : null;
   // Reviewing contractor compliance docs is a staff (owner/admin/finance) concern.
   const canReviewDocs = can(ctx.active.role, 'payment:record');
 
@@ -317,6 +333,13 @@ export default async function OrgPage({
 
         {activeTab === 'members' && (
           <>
+            {memberNotice && (
+              <p className={`rounded-md px-3 py-2 text-sm ${memberNotice.kind === 'error'
+                ? 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400'
+                : 'bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400'}`}>
+                {memberNotice.text}
+              </p>
+            )}
             <Link href="/org/audit" className="block">
               <Card className="transition-colors hover:border-zinc-300 dark:hover:border-zinc-700">
                 <div className="flex items-center gap-4">

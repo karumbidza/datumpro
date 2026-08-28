@@ -137,7 +137,7 @@ export function MembersRoster({
                   </form>
                 )}
 
-                {editable && (
+                {editable && !disabled && (
                   <form action={sendMemberPasswordReset}>
                     <input type="hidden" name="orgId" value={orgId} />
                     <input type="hidden" name="userId" value={m.userId} />

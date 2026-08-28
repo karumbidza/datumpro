@@ -184,6 +184,15 @@ export async function sendMemberPasswordReset(formData: FormData) {
   const userId = String(formData.get('userId') ?? '');
   const { supabase, user } = await requireUser();
 
+  const { data: me } = await supabase
+    .from('org_members')
+    .select('role')
+    .eq('org_id', orgId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  const myRole = (me as { role?: string } | null)?.role;
+  if (myRole !== 'owner' && myRole !== 'admin') fail('Only an admin can reset a member’s password.');
+
   // Resolve the target's email, scoped to this org (a non-member returns no row).
   const { data: membership } = await supabase
     .from('org_members')
