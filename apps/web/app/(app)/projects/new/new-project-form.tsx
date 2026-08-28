@@ -90,7 +90,10 @@ export function NewProjectForm({
   const selectedCalendar = calendars.find((c) => c.id === calendarId) ?? null;
 
   const step1Valid = name.trim().length > 0 && !!selectedClient;
-  const step2Valid = !!startDate && Number(durationValue) > 0;
+  // Gate the "existing BOQ" bill too — its select is `required` and lives on this
+  // (hidden-on-step-3) step, so leaving it empty would throw a "not focusable"
+  // error at submit rather than a visible validation message.
+  const step2Valid = !!startDate && Number(durationValue) > 0 && (boqMode !== 'existing' || !!boqId);
   const currentStepValid = step === 1 ? step1Valid : step === 2 ? step2Valid : true;
 
   const filteredClients = filter
