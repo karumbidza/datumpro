@@ -121,7 +121,7 @@ export default function SignInPage({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-mark.svg" alt="DatumPro" className="mb-6 h-12 w-12 rounded-xl shadow-sm" />
           <h1 className="font-display text-2xl font-semibold leading-[1.2] tracking-[-0.02em] text-zinc-900 dark:text-white">
-            {view === 'forgot' ? 'Reset your password' : fromInvite ? 'Accept your invitation' : 'Welcome back'}
+            {view === 'forgot' ? 'Reset your password' : fromInvite ? 'Accept your invitation' : 'Sign in'}
           </h1>
           <p className="mt-2 max-w-[340px] text-sm text-zinc-500 dark:text-zinc-400">
             {view === 'forgot' ? (

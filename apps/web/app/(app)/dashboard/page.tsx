@@ -41,9 +41,9 @@ export default async function DashboardPage() {
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Welcome to DatumPro</h1>
+          <h1 className="text-xl font-semibold tracking-tight">{offer ? 'Join your company' : 'Create your company'}</h1>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            {offer ? 'Your company is already on DatumPro.' : 'Create your company to get started.'}
+            {offer ? 'Your company is already on DatumPro.' : 'One organisation holds your projects, team, and tenders.'}
           </p>
         </div>
 
@@ -109,7 +109,7 @@ export default async function DashboardPage() {
         {live}
         <Greeting
           name={displayName}
-          subtitle={`Here's what's happening across ${active.name} today · ${formatLongDate(new Date())}`}
+          subtitle={`${active.name} · ${formatLongDate(new Date())}`}
           action={newProject}
         />
         <KpiRow kpis={portfolio.kpis} />
@@ -141,7 +141,7 @@ export default async function DashboardPage() {
         {live}
         <Greeting
           name={displayName}
-          subtitle={`Your delivery overview · ${formatLongDate(new Date())}`}
+          subtitle={`Delivery overview · ${formatLongDate(new Date())}`}
           action={newProject}
         />
         <DeliveryFocus approvals={approvals} blockers={blockers} overdue={overdue} />
@@ -159,7 +159,7 @@ export default async function DashboardPage() {
   return (
     <PageContainer width="3xl" className="space-y-8">
       {live}
-      <Greeting name={displayName} subtitle={`Here's your work today · ${formatLongDate(new Date())}`} />
+      <Greeting name={displayName} subtitle={`Your work · ${formatLongDate(new Date())}`} />
       {approvals.length > 0 && <ApprovalsInbox items={approvals} />}
       <MyTasksCard tasks={myTasks} />
       {hasPay && (
@@ -186,7 +186,7 @@ function Greeting({ name, subtitle, action }: { name: string; subtitle: string; 
     <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
       <div>
         <h1 className="mb-1 text-xl font-semibold tracking-tight text-zinc-900 dark:text-white sm:text-2xl">
-          Welcome back, {name}
+          {name}
         </h1>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">{subtitle}</p>
       </div>
