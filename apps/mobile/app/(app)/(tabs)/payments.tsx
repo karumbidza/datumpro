@@ -28,6 +28,10 @@ function reqPill(c: Colors, status: PaymentRequestStatus): { bg: string; fg: str
       return { bg: c.brandSoft, fg: c.brandDeep };
     case 'paid':
       return { bg: c.successSoft, fg: c.success };
+    case 'rejected':
+      return { bg: c.dangerSoft, fg: c.danger };
+    case 'cancelled':
+      return { bg: c.sunk, fg: c.muted };
     default:
       return { bg: c.sunk, fg: c.muted };
   }
