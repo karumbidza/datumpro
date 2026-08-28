@@ -117,3 +117,37 @@ export async function listOrgDocuments(orgId: string): Promise<ContractorDocumen
   const order: Record<ContractorDocStatus, number> = { submitted: 0, rejected: 1, verified: 2 };
   return hydrated.sort((a, b) => order[a.status] - order[b.status]);
 }
+
+export interface ContractorDocRow {
+  id: string;
+  contractorId: string;
+  docType: string;
+  title: string | null;
+  fileName: string | null;
+  status: 'submitted' | 'verified' | 'rejected';
+  expiryDate: string | null;
+}
+
+/** All contractor compliance docs in the org, grouped by contractor user id.
+ *  RLS already limits reads to org staff. */
+export async function listOrgContractorDocuments(orgId: string): Promise<Map<string, ContractorDocRow[]>> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('contractor_documents')
+    .select('id, contractor_id, doc_type, title, file_name, status, expiry_date')
+    .eq('org_id', orgId)
+    .order('created_at', { ascending: false });
+  const rows = (data ?? []) as {
+    id: string; contractor_id: string; doc_type: string; title: string | null;
+    file_name: string | null; status: 'submitted' | 'verified' | 'rejected'; expiry_date: string | null;
+  }[];
+  const map = new Map<string, ContractorDocRow[]>();
+  for (const r of rows) {
+    const row: ContractorDocRow = {
+      id: r.id, contractorId: r.contractor_id, docType: r.doc_type, title: r.title,
+      fileName: r.file_name, status: r.status, expiryDate: r.expiry_date,
+    };
+    (map.get(r.contractor_id) ?? map.set(r.contractor_id, []).get(r.contractor_id)!).push(row);
+  }
+  return map;
+}
