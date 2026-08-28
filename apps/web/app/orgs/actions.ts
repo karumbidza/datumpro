@@ -37,6 +37,18 @@ export async function createOrg(input: OrgSetupInput): Promise<CreateOrgResult |
     return { error: 'Verify your email before creating a company.' };
   }
 
+  // One organisation per owner. The DB cap trigger is the real gate; this is the
+  // clean early message (the page also redirects existing owners away).
+  const { count: ownedCount } = await supabase
+    .from('org_members')
+    .select('org_id', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .eq('role', 'owner')
+    .eq('status', 'active');
+  if ((ownedCount ?? 0) > 0) {
+    return { error: 'This account already owns an organisation — each account can create only one.' };
+  }
+
   const d = parsed.data;
 
   // Set the owner's display name first so their identity is on record even if the

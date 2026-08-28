@@ -7,6 +7,17 @@ import { ACTIVE_ORG_COOKIE } from '@/lib/data/org';
 import { getInvitationPreview } from '@/lib/data/org-members';
 import { profileSetupSchema } from '@datumpro/shared/validation';
 
+/** "Not you?" — drop the session and return to this invite's sign-in, prefilled
+ *  with the invited address so they can sign in / create the right account. */
+export async function signOutToSwitch(formData: FormData): Promise<void> {
+  const token = String(formData.get('token') ?? '');
+  const email = String(formData.get('email') ?? '');
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  const next = encodeURIComponent(`/invite/${token}`);
+  redirect(`/sign-in?next=${next}${email ? `&email=${encodeURIComponent(email)}` : ''}`);
+}
+
 /** Accept an invitation: the DB RPC verifies token + email match, adds the
  *  membership, and returns the org id. We then make it the active org. */
 export async function acceptInvitation(formData: FormData) {

@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getAuthUser } from '@/lib/data/org';
 import { getInvitationPreview } from '@/lib/data/org-members';
 import { MEMBER_TYPE_META } from '@datumpro/shared/access';
-import { acceptInvitation } from './actions';
+import { acceptInvitation, signOutToSwitch } from './actions';
 import { ProfileSetupForm } from './profile-setup-form';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,6 +35,9 @@ export default async function InvitePage({
     profile = data as { username: string | null; display_name: string | null } | null;
   }
   const needsSetup = !!user && !profile?.username;
+  // Signed in with a different address than the one invited — the accept RPC
+  // would reject it, so we surface a clear switch-account step instead of a form.
+  const wrongEmail = !!user?.email && !!preview && user.email.toLowerCase() !== preview.email.toLowerCase();
   const typeMeta = preview ? MEMBER_TYPE_META[preview.memberType] : null;
 
   return (
@@ -80,14 +83,19 @@ export default async function InvitePage({
               </p>
             )}
 
-            {user && user.email && user.email.toLowerCase() !== preview.email.toLowerCase() && (
-              <p className="mt-3 text-xs text-amber-600">
-                You’re signed in as {user.email}. This invite was sent to {preview.email} — sign in
-                with that address to accept.
-              </p>
-            )}
-
-            {user && needsSetup ? (
+            {user && wrongEmail ? (
+              <div className="mt-4">
+                <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+                  You&apos;re signed in as <span className="font-medium">{user.email}</span>, but this invite was sent
+                  to <span className="font-medium">{preview.email}</span>. Switch to that account to accept.
+                </p>
+                <form action={signOutToSwitch} className="mt-3">
+                  <input type="hidden" name="token" value={token} />
+                  <input type="hidden" name="email" value={preview.email} />
+                  <SubmitButton pendingText="Switching…">Sign out &amp; switch account</SubmitButton>
+                </form>
+              </div>
+            ) : user && needsSetup ? (
               <ProfileSetupForm
                 token={token}
                 email={preview.email}
@@ -106,9 +114,8 @@ export default async function InvitePage({
             ) : (
               <div className="mt-4">
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                  Continue with <span className="font-medium">{preview.email}</span> to accept. New
-                  to DatumPro? Create your account on the next screen — sign-in and sign-up both use
-                  this address.
+                  Continue as <span className="font-medium">{preview.email}</span>. New here? Create your account on
+                  the next screen — the same address works for sign-in and sign-up.
                 </p>
                 <Link
                   href={`/sign-in?next=${encodeURIComponent(`/invite/${token}`)}&email=${encodeURIComponent(preview.email)}`}

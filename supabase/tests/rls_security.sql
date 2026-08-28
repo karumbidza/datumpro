@@ -165,26 +165,25 @@ select pg_temp.ok(
   exists (select 1 from pg_policy where polname = 'org_domains_update' and polwithcheck is not null),
   'F5: org_domains_update policy carries a WITH CHECK');
 
--- ── F7: organisation-creation cap ────────────────────────────────────────────
+-- ── F7: one organisation per owner (creation cap = 1) ────────────────────────
 insert into auth.users (id, email) values ('d0000000-0000-0000-0000-0000000000d1','capper@test.dev');
 set role authenticated;
 set request.jwt.claims = '{"sub":"d0000000-0000-0000-0000-0000000000d1","role":"authenticated","aal":"aal1"}';
 do $$
-declare i int;
 begin
-  for i in 1..10 loop perform public.create_organization('Cap Org '||i); end loop;
+  perform public.create_organization('Cap Org 1');
 end $$;
 select pg_temp.ok(
   (select count(*) from public.org_members
-    where user_id = 'd0000000-0000-0000-0000-0000000000d1' and role = 'owner' and status = 'active') = 10,
-  'F7: user can create up to the cap (10) organisations');
+    where user_id = 'd0000000-0000-0000-0000-0000000000d1' and role = 'owner' and status = 'active') = 1,
+  'F7: an account can create its one organisation');
 do $$
 begin
-  perform public.create_organization('Cap Org 11');
-  raise exception 'FAIL: 11th organisation was created past the cap';
+  perform public.create_organization('Cap Org 2');
+  raise exception 'FAIL: a second organisation was created past the one-per-owner cap';
 exception
   when check_violation then
-    raise notice 'PASS: F7: 11th organisation is rejected by the cap.';
+    raise notice 'PASS: F7: a second organisation is rejected by the one-per-owner cap.';
 end $$;
 reset role;
 reset request.jwt.claims;
