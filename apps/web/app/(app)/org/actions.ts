@@ -29,6 +29,38 @@ export async function renameOrganization(formData: FormData) {
   revalidatePath('/', 'layout');
 }
 
+/** Update the organisation's company profile (legal name, sector, country,
+ *  registration number). These are captured at signup; this lets an admin edit
+ *  them afterwards. RLS restricts organizations UPDATE to owner/admin. */
+export async function updateCompanyProfile(formData: FormData) {
+  const orgId = String(formData.get('orgId') ?? '');
+  if (!orgId) throw new Error('Missing organisation');
+
+  const clip = (v: FormDataEntryValue | null, max: number) => {
+    const s = String(v ?? '').trim();
+    if (s.length > max) throw new Error('That value is too long');
+    return s === '' ? null : s;
+  };
+  const patch = {
+    legal_name: clip(formData.get('legalName'), 200),
+    sector: clip(formData.get('sector'), 120),
+    country: clip(formData.get('country'), 120),
+    registration_number: clip(formData.get('registrationNumber'), 120),
+  };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect('/sign-in');
+
+  const { error } = await supabase.from('organizations').update(patch).eq('id', orgId);
+  if (error) throw new Error(error.message);
+
+  await logAudit({ orgId, actorId: user.id, entityType: 'organization', entityId: orgId, action: 'organization.profile_updated', after: patch });
+  revalidatePath('/org');
+}
+
 const SECOND_APPROVERS = ['admin', 'finance', 'pm', 'viewer', 'none'];
 
 /** Set the org-wide second approver (or 'none' for a single PM-only approval).
