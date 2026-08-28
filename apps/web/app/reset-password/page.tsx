@@ -2,26 +2,31 @@
 
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { passwordIssue } from '@datumpro/shared/validation';
+import { PASSWORD_MIN_LENGTH, passwordIssue } from '@datumpro/shared/validation';
 
+// 48px min tap target (h-12) for comfortable thumb reach on mobile.
 const fieldClass =
-  'flex h-11 w-full items-center gap-2.5 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 transition focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/15 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100';
+  'flex h-12 w-full items-center gap-2.5 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 transition focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/15 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100';
+const inputClass = 'flex-1 bg-transparent outline-none placeholder:text-zinc-400';
 
 /** Completes the password-reset flow. The recovery link lands here (via
  *  /auth/callback, which established a recovery session), and the user sets a new
- *  password with supabase.auth.updateUser. */
+ *  password with supabase.auth.updateUser. A reveal toggle replaces the old
+ *  confirm-password field — one field, verifiable, less friction. */
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [capsOn, setCapsOn] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: 'error' | 'info'; text: string } | null>(null);
   const [done, setDone] = useState(false);
+
+  const pwLongEnough = password.length >= PASSWORD_MIN_LENGTH;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const pwIssue = passwordIssue(password);
     if (pwIssue) return setMessage({ kind: 'error', text: pwIssue });
-    if (password !== confirm) return setMessage({ kind: 'error', text: 'The two passwords don’t match.' });
     setBusy(true);
     setMessage(null);
     const supabase = createClient();
@@ -51,37 +56,46 @@ export default function ResetPasswordPage() {
 
       <form onSubmit={submit} className="mt-6 flex flex-col gap-3">
         <div>
-          <label className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">New password</label>
+          <label htmlFor="new-password" className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+            New password
+          </label>
           <div className={fieldClass}>
             <input
-              type="password"
+              id="new-password"
+              type={showPassword ? 'text' : 'password'}
               required
+              autoFocus
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              onKeyUp={(e) => setCapsOn(e.getModifierState('CapsLock'))}
               placeholder="••••••••"
-              className="flex-1 bg-transparent outline-none placeholder:text-zinc-400"
+              className={inputClass}
               disabled={busy || done}
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword((s) => !s)}
+              className="text-zinc-400 dark:text-zinc-500 transition hover:text-zinc-600 dark:hover:text-zinc-300"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+            </button>
           </div>
-        </div>
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Confirm password</label>
-          <div className={fieldClass}>
-            <input
-              type="password"
-              required
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              placeholder="••••••••"
-              className="flex-1 bg-transparent outline-none placeholder:text-zinc-400"
-              disabled={busy || done}
-            />
-          </div>
+          <p
+            className={`mt-1.5 flex items-center gap-1.5 text-xs ${
+              pwLongEnough ? 'text-green-600 dark:text-green-400' : 'text-zinc-500 dark:text-zinc-400'
+            }`}
+          >
+            <CheckIcon filled={pwLongEnough} />
+            At least {PASSWORD_MIN_LENGTH} characters
+          </p>
+          {capsOn && <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">Caps Lock is on.</p>}
         </div>
         <button
           type="submit"
           disabled={busy || done}
-          className="mt-1 h-11 w-full rounded-lg bg-brand-500 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
+          className="mt-1 h-12 w-full rounded-lg bg-brand-500 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
         >
           {busy ? 'Updating…' : 'Update password'}
         </button>
@@ -97,5 +111,42 @@ export default function ResetPasswordPage() {
         ← Back to sign in
       </a>
     </main>
+  );
+}
+
+/* ── Icons ─────────────────────────────────────────────────────────────────── */
+
+function CheckIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      className={`h-3.5 w-3.5 flex-none ${filled ? '' : 'opacity-40'}`}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function EyeOffIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6 0 10 7 10 7a13.2 13.2 0 0 1-1.67 2.26M6.6 6.6A13.2 13.2 0 0 0 2 12s4 7 10 7a9.12 9.12 0 0 0 2.1-.24" />
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M1 1l22 22" />
+    </svg>
   );
 }
