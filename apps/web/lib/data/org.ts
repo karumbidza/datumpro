@@ -26,6 +26,8 @@ export interface OrgMembershipSummary {
   name: string;
   role: OrgRole;
   memberType: MemberType;
+  /** Public URL of the org logo (cache-busted), or null if none set. */
+  logoUrl: string | null;
 }
 
 export interface ActiveContext {
@@ -35,11 +37,12 @@ export interface ActiveContext {
   active: OrgMembershipSummary | null;
 }
 
+type OrgRef = { id: string; name: string | null; logo_path: string | null; logo_updated_at: string | null };
 type MembershipQueryRow = {
   role: string | null;
   member_type: string | null;
   org_id: string;
-  organizations: { id: string; name: string | null } | { id: string; name: string | null }[] | null;
+  organizations: OrgRef | OrgRef[] | null;
 };
 
 function orgName(row: MembershipQueryRow): string {
@@ -57,16 +60,26 @@ export const getActiveContext = cache(async (): Promise<ActiveContext | null> =>
   const supabase = await createClient();
   const { data } = await supabase
     .from('org_members')
-    .select('role, member_type, org_id, organizations(id, name)')
+    .select('role, member_type, org_id, organizations(id, name, logo_path, logo_updated_at)')
     .eq('user_id', user.id)
     .eq('status', 'active');
 
-  const memberships: OrgMembershipSummary[] = ((data ?? []) as MembershipQueryRow[]).map((m) => ({
-    orgId: m.org_id,
-    name: orgName(m),
-    role: (m.role ?? 'viewer') as OrgRole,
-    memberType: (m.member_type ?? 'staff') as MemberType,
-  }));
+  const memberships: OrgMembershipSummary[] = ((data ?? []) as MembershipQueryRow[]).map((m) => {
+    const org = Array.isArray(m.organizations) ? m.organizations[0] : m.organizations;
+    let logoUrl: string | null = null;
+    if (org?.logo_path) {
+      const { data: pub } = supabase.storage.from('org-logos').getPublicUrl(org.logo_path);
+      const v = org.logo_updated_at ? new Date(org.logo_updated_at).getTime() : 0;
+      logoUrl = v ? `${pub.publicUrl}?v=${v}` : pub.publicUrl;
+    }
+    return {
+      orgId: m.org_id,
+      name: orgName(m),
+      role: (m.role ?? 'viewer') as OrgRole,
+      memberType: (m.member_type ?? 'staff') as MemberType,
+      logoUrl,
+    };
+  });
 
   const cookieStore = await cookies();
   const preferred = cookieStore.get(ACTIVE_ORG_COOKIE)?.value;
