@@ -83,3 +83,29 @@ export async function getOrgSecondApprover(orgId: string): Promise<string> {
     .maybeSingle();
   return (data as { approver_role: string } | null)?.approver_role ?? 'none';
 }
+
+export interface ApprovalMatrixRow {
+  entityType: string;
+  extraRoles: string[]; // approver roles for steps 2..N, in order
+  minAmountCents: number; // threshold above which the extra steps apply
+}
+
+/** Current per-entity-type approval chains (steps 2..N + threshold). Step 1 is
+ *  always PM and is not returned. */
+export async function getOrgApprovalMatrix(orgId: string): Promise<ApprovalMatrixRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('approval_policies')
+    .select('entity_type, step_order, approver_role, min_amount_cents')
+    .eq('org_id', orgId)
+    .order('entity_type', { ascending: true })
+    .order('step_order', { ascending: true });
+  const rows = (data ?? []) as { entity_type: string; step_order: number; approver_role: string; min_amount_cents: number }[];
+  const byType = new Map<string, ApprovalMatrixRow>();
+  for (const r of rows) {
+    let m = byType.get(r.entity_type);
+    if (!m) { m = { entityType: r.entity_type, extraRoles: [], minAmountCents: 0 }; byType.set(r.entity_type, m); }
+    if (r.step_order >= 2) { m.extraRoles.push(r.approver_role); m.minAmountCents = r.min_amount_cents; }
+  }
+  return [...byType.values()];
+}

@@ -5,8 +5,9 @@ import { redirect } from 'next/navigation';
 import { can } from '@datumpro/shared/access';
 import { getActiveContext } from '@/lib/data/org';
 import { listOrgMembers, listPendingInvitations } from '@/lib/data/org-members';
-import { getOrgSecondApprover } from '@/lib/data/approvals';
-import { renameOrganization, setApprovalPolicy, updateCompanyProfile, uploadOrgLogo, removeOrgLogo } from './actions';
+import { getOrgApprovalMatrix } from '@/lib/data/approvals';
+import { ApprovalMatrix } from '@/components/org/approval-matrix';
+import { renameOrganization, updateCompanyProfile, uploadOrgLogo, removeOrgLogo } from './actions';
 import { setOrgMfaRequirement } from './mfa-actions';
 import { addOrgDomain, verifyOrgDomain, removeOrgDomain } from './domain-actions';
 import { createClient } from '@/lib/supabase/server';
@@ -63,11 +64,11 @@ export default async function OrgPage({
   const canReviewDocs = can(ctx.active.role, 'payment:record');
 
   const supabase = await createClient();
-  const [members, invitations, secondApprover, { data: orgRow }, { data: domains }, projectRows, docsByContractor] =
+  const [members, invitations, approvalMatrix, { data: orgRow }, { data: domains }, projectRows, docsByContractor] =
     await Promise.all([
       listOrgMembers(orgId),
       listPendingInvitations(orgId),
-      getOrgSecondApprover(orgId),
+      getOrgApprovalMatrix(orgId),
       supabase
         .from('organizations')
         .select('require_mfa, legal_name, sector, country, registration_number')
@@ -229,30 +230,7 @@ export default async function OrgPage({
           </>
         )}
 
-        {activeTab === 'policies' && (
-          <Card>
-            <CardTitle>Approval policy</CardTitle>
-            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-              Everything that needs sign-off (task plans, variations, extensions, payments, requests) goes to the{' '}
-              <span className="font-medium text-zinc-700 dark:text-zinc-300">project manager first</span>, then to a second
-              approver — set that here, or make it a single PM-only approval.
-            </p>
-            <form action={setApprovalPolicy} className="mt-3 flex flex-wrap items-end gap-3">
-              <input type="hidden" name="orgId" value={orgId} />
-              <div className="min-w-56 flex-1">
-                <label className="mb-1 block text-xs font-medium">Second approver</label>
-                <select name="secondApprover" defaultValue={secondApprover} className={inputClass}>
-                  <option value="admin">Admin (default)</option>
-                  <option value="finance">Finance</option>
-                  <option value="viewer">Viewer</option>
-                  <option value="pm">Another PM</option>
-                  <option value="none">None — PM approves alone</option>
-                </select>
-              </div>
-              <Button type="submit">Save</Button>
-            </form>
-          </Card>
-        )}
+        {activeTab === 'policies' && <ApprovalMatrix orgId={orgId} matrix={approvalMatrix} />}
 
         {activeTab === 'domains' && (
           <Card>
