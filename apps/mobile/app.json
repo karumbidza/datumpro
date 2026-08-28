@@ -40,7 +40,10 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.datumpro.field"
+      "bundleIdentifier": "app.datumpro.field",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "app.datumpro.field",
