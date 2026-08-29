@@ -1,17 +1,31 @@
 'use client';
+import { useRef, useState } from 'react';
 import { fmtMoney } from '@/lib/money';
 import { type Row, type Kind, lineCents } from './grid-types';
+
+const DEFAULT_COL_W = [96, 72, 360, 72, 88, 104, 120, 120]; // Kind No Desc Unit Qty Rate Amount Total
 
 export function ReviewGrid({ rows, setRow, currency }: {
   rows: Row[];
   setRow: (i: number, patch: Partial<Row>) => void;
   currency: string;
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [colWidths] = useState<number[]>(DEFAULT_COL_W);
+  const totalWidth = colWidths.reduce((a, b) => a + b, 0);
   return (
-    <div className="overflow-x-auto rounded-lg border border-zinc-300 dark:border-zinc-700">
-      <table className="min-w-[860px] border-collapse text-sm">
-        <thead>
-          <tr className="bg-zinc-100 text-left text-[11px] uppercase tracking-wide text-zinc-500 dark:bg-zinc-800/70 dark:text-zinc-400">
+    <div
+      ref={scrollRef}
+      className="relative max-h-[calc(100vh-16rem)] overflow-auto rounded-lg border border-zinc-300 dark:border-zinc-700"
+    >
+      <table className="border-collapse text-sm" style={{ tableLayout: 'fixed', width: totalWidth }}>
+        <colgroup>
+          {colWidths.map((w, i) => (
+            <col key={i} style={{ width: w }} />
+          ))}
+        </colgroup>
+        <thead className="sticky top-0 z-20">
+          <tr className="bg-zinc-100 text-left text-[11px] uppercase tracking-wide text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
             <th className="border-b border-r border-zinc-300 px-2 py-2 dark:border-zinc-700">Kind</th>
             <th className="border-b border-r border-zinc-300 px-2 py-2 dark:border-zinc-700">No.</th>
             <th className="border-b border-r border-zinc-300 px-2 py-2 dark:border-zinc-700">Description</th>
