@@ -1399,6 +1399,37 @@ select pg_temp.ok((select count(*) from public.projects where id = 'a2220000-000
 reset role;
 reset request.jwt.claims;
 
+-- ── BOQ subtasks are BASELINE scope, not variations (20260826000027) ──────────
+-- set_subtask_variation_flag flags any subtask inserted into a plan-approved task
+-- as a pending variation. Vetted generation (export_award_to_project etc.) sets
+-- app.workflow_ctx before inserting the BOQ lines, so a task's own scope must land
+-- BASELINE even though the plan is already approved; a later user-added subtask
+-- (no ctx) into the same approved task is still flagged as a variation.
+reset role;
+insert into public.tasks (id, org_id, project_id, title, plan_approved_at) values
+  ('a5000000-0000-0000-0000-0000000000b1','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000','Approved plan task', now());
+
+-- Vetted generation context set → baseline regardless of plan_approved_at.
+select set_config('app.workflow_ctx', 'a1110000-0000-0000-0000-000000000000'::text, true);
+with ins as (
+  insert into public.task_subtasks (org_id, task_id, title, cost_cents)
+    values ('a1110000-0000-0000-0000-000000000000',
+            'a5000000-0000-0000-0000-0000000000b1','Generated BOQ line', 5000)
+  returning is_variation)
+select pg_temp.ok((select is_variation from ins) = false,
+  'boq-baseline: subtask inserted under app.workflow_ctx is baseline, not a variation');
+
+-- No context (ordinary user add) → the approved-plan path flags it a variation.
+select set_config('app.workflow_ctx', '', true);
+with ins as (
+  insert into public.task_subtasks (org_id, task_id, title, cost_cents)
+    values ('a1110000-0000-0000-0000-000000000000',
+            'a5000000-0000-0000-0000-0000000000b1','User-added extra', 3000)
+  returning is_variation)
+select pg_temp.ok((select is_variation from ins) = true,
+  'boq-baseline: subtask added without ctx into an approved task is a variation');
+
 rollback;
 
 \echo '────────────────────────────────────────────'
