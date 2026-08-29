@@ -41,9 +41,16 @@ export function StartDelivery({ tenderId, boqId, projects, linkedProject = null 
 
   if (!open) {
     return (
-      <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(true)}>
-        Start delivery →
-      </Button>
+      <div>
+        <p className="mb-2 text-sm text-zinc-600 dark:text-zinc-300">
+          This tender is awarded but its tasks weren&apos;t generated automatically — usually because the
+          winner hasn&apos;t created an account yet. Finish setting up delivery to generate the tasks and
+          enrol them.
+        </p>
+        <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(true)}>
+          Finish delivery setup →
+        </Button>
+      </div>
     );
   }
 

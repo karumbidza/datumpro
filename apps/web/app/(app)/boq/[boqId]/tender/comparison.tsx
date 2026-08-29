@@ -131,9 +131,11 @@ export function Comparison({ data, boqId, canManage }: Props) {
                         <form
                           action={awardTender}
                           onSubmit={(e) => {
+                            const tail =
+                              ' All bidders are notified, then the delivery project and their tasks are generated.';
                             const message = bidder.isComplete
-                              ? `Award this tender to ${bidder.companyName}? All bidders will be notified.`
-                              : `${bidder.companyName} left ${unpricedCount} of ${bidder.totalLines} lines unpriced. Award anyway? All bidders will be notified.`;
+                              ? `Award this tender to ${bidder.companyName}?${tail}`
+                              : `${bidder.companyName} left ${unpricedCount} of ${bidder.totalLines} lines unpriced. Award anyway?${tail}`;
                             if (!window.confirm(message)) {
                               e.preventDefault();
                             }
@@ -143,7 +145,7 @@ export function Comparison({ data, boqId, canManage }: Props) {
                           <input type="hidden" name="bidderId" value={bidder.bidderId} />
                           <input type="hidden" name="boqId" value={boqId} />
                           <Button type="submit" variant="secondary" size="sm" className="mt-0.5 normal-case text-[11px]">
-                            Award
+                            Award &amp; start delivery
                           </Button>
                         </form>
                       )}
