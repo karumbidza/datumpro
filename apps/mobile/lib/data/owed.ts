@@ -63,10 +63,22 @@ export async function listMyOwed(): Promise<{ tasks: OwedTask[]; summary: OwedSu
       pendingByTask.set(r.task_id, (pendingByTask.get(r.task_id) ?? 0) + r.amount_cents);
   }
 
+  // Progress-gated: claimable is the milestone entitlement (net of retention),
+  // not the full committed value. Mirror the web owed model and the DB gate so a
+  // contractor is never shown/prefilled more than the DB trigger will accept.
+  const entitlementByTask = new Map<string, number>();
+  await Promise.all(
+    tasks.map(async (t) => {
+      const { data } = await supabase.rpc('task_payment_entitlement_cents', { p_task_id: t.id });
+      entitlementByTask.set(t.id, (data as number | null) ?? 0);
+    }),
+  );
+
   const owed: OwedTask[] = tasks.map((t) => {
     const committed = t.awarded_cost_cents ?? 0;
     const paid = paidByTask.get(t.id) ?? 0;
     const pending = pendingByTask.get(t.id) ?? 0;
+    const entitlement = entitlementByTask.get(t.id) ?? 0;
     return {
       taskId: t.id,
       title: t.title,
@@ -77,7 +89,7 @@ export async function listMyOwed(): Promise<{ tasks: OwedTask[]; summary: OwedSu
       paidCents: paid,
       pendingCents: pending,
       outstandingCents: committed - paid,
-      requestableCents: Math.max(0, committed - paid - pending),
+      requestableCents: Math.max(0, entitlement - paid - pending),
     };
   });
 
