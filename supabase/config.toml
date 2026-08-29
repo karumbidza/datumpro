@@ -18,7 +18,17 @@ port = 54323
 
 [auth]
 enabled = true
-site_url = "http://localhost:3000"
+# Production values — this file is the source of truth for `supabase config push`,
+# so these must be the live URLs (not localhost) or a push repoints hosted auth
+# redirects at a dev machine and breaks OAuth / email links. Local `supabase
+# start` also reads these; harmless for the code-only OTP flow we use (no
+# redirect is followed), and local email is caught by the bundled mail server.
+site_url = "https://datumpro.app"
+additional_redirect_urls = [
+  "https://datumpro.app/auth/callback",
+  "https://datumpro.app/**",
+  "https://www.datumpro.app/**",
+]
 # Email OTP / magic link is the default sign-in for v1. SMS OTP (Africa's Talking)
 # is wired at the app layer.
 [auth.mfa]
@@ -36,6 +46,17 @@ enable_signup = true
 # via magic link / OAuth). Takes effect locally on `db reset` and on the hosted
 # project via `supabase config push`.
 enable_confirmations = true
+
+# Email OTP is exactly 6 digits, expiring in 1 hour. Pinned here because the
+# length is otherwise a hosted dashboard setting that silently drifts — both
+# email templates, the mobile sign-in input (maxLength 6) and the web password
+# reset input (maxLength 6) hard-assume 6, so an 8-digit code from the server
+# is physically un-enterable. `supabase config push` applies this to hosted.
+otp_length = 6
+otp_expiry = 3600
+# Throttle OTP/confirmation email sends (restored to the live 1-minute value the
+# hosted project used; the CLI default of 1s would let the endpoint be hammered).
+max_frequency = "60s"
 
 # The magic-link template is what `signInWithOtp` emails — used ONLY by the
 # mobile app's 6-digit OTP sign-in (the web app is password/OAuth only). It is
