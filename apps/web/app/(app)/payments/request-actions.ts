@@ -41,18 +41,28 @@ export async function requestPayment(formData: FormData): Promise<Result> {
     return { ok: false, error: 'This task has no approved plan amount to invoice yet.' };
   }
 
-  // Cap at what's still claimable: awarded − everything not rejected.
-  const { data: reqs } = await supabase
-    .from('contractor_payment_requests')
-    .select('amount_cents, status')
-    .eq('task_id', input.taskId)
-    .eq('contractor_id', user.id);
+  // Cap at what's unlocked by progress, net of retention, minus what's already
+  // claimed. Mirrors enforce_payment_request_insert (the DB is the hard gate).
+  const [{ data: reqs }, { data: entitlement }] = await Promise.all([
+    supabase
+      .from('contractor_payment_requests')
+      .select('amount_cents, status')
+      .eq('task_id', input.taskId)
+      .eq('contractor_id', user.id),
+    supabase.rpc('task_payment_entitlement_cents', { p_task_id: input.taskId }),
+  ]);
   const used = ((reqs ?? []) as { amount_cents: number; status: string }[])
     .filter((r) => r.status !== 'rejected' && r.status !== 'cancelled')
     .reduce((s, r) => s + r.amount_cents, 0);
-  const requestable = (task.awarded_cost_cents ?? 0) - used;
+  const requestable = Math.max(0, ((entitlement as number | null) ?? 0) - used);
   if (input.amountCents > requestable) {
-    return { ok: false, error: `You can request up to $${(requestable / 100).toFixed(2)} more on this task.` };
+    return {
+      ok: false,
+      error:
+        requestable <= 0
+          ? 'Nothing is claimable yet — payment unlocks as the task progresses (25/50/75/90/100%) and retention is held back.'
+          : `You can request up to $${(requestable / 100).toFixed(2)} more at this stage.`,
+    };
   }
 
   const { error } = await supabase.from('contractor_payment_requests').insert({
