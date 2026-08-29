@@ -187,13 +187,19 @@ function OrgSwitcher({ orgs, activeOrgId }: { orgs: OrgMembershipSummary[]; acti
                 </button>
               </form>
             ))}
-            <Link
-              href="/orgs/new"
+            {/* A DatumPro account owns ONE organisation. Creating another means a
+                new account with a new email — open the sign-up page in a new tab so
+                the current session stays put and the "new email" rule is obvious. */}
+            <a
+              href="/sign-in?reason=new-org"
+              target="_blank"
+              rel="noopener noreferrer"
               onClick={() => setOpen(false)}
               className="flex items-center gap-2 border-t border-zinc-100 px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
             >
               <Plus size={14} /> New organisation
-            </Link>
+              <span className="ml-auto text-xs text-zinc-400 dark:text-zinc-500" aria-hidden>↗</span>
+            </a>
           </div>
         </>
       )}

@@ -40,11 +40,14 @@ function safeNext(): string {
 export default function SignInPage({
   searchParams,
 }: {
-  searchParams: Promise<{ email?: string }>;
+  searchParams: Promise<{ email?: string; reason?: string }>;
 }) {
   // Email carried over from an invite link (?email=), read from searchParams so
   // it's identical on server and client (no hydration mismatch).
-  const invited = (use(searchParams).email ?? '').trim();
+  const sp = use(searchParams);
+  const invited = (sp.email ?? '').trim();
+  // Opened from an existing workspace's "New organisation" — one account owns one org.
+  const newOrg = sp.reason === 'new-org';
   const [view, setView] = useState<'signin' | 'forgot'>('signin');
   const [email, setEmail] = useState(invited);
   const fromInvite = invited !== '';
@@ -158,6 +161,13 @@ export default function SignInPage({
               'Sign in to run your projects, tasks and payments.'
             )}
           </p>
+          {newOrg && (
+            <div className="mt-4 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2.5 text-sm text-brand-800 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300">
+              Starting a new organisation? Create an account with a{' '}
+              <span className="font-semibold">new email address</span> — DatumPro is one organisation per email.
+              You&apos;ll stay signed in to your other workspace in the original tab.
+            </div>
+          )}
         </div>
 
         {view === 'signin' ? (
