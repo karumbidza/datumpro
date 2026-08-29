@@ -5,11 +5,10 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveContext } from '@/lib/data/org';
 import { getPortfolioTimeline, getDashboardData, listMyTimelineTasks } from '@/lib/data/dashboard';
-import { getPortfolioData } from '@/lib/data/portfolio';
+import { getPortfolioData, listMyUpcomingTasks } from '@/lib/data/portfolio';
 import {
   homePersona,
   listPendingApprovals,
-  listMyOpenTasks,
   listManagedProjects,
 } from '@/lib/data/home';
 import { listMyOwed } from '@/lib/data/owed';
@@ -18,7 +17,6 @@ import { KpiRow } from '@/components/dashboard/kpi-row';
 import { UpcomingTasksTable } from '@/components/dashboard/portfolio-tables';
 import { DeliveryFocus } from '@/components/dashboard/delivery-focus';
 import { ApprovalsInbox } from '@/components/dashboard/approvals-inbox';
-import { MyTasksCard } from '@/components/dashboard/my-tasks-card';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { SubmitButton } from '@/components/ui/submit-button';
@@ -151,8 +149,8 @@ export default async function DashboardPage() {
   }
 
   // ── Personal home — member / contractor / viewer ──────────────────────────
-  const [myTasks, myPay, myTimeline] = await Promise.all([
-    listMyOpenTasks(ctx.userId),
+  const [myUpcoming, myPay, myTimeline] = await Promise.all([
+    listMyUpcomingTasks(ctx.userId),
     listMyOwed(ctx.userId),
     listMyTimelineTasks(ctx.userId),
   ]);
@@ -178,7 +176,7 @@ export default async function DashboardPage() {
         <Stat label="Done" value={String(tStats.done)} tone="green" />
       </div>
       <TimelineOverview tasks={myTimeline} unit="task" />
-      <MyTasksCard tasks={myTasks} />
+      <UpcomingTasksTable tasks={myUpcoming} />
       {hasPay && (
         <Card>
           <div className="flex items-center justify-between gap-3">
