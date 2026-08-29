@@ -95,6 +95,38 @@ export async function listMyOwed(userId: string): Promise<{ tasks: OwedTask[]; s
     };
   });
 
+  // Advance recoupment (full offset): project-wide, cash claimable = max(0, Σ
+  // entitlements − advances). Reduce each task's requestable so the UI matches the
+  // DB gate — the first <advance> of earned work is offset before any cash flows.
+  const byProject = new Map<string, OwedTask[]>();
+  for (const o of owed) {
+    const arr = byProject.get(o.projectId) ?? [];
+    arr.push(o);
+    byProject.set(o.projectId, arr);
+  }
+  const advanceByProject = new Map<string, number>();
+  await Promise.all(
+    [...byProject.keys()].map(async (pid) => {
+      const { data } = await supabase.rpc('project_contractor_advance_cents', {
+        p_project_id: pid,
+        p_contractor: userId,
+      });
+      advanceByProject.set(pid, (data as number | null) ?? 0);
+    }),
+  );
+  for (const [pid, group] of byProject) {
+    const advance = advanceByProject.get(pid) ?? 0;
+    if (advance <= 0) continue;
+    const projEntitlement = group.reduce((s, o) => s + (entitlementByTask.get(o.taskId) ?? 0), 0);
+    const projClaimed = group.reduce((s, o) => s + o.paidCents + o.pendingCents, 0);
+    let budget = Math.max(0, Math.max(0, projEntitlement - advance) - projClaimed);
+    for (const o of group) {
+      const capped = Math.min(o.requestableCents, budget);
+      o.requestableCents = capped;
+      budget -= capped;
+    }
+  }
+
   const summary = owed.reduce(
     (a, o) => {
       a.earnedCents += o.committedCents;
@@ -135,10 +167,15 @@ export async function getTaskPaymentInfo(taskId: string): Promise<TaskPaymentInf
   const supabase = await createClient();
   const { data: t } = await supabase
     .from('tasks')
-    .select('awarded_cost_cents, plan_approved_at')
+    .select('awarded_cost_cents, plan_approved_at, project_id, assignee_id')
     .eq('id', taskId)
     .maybeSingle();
-  const task = t as { awarded_cost_cents: number | null; plan_approved_at: string | null } | null;
+  const task = t as {
+    awarded_cost_cents: number | null;
+    plan_approved_at: string | null;
+    project_id: string;
+    assignee_id: string | null;
+  } | null;
   if (!task || !task.plan_approved_at || (task.awarded_cost_cents ?? 0) <= 0) return null;
   const committed = task.awarded_cost_cents ?? 0;
 
@@ -166,7 +203,36 @@ export async function getTaskPaymentInfo(taskId: string): Promise<TaskPaymentInf
 
   // Progress-gated: claimable now is the milestone entitlement (net of retention).
   const { data: entitlement } = await supabase.rpc('task_payment_entitlement_cents', { p_task_id: taskId });
-  const claimable = Math.max(0, ((entitlement as number | null) ?? 0) - paid - pending);
+  let claimable = Math.max(0, ((entitlement as number | null) ?? 0) - paid - pending);
+
+  // Advance recoupment (full offset): cap this task's claim by the project-wide
+  // cash left after the contractor's advance is recouped from earned work.
+  if (task.assignee_id) {
+    const { data: advance } = await supabase.rpc('project_contractor_advance_cents', {
+      p_project_id: task.project_id,
+      p_contractor: task.assignee_id,
+    });
+    if (((advance as number | null) ?? 0) > 0) {
+      const { data: projEnt } = await supabase.rpc('project_contractor_entitlement_cents', {
+        p_project_id: task.project_id,
+        p_contractor: task.assignee_id,
+      });
+      const { data: claimRows } = await supabase
+        .from('contractor_payment_requests')
+        .select('amount_cents, status')
+        .eq('project_id', task.project_id)
+        .eq('contractor_id', task.assignee_id)
+        .eq('kind', 'milestone');
+      const projClaimed = ((claimRows ?? []) as { amount_cents: number; status: string }[])
+        .filter((r) => r.status !== 'rejected' && r.status !== 'cancelled')
+        .reduce((s, r) => s + r.amount_cents, 0);
+      const projClaimable = Math.max(
+        0,
+        Math.max(0, ((projEnt as number | null) ?? 0) - ((advance as number | null) ?? 0)) - projClaimed,
+      );
+      claimable = Math.min(claimable, projClaimable);
+    }
+  }
 
   const paths = [...new Set(rows.map((r) => r.invoice_path).filter(Boolean))] as string[];
   const urlByPath = new Map<string, string>();

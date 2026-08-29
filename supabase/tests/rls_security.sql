@@ -1277,6 +1277,79 @@ exception when insufficient_privilege then
   raise notice 'PASS: retention: deduction delete blocked';
 end $$;
 
+-- ── Advances: issued money is recouped from progress claims (full offset) ─────
+--    (20260826000025) Contractor a2 has earned 225000 on project A (task …0003 net
+--    of 10% retention); task …0001 is 0% so earns nothing. They've already claimed
+--    100000 (Claim 1, approved). Cash claimable = Σ entitlement − advance − claimed.
+select pg_temp.ok(
+  public.project_contractor_entitlement_cents(
+    'a2220000-0000-0000-0000-000000000000'::uuid, 'a0000000-0000-0000-0000-0000000000a2'::uuid) = 225000,
+  'advance: project entitlement sums each task''s entitlement (225000)');
+select pg_temp.ok(
+  public.project_contractor_advance_cents(
+    'a2220000-0000-0000-0000-000000000000'::uuid, 'a0000000-0000-0000-0000-0000000000a2'::uuid) = 0,
+  'advance: none issued yet');
+
+-- Issue a 50000 advance (owner a1). Ceiling = 225000 − 50000 = 175000; with 100000
+-- already claimed, 75000 of new cash remains.
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+select public.issue_contractor_advance(
+  'a2220000-0000-0000-0000-000000000000'::uuid, 'a0000000-0000-0000-0000-0000000000a2'::uuid,
+  50000, 'chq 001', 'Mobilisation');
+reset request.jwt.claims;
+select pg_temp.ok(
+  public.project_contractor_advance_cents(
+    'a2220000-0000-0000-0000-000000000000'::uuid, 'a0000000-0000-0000-0000-0000000000a2'::uuid) = 50000,
+  'advance: issued advance recorded (50000)');
+
+-- A progress claim within the recoupment ceiling is accepted (75000 more).
+insert into public.contractor_payment_requests
+  (id, org_id, project_id, task_id, kind, contractor_id, title, amount_cents, invoice_path, status) values
+  ('a6000000-0000-0000-0000-000000000004','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000','a5000000-0000-0000-0000-000000000003','milestone',
+   'a0000000-0000-0000-0000-0000000000a2','Claim 3',75000,'inv/claim3.pdf','requested');
+select pg_temp.ok(
+  (select amount_cents from public.contractor_payment_requests
+     where id = 'a6000000-0000-0000-0000-000000000004') = 75000,
+  'advance: a progress claim within the recoupment ceiling is accepted');
+
+-- A further cent is blocked — the advance must be recouped before more cash flows.
+do $$
+begin
+  insert into public.contractor_payment_requests
+    (org_id, project_id, task_id, kind, contractor_id, title, amount_cents, invoice_path, status)
+  values ('a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000',
+          'a5000000-0000-0000-0000-000000000003','milestone',
+          'a0000000-0000-0000-0000-0000000000a2','Claim over',1,'inv/claim4.pdf','requested');
+  raise exception 'FAIL: progress claim past the advance ceiling accepted';
+exception when others then
+  if sqlerrm like 'FAIL:%' then raise; end if;
+  raise notice 'PASS: advance: over-ceiling claim blocked (%)', sqlerrm;
+end $$;
+
+-- Cancelling the advance (owner a1) frees the offset; the balance is claimable again.
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+select public.cancel_contractor_advance(
+  (select id from public.contractor_advances
+     where project_id = 'a2220000-0000-0000-0000-000000000000'
+       and contractor_id = 'a0000000-0000-0000-0000-0000000000a2' and status = 'active'
+     limit 1), 'issued in error');
+reset request.jwt.claims;
+select pg_temp.ok(
+  public.project_contractor_advance_cents(
+    'a2220000-0000-0000-0000-000000000000'::uuid, 'a0000000-0000-0000-0000-0000000000a2'::uuid) = 0,
+  'advance: cancelling removes it from the outstanding offset');
+
+-- An advance is a permanent record — it cannot be deleted (only cancelled).
+do $$
+begin
+  delete from public.contractor_advances
+    where project_id = 'a2220000-0000-0000-0000-000000000000';
+  raise exception 'FAIL: an advance was deleted';
+exception when insufficient_privilege then
+  raise notice 'PASS: advance: delete blocked';
+end $$;
+
 -- ── Project member disable revokes project access ────────────────────────────
 -- A plain org member (not staff) added to a project as a contributor can see the
 -- project while active; disabling their membership (status='disabled') must drop

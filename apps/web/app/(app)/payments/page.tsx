@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { listMyOwed } from '@/lib/data/owed';
 import { listMyRetention } from '@/lib/data/retention';
+import { listMyAdvances } from '@/lib/data/advances';
 import { RequestRetentionForm } from '@/components/payments/request-retention-form';
 import { Card, CardTitle, CardValue } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -26,11 +27,12 @@ export default async function MyPaymentsPage() {
   if (!user) redirect('/sign-in');
 
   const { tasks: owed, summary } = await listMyOwed(user.id);
-  const [{ rows: requests }, documents, myOrgs, retention] = await Promise.all([
+  const [{ rows: requests }, documents, myOrgs, retention, advances] = await Promise.all([
     listMyPaymentRequests(user.id),
     listMyDocuments(user.id),
     listMyOrgs(user.id),
     listMyRetention(user.id),
+    listMyAdvances(user.id),
   ]);
   const retentionClaimable = retention
     .filter((r) => r.releasable && r.availableCents > 0)
@@ -133,6 +135,38 @@ export default async function MyPaymentsPage() {
           </div>
         )}
       </section>
+
+      {/* Advances received — recouped from progress claims as tasks complete */}
+      {advances.length > 0 && (
+        <section className="mt-8">
+          <div className="mb-3">
+            <h2 className="text-sm font-semibold">Advances</h2>
+            <p className="text-xs text-zinc-400 dark:text-zinc-500">
+              Money paid to you up front. It&apos;s recouped from your progress claims — new cash unlocks
+              once your earned work passes the advance.
+            </p>
+          </div>
+          <div className="divide-y divide-zinc-100 rounded-lg border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-950">
+            {advances.map((a) => (
+              <div key={a.projectId} className="p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="min-w-0 truncate text-sm font-medium">{a.projectName}</p>
+                  <div className="shrink-0 text-right">
+                    <p className="text-sm font-semibold tabular-nums">{formatUsd(a.outstandingCents)}</p>
+                    <p className="text-[11px] text-zinc-400 dark:text-zinc-500">to recoup</p>
+                  </div>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+                  <span>Advanced {formatUsd(a.issuedCents)}</span>
+                  {a.recoupedCents > 0 && (
+                    <span className="text-green-600 dark:text-green-400">Recouped {formatUsd(a.recoupedCents)}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Retention held back — releasable after the defects-liability period */}
       {retention.length > 0 && (

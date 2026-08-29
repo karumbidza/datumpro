@@ -8,9 +8,12 @@ import { myProjectRole } from '@/lib/data/members';
 import { financeSummary } from '@/lib/data/finance';
 import { listProjectPaymentRequests } from '@/lib/data/payment-requests';
 import { getProjectRetention } from '@/lib/data/retention';
+import { getProjectAdvances } from '@/lib/data/advances';
 import { BudgetVsCost } from '@/components/finance/budget-vs-cost';
 import { ManageRequest } from '@/components/payments/manage-request';
 import { RecordDeductionForm } from '@/components/payments/record-deduction-form';
+import { IssueAdvanceForm } from '@/components/payments/issue-advance-form';
+import { CancelAdvanceButton } from '@/components/payments/cancel-advance-button';
 import { stepsByEntity } from '@/lib/data/approvals';
 import { LiveRefresh } from '@/components/live-refresh';
 import { Card, CardTitle, CardValue } from '@/components/ui/card';
@@ -33,6 +36,7 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
     listProjectPaymentRequests(projectId),
     getProjectRetention(projectId),
   ]);
+  const advances = await getProjectAdvances(projectId);
   const paymentSteps = await stepsByEntity('payment', paymentRequests.map((r) => r.id));
   // The budget is the project's contract value; committed cost + payments track
   // against it (buy-side, request-and-pay — no client invoicing here).
@@ -141,6 +145,85 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
               ))}
             </ul>
           </Card>
+          )}
+        </section>
+      )}
+
+      {/* Advances issued to contractors, recouped against their progress claims. */}
+      {(canManagePayments || advances.summaries.length > 0 || advances.advances.length > 0) && (
+        <section className="mt-8">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold">Advances</h2>
+              <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                Money paid up front and recouped from progress claims — a contractor draws no new cash
+                until their earned work exceeds the advance.
+              </p>
+            </div>
+            {canManagePayments && <IssueAdvanceForm projectId={projectId} members={advances.members} />}
+          </div>
+
+          {advances.summaries.length > 0 && (
+            <Card className="p-0">
+              <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                {advances.summaries.map((s) => (
+                  <li key={s.contractorId} className="p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="truncate text-sm font-medium">{s.contractorName ?? 'Contractor'}</p>
+                      <span className="shrink-0 text-sm font-semibold tabular-nums">
+                        {formatUsd(s.outstandingCents)}{' '}
+                        <span className="text-xs font-normal text-zinc-400 dark:text-zinc-500">outstanding</span>
+                      </span>
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+                      <span>Issued {formatUsd(s.issuedCents)}</span>
+                      {s.recoupedCents > 0 && (
+                        <span className="text-green-600 dark:text-green-400">Recouped {formatUsd(s.recoupedCents)}</span>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+
+          {advances.advances.length > 0 && (
+            <div className="mt-3">
+              <h3 className="mb-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400">Advance records</h3>
+              <Card className="p-0">
+                <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                  {advances.advances.map((a) => (
+                    <li key={a.id} className="flex items-start justify-between gap-3 p-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm">
+                          {a.contractorName ?? 'Contractor'}
+                          {a.status === 'cancelled' && (
+                            <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                              Cancelled
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
+                          {new Date(a.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                          {a.reference ? ` · ref ${a.reference}` : ''}
+                          {a.note ? ` · ${a.note}` : ''}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-3">
+                        <span
+                          className={`text-sm font-medium tabular-nums ${a.status === 'cancelled' ? 'text-zinc-400 line-through dark:text-zinc-500' : ''}`}
+                        >
+                          {formatUsd(a.amountCents)}
+                        </span>
+                        {canManagePayments && a.status === 'active' && (
+                          <CancelAdvanceButton advanceId={a.id} projectId={projectId} />
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            </div>
           )}
         </section>
       )}
