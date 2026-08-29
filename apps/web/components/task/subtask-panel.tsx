@@ -29,6 +29,7 @@ import { Badge } from '@/components/ui/badge';
 import { DocAttach } from '@/components/task/doc-attach';
 import { formatUsd } from '@datumpro/shared/domain';
 import { MediaUploader } from '@/components/task/media-uploader';
+import { Req } from '@/components/ui/form';
 
 const inputClass =
   'rounded-md border border-zinc-200 bg-transparent px-2 py-1 text-xs outline-none focus:border-brand-500 dark:border-zinc-800';
@@ -211,7 +212,7 @@ export function SubtaskPanel({
           <form action={acceptAndPriceAction} className="mt-4 space-y-3.5">
             <input type="hidden" name="taskId" value={taskId} />
             <div>
-              <label className={stepLabel}>Task price ($)</label>
+              <label className={stepLabel}>Task price ($)<Req /></label>
               <input
                 name="price"
                 type="number"
@@ -223,12 +224,11 @@ export function SubtaskPanel({
               />
             </div>
             <div>
-              <label className={stepLabel}>Works to be done</label>
+              <label className={stepLabel}>Works to be done<Req /></label>
               <textarea
                 name="worksNotes"
                 rows={4}
                 required
-                placeholder="Describe what you'll do to complete this task…"
                 className={`${field} h-auto w-full py-2 leading-relaxed`}
               />
             </div>
@@ -358,8 +358,8 @@ export function SubtaskPanel({
           >
             <input type="hidden" name="taskId" value={taskId} />
             <div>
-              <label className={stepLabel}>Step</label>
-              <input name="title" required placeholder="e.g. Excavate footing" className={`${field} w-full`} />
+              <label className={stepLabel}>Step<Req /></label>
+              <input name="title" required className={`${field} w-full`} />
             </div>
             <div className="mt-3.5 grid grid-cols-2 items-end gap-x-4 gap-y-3.5">
               <div>
@@ -403,7 +403,7 @@ export function SubtaskPanel({
                     <input type="hidden" name="taskId" value={taskId} />
                     <input type="hidden" name="projectId" value={projectId} />
                     <div>
-                      <label className={stepLabel}>Step</label>
+                      <label className={stepLabel}>Step<Req /></label>
                       <input name="title" defaultValue={s.title} required className={`${field} w-full`} />
                     </div>
                     <div className="mt-3.5 grid grid-cols-2 items-end gap-x-4 gap-y-3.5">
@@ -679,8 +679,8 @@ export function SubtaskPanel({
             >
               <input type="hidden" name="taskId" value={taskId} />
               <div className="min-w-40 flex-1">
-                <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Step</label>
-                <input name="title" required placeholder="e.g. Set formwork" className={`${inputClass} w-full`} />
+                <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Step<Req /></label>
+                <input name="title" required className={`${inputClass} w-full`} />
               </div>
               <div>
                 <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Start</label>
@@ -839,18 +839,17 @@ export function SubtaskPanel({
                     <input type="hidden" name="taskId" value={taskId} />
                     <div>
                       <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
-                        Additional works
+                        Additional works<Req />
                       </label>
                       <input
                         name="title"
                         required
-                        placeholder="e.g. Extra rockbreaking to south footing"
                         className={`${inputClass} w-full`}
                       />
                     </div>
                     <div>
                       <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
-                        Extra cost ($)
+                        Extra cost ($)<Req />
                       </label>
                       <input
                         name="cost"
@@ -911,12 +910,12 @@ export function SubtaskPanel({
                   >
                     <input type="hidden" name="taskId" value={taskId} />
                     <div>
-                      <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Proposed new due date</label>
+                      <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Proposed new due date<Req /></label>
                       <input name="proposedDueDate" type="date" required min={taskEnd ?? undefined} className={`${inputClass} w-full`} />
                     </div>
                     <div>
                       <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Reason</label>
-                      <input name="reason" placeholder="e.g. rain delays, material lead-time" className={`${inputClass} w-full`} />
+                      <input name="reason" className={`${inputClass} w-full`} />
                     </div>
                     <div className="flex gap-2">
                       <SubmitButton variant="secondary" pendingText="Sending…">
@@ -952,13 +951,12 @@ export function SubtaskPanel({
             <form action={returnTask} className="space-y-2">
               <input type="hidden" name="taskId" value={taskId} />
               <label className="block text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
-                Hand back to the project manager — why? <span className="text-zinc-400 dark:text-zinc-500">(shared with them)</span>
+                Hand back to the project manager — why?<Req /> <span className="text-zinc-400 dark:text-zinc-500">(shared with them)</span>
               </label>
               <textarea
                 name="reason"
                 rows={2}
                 required
-                placeholder="e.g. Materials aren’t available — this needs to be rescheduled."
                 className={`${inputClass} w-full text-sm`}
               />
               <div className="flex gap-2">

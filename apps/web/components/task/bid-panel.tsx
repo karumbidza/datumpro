@@ -7,6 +7,7 @@ import { FormError, type FormState } from '@/components/ui/form-error';
 import { submitBid } from '@/app/(app)/projects/[projectId]/tasks/actions';
 import type { TaskDoc } from '@/lib/data/tenders';
 import { DocAttach } from '@/components/task/doc-attach';
+import { Req } from '@/components/ui/form';
 
 const field =
   'h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100';
@@ -56,7 +57,7 @@ export function BidPanel({
         <input type="hidden" name="taskId" value={taskId} />
         <input type="hidden" name="projectId" value={projectId} />
         <div>
-          <label className={labelCls}>Bid price ($)</label>
+          <label className={labelCls}>Bid price ($)<Req /></label>
           <input
             name="price"
             type="number"
@@ -69,12 +70,11 @@ export function BidPanel({
           />
         </div>
         <div>
-          <label className={labelCls}>Works to be done</label>
+          <label className={labelCls}>Works to be done<Req /></label>
           <textarea
             name="worksNotes"
             rows={4}
             required
-            placeholder="Describe what you'll do to complete this task…"
             defaultValue={worksNotes ?? ''}
             className={`${field} h-auto w-full py-2 leading-relaxed`}
           />

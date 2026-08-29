@@ -10,7 +10,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { TASK_PRIORITIES, TASK_PRIORITY_LABELS } from '@datumpro/shared/domain';
 
-import { inputClass } from '@/components/ui/form';
+import { inputClass, Req } from '@/components/ui/form';
 
 export default async function EditTaskPage({
   params,
@@ -37,7 +37,7 @@ export default async function EditTaskPage({
         <form action={updateTask} className="space-y-4">
           <input type="hidden" name="taskId" value={taskId} />
           <div>
-            <label className="mb-1 block text-sm font-medium">Title</label>
+            <label className="mb-1 block text-sm font-medium">Title<Req /></label>
             <input name="title" required defaultValue={task.title} className={inputClass} />
           </div>
           <div>

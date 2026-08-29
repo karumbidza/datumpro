@@ -7,7 +7,7 @@ import { SubmitButton } from '@/components/ui/submit-button';
 import { FormError } from '@/components/ui/form-error';
 import { Check } from '@/components/icons';
 
-import { inputClass, labelClass } from '@/components/ui/form';
+import { inputClass, labelClass, Req } from '@/components/ui/form';
 
 const USERNAME_RE = /^[a-z0-9._-]{3,30}$/;
 
@@ -187,7 +187,7 @@ export function ProfileSetupForm({
       </div>
 
       <div>
-        <label className={labelClass}>Username</label>
+        <label className={labelClass}>Username<Req /></label>
         <input
           name="username"
           required
@@ -209,18 +209,17 @@ export function ProfileSetupForm({
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label className={labelClass}>Full name</label>
+          <label className={labelClass}>Full name<Req /></label>
           <input
             name="fullName"
             required
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            placeholder="e.g. Tariro Moyo"
             className={inputClass}
           />
         </div>
         <div>
-          <label className={labelClass}>Phone</label>
+          <label className={labelClass}>Phone<Req /></label>
           <input
             name="phone"
             required
@@ -285,14 +284,14 @@ export function ProfileSetupForm({
         <div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className={labelClass}>Company</label>
-              <input name="companyName" required placeholder="e.g. Moyo Electrical (Pvt) Ltd" className={inputClass} />
+              <label className={labelClass}>Company<Req /></label>
+              <input name="companyName" required className={inputClass} />
             </div>
             <div>
               <label className={labelClass}>
                 Trade <span className="font-normal text-zinc-400 dark:text-zinc-500">(optional)</span>
               </label>
-              <input name="trade" placeholder="e.g. Electrical" className={inputClass} />
+              <input name="trade" className={inputClass} />
             </div>
           </div>
           <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">Shown because this invite is for a contractor.</p>

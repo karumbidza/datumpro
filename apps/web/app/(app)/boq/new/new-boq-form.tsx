@@ -4,7 +4,7 @@ import { useActionState } from 'react';
 import { createBoq } from '../actions';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { FormError } from '@/components/ui/form-error';
-import { inputClass, labelClass } from '@/components/ui/form';
+import { inputClass, labelClass, Req } from '@/components/ui/form';
 import { BOQ_INDUSTRIES, BOQ_TYPES, BOQ_TYPE_LABELS, CURRENCIES } from '@datumpro/shared/domain';
 
 export function NewBoqForm() {
@@ -18,7 +18,7 @@ export function NewBoqForm() {
 
       <div>
         <label htmlFor="name" className={labelClass}>
-          BOQ name
+          BOQ name<Req />
         </label>
         <input
           id="name"
@@ -26,14 +26,13 @@ export function NewBoqForm() {
           required
           autoComplete="off"
           className={inputClass}
-          placeholder="e.g. Scooter Filling Station — Ardbennie"
         />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="boqType" className={labelClass}>
-            BOQ type
+            BOQ type<Req />
           </label>
           <select id="boqType" name="boqType" required defaultValue="" className={inputClass}>
             <option value="" disabled>
@@ -66,7 +65,7 @@ export function NewBoqForm() {
           <label htmlFor="clientName" className={labelClass}>
             Client <span className="font-normal text-zinc-400">optional</span>
           </label>
-          <input id="clientName" name="clientName" autoComplete="off" className={inputClass} placeholder="Client / owner" />
+          <input id="clientName" name="clientName" autoComplete="off" className={inputClass} />
         </div>
         <div>
           <label htmlFor="reference" className={labelClass}>
@@ -101,7 +100,7 @@ export function NewBoqForm() {
         <label htmlFor="location" className={labelClass}>
           Location <span className="font-normal text-zinc-400">optional</span>
         </label>
-        <input id="location" name="location" autoComplete="off" className={inputClass} placeholder="e.g. Harare" />
+        <input id="location" name="location" autoComplete="off" className={inputClass} />
       </div>
 
       <div className="flex justify-end pt-2">

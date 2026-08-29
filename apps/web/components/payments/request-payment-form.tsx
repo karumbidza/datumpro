@@ -132,7 +132,7 @@ export function RequestPaymentForm({ tasks, taskId }: { tasks: RequestTask[]; ta
 
       <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400">
         Note (optional)
-        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Anything the reviewer should know" className={inputClass} />
+        <input value={note} onChange={(e) => setNote(e.target.value)} className={inputClass} />
       </label>
 
       <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400">

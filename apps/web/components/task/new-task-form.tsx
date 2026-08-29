@@ -9,7 +9,7 @@ import { PROJECT_ROLE_LABELS, isProjectRole } from '@datumpro/shared/access';
 
 const roleLabel = (r: string) => (isProjectRole(r) ? PROJECT_ROLE_LABELS[r] : r);
 
-import { inputClass } from '@/components/ui/form';
+import { inputClass, Req } from '@/components/ui/form';
 
 type Mode = 'direct' | 'tender' | 'unassigned';
 
@@ -49,8 +49,8 @@ export function NewTaskForm({
       <FormError error={state.error} />
 
       <div>
-        <label className="mb-1 block text-sm font-medium">Title</label>
-        <input name="title" required placeholder="e.g. Pour ground-floor slab" className={inputClass} />
+        <label className="mb-1 block text-sm font-medium">Title<Req /></label>
+        <input name="title" required className={inputClass} />
       </div>
       <div>
         <label className="mb-1 block text-sm font-medium">Description</label>

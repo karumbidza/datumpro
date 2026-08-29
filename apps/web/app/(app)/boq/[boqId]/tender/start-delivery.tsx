@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { inputClass, labelClass } from '@/components/ui/form';
+import { inputClass, labelClass, Req } from '@/components/ui/form';
 import { startDelivery } from './actions';
 
 interface Props {
@@ -87,14 +87,13 @@ export function StartDelivery({ tenderId, boqId, projects, linkedProject = null 
       {mode === 'new' || !hasProjects ? (
         <div>
           <label className={labelClass} htmlFor="projectName">
-            Project name
+            Project name<Req />
           </label>
           <input
             id="projectName"
             name="projectName"
             required
             className={inputClass}
-            placeholder="e.g. Riverside Development — Phase 1"
           />
         </div>
       ) : (

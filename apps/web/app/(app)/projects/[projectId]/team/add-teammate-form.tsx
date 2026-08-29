@@ -5,7 +5,7 @@ import { projectRolesForType, type MemberType } from '@datumpro/shared/access';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { addProjectMember } from './actions';
 
-import { inputCompactClass as inputClass } from '@/components/ui/form';
+import { inputCompactClass as inputClass, Req } from '@/components/ui/form';
 
 interface Addable {
   userId: string;
@@ -25,7 +25,7 @@ export function AddTeammateForm({ projectId, addable }: { projectId: string; add
     <form action={addProjectMember} className="mt-3 flex flex-wrap items-end gap-3">
       <input type="hidden" name="projectId" value={projectId} />
       <div className="min-w-48 flex-1">
-        <label className="mb-1 block text-xs font-medium">Company member</label>
+        <label className="mb-1 block text-xs font-medium">Company member<Req /></label>
         <select
           name="userId"
           required

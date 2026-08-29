@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { PASSWORD_MIN_LENGTH, passwordIssue } from '@datumpro/shared/validation';
+import { Req } from '@/components/ui/form';
 
 const fieldClass =
   'flex h-12 w-full items-center gap-2.5 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 transition focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/15 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100';
@@ -123,7 +124,7 @@ export function ForgotPasswordFlow({
       {step === 'email' && (
         <form onSubmit={sendCode} className="flex flex-col gap-3">
           <div>
-            <label className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Work email</label>
+            <label className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Work email<Req /></label>
             <div className={fieldClass}>
               <MailIcon />
               <input
@@ -147,7 +148,7 @@ export function ForgotPasswordFlow({
         <form onSubmit={verifyCode} className="flex flex-col gap-3">
           <div>
             <label className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-              6-digit code sent to {email.trim()}
+              6-digit code sent to {email.trim()}<Req />
             </label>
             <div className={fieldClass}>
               <input
@@ -194,7 +195,7 @@ export function ForgotPasswordFlow({
       {step === 'password' && (
         <form onSubmit={setNewPassword} className="flex flex-col gap-3">
           <div>
-            <label className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">New password</label>
+            <label className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">New password<Req /></label>
             <div className={fieldClass}>
               <LockIcon />
               <input

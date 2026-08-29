@@ -152,6 +152,10 @@ function OrgSwitcher({ orgs, activeOrgId }: { orgs: OrgMembershipSummary[]; acti
   const [open, setOpen] = useState(false);
   const active = orgs.find((o) => o.orgId === activeOrgId);
   const activeName = active?.name ?? 'Organisation';
+  // An account owns at most one org (but can be a member of many). If this account
+  // already owns one, a second needs a new email → sign up in a new tab. If it only
+  // holds memberships (contractor/pm elsewhere), it can create its first org here.
+  const ownsOrg = orgs.some((o) => o.role === 'owner');
 
   return (
     <div className="relative">
@@ -187,19 +191,30 @@ function OrgSwitcher({ orgs, activeOrgId }: { orgs: OrgMembershipSummary[]; acti
                 </button>
               </form>
             ))}
-            {/* A DatumPro account owns ONE organisation. Creating another means a
-                new account with a new email — open the sign-up page in a new tab so
-                the current session stays put and the "new email" rule is obvious. */}
-            <a
-              href="/sign-in?reason=new-org"
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2 border-t border-zinc-100 px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              <Plus size={14} /> New organisation
-              <span className="ml-auto text-xs text-zinc-400 dark:text-zinc-500" aria-hidden>↗</span>
-            </a>
+            {ownsOrg ? (
+              // Already owns an org — a second needs a new account/email. Open sign-up
+              // in a new tab so this session (and org) stays put in the original tab.
+              <a
+                href="/sign-in?reason=new-org"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2 border-t border-zinc-100 px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                <Plus size={14} /> New organisation
+                <span className="ml-auto text-xs text-zinc-400 dark:text-zinc-500" aria-hidden>↗</span>
+              </a>
+            ) : (
+              // Member-only account (contractor/pm elsewhere) — can create its first
+              // owned org with the current account, right here.
+              <Link
+                href="/orgs/new"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2 border-t border-zinc-100 px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                <Plus size={14} /> New organisation
+              </Link>
+            )}
           </div>
         </>
       )}
