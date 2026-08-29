@@ -67,6 +67,9 @@ export function useColumnResize(
   }
 
   function autoFit(i: number, texts: string[]) {
+    // Nothing measurable (e.g. a computed Total column) — leave the width as-is
+    // rather than collapsing it to the minimum.
+    if (!texts.some((t) => t)) return;
     const holder = autoFit as unknown as { _c?: HTMLCanvasElement };
     const canvas = holder._c || (holder._c = document.createElement('canvas'));
     const ctx = canvas.getContext('2d');
