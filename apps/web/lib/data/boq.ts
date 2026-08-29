@@ -279,6 +279,39 @@ export async function listUnlinkedBoqs(orgId: string): Promise<UnlinkedBoqOption
   });
 }
 
+/** Bills from OTHER projects, to clone as a starting point for this project's
+ *  bill (project-first creation). Excludes this project's own bill. */
+export async function listCloneableBoqs(orgId: string, excludeProjectId: string): Promise<UnlinkedBoqOption[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('boqs')
+    .select('id, name, status, currency, project_id, projects(name), boq_sections(boq_items(amount_cents))')
+    .eq('org_id', orgId)
+    .not('project_id', 'is', null)
+    .neq('project_id', excludeProjectId)
+    .order('updated_at', { ascending: false });
+
+  type Row = {
+    id: string;
+    name: string;
+    status: string;
+    currency: string;
+    projects: { name: string } | null;
+    boq_sections: { boq_items: { amount_cents: number | string | null }[] | null }[] | null;
+  };
+  return ((data ?? []) as unknown as Row[]).map((r) => {
+    const items = (r.boq_sections ?? []).flatMap((s) => s.boq_items ?? []);
+    return {
+      id: r.id,
+      name: r.projects?.name ? `${r.name} · ${r.projects.name}` : r.name,
+      status: r.status,
+      currency: r.currency,
+      itemCount: items.length,
+      totalCents: items.reduce((a, it) => a + n(it.amount_cents), 0),
+    };
+  });
+}
+
 export interface ProjectBoqSummary {
   id: string;
   name: string;

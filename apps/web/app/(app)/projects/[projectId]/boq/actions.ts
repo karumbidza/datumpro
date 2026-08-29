@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveContext } from '@/lib/data/org';
+import { duplicateBoq } from '@/app/(app)/boq/actions';
 
 /** Signed-in user + active org, or bounce — same shape as the BOQ actions.
  *  All writes run under RLS (org admin/PM for boqs); the generate RPC guards itself. */
@@ -62,6 +63,29 @@ export async function createProjectBoq(formData: FormData): Promise<void> {
   if (error || !nb)
     redirect(`/projects/${projectId}/boq?genError=${encodeURIComponent(error?.message ?? 'Could not create the BOQ.')}`);
   redirect(`/boq/${(nb as { id: string }).id}`);
+}
+
+/** Project-first creation from an existing bill: deep-copy another project's bill
+ *  and link the copy to this project. */
+export async function cloneBoqIntoProject(formData: FormData): Promise<void> {
+  const { supabase } = await requireOrg();
+  const projectId = String(formData.get('projectId') ?? '');
+  const sourceBoqId = String(formData.get('sourceBoqId') ?? '');
+  if (!sourceBoqId) redirect(`/projects/${projectId}/boq?genError=${encodeURIComponent('Pick a bill to clone.')}`);
+
+  const res = await duplicateBoq(sourceBoqId);
+  if ('error' in res)
+    redirect(`/projects/${projectId}/boq?genError=${encodeURIComponent(res.error ?? 'Could not clone the bill.')}`);
+
+  const { error } = await supabase
+    .from('boqs')
+    .update({ project_id: projectId })
+    .eq('id', res.id)
+    .is('project_id', null);
+  if (error) redirect(`/projects/${projectId}/boq?genError=${encodeURIComponent(error.message)}`);
+
+  revalidatePath(`/projects/${projectId}/boq`);
+  redirect(`/projects/${projectId}/boq`);
 }
 
 /** Generate unassigned budget-priced tasks from the linked bill (RPC guards +

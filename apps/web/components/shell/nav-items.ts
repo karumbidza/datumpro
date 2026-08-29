@@ -67,7 +67,11 @@ export function computeNav(
       ? [{ name: 'Tenders', href: '/boq', icon: FileText }]
       : memberType === 'client' || memberType === 'viewer'
         ? []
-        : [{ name: 'BOQ', href: '/boq', icon: FileText }]),
+        : // The bills-and-tenders library is a management surface (owner/admin, or
+          // a PM of any project). Plain staff don't need it.
+          canManageMembers || managedProjectIds.length > 0
+          ? [{ name: 'BOQ', href: '/boq', icon: FileText }]
+          : []),
     // One "Finance" item: managers → the org finance hub; an assignee without
     // finance access → their own statement. Same label, role-appropriate target.
     ...(canViewFinance
