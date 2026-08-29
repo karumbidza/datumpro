@@ -24,6 +24,55 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
   const [band, setBand] = useState<{ rowTop: number; rowH: number; colLeft: number; colW: number } | null>(null);
   const totalWidth = colWidths.reduce((a, b) => a + b, 0);
 
+  const [metrics, setMetrics] = useState({ scrollTop: 0, scrollH: 0, clientH: 0 });
+  function syncMetrics() {
+    const b = scrollRef.current;
+    if (b) setMetrics({ scrollTop: b.scrollTop, scrollH: b.scrollHeight, clientH: b.clientHeight });
+  }
+  useEffect(() => {
+    syncMetrics();
+  }, [rows.length, colWidths, rowHeights]);
+
+  const [dragging, setDragging] = useState(false);
+  const trackH = metrics.clientH;
+  const thumbH = metrics.scrollH > 0 ? Math.max(28, (metrics.clientH / metrics.scrollH) * trackH) : 0;
+  const thumbTop =
+    metrics.scrollH > metrics.clientH
+      ? (metrics.scrollTop / (metrics.scrollH - metrics.clientH)) * (trackH - thumbH)
+      : 0;
+  const showRail = metrics.scrollH > metrics.clientH + 4;
+  const firstVisible = (() => {
+    const tbody = tableRef.current?.tBodies[0];
+    if (!tbody) return 0;
+    for (let k = 0; k < tbody.children.length; k++) {
+      const el = tbody.children[k] as HTMLElement | undefined;
+      if (el && el.offsetTop >= metrics.scrollTop) return k + 1;
+    }
+    return rows.length;
+  })();
+
+  function startRailDrag(e: React.PointerEvent) {
+    e.preventDefault();
+    setDragging(true);
+    const startY = e.clientY;
+    const startScroll = metrics.scrollTop;
+    const box = scrollRef.current;
+    const denom = trackH - thumbH || 1;
+    if (!box) return;
+    function move(ev: PointerEvent) {
+      const frac = (ev.clientY - startY) / denom;
+      box!.scrollTop = startScroll + frac * (metrics.scrollH - metrics.clientH);
+      syncMetrics();
+    }
+    function up() {
+      setDragging(false);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    }
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  }
+
   const sections = useMemo(
     () => rows.map((r, i) => ({ i, label: r.description, kind: r.kind })).filter((s) => s.kind === 'section'),
     [rows],
@@ -186,8 +235,10 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
         )}
       </div>
 
+      <div className="relative">
       <div
         ref={scrollRef}
+        onScroll={syncMetrics}
         onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node)) setActive(null);
       }}
@@ -377,6 +428,24 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
           })}
         </tbody>
       </table>
+      </div>
+      {showRail && (
+        <div className="pointer-events-none absolute right-1 top-0 h-full w-3">
+          <div
+            onPointerDown={startRailDrag}
+            style={{ height: thumbH, transform: `translateY(${thumbTop}px)` }}
+            className="pointer-events-auto absolute right-0 w-2.5 cursor-grab rounded-full bg-zinc-400/70 hover:bg-zinc-500 active:cursor-grabbing dark:bg-zinc-500/70"
+          />
+          {dragging && (
+            <div
+              style={{ transform: `translateY(${thumbTop}px)` }}
+              className="pointer-events-none absolute right-5 rounded bg-zinc-800 px-2 py-1 font-mono text-[11px] text-white shadow"
+            >
+              {firstVisible} / {rows.length}
+            </div>
+          )}
+        </div>
+      )}
       </div>
     </div>
   );
