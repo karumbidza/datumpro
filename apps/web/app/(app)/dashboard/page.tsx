@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveContext } from '@/lib/data/org';
-import { getPortfolioTimeline, getDashboardData } from '@/lib/data/dashboard';
+import { getPortfolioTimeline, getDashboardData, listMyTimelineTasks } from '@/lib/data/dashboard';
 import { getPortfolioData } from '@/lib/data/portfolio';
 import {
   homePersona,
@@ -151,16 +151,33 @@ export default async function DashboardPage() {
   }
 
   // ── Personal home — member / contractor / viewer ──────────────────────────
-  const [myTasks, myPay] = await Promise.all([
+  const [myTasks, myPay, myTimeline] = await Promise.all([
     listMyOpenTasks(ctx.userId),
     listMyOwed(ctx.userId),
+    listMyTimelineTasks(ctx.userId),
   ]);
   const hasPay = myPay.summary.earnedCents > 0;
+  const nowMs = Date.now();
+  const tStats = {
+    assigned: myTimeline.length,
+    inProgress: myTimeline.filter((t) => t.status === 'in_progress').length,
+    overdue: myTimeline.filter(
+      (t) => t.status !== 'done' && ((t.due_date && new Date(t.due_date).getTime() < nowMs) || t.sla_status === 'breached'),
+    ).length,
+    done: myTimeline.filter((t) => t.status === 'done').length,
+  };
   return (
-    <PageContainer width="3xl" className="space-y-8">
+    <PageContainer width="6xl" className="space-y-8">
       {live}
       <Greeting name={displayName} subtitle={`Your work · ${formatLongDate(new Date())}`} />
       {approvals.length > 0 && <ApprovalsInbox items={approvals} />}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat label="Assigned" value={String(tStats.assigned)} />
+        <Stat label="In progress" value={String(tStats.inProgress)} />
+        <Stat label="Overdue" value={String(tStats.overdue)} tone="amber" />
+        <Stat label="Done" value={String(tStats.done)} tone="green" />
+      </div>
+      <TimelineOverview tasks={myTimeline} unit="task" />
       <MyTasksCard tasks={myTasks} />
       {hasPay && (
         <Card>

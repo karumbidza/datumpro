@@ -233,6 +233,7 @@ export async function startDelivery(formData: FormData): Promise<void> {
   const mode = String(formData.get('mode') ?? 'new');
   const projectName = String(formData.get('projectName') ?? '');
   const projectId = String(formData.get('projectId') ?? '');
+  const startDate = String(formData.get('startDate') ?? '').trim() || new Date().toISOString().slice(0, 10);
 
   const { data: result, error } = await supabase.rpc('export_award_to_project', {
     p_tender_id: tenderId,
@@ -242,6 +243,14 @@ export async function startDelivery(formData: FormData): Promise<void> {
   if (error) throw new Error(error.message);
   const res = result as unknown as { project_id: string; mode: string; skipped_tasks: string[] };
   const projId = res.project_id;
+
+  // Same program-of-works scheduling as the auto-award path.
+  try {
+    await supabase.rpc('schedule_boq_tasks', { p_project_id: projId, p_boq_id: boqId, p_start_date: startDate });
+  } catch (e) {
+    if (isRedirect(e)) throw e;
+    console.error('[tender] start-delivery auto-schedule failed (tasks stand):', e);
+  }
 
   // Best-effort: notify the winning contractor.
   try {
@@ -280,6 +289,8 @@ export async function awardTender(formData: FormData): Promise<void> {
   const tenderId = String(formData.get('tenderId') ?? '');
   const bidderId = String(formData.get('bidderId') ?? '');
   const boqId = String(formData.get('boqId') ?? '');
+  // Optional mobilisation date for the program of works; default = today (win date).
+  const startDate = String(formData.get('startDate') ?? '').trim() || new Date().toISOString().slice(0, 10);
 
   const { error } = await supabase.rpc('award_boq_tender', { p_tender_id: tenderId, p_bidder_id: bidderId });
   if (error) throw new Error(error.message);
@@ -348,6 +359,21 @@ export async function awardTender(formData: FormData): Promise<void> {
     }
   } catch (e) {
     console.error('[tender] auto start-delivery threw (award stands):', e);
+  }
+
+  // Auto-schedule the generated tasks into a program of works (planned_start/end/due
+  // via the forward pass over BOQ durations + dependencies). Best-effort: a schedule
+  // failure must not undo the award or the tasks.
+  if (deliveredProjectId) {
+    try {
+      await supabase.rpc('schedule_boq_tasks', {
+        p_project_id: deliveredProjectId,
+        p_boq_id: boqId,
+        p_start_date: startDate,
+      });
+    } catch (e) {
+      console.error('[tender] auto-schedule failed (award + tasks stand):', e);
+    }
   }
 
   revalidatePath(`/boq/${boqId}/tender`);
