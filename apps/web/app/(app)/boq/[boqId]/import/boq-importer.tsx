@@ -8,15 +8,13 @@ import { Button } from '@/components/ui/button';
 import { FormError } from '@/components/ui/form-error';
 import { inputCompactClass } from '@/components/ui/form';
 import { fmtMoney } from '@/lib/money';
+import { type Row, type Kind, lineCents } from './grid-types';
+import { ReviewGrid } from './review-grid';
 
 type Cell = string | number | boolean | null;
 type Grid = Cell[][];
 type Sheet = { name: string; grid: Grid };
 type Role = 'ignore' | 'item_no' | 'description' | 'unit' | 'qty' | 'rate' | 'amount' | 'section';
-type Kind = 'section' | 'item' | 'skip';
-// A row carries qty/rate AND an amount; a lump-sum bill prices by amount alone
-// (qty/rate may be text like "Item"/"Sum"), a measured bill by qty × rate.
-type Row = { kind: Kind; itemNo: string; description: string; unit: string; qty: number; rate: number; amount: number };
 
 const ROLE_OPTIONS: [Role, string][] = [
   ['ignore', 'Ignore'],
@@ -48,14 +46,6 @@ const looksLikeSummary = (name: string) => /summary|contents|cover|index|grand\s
 // Rows that are running totals / carried-forward / collections — never items.
 const NONITEM =
   /^\s*(sub[-\s]*total|totals?\b|carried\b|carried\s+(to|forward|down)|brought\s+(forward|down)|c\/?[fd]\b|b\/?[fd]\b|collection\b|to\s+(collection|summary)|amount\s+carried|grand\s+total|say\b)/i;
-
-/** The effective line total in cents. The Amount column is authoritative when
- *  present (real bills often round or hand-enter it, so it can differ from
- *  qty × rate); fall back to qty × rate only when there is no amount. */
-function lineCents(r: Pick<Row, 'qty' | 'rate' | 'amount'>): number {
-  if (r.amount > 0) return Math.round(r.amount * 100);
-  return Math.round(r.qty * r.rate * 100);
-}
 
 /** Guess a header row + per-column roles from the first few rows. */
 function guess(grid: Grid): { headerSkip: number; roles: Role[]; sectionMode: 'auto' | 'column' } {
@@ -545,102 +535,7 @@ export function BoqImporter({ boqId, currency }: { boqId: string; currency: stri
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-zinc-300 dark:border-zinc-700">
-        <table className="min-w-[860px] border-collapse text-sm">
-          <thead>
-            <tr className="bg-zinc-100 text-left text-[11px] uppercase tracking-wide text-zinc-500 dark:bg-zinc-800/70 dark:text-zinc-400">
-              <th className="border-b border-r border-zinc-300 px-2 py-2 dark:border-zinc-700">Kind</th>
-              <th className="border-b border-r border-zinc-300 px-2 py-2 dark:border-zinc-700">No.</th>
-              <th className="border-b border-r border-zinc-300 px-2 py-2 dark:border-zinc-700">Description</th>
-              <th className="border-b border-r border-zinc-300 px-2 py-2 dark:border-zinc-700">Unit</th>
-              <th className="border-b border-r border-zinc-300 px-2 py-2 text-right dark:border-zinc-700">Qty</th>
-              <th className="border-b border-r border-zinc-300 px-2 py-2 text-right dark:border-zinc-700">Rate</th>
-              <th className="border-b border-r border-zinc-300 px-2 py-2 text-right dark:border-zinc-700">Amount</th>
-              <th className="border-b border-zinc-300 px-2 py-2 text-right dark:border-zinc-700">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r, i) => {
-              const isSection = r.kind === 'section';
-              const isSkip = r.kind === 'skip';
-              const measured = r.qty > 0 && r.rate > 0;
-              const disabled = isSection || isSkip;
-              return (
-                <tr key={i} className={isSection ? 'bg-zinc-50 dark:bg-zinc-900/50' : isSkip ? 'opacity-45' : ''}>
-                  <td className="border-b border-r border-zinc-200 p-0 dark:border-zinc-800">
-                    <select
-                      value={r.kind}
-                      onChange={(e) => setRow(i, { kind: e.target.value as Kind })}
-                      className={`w-full bg-transparent px-2 py-1.5 text-xs font-medium outline-none ${isSection ? 'text-zinc-800 dark:text-zinc-200' : 'text-zinc-500'}`}
-                    >
-                      <option value="section">Section</option>
-                      <option value="item">Item</option>
-                      <option value="skip">Skip</option>
-                    </select>
-                  </td>
-                  <td className="border-b border-r border-zinc-200 p-0 dark:border-zinc-800">
-                    <input
-                      value={isSection ? '' : r.itemNo}
-                      disabled={disabled}
-                      placeholder={isSection ? '' : '—'}
-                      onChange={(e) => setRow(i, { itemNo: e.target.value })}
-                      className="w-16 bg-transparent px-2 py-1.5 font-mono text-xs outline-none focus:ring-1 focus:ring-inset focus:ring-brand-500"
-                    />
-                  </td>
-                  <td className="border-b border-r border-zinc-200 p-0 dark:border-zinc-800">
-                    <input
-                      value={r.description}
-                      onChange={(e) => setRow(i, { description: e.target.value })}
-                      className={`w-full bg-transparent px-2 py-1.5 outline-none focus:ring-1 focus:ring-inset focus:ring-brand-500 ${isSection ? 'font-semibold' : ''}`}
-                    />
-                  </td>
-                  <td className="border-b border-r border-zinc-200 p-0 dark:border-zinc-800">
-                    <input
-                      value={isSection ? '' : r.unit}
-                      disabled={disabled}
-                      onChange={(e) => setRow(i, { unit: e.target.value })}
-                      className="w-full bg-transparent px-2 py-1.5 text-center outline-none focus:ring-1 focus:ring-inset focus:ring-brand-500 disabled:bg-transparent"
-                    />
-                  </td>
-                  <td className="border-b border-r border-zinc-200 p-0 dark:border-zinc-800">
-                    <input
-                      value={isSection ? '' : r.qty ? String(r.qty) : ''}
-                      disabled={disabled}
-                      inputMode="decimal"
-                      placeholder={isSection ? '' : '—'}
-                      onChange={(e) => setRow(i, { qty: Math.max(0, Number(e.target.value) || 0) })}
-                      className="w-full bg-transparent px-2 py-1.5 text-right font-mono tabular-nums outline-none focus:ring-1 focus:ring-inset focus:ring-brand-500"
-                    />
-                  </td>
-                  <td className="border-b border-r border-zinc-200 p-0 dark:border-zinc-800">
-                    <input
-                      value={isSection ? '' : r.rate ? String(r.rate) : ''}
-                      disabled={disabled}
-                      inputMode="decimal"
-                      placeholder={isSection ? '' : '—'}
-                      onChange={(e) => setRow(i, { rate: Math.max(0, Number(e.target.value) || 0) })}
-                      className="w-full bg-transparent px-2 py-1.5 text-right font-mono tabular-nums outline-none focus:ring-1 focus:ring-inset focus:ring-brand-500"
-                    />
-                  </td>
-                  <td className="border-b border-r border-zinc-200 p-0 dark:border-zinc-800">
-                    <input
-                      value={isSection ? '' : r.amount ? String(r.amount) : ''}
-                      disabled={disabled}
-                      inputMode="decimal"
-                      placeholder={isSection ? '' : '—'}
-                      onChange={(e) => setRow(i, { amount: Math.max(0, Number(e.target.value) || 0) })}
-                      className={`w-full bg-transparent px-2 py-1.5 text-right font-mono tabular-nums outline-none focus:ring-1 focus:ring-inset focus:ring-brand-500 ${measured ? 'text-zinc-400' : ''}`}
-                    />
-                  </td>
-                  <td className="border-b border-zinc-200 px-2 py-1.5 text-right font-mono tabular-nums dark:border-zinc-800">
-                    {disabled ? '' : fmtMoney(lineCents(r), currency)}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <ReviewGrid rows={rows} setRow={setRow} currency={currency} />
 
       <label className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
         <input
