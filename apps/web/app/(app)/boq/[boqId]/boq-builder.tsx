@@ -30,6 +30,7 @@ import { ChevronDown } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { BOQ_STATUS_TONE, TENDER_STATUS_TONE } from '@/components/ui/tones';
+import { useColumnResize } from '@/lib/use-column-resize';
 
 type Item = { id: string; sectionId: string; itemNo: string | null; description: string; uom: string; qty: number; rateCents: number; durationDays: number | null };
 type Section = { id: string; name: string; parentId: string | null };
@@ -47,6 +48,9 @@ const colB = 'border-r border-zinc-200 dark:border-zinc-800';
 const cell =
   'w-full bg-transparent px-2.5 py-2 text-sm outline-none focus:bg-white focus:ring-1 focus:ring-inset focus:ring-brand-500 dark:focus:bg-zinc-950';
 const numCell = `${cell} text-right font-mono tabular-nums`;
+
+// Item No, Description, Unit, Qty, Budget/Est, Days, Total, actions
+const BUILDER_DEFAULT_W = [64, 320, 96, 96, 112, 64, 128, 36];
 
 export function BoqBuilder({
   boq,
@@ -86,6 +90,24 @@ export function BoqBuilder({
   const [pending, start] = useTransition();
   const cur = boq.currency;
   const status = (boq.status as BoqStatus) ?? 'draft';
+
+  const { widths, totalWidth, startResize, autoFit } = useColumnResize(
+    `boq-builder-colw:${boq.id}`,
+    BUILDER_DEFAULT_W,
+    { min: 40, max: 900 },
+  );
+
+  function builderColText(i: number): string[] {
+    switch (i) {
+      case 0: return items.map((x) => x.itemNo ?? '');
+      case 1: return items.map((x) => x.description);
+      case 2: return items.map((x) => x.uom);
+      case 3: return items.map((x) => String(x.qty || ''));
+      case 4: return items.map((x) => String(x.rateCents ? x.rateCents / 100 : ''));
+      case 5: return items.map((x) => String(x.durationDays ?? ''));
+      default: return [];
+    }
+  }
 
   const childSections = (pid: string | null) => sections.filter((s) => s.parentId === pid);
   const itemsOf = (sid: string) => items.filter((i) => i.sectionId === sid);
@@ -291,6 +313,7 @@ export function BoqBuilder({
               disabled={!canEdit}
               placeholder="Item description"
               aria-label="Description"
+              title={it.description || undefined}
               style={{ paddingLeft: (depth + 1) * 18 + 10 }}
               onChange={(e) => patchLocal(it.id, (x) => ({ ...x, description: e.target.value }))}
               onBlur={(e) => persistItem(it.id, { description: e.target.value })}
@@ -479,26 +502,49 @@ export function BoqBuilder({
 
       {/* the bill */}
       <div className="mt-4 max-h-[calc(100vh-15rem)] overflow-auto rounded-lg border border-zinc-300 dark:border-zinc-700">
-        <table className="w-full min-w-[720px] border-collapse text-sm">
+        <table className="border-collapse text-sm" style={{ tableLayout: 'fixed', width: totalWidth }}>
           <colgroup>
-            <col className="w-16" />
-            <col />
-            <col className="w-24" />
-            <col className="w-24" />
-            <col className="w-28" />
-            <col className="w-16" />
-            <col className="w-32" />
-            <col className="w-9" />
+            {widths.map((w, i) => (
+              <col key={i} style={{ width: w }} />
+            ))}
           </colgroup>
           <thead className="sticky top-0 z-20">
             <tr className="bg-zinc-100 text-[11px] uppercase tracking-wide text-zinc-500 dark:bg-zinc-800/70 dark:text-zinc-400">
-              <th className={`${colB} border-b border-zinc-300 bg-zinc-100 px-2.5 py-2.5 text-left font-semibold dark:border-zinc-700 dark:bg-zinc-800`}>Item No</th>
-              <th className={`${colB} border-b border-zinc-300 bg-zinc-100 px-2.5 py-2.5 text-left font-semibold dark:border-zinc-700 dark:bg-zinc-800`}>Description</th>
-              <th className={`${colB} border-b border-zinc-300 bg-zinc-100 px-2.5 py-2.5 text-left font-semibold dark:border-zinc-700 dark:bg-zinc-800`}>Unit</th>
-              <th className={`${colB} border-b border-zinc-300 bg-zinc-100 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700 dark:bg-zinc-800`}>Qty</th>
-              <th className={`${colB} border-b border-zinc-300 bg-zinc-100 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700 dark:bg-zinc-800`}>Budget/Est</th>
-              <th className={`${colB} border-b border-zinc-300 bg-zinc-100 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700 dark:bg-zinc-800`} title="Working days">Days</th>
-              <th className={`${colB} border-b border-zinc-300 bg-zinc-100 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700 dark:bg-zinc-800`}>Total</th>
+              <th className={`relative ${colB} border-b border-zinc-300 bg-zinc-100 px-2.5 py-2.5 text-left font-semibold dark:border-zinc-700 dark:bg-zinc-800`}>Item No<div
+                onPointerDown={(e) => startResize(0, e)}
+                onDoubleClick={() => autoFit(0, builderColText(0))}
+                className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-brand-400/50"
+              /></th>
+              <th className={`relative ${colB} border-b border-zinc-300 bg-zinc-100 px-2.5 py-2.5 text-left font-semibold dark:border-zinc-700 dark:bg-zinc-800`}>Description<div
+                onPointerDown={(e) => startResize(1, e)}
+                onDoubleClick={() => autoFit(1, builderColText(1))}
+                className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-brand-400/50"
+              /></th>
+              <th className={`relative ${colB} border-b border-zinc-300 bg-zinc-100 px-2.5 py-2.5 text-left font-semibold dark:border-zinc-700 dark:bg-zinc-800`}>Unit<div
+                onPointerDown={(e) => startResize(2, e)}
+                onDoubleClick={() => autoFit(2, builderColText(2))}
+                className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-brand-400/50"
+              /></th>
+              <th className={`relative ${colB} border-b border-zinc-300 bg-zinc-100 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700 dark:bg-zinc-800`}>Qty<div
+                onPointerDown={(e) => startResize(3, e)}
+                onDoubleClick={() => autoFit(3, builderColText(3))}
+                className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-brand-400/50"
+              /></th>
+              <th className={`relative ${colB} border-b border-zinc-300 bg-zinc-100 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700 dark:bg-zinc-800`}>Budget/Est<div
+                onPointerDown={(e) => startResize(4, e)}
+                onDoubleClick={() => autoFit(4, builderColText(4))}
+                className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-brand-400/50"
+              /></th>
+              <th className={`relative ${colB} border-b border-zinc-300 bg-zinc-100 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700 dark:bg-zinc-800`} title="Working days">Days<div
+                onPointerDown={(e) => startResize(5, e)}
+                onDoubleClick={() => autoFit(5, builderColText(5))}
+                className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-brand-400/50"
+              /></th>
+              <th className={`relative ${colB} border-b border-zinc-300 bg-zinc-100 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700 dark:bg-zinc-800`}>Total<div
+                onPointerDown={(e) => startResize(6, e)}
+                onDoubleClick={() => autoFit(6, builderColText(6))}
+                className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-brand-400/50"
+              /></th>
               <th className="border-b border-zinc-300 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800" />
             </tr>
           </thead>
