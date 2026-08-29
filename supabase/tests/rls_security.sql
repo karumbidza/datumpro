@@ -1174,9 +1174,12 @@ end $$;
 -- is_project_member / project_role and cut off access, and re-enabling restores it.
 reset role;
 reset request.jwt.claims;
+-- A CONTRACTOR (not internal staff — is_org_staff would grant org-wide project
+-- visibility) so access is scoped to project membership, which is what disable
+-- must revoke.
 insert into auth.users (id, email) values ('a0000000-0000-0000-0000-0000000000a9','proj-only@test.dev');
 insert into public.org_members (org_id, user_id, role, member_type, status) values
-  ('a1110000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000a9','member','staff','active');
+  ('a1110000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000a9','member','contractor','active');
 insert into public.project_members (org_id, project_id, user_id, role, status) values
   ('a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000a9','contributor','active');
 
