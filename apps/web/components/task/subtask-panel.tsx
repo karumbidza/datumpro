@@ -713,12 +713,90 @@ export function SubtaskPanel({
               </p>
             ) : null)}
 
-          {/* Variations & Extension-of-time render below the workflow buttons. */}
+          {/* Variations, invoice, actions & footer links render below. */}
         </>
       )}
 
-      {usesPlanFlow && (planDraft || planPending || planLocked) && (
-        <DocAttach taskId={taskId} projectId={projectId} orgId={orgId} docs={planDocs} canEdit={isAssignee} />
+      {/* ── Variations ("Additional works") — full width, above the actions ── */}
+      {planLocked && (openVariations.length > 0 || canAddVariation) && (
+        <div className="mt-4 border-t border-zinc-100 pt-4 dark:border-zinc-800">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Additional works</p>
+
+          {openVariations.map((v) => (
+            <div key={v.id} className="mt-2 rounded-md border border-zinc-100 p-2 dark:border-zinc-800">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm text-zinc-800 dark:text-zinc-200">{v.title}</span>
+                <span className="flex items-center gap-2">
+                  <span className="text-[11px] tabular-nums text-zinc-400 dark:text-zinc-500">{formatUsd(v.costCents)}</span>
+                  <span
+                    className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                      v.variationStatus === 'rejected'
+                        ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300'
+                        : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
+                    }`}
+                  >
+                    {v.variationStatus === 'rejected' ? 'Declined' : 'Pending'}
+                  </span>
+                </span>
+              </div>
+              {v.variationStatus === 'pending' && (
+                <ApprovalChain steps={variationSteps[v.id] ?? []} viewerRole={viewerRole} path={path} />
+              )}
+            </div>
+          ))}
+
+          {canAddVariation &&
+            (!variationOpen ? (
+              <button
+                type="button"
+                onClick={() => setVariationOpen(true)}
+                className="mt-2 text-[11px] font-medium text-brand-600 dark:text-brand-400 hover:underline"
+              >
+                + Request additional works
+              </button>
+            ) : (
+              <form
+                action={addSubtask}
+                className="mt-2 space-y-2 rounded-md border border-brand-500/30 bg-brand-50 p-2 dark:bg-brand-500/10"
+              >
+                <input type="hidden" name="taskId" value={taskId} />
+                <div>
+                  <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
+                    Additional works<Req />
+                  </label>
+                  <input
+                    name="title"
+                    required
+                    className={`${inputClass} w-full`}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
+                    Extra cost ($)<Req />
+                  </label>
+                  <input
+                    name="cost"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    required
+                    className={`${inputClass} w-full max-w-[160px] text-right`}
+                  />
+                </div>
+                <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
+                  Goes to the project manager for approval; if approved it adds to the awarded value.
+                </p>
+                <div className="flex gap-2">
+                  <SubmitButton variant="secondary" pendingText="Sending…">
+                    Submit for approval
+                  </SubmitButton>
+                  <button type="button" onClick={() => setVariationOpen(false)} className="text-sm text-zinc-500 dark:text-zinc-400 hover:underline">
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ))}
+        </div>
       )}
 
       {/* Files attached at submit / blocker time — kept visible here now that the
@@ -763,6 +841,11 @@ export function SubtaskPanel({
         </div>
       )}
 
+      {/* ── Attach invoice — sits just above the bottom actions ── */}
+      {usesPlanFlow && (planDraft || planPending || planLocked) && (
+        <DocAttach taskId={taskId} projectId={projectId} orgId={orgId} docs={planDocs} canEdit={isAssignee} />
+      )}
+
       {/* ── Commenced work: submit for sign-off / raise a blocker ── */}
       {canWorkflow && (
         <div className="mt-4 flex items-center gap-3 border-t border-zinc-100 pt-4 dark:border-zinc-800">
@@ -790,158 +873,87 @@ export function SubtaskPanel({
         </p>
       )}
 
-      {/* ── Variations + Extension of time — side by side, below the actions ── */}
-      {((planLocked && (openVariations.length > 0 || canAddVariation)) ||
-        extensionRequests.length > 0 ||
-        canRequestExtension ||
-        extensionPreStart) && (
-        <div className="mt-4 grid gap-x-6 gap-y-4 border-t border-zinc-100 pt-4 dark:border-zinc-800 sm:grid-cols-2">
-          {/* Variations column */}
-          {planLocked && (openVariations.length > 0 || canAddVariation) && (
-            <div>
-              <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Additional works</p>
+      {/* ── Extension-of-time requests / approval chains (details) ── */}
+      {(extensionRequests.length > 0 || extensionPreStart) && (
+        <div className="mt-4 border-t border-zinc-100 pt-4 dark:border-zinc-800">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Extension of time</p>
 
-              {openVariations.map((v) => (
-                <div key={v.id} className="mt-2 rounded-md border border-zinc-100 p-2 dark:border-zinc-800">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm text-zinc-800 dark:text-zinc-200">{v.title}</span>
-                    <span className="flex items-center gap-2">
-                      <span className="text-[11px] tabular-nums text-zinc-400 dark:text-zinc-500">{formatUsd(v.costCents)}</span>
-                      <span
-                        className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                          v.variationStatus === 'rejected'
-                            ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300'
-                            : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
-                        }`}
-                      >
-                        {v.variationStatus === 'rejected' ? 'Declined' : 'Pending'}
-                      </span>
-                    </span>
-                  </div>
-                  {v.variationStatus === 'pending' && (
-                    <ApprovalChain steps={variationSteps[v.id] ?? []} viewerRole={viewerRole} path={path} />
-                  )}
-                </div>
-              ))}
-
-              {canAddVariation &&
-                (!variationOpen ? (
-                  <button
-                    type="button"
-                    onClick={() => setVariationOpen(true)}
-                    className="mt-2 text-[11px] font-medium text-brand-600 dark:text-brand-400 hover:underline"
-                  >
-                    + Request additional works
-                  </button>
-                ) : (
-                  <form
-                    action={addSubtask}
-                    className="mt-2 space-y-2 rounded-md border border-brand-500/30 bg-brand-50 p-2 dark:bg-brand-500/10"
-                  >
-                    <input type="hidden" name="taskId" value={taskId} />
-                    <div>
-                      <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
-                        Additional works<Req />
-                      </label>
-                      <input
-                        name="title"
-                        required
-                        className={`${inputClass} w-full`}
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
-                        Extra cost ($)<Req />
-                      </label>
-                      <input
-                        name="cost"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        required
-                        className={`${inputClass} w-full max-w-[160px] text-right`}
-                      />
-                    </div>
-                    <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
-                      Goes to the project manager for approval; if approved it adds to the awarded value.
-                    </p>
-                    <div className="flex gap-2">
-                      <SubmitButton variant="secondary" pendingText="Sending…">
-                        Submit for approval
-                      </SubmitButton>
-                      <button type="button" onClick={() => setVariationOpen(false)} className="text-sm text-zinc-500 dark:text-zinc-400 hover:underline">
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
-                ))}
-            </div>
-          )}
-
-          {/* Extension-of-time column */}
-          {(extensionRequests.length > 0 || canRequestExtension || extensionPreStart) && (
-            <div>
-              <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Extension of time</p>
-
-              {extensionRequests.map((r) => (
-                <div key={r.id} className="mt-2 rounded-md border border-zinc-100 p-2 dark:border-zinc-800">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm text-zinc-800 dark:text-zinc-200">New due: {r.proposedDueDate}</span>
-                    <Badge tone={EXT_TONE[r.status]}>{r.status}</Badge>
-                  </div>
-                  {r.reason && <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{r.reason}</p>}
-                  {r.status === 'pending' && (
-                    <ApprovalChain steps={extensionSteps[r.id] ?? []} viewerRole={viewerRole} path={path} />
-                  )}
-                </div>
-              ))}
-
-              {canRequestExtension && !hasPendingExt &&
-                (!extensionOpen ? (
-                  <button
-                    type="button"
-                    onClick={() => setExtensionOpen(true)}
-                    className="mt-2 text-[11px] font-medium text-brand-600 dark:text-brand-400 hover:underline"
-                  >
-                    + Request an extension (needs approval)
-                  </button>
-                ) : (
-                  <form
-                    action={requestExtensionAction}
-                    className="mt-2 space-y-2 rounded-md border border-brand-500/30 bg-brand-50 p-2 dark:bg-brand-500/10"
-                  >
-                    <input type="hidden" name="taskId" value={taskId} />
-                    <div>
-                      <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Proposed new due date<Req /></label>
-                      <input name="proposedDueDate" type="date" required min={taskEnd ?? undefined} className={`${inputClass} w-full`} />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Reason</label>
-                      <input name="reason" className={`${inputClass} w-full`} />
-                    </div>
-                    <div className="flex gap-2">
-                      <SubmitButton variant="secondary" pendingText="Sending…">
-                        Request
-                      </SubmitButton>
-                      <button type="button" onClick={() => setExtensionOpen(false)} className="text-sm text-zinc-500 dark:text-zinc-400 hover:underline">
-                        Cancel
-                      </button>
-                    </div>
-                    <FormError error={extErr.error} />
-                  </form>
-                ))}
-
-              {extensionPreStart && extensionRequests.length === 0 && (
-                <p className="mt-2 text-[11px] text-zinc-400 dark:text-zinc-500">You can request an extension once the task is underway.</p>
+          {extensionRequests.map((r) => (
+            <div key={r.id} className="mt-2 rounded-md border border-zinc-100 p-2 dark:border-zinc-800">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm text-zinc-800 dark:text-zinc-200">New due: {r.proposedDueDate}</span>
+                <Badge tone={EXT_TONE[r.status]}>{r.status}</Badge>
+              </div>
+              {r.reason && <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{r.reason}</p>}
+              {r.status === 'pending' && (
+                <ApprovalChain steps={extensionSteps[r.id] ?? []} viewerRole={viewerRole} path={path} />
               )}
             </div>
+          ))}
+
+          {extensionOpen && canRequestExtension && !hasPendingExt && (
+            <form
+              action={requestExtensionAction}
+              className="mt-2 space-y-2 rounded-md border border-brand-500/30 bg-brand-50 p-2 dark:bg-brand-500/10"
+            >
+              <input type="hidden" name="taskId" value={taskId} />
+              <div>
+                <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Proposed new due date<Req /></label>
+                <input name="proposedDueDate" type="date" required min={taskEnd ?? undefined} className={`${inputClass} w-full`} />
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Reason</label>
+                <input name="reason" className={`${inputClass} w-full`} />
+              </div>
+              <div className="flex gap-2">
+                <SubmitButton variant="secondary" pendingText="Sending…">
+                  Request
+                </SubmitButton>
+                <button type="button" onClick={() => setExtensionOpen(false)} className="text-sm text-zinc-500 dark:text-zinc-400 hover:underline">
+                  Cancel
+                </button>
+              </div>
+              <FormError error={extErr.error} />
+            </form>
+          )}
+
+          {extensionPreStart && extensionRequests.length === 0 && (
+            <p className="mt-2 text-[11px] text-zinc-400 dark:text-zinc-500">You can request an extension once the task is underway.</p>
           )}
         </div>
       )}
 
-      {canHandBack && (
+      {/* Hand-back — inline form (expands from the footer link) */}
+      {canHandBack && handBackOpen && (
         <div className="mt-4 border-t border-zinc-100 pt-3 dark:border-zinc-800">
-          {!handBackOpen ? (
+          <form action={returnTask} className="space-y-2">
+            <input type="hidden" name="taskId" value={taskId} />
+            <label className="block text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
+              Hand back to the project manager — why?<Req /> <span className="text-zinc-400 dark:text-zinc-500">(shared with them)</span>
+            </label>
+            <textarea
+              name="reason"
+              rows={2}
+              required
+              className={`${inputClass} w-full text-sm`}
+            />
+            <div className="flex gap-2">
+              <SubmitButton variant="secondary" pendingText="Handing back…">
+                Hand back task
+              </SubmitButton>
+              <button type="button" onClick={() => setHandBackOpen(false)} className="text-sm text-zinc-500 dark:text-zinc-400 hover:underline">
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ── Footer links row — hand-back beside request-an-extension ── */}
+      {((canHandBack && !handBackOpen) ||
+        (canRequestExtension && !hasPendingExt && !extensionOpen)) && (
+        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-zinc-100 pt-4 dark:border-zinc-800">
+          {canHandBack && !handBackOpen && (
             <button
               type="button"
               onClick={() => setHandBackOpen(true)}
@@ -949,27 +961,15 @@ export function SubtaskPanel({
             >
               Can’t complete this? Hand the task back
             </button>
-          ) : (
-            <form action={returnTask} className="space-y-2">
-              <input type="hidden" name="taskId" value={taskId} />
-              <label className="block text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
-                Hand back to the project manager — why?<Req /> <span className="text-zinc-400 dark:text-zinc-500">(shared with them)</span>
-              </label>
-              <textarea
-                name="reason"
-                rows={2}
-                required
-                className={`${inputClass} w-full text-sm`}
-              />
-              <div className="flex gap-2">
-                <SubmitButton variant="secondary" pendingText="Handing back…">
-                  Hand back task
-                </SubmitButton>
-                <button type="button" onClick={() => setHandBackOpen(false)} className="text-sm text-zinc-500 dark:text-zinc-400 hover:underline">
-                  Cancel
-                </button>
-              </div>
-            </form>
+          )}
+          {canRequestExtension && !hasPendingExt && !extensionOpen && (
+            <button
+              type="button"
+              onClick={() => setExtensionOpen(true)}
+              className="text-[11px] font-medium text-brand-600 dark:text-brand-400 hover:underline"
+            >
+              + Request an extension (needs approval)
+            </button>
           )}
         </div>
       )}

@@ -62,7 +62,7 @@ export function DocAttach({
 
   return (
     <div className="mt-3 border-t border-zinc-100 pt-3 dark:border-zinc-800">
-      <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">BoQ / invoice (PDF, Excel, CSV)</p>
+      <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Invoice (PDF, Excel, CSV)</p>
       {docs.length > 0 && (
         <ul className="mb-2 space-y-1">
           {docs.map((d) => (
@@ -104,7 +104,7 @@ export function DocAttach({
             onChange={onChange}
             disabled={busy}
           />
-          {busy ? 'Uploading…' : docs.length > 0 ? 'Attach another file' : 'Attach BoQ / invoice'}
+          {busy ? 'Uploading…' : docs.length > 0 ? 'Attach another file' : 'Attach invoice'}
         </label>
       )}
       {!canEdit && docs.length === 0 && <p className="text-sm text-zinc-400 dark:text-zinc-500">No documents attached.</p>}
