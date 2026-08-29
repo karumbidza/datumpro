@@ -9,16 +9,17 @@ import {
   type ProjectRole, type MemberType,
 } from '@datumpro/shared/access';
 
-const teamPath = (projectId: string) => `/projects/${projectId}/team`;
+// Team management now lives in the Project set up "Team" tab.
+const teamTab = (projectId: string) => `/projects/${projectId}/settings?tab=team`;
 
 /** Server-action throws surface as a full-page error boundary, so expected
- *  failures redirect back to the team page with an inline banner instead. */
+ *  failures redirect back to the Team tab with an inline banner instead. */
 function fail(projectId: string, message: string): never {
-  redirect(`${teamPath(projectId)}?error=${encodeURIComponent(message)}`);
+  redirect(`${teamTab(projectId)}&error=${encodeURIComponent(message)}`);
 }
 function done(projectId: string, flag?: string): never {
-  revalidatePath(teamPath(projectId));
-  redirect(flag ? `${teamPath(projectId)}?${flag}=1` : teamPath(projectId));
+  revalidatePath(`/projects/${projectId}/settings`);
+  redirect(flag ? `${teamTab(projectId)}&${flag}=1` : teamTab(projectId));
 }
 
 function validRole(projectId: string, raw: string): ProjectRole {
@@ -105,6 +106,32 @@ export async function removeProjectMember(formData: FormData) {
   const { error } = await supabase
     .from('project_members')
     .delete()
+    .eq('project_id', projectId)
+    .eq('user_id', userId);
+  if (error) fail(projectId, error.message);
+  done(projectId);
+}
+
+/** Disable a member — keeps the row and their history but revokes project access
+ *  (is_project_member / project_role require status='active'). Reversible. */
+export async function setProjectMemberStatus(formData: FormData) {
+  const projectId = String(formData.get('projectId') ?? '');
+  const userId = String(formData.get('userId') ?? '');
+  const status = String(formData.get('status') ?? '');
+  if (!projectId || !userId) fail(projectId, 'Missing project or member.');
+  if (status !== 'active' && status !== 'disabled') fail(projectId, 'Invalid status.');
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user && user.id === userId && status === 'disabled') {
+    fail(projectId, 'You can’t disable your own access.');
+  }
+
+  const { error } = await supabase
+    .from('project_members')
+    .update({ status })
     .eq('project_id', projectId)
     .eq('user_id', userId);
   if (error) fail(projectId, error.message);

@@ -56,7 +56,7 @@ export function computeNav(
     }
     items.push({ name: 'Chat', href: `/projects/${id}/chat`, icon: MessageSquare });
     if (manages) {
-      items.push({ name: 'Settings', href: `/projects/${id}/settings`, icon: Settings });
+      items.push({ name: 'Project set up', href: `/projects/${id}/settings`, icon: Settings });
     }
     return items;
   }

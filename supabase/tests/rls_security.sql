@@ -1168,6 +1168,55 @@ exception when insufficient_privilege then
   raise notice 'PASS: ledger: task_activity delete blocked';
 end $$;
 
+-- ── Project member disable revokes project access ────────────────────────────
+-- A plain org member (not staff) added to a project as a contributor can see the
+-- project while active; disabling their membership (status='disabled') must drop
+-- is_project_member / project_role and cut off access, and re-enabling restores it.
+reset role;
+reset request.jwt.claims;
+-- A CONTRACTOR (not internal staff — is_org_staff would grant org-wide project
+-- visibility) so access is scoped to project membership, which is what disable
+-- must revoke.
+insert into auth.users (id, email) values ('a0000000-0000-0000-0000-0000000000a9','proj-only@test.dev');
+insert into public.org_members (org_id, user_id, role, member_type, status) values
+  ('a1110000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000a9','member','contractor','active');
+insert into public.project_members (org_id, project_id, user_id, role, status) values
+  ('a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000a9','contributor','active');
+
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a9","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok((select count(*) from public.projects where id = 'a2220000-0000-0000-0000-000000000000') = 1,
+  'proj-member: active contributor can read the project');
+select pg_temp.ok(public.project_role('a2220000-0000-0000-0000-000000000000'::uuid) = 'contributor',
+  'proj-member: active contributor resolves role = contributor');
+reset role;
+reset request.jwt.claims;
+
+-- Disable them (as superuser, mirroring the setProjectMemberStatus action).
+update public.project_members set status = 'disabled'
+  where project_id = 'a2220000-0000-0000-0000-000000000000' and user_id = 'a0000000-0000-0000-0000-0000000000a9';
+
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a9","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok((select count(*) from public.projects where id = 'a2220000-0000-0000-0000-000000000000') = 0,
+  'proj-member: DISABLED member can no longer read the project');
+select pg_temp.ok(public.project_role('a2220000-0000-0000-0000-000000000000'::uuid) is null,
+  'proj-member: DISABLED member resolves no project role');
+select pg_temp.ok(public.is_project_member('a2220000-0000-0000-0000-000000000000'::uuid) = false,
+  'proj-member: DISABLED member is not a project member');
+reset role;
+reset request.jwt.claims;
+
+-- Re-enable restores access.
+update public.project_members set status = 'active'
+  where project_id = 'a2220000-0000-0000-0000-000000000000' and user_id = 'a0000000-0000-0000-0000-0000000000a9';
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a9","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok((select count(*) from public.projects where id = 'a2220000-0000-0000-0000-000000000000') = 1,
+  'proj-member: re-enabled member can read the project again');
+reset role;
+reset request.jwt.claims;
+
 rollback;
 
 \echo '────────────────────────────────────────────'

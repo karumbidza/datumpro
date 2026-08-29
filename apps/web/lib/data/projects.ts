@@ -47,3 +47,31 @@ export const getProject = cache(async (projectId: string): Promise<ProjectRow | 
   return (data as ProjectRow | null) ?? null;
 });
 
+/** Full editable field set for the Project set up screen (superset of ProjectRow).
+ *  Kept separate from getProject so list/summary queries stay lean. */
+export interface ProjectEditRow extends ProjectRow {
+  construction_type: string | null;
+  currency: string;
+  client_id: string | null;
+  start_date: string | null;
+  duration_working_days: number | null;
+  retention_pct: number | null;
+  payment_terms_days: number | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+const PROJECT_EDIT_COLUMNS =
+  `${PROJECT_COLUMNS}, construction_type, currency, client_id, duration_working_days, retention_pct, payment_terms_days, latitude, longitude`;
+
+export async function getProjectForEdit(projectId: string): Promise<ProjectEditRow | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('projects')
+    .select(PROJECT_EDIT_COLUMNS)
+    .eq('id', projectId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as ProjectEditRow | null) ?? null;
+}
+
