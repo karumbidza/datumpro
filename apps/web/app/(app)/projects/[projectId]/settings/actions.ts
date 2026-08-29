@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getProject } from '@/lib/data/projects';
+import { notifyRetentionReleaseScheduled } from '@/lib/data/notifications';
 import {
   PROJECT_STATUSES, CONSTRUCTION_TYPES, CURRENCIES, type ProjectStatus,
 } from '@datumpro/shared/domain';
@@ -85,6 +86,9 @@ export async function updateCommercialTerms(formData: FormData) {
   if (contractValue < 0) fail(projectId, 'commercial', 'Contract value can’t be negative.');
   const retention = num(formData.get('retentionPct'));
   if (retention !== null && (retention < 0 || retention > 100)) fail(projectId, 'commercial', 'Retention must be 0–100%.');
+  const retentionMonths = num(formData.get('retentionPeriodMonths'));
+  if (retentionMonths !== null && (retentionMonths < 0 || retentionMonths > 120))
+    fail(projectId, 'commercial', 'Defects-liability period must be 0–120 months.');
   const paymentDays = num(formData.get('paymentTermsDays'));
   if (paymentDays !== null && (paymentDays < 0 || paymentDays > 365)) fail(projectId, 'commercial', 'Payment terms look out of range.');
 
@@ -95,11 +99,24 @@ export async function updateCommercialTerms(formData: FormData) {
       currency,
       contract_value_cents: Math.round(contractValue * 100),
       retention_pct: retention,
+      retention_period_months: retentionMonths === null ? null : Math.round(retentionMonths),
       payment_terms_days: paymentDays === null ? null : Math.round(paymentDays),
     })
     .eq('id', projectId);
   if (error) fail(projectId, 'commercial', error.message);
   done(projectId, 'commercial');
+}
+
+/** Practical completion: stamps the defects-liability clock and completes the
+ *  project (via the mark_practical_completion RPC — PM or org staff only). This is
+ *  what makes retention releasable once the agreed period elapses. */
+export async function markPracticalCompletion(formData: FormData) {
+  const projectId = String(formData.get('projectId') ?? '');
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('mark_practical_completion', { p_project: projectId });
+  if (error) fail(projectId, 'status', error.message);
+  await notifyRetentionReleaseScheduled(supabase, projectId);
+  done(projectId, 'status');
 }
 
 /** Lifecycle status (planning / active / on_hold / completed / archived). */

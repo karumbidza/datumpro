@@ -1180,6 +1180,103 @@ exception when insufficient_privilege then
   raise notice 'PASS: ledger: task_activity delete blocked';
 end $$;
 
+-- ── Retention release: held retention is claimable only after the defects-
+--    liability period, less anything the PM spent on repairs. (20260826000023)
+--    Contractor a2 holds retention on the done task a500…0003: 10% of 250000 =
+--    25000. Task a500…0001 is 0% (no subtasks) so withholds nothing.
+select pg_temp.ok(
+  public.task_retention_withheld_cents('a5000000-0000-0000-0000-000000000003'::uuid) = 25000,
+  'retention: 10% of a completed 250000 task is withheld (25000)');
+select pg_temp.ok(
+  public.project_contractor_retention_cents(
+    'a2220000-0000-0000-0000-000000000000'::uuid, 'a0000000-0000-0000-0000-0000000000a2'::uuid) = 25000,
+  'retention: contractor pool sums withheld across their approved tasks (25000)');
+
+-- Not releasable before practical completion; a retention claim is rejected.
+select pg_temp.ok(
+  public.project_retention_releasable('a2220000-0000-0000-0000-000000000000'::uuid) = false,
+  'retention: not releasable before practical completion');
+do $$
+begin
+  insert into public.contractor_payment_requests
+    (org_id, project_id, task_id, kind, contractor_id, title, amount_cents, invoice_path, status)
+  values ('a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000', null,
+          'retention','a0000000-0000-0000-0000-0000000000a2','Retention (early)',25000,'inv/ret.pdf','requested');
+  raise exception 'FAIL: retention claim accepted before the period elapsed';
+exception when others then
+  if sqlerrm like 'FAIL:%' then raise; end if;
+  raise notice 'PASS: retention: early claim blocked (%)', sqlerrm;
+end $$;
+
+-- Agree a 6-month period, then stamp practical completion via the RPC (owner a1).
+update public.projects set retention_period_months = 6
+  where id = 'a2220000-0000-0000-0000-000000000000';
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+select public.mark_practical_completion('a2220000-0000-0000-0000-000000000000');
+reset request.jwt.claims;
+select pg_temp.ok(
+  (select practical_completion_at is not null and status = 'completed'
+     from public.projects where id = 'a2220000-0000-0000-0000-000000000000'),
+  'retention: mark_practical_completion stamps the date and completes the project');
+-- Just stamped (now) with a 6-month period → still not releasable.
+select pg_temp.ok(
+  public.project_retention_releasable('a2220000-0000-0000-0000-000000000000'::uuid) = false,
+  'retention: not releasable until the agreed period elapses');
+
+-- Back-date completion a year → the 6-month period has elapsed → releasable.
+update public.projects set practical_completion_at = now() - interval '12 months'
+  where id = 'a2220000-0000-0000-0000-000000000000';
+select pg_temp.ok(
+  public.project_retention_releasable('a2220000-0000-0000-0000-000000000000'::uuid) = true,
+  'retention: releasable once practical completion + period has elapsed');
+select pg_temp.ok(
+  public.project_contractor_retention_available_cents(
+    'a2220000-0000-0000-0000-000000000000'::uuid,'a0000000-0000-0000-0000-0000000000a2'::uuid) = 25000,
+  'retention: full pool available before any deduction (25000)');
+
+-- The PM spends 10000 on repairs → available drops to 15000.
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+select public.record_retention_deduction(
+  'a2220000-0000-0000-0000-000000000000'::uuid,'a0000000-0000-0000-0000-0000000000a2'::uuid,
+  10000, 'Re-grout failed tiling');
+reset request.jwt.claims;
+select pg_temp.ok(
+  public.project_contractor_retention_available_cents(
+    'a2220000-0000-0000-0000-000000000000'::uuid,'a0000000-0000-0000-0000-0000000000a2'::uuid) = 15000,
+  'retention: a 10000 repair deduction reduces available to 15000');
+
+-- A retention claim within the net available is accepted; a further cent is rejected.
+insert into public.contractor_payment_requests
+  (id, org_id, project_id, task_id, kind, contractor_id, title, amount_cents, invoice_path, status) values
+  ('a6000000-0000-0000-0000-000000000003','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000', null, 'retention','a0000000-0000-0000-0000-0000000000a2',
+   'Retention release',15000,'inv/ret.pdf','requested');
+select pg_temp.ok(
+  (select amount_cents from public.contractor_payment_requests
+     where id = 'a6000000-0000-0000-0000-000000000003') = 15000,
+  'retention: a claim within net available is accepted');
+do $$
+begin
+  insert into public.contractor_payment_requests
+    (org_id, project_id, task_id, kind, contractor_id, title, amount_cents, invoice_path, status)
+  values ('a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000', null,
+          'retention','a0000000-0000-0000-0000-0000000000a2','Retention (over)',1,'inv/ret.pdf','requested');
+  raise exception 'FAIL: retention claim exceeding net available accepted';
+exception when others then
+  if sqlerrm like 'FAIL:%' then raise; end if;
+  raise notice 'PASS: retention: over-claim blocked (%)', sqlerrm;
+end $$;
+
+-- A retention deduction is a permanent record — it cannot be deleted.
+do $$
+begin
+  delete from public.retention_deductions
+    where project_id = 'a2220000-0000-0000-0000-000000000000';
+  raise exception 'FAIL: a retention deduction was deleted';
+exception when insufficient_privilege then
+  raise notice 'PASS: retention: deduction delete blocked';
+end $$;
+
 -- ── Project member disable revokes project access ────────────────────────────
 -- A plain org member (not staff) added to a project as a contributor can see the
 -- project while active; disabling their membership (status='disabled') must drop

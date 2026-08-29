@@ -73,6 +73,28 @@ export function CommercialTab({ project }: { project: ProjectEditRow }) {
             />
           </div>
         </div>
+
+        <div className="flex flex-col gap-4 sm:flex-row">
+          <div className="flex-1">
+            <label htmlFor="retentionPeriodMonths" className={labelClass}>Defects-liability period (months)</label>
+            <input
+              id="retentionPeriodMonths"
+              name="retentionPeriodMonths"
+              type="number"
+              min={0}
+              max={120}
+              inputMode="numeric"
+              defaultValue={project.retention_period_months ?? ''}
+              placeholder="e.g. 6–12"
+              className={inputClass}
+            />
+            <p className={hintClass}>
+              How long retention is held after practical completion to cover defects. It becomes
+              releasable once this period elapses.
+            </p>
+          </div>
+          <div className="flex-1" />
+        </div>
         <p className={hintClass}>Set both retention and payment days to complete the Payment terms item.</p>
 
         <div className="flex justify-end">
