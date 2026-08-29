@@ -20,6 +20,7 @@ function fmtVariancePct(pct: number): string {
 
 export function Comparison({ data, boqId, canManage }: Props) {
   const { sections, bidders, currency, budgetTotalCents, awardedBidderId, status, tenderId } = data;
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   return (
     <div className="space-y-4">
@@ -144,6 +145,16 @@ export function Comparison({ data, boqId, canManage }: Props) {
                           <input type="hidden" name="tenderId" value={tenderId} />
                           <input type="hidden" name="bidderId" value={bidder.bidderId} />
                           <input type="hidden" name="boqId" value={boqId} />
+                          <label className="flex flex-col gap-0.5 text-[10px] font-normal normal-case text-zinc-500 dark:text-zinc-400">
+                            Site start date
+                            <input
+                              type="date"
+                              name="startDate"
+                              defaultValue={todayStr}
+                              min={todayStr}
+                              className="rounded border border-zinc-300 bg-white px-1.5 py-1 text-[11px] text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
+                            />
+                          </label>
                           <Button type="submit" variant="secondary" size="sm" className="mt-0.5 normal-case text-[11px]">
                             Award &amp; start delivery
                           </Button>
