@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { getActiveContext, getAuthUser } from '@/lib/data/org';
+import { createClient } from '@/lib/supabase/server';
 import { listBoqs } from '@/lib/data/boq';
 import { listMyTenderInvites } from '@/lib/data/tender';
 import { ContractorTenderPortal } from './contractor-portal';
@@ -27,26 +28,34 @@ export default async function BoqIndexPage() {
     const invites = await listMyTenderInvites(ctx.userId);
     return <ContractorTenderPortal invites={invites} orgName={ctx.active.name} />;
   }
+  // Managers only — estimating and tendering is an owner/admin/PM activity.
+  // Org owner/admin/pm qualify outright; otherwise allow anyone who is a PM on at
+  // least one project (mirrors the nav gate so the shortcut and the page agree).
+  let canAccess = ['owner', 'admin', 'pm'].includes(ctx.active.role);
+  if (!canAccess) {
+    const supabase = await createClient();
+    const { count } = await supabase
+      .from('project_members')
+      .select('project_id', { count: 'exact', head: true })
+      .eq('user_id', ctx.userId)
+      .eq('role', 'pm')
+      .eq('status', 'active');
+    canAccess = (count ?? 0) > 0;
+  }
+  if (!canAccess) notFound();
 
   const boqs = await listBoqs(ctx.active.orgId);
-  const canEdit = ['owner', 'admin', 'pm'].includes(ctx.active.role);
 
   return (
     <PageContainer width="6xl">
       <PageHeader
-        title="Bills of Quantities"
+        title="Bills & tenders"
         subtitle={
           <>
-            Bills of quantities for{' '}
-            <span className="font-medium text-brand-600 dark:text-brand-500">{ctx.active.name}</span>.
+            Every bill across{' '}
+            <span className="font-medium text-brand-600 dark:text-brand-500">{ctx.active.name}</span> — open one to
+            edit or put it out to tender. Bills are created inside a project&apos;s set-up.
           </>
-        }
-        actions={
-          canEdit ? (
-            <Link href="/boq/new">
-              <Button>New BOQ</Button>
-            </Link>
-          ) : undefined
         }
       />
 
@@ -55,13 +64,11 @@ export default async function BoqIndexPage() {
           <EmptyState
             icon={FileText}
             title="No bills yet"
-            hint="A BOQ is an estimate you build once and reuse — sections of priced items, ready to put to tender."
+            hint="A bill of quantities belongs to a project. Open a project and create its bill from the BOQ tab — it’ll appear here."
             action={
-              canEdit ? (
-                <Link href="/boq/new">
-                  <Button size="sm">Start a new BOQ</Button>
-                </Link>
-              ) : undefined
+              <Link href="/projects">
+                <Button size="sm">Go to projects</Button>
+              </Link>
             }
           />
         </div>

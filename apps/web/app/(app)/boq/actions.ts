@@ -4,9 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveContext } from '@/lib/data/org';
-import { createBoqSchema } from '@datumpro/shared/validation';
 import { BOQ_ITEM_TYPES, BOQ_STATUSES, type BoqItemType, type BoqStatus } from '@datumpro/shared/domain';
-import type { FormState } from '@/components/ui/form-error';
 
 /** Resolve the signed-in user + their active org, or bounce. Every mutation runs
  *  under RLS as this user; writes additionally require org admin/PM (enforced by
@@ -25,44 +23,8 @@ async function requireOrg() {
 type Ok<T> = T & { error?: undefined };
 type Err = { error: string };
 
-/** Create a bill and open its builder. */
-export async function createBoq(_prev: FormState, formData: FormData): Promise<FormState> {
-  const { supabase, userId, orgId } = await requireOrg();
-
-  const parsed = createBoqSchema.safeParse({
-    name: String(formData.get('name') ?? ''),
-    boqType: String(formData.get('boqType') ?? ''),
-    clientName: String(formData.get('clientName') ?? ''),
-    industry: (formData.get('industry') as string) || undefined,
-    reference: String(formData.get('reference') ?? ''),
-    location: String(formData.get('location') ?? ''),
-    boqDate: String(formData.get('boqDate') ?? ''),
-    currency: String(formData.get('currency') ?? 'USD'),
-  });
-  if (!parsed.success) return { error: parsed.error.issues.map((i) => i.message).join(', ') };
-  const d = parsed.data;
-
-  const { data, error } = await supabase
-    .from('boqs')
-    .insert({
-      org_id: orgId,
-      name: d.name,
-      boq_type: d.boqType,
-      client_name: d.clientName || null,
-      industry: d.industry ?? null,
-      reference: d.reference || null,
-      location: d.location || null,
-      boq_date: d.boqDate || null,
-      currency: d.currency,
-      created_by: userId,
-    })
-    .select('id')
-    .single();
-  if (error) return { error: error.message };
-
-  revalidatePath('/boq');
-  redirect(`/boq/${(data as { id: string }).id}`);
-}
+// Standalone BOQ creation is retired — a bill is created inside a project (see
+// projects/[projectId]/boq/actions.ts: createProjectBoq / cloneBoqIntoProject).
 
 async function touchBoq(supabase: Awaited<ReturnType<typeof createClient>>, boqId: string) {
   await supabase.from('boqs').update({ updated_at: new Date().toISOString() }).eq('id', boqId);

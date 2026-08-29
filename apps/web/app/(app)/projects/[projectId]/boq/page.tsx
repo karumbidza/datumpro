@@ -8,6 +8,7 @@ import {
   getProjectBoq,
   getBoqDetail,
   listUnlinkedBoqs,
+  listCloneableBoqs,
   listBoqGeneratedTasks,
   type BoqGeneratedTask,
 } from '@/lib/data/boq';
@@ -43,7 +44,9 @@ export default async function ProjectBoqPage({
   if (!manages) notFound();
 
   const boq = await getProjectBoq(project.org_id, projectId);
-  const unlinked = boq ? [] : await listUnlinkedBoqs(project.org_id);
+  const [unlinked, cloneable] = boq
+    ? [[], []]
+    : await Promise.all([listUnlinkedBoqs(project.org_id), listCloneableBoqs(project.org_id, projectId)]);
 
   // Board data: the full priced bill + the generated section-tasks (for the
   // per-section assign picker) + active contractor options.
@@ -98,10 +101,10 @@ export default async function ProjectBoqPage({
       {boq === null ? (
         <Card className="mt-6">
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            No bill is attached to this project. Attach an existing bill from the library, or draft a new
-            one — its line items become the project&apos;s tasks.
+            No bill for this project yet. Draft a new one, or clone another project&apos;s bill as a starting
+            point — its line items become this project&apos;s tasks.
           </p>
-          <BoqTabControls projectId={projectId} boq={null} unlinked={unlinked} />
+          <BoqTabControls projectId={projectId} boq={null} unlinked={unlinked} cloneable={cloneable} />
         </Card>
       ) : (
         <>
@@ -155,7 +158,7 @@ export default async function ProjectBoqPage({
             />
           )}
 
-          <BoqTabControls projectId={projectId} boq={boq} unlinked={[]} />
+          <BoqTabControls projectId={projectId} boq={boq} unlinked={[]} cloneable={[]} />
         </>
       )}
     </PageContainer>
