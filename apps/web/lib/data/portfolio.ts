@@ -177,3 +177,30 @@ export async function getPortfolioData(
 
   return { kpis, statusDistribution, recentProjects, upcomingTasks, progressSeries };
 }
+
+/** The signed-in contractor's own upcoming (scheduled, not-done) tasks — soonest
+ *  due first, top 8 — shaped like the admin's upcoming-tasks table. RLS scopes to
+ *  the caller. Mirrors the `upcomingTasks` build in getPortfolioData. */
+export async function listMyUpcomingTasks(userId: string): Promise<UpcomingTask[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('tasks')
+    .select('id, title, project_id, priority, due_date, projects(name)')
+    .eq('assignee_id', userId)
+    .not('due_date', 'is', null)
+    .neq('status', 'done')
+    .order('due_date', { ascending: true })
+    .limit(8);
+
+  type Row = {
+    id: string; title: string; project_id: string; priority: TaskPriority; due_date: string;
+    projects: { name: string | null } | { name: string | null }[] | null;
+  };
+  return ((data ?? []) as unknown as Row[]).map((t) => {
+    const proj = Array.isArray(t.projects) ? t.projects[0] : t.projects;
+    return {
+      id: t.id, title: t.title, projectId: t.project_id, projectName: proj?.name ?? 'Project',
+      priority: t.priority, dueDate: t.due_date, assigneeName: null,
+    };
+  });
+}
