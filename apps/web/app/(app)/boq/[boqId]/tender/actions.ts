@@ -303,5 +303,53 @@ export async function awardTender(formData: FormData): Promise<void> {
     if (isRedirect(e)) throw e;
     console.error('[tender] award emails failed:', e);
   }
+
+  // Auto-start delivery: create/use the project, generate costed tasks, and enrol
+  // the winner — so "awarded" always means the contractor can see the work.
+  // Best-effort: a failure (most often the winner has no linked account) must NOT
+  // undo the award. The StartDelivery recovery UI stays on the tender page for
+  // those cases. redirect() lives OUTSIDE the try so its control-flow throw isn't
+  // swallowed here.
+  let deliveredProjectId: string | null = null;
+  try {
+    const { data: exp, error: expErr } = await supabase.rpc('export_award_to_project', {
+      p_tender_id: tenderId,
+      p_project_id: null,
+      p_new_project_name: null,
+    });
+    if (expErr) {
+      console.error('[tender] auto start-delivery skipped (award stands):', expErr.message);
+    } else if (exp) {
+      deliveredProjectId = (exp as { project_id?: string } | null)?.project_id ?? null;
+      if (deliveredProjectId) {
+        try {
+          const [{ data: org }, { data: tender }, { count: taskCount }, { data: proj }] = await Promise.all([
+            supabase.from('organizations').select('name').eq('id', orgId).single(),
+            supabase.from('boq_tenders').select('awarded_bidder_id').eq('id', tenderId).single(),
+            supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('project_id', deliveredProjectId),
+            supabase.from('projects').select('name').eq('id', deliveredProjectId).single(),
+          ]);
+          const awardedBidderId = (tender as { awarded_bidder_id?: string } | null)?.awarded_bidder_id ?? '';
+          const { data: bidder } = await supabase
+            .from('boq_bidders').select('contact_email').eq('id', awardedBidderId).single();
+          const email = (bidder as { contact_email?: string } | null)?.contact_email;
+          if (email) {
+            const { subject, html } = deliveryAssignedEmail({
+              orgName: (org as { name?: string } | null)?.name ?? 'DatumPro',
+              projectName: (proj as { name?: string } | null)?.name ?? 'your project',
+              taskCount: taskCount ?? 0,
+            });
+            await sendEmail({ to: email, subject, html });
+          }
+        } catch (e) {
+          console.error('[tender] delivery-assigned email failed:', e);
+        }
+      }
+    }
+  } catch (e) {
+    console.error('[tender] auto start-delivery threw (award stands):', e);
+  }
+
   revalidatePath(`/boq/${boqId}/tender`);
+  if (deliveredProjectId) redirect(`/projects/${deliveredProjectId}/tasks`);
 }
