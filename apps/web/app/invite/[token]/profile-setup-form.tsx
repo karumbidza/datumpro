@@ -177,9 +177,11 @@ export function ProfileSetupForm({
         <label className={labelClass}>Email</label>
         <input
           readOnly
+          disabled
           value={email}
           tabIndex={-1}
-          className={`${inputClass} cursor-not-allowed bg-zinc-50 text-zinc-400 dark:bg-zinc-900 dark:text-zinc-500`}
+          aria-label="Invited email (locked)"
+          className={`${inputClass} pointer-events-none cursor-not-allowed select-none bg-zinc-50 text-zinc-400 dark:bg-zinc-900 dark:text-zinc-500`}
         />
         <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">Locked — it's the address that was invited.</p>
       </div>
@@ -193,7 +195,10 @@ export function ProfileSetupForm({
           value={username}
           onChange={(e) => {
             setUsernameTouched(true);
-            setUsername(e.target.value.toLowerCase());
+            // Strip anything the username rule (^[a-z0-9._-]{3,30}$) forbids — most
+            // often a space — so the field can never hold an invalid value that
+            // silently disables Join.
+            setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ''));
           }}
           className={inputClass}
           autoComplete="off"
