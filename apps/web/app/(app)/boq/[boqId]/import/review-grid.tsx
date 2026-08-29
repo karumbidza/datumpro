@@ -115,7 +115,15 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
-      if (Array.isArray(saved) && saved.length === DEFAULT_COL_W.length) setColWidths(saved);
+      // Right length AND all finite numbers in range — a stale/junk array must
+      // not wedge the grid with NaN/zero-width columns.
+      if (
+        Array.isArray(saved) &&
+        saved.length === DEFAULT_COL_W.length &&
+        saved.every((n) => typeof n === 'number' && Number.isFinite(n) && n >= MIN_COL_W && n <= MAX_COL_W)
+      ) {
+        setColWidths(saved);
+      }
     } catch {
       /* ignore malformed cache */
     }
