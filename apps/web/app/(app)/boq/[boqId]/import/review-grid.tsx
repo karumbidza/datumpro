@@ -6,6 +6,8 @@ import { type Row, type Kind, lineCents } from './grid-types';
 const DEFAULT_COL_W = [96, 72, 360, 72, 88, 104, 120, 120]; // Kind No Desc Unit Qty Rate Amount Total
 const MIN_COL_W = 48;
 const MAX_COL_W = 800;
+const MIN_ROW_H = 28;
+const MAX_ROW_H = 400;
 
 export function ReviewGrid({ boqId, rows, setRow, currency }: {
   boqId: string;
@@ -15,6 +17,7 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [colWidths, setColWidths] = useState<number[]>(DEFAULT_COL_W);
+  const [rowHeights, setRowHeights] = useState<Map<number, number>>(new Map());
   const totalWidth = colWidths.reduce((a, b) => a + b, 0);
 
   const LS_KEY = `boq-review-colw:${boqId}`;
@@ -81,6 +84,31 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
       const out = [...prev];
       out[i] = next;
       persist(out);
+      return out;
+    });
+  }
+
+  function startRowResize(i: number, e: React.PointerEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    const startY = e.clientY;
+    const tr = (e.currentTarget as HTMLElement).closest('tr');
+    const startH = tr?.offsetHeight ?? MIN_ROW_H;
+    function move(ev: PointerEvent) {
+      const next = Math.min(MAX_ROW_H, Math.max(MIN_ROW_H, startH + (ev.clientY - startY)));
+      setRowHeights((prev) => new Map(prev).set(i, next));
+    }
+    function up() {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    }
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  }
+  function resetRow(i: number) {
+    setRowHeights((prev) => {
+      const out = new Map(prev);
+      out.delete(i);
       return out;
     });
   }
@@ -170,8 +198,12 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
             const measured = r.qty > 0 && r.rate > 0;
             const disabled = isSection || isSkip;
             return (
-              <tr key={i} className={isSection ? 'bg-zinc-50 dark:bg-zinc-900/50' : isSkip ? 'opacity-45' : ''}>
-                <td className="border-b border-r border-zinc-200 p-0 dark:border-zinc-800">
+              <tr
+                key={i}
+                style={{ height: rowHeights.get(i) }}
+                className={isSection ? 'bg-zinc-50 dark:bg-zinc-900/50' : isSkip ? 'opacity-45' : ''}
+              >
+                <td className="relative border-b border-r border-zinc-200 p-0 dark:border-zinc-800">
                   <select
                     value={r.kind}
                     onChange={(e) => setRow(i, { kind: e.target.value as Kind })}
@@ -181,6 +213,11 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
                     <option value="item">Item</option>
                     <option value="skip">Skip</option>
                   </select>
+                  <div
+                    onPointerDown={(e) => startRowResize(i, e)}
+                    onDoubleClick={() => resetRow(i)}
+                    className="absolute inset-x-0 bottom-0 z-10 h-1.5 cursor-row-resize touch-none select-none hover:bg-brand-400/50"
+                  />
                 </td>
                 <td className="border-b border-r border-zinc-200 p-0 dark:border-zinc-800">
                   <input
@@ -192,10 +229,11 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
                   />
                 </td>
                 <td className="border-b border-r border-zinc-200 p-0 dark:border-zinc-800">
-                  <input
+                  <textarea
                     value={r.description}
                     onChange={(e) => setRow(i, { description: e.target.value })}
-                    className={`w-full bg-transparent px-2 py-1.5 outline-none focus:ring-1 focus:ring-inset focus:ring-brand-500 ${isSection ? 'font-semibold' : ''}`}
+                    rows={1}
+                    className={`h-full w-full resize-none bg-transparent px-2 py-1.5 leading-snug outline-none focus:ring-1 focus:ring-inset focus:ring-brand-500 ${isSection ? 'font-semibold' : ''}`}
                   />
                 </td>
                 <td className="border-b border-r border-zinc-200 p-0 dark:border-zinc-800">
