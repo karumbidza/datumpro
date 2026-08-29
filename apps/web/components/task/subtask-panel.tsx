@@ -395,8 +395,10 @@ export function SubtaskPanel({
                 editing === s.id ? (
                   <form
                     key={s.id}
-                    action={updateSubtask}
-                    onSubmit={() => setEditing(null)}
+                    action={async (formData) => {
+                      await updateSubtask(formData);
+                      setEditing(null);
+                    }}
                     className="rounded-xl border border-brand-500/40 bg-brand-50/40 p-4 dark:bg-brand-500/5"
                   >
                     <input type="hidden" name="id" value={s.id} />
@@ -990,7 +992,12 @@ export function SubtaskPanel({
             >
               Cancel
             </button>
-            <form action={toggleSubtask} onSubmit={() => setConfirmStep(null)}>
+            <form
+              action={async (formData) => {
+                await toggleSubtask(formData);
+                setConfirmStep(null);
+              }}
+            >
               <input type="hidden" name="id" value={confirmStep.id} />
               <input type="hidden" name="taskId" value={taskId} />
               <input type="hidden" name="projectId" value={projectId} />
