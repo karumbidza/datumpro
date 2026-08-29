@@ -427,6 +427,64 @@ export async function importBoqRows(
   return { sections: secCount, items: itemCount };
 }
 
+/** Decrypt a password-protected Office spreadsheet server-side and return its
+ *  grids. The client detects the encrypted OLE container, holds the file, and
+ *  posts it here with the user's password. The password is used for this one
+ *  request and discarded; the decrypted bytes live only in memory (never saved
+ *  unprotected) and are parsed straight into plain grids for the mapper. */
+export async function decryptBoqExcel(
+  formData: FormData,
+): Promise<{ sheets: { name: string; grid: (string | number | boolean | null)[][] }[] } | Err> {
+  // Auth-gate: require a signed-in user with an active org (same as writes,
+  // minus the write-policy check — this reads nothing from the DB).
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: 'Please sign in and try again.' };
+  const ctx = await getActiveContext();
+  if (!ctx?.active) return { error: 'Pick an organisation and try again.' };
+
+  const file = formData.get('file');
+  const password = formData.get('password');
+  if (!(file instanceof Blob) || file.size === 0) return { error: 'No file was received.' };
+  if (typeof password !== 'string' || password.length === 0) return { error: 'Enter the file password.' };
+  if (file.size > 25 * 1024 * 1024) return { error: 'That file is too large — keep it under 25 MB.' };
+
+  const buf = Buffer.from(await file.arrayBuffer());
+
+  let decrypted: Buffer;
+  try {
+    const officeCrypto = (await import('officecrypto-tool')).default;
+    decrypted = await officeCrypto.decrypt(buf, { password });
+  } catch {
+    // A wrong password, or an encryption scheme the library can't handle, throws.
+    return { error: 'Incorrect password — check it and try again.' };
+  }
+
+  try {
+    const XLSX = await import('xlsx');
+    const wb = XLSX.read(decrypted, { type: 'buffer' });
+    const sheets = wb.SheetNames.map((name) => {
+      const ws = wb.Sheets[name];
+      if (!ws) return null;
+      return {
+        name,
+        grid: XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' }) as (
+          | string
+          | number
+          | boolean
+          | null
+        )[][],
+      };
+    }).filter((s): s is { name: string; grid: (string | number | boolean | null)[][] } => s !== null && s.grid.length > 0);
+    if (sheets.length === 0) return { error: 'No readable rows in that file.' };
+    return { sheets };
+  } catch {
+    return { error: 'The file unlocked, but its contents could not be read.' };
+  }
+}
+
 export async function setBoqStatus(boqId: string, status: BoqStatus): Promise<Err | void> {
   const { supabase } = await requireOrg();
   if (!BOQ_STATUSES.includes(status)) return { error: 'Invalid status.' };
