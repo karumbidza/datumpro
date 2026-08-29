@@ -389,7 +389,8 @@ export function NewProjectForm({
                     value={durationValue}
                     onChange={(e) => setDurationValue(e.target.value)}
                     required
-                    className={`${inputClass} min-w-0`}
+                    placeholder="0"
+                    className={`${inputClass} min-w-0 flex-1`}
                   />
                   <div className="flex shrink-0 overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800">
                     {(['weeks', 'days'] as const).map((u) => (
@@ -432,8 +433,9 @@ export function NewProjectForm({
             </select>
           </div>
 
-          {/* Currency + contract value */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* Currency + contract value — items-end keeps the two inputs aligned even
+              when the "(optional)" label wraps to a second line on narrow columns. */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-end">
             <div>
               <label className={labelClass}>Currency</label>
               <select name="currency" required value={currency} onChange={(e) => setCurrency(e.target.value)} className={inputClass}>
@@ -500,14 +502,6 @@ export function NewProjectForm({
                 builder. Generate tasks from the project&apos;s BOQ tab when the bill is approved.
               </p>
             )}
-          </div>
-
-          {/* Template (out of scope to apply yet) */}
-          <div>
-            <label className={labelClass}>Template</label>
-            <select name="templateId" defaultValue="" className={inputClass}>
-              <option value="">No templates yet — you can add tasks manually</option>
-            </select>
           </div>
         </div>
 
