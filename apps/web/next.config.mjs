@@ -82,6 +82,11 @@ const nextConfig = {
   reactStrictMode: true,
   // The shared package ships TypeScript source; let Next transpile it.
   transpilePackages: ['@datumpro/shared'],
+  // officecrypto-tool (used server-side to decrypt password-protected BOQ Excel)
+  // is a CommonJS package with dynamic requires (cfb, crypto-js, xml2js, node
+  // crypto); leave it external so it runs from node_modules instead of being
+  // bundled, which the dynamic requires would otherwise break.
+  serverExternalPackages: ['officecrypto-tool'],
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },

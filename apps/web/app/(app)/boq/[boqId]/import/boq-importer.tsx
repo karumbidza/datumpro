@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { importBoqRows, type ImportSection } from '../../actions';
+import { importBoqRows, decryptBoqExcel, type ImportSection } from '../../actions';
 import { Button } from '@/components/ui/button';
 import { FormError } from '@/components/ui/form-error';
 import { inputCompactClass } from '@/components/ui/form';
@@ -138,38 +138,97 @@ export function BoqImporter({ boqId, currency }: { boqId: string; currency: stri
   const [rows, setRows] = useState<Row[]>([]);
   const [replace, setReplace] = useState(false);
   const [pending, start] = useTransition();
+  // A password-protected (encrypted OLE) file waiting on its password. Set from
+  // onFile's catch when the buffer starts with the OLE/CFB signature; cleared on
+  // cancel or a successful server-side decrypt.
+  const [locked, setLocked] = useState<File | null>(null);
+  const [password, setPassword] = useState('');
+  const [lockError, setLockError] = useState<string | null>(null);
+  const [unlocking, setUnlocking] = useState(false);
 
   const grid = sheets[sheetIndex]?.grid ?? [];
   const colCount = Math.min(20, grid.reduce((m, r) => Math.max(m, r.length), 0));
   const includedCount = included.filter(Boolean).length;
 
+  // Shared post-parse logic: guard empty sheets, then seed the mapper. Used by
+  // both the client-side parse and the server-side decrypt path.
+  function loadSheets(parsed: Sheet[]): boolean {
+    const first = parsed[0];
+    if (!first) {
+      setError('That file has no readable rows.');
+      return false;
+    }
+    setSheets(parsed);
+    // Default: include every sheet that isn't obviously a summary/cover.
+    setIncluded(parsed.map((s) => !looksLikeSummary(s.name)));
+    const firstBill = parsed.findIndex((s) => !looksLikeSummary(s.name));
+    const idx = firstBill >= 0 ? firstBill : 0;
+    setSheetIndex(idx);
+    applyGuess(parsed[idx]!.grid);
+    setStep('map');
+    return true;
+  }
+
+  // Encrypted Office files are OLE/CFB containers starting with this signature.
+  // SheetJS parses old plain .xls (also OLE), so only encrypted files reach the
+  // catch below — a match there means "password-protected", not "corrupt".
+  const OLE_SIG = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1];
+  const isOle = (buf: ArrayBuffer): boolean => {
+    const b = new Uint8Array(buf, 0, Math.min(8, buf.byteLength));
+    if (b.length < 8) return false;
+    return OLE_SIG.every((v, i) => b[i] === v);
+  };
+
   async function onFile(file: File) {
     setError(null);
+    setLockError(null);
+    setLocked(null);
+    setPassword('');
     setFileName(file.name);
+    let buf: ArrayBuffer;
     try {
       const XLSX = await import('xlsx');
-      const buf = await file.arrayBuffer();
+      buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: 'array' });
       const parsed: Sheet[] = wb.SheetNames.map((name): Sheet | null => {
         const ws = wb.Sheets[name];
         if (!ws) return null;
         return { name, grid: XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' }) as Grid };
       }).filter((s): s is Sheet => s !== null && s.grid.length > 0);
-      const first = parsed[0];
-      if (!first) {
-        setError('That file has no readable rows.');
+      loadSheets(parsed);
+    } catch {
+      // A password-protected file fails to parse here; if it's an encrypted OLE
+      // container, prompt for the password (decrypt runs server-side). Otherwise
+      // it's genuinely unreadable.
+      if (buf! && isOle(buf!)) {
+        setLocked(file);
+      } else {
+        setError('Could not read that file. Use .xlsx, .xls or .csv.');
+      }
+    }
+  }
+
+  async function onUnlock() {
+    if (!locked || password.length === 0 || unlocking) return;
+    setLockError(null);
+    setUnlocking(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', locked);
+      fd.append('password', password);
+      const res = await decryptBoqExcel(fd);
+      if ('error' in res) {
+        setLockError(res.error);
         return;
       }
-      setSheets(parsed);
-      // Default: include every sheet that isn't obviously a summary/cover.
-      setIncluded(parsed.map((s) => !looksLikeSummary(s.name)));
-      const firstBill = parsed.findIndex((s) => !looksLikeSummary(s.name));
-      const idx = firstBill >= 0 ? firstBill : 0;
-      setSheetIndex(idx);
-      applyGuess(parsed[idx]!.grid);
-      setStep('map');
+      if (loadSheets(res.sheets as Sheet[])) {
+        setLocked(null);
+        setPassword('');
+      }
     } catch {
-      setError('Could not read that file. Use .xlsx, .xls or .csv.');
+      setLockError('Could not unlock that file. Try again.');
+    } finally {
+      setUnlocking(false);
     }
   }
 
@@ -283,19 +342,65 @@ export function BoqImporter({ boqId, currency }: { boqId: string; currency: stri
     return (
       <div className="mt-6">
         <FormError error={error} />
-        <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-zinc-300 bg-zinc-50 px-6 py-14 text-center transition hover:border-brand-500 hover:bg-brand-50/40 dark:border-zinc-700 dark:bg-zinc-900/40">
-          <span className="text-sm font-medium">Drop an Excel/CSV bill here, or click to choose</span>
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">.xlsx · .xls · .csv — any layout, any number of sheets</span>
-          <input
-            type="file"
-            accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
-            className="sr-only"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) onFile(f);
-            }}
-          />
-        </label>
+        {locked ? (
+          <div className="rounded-xl border border-zinc-300 bg-zinc-50 p-6 dark:border-zinc-700 dark:bg-zinc-900/40">
+            <h3 className="text-sm font-semibold">This file is password-protected</h3>
+            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              <span className="font-medium text-zinc-700 dark:text-zinc-300">{fileName}</span> is encrypted. Enter its
+              password to unlock and import it. The password is used once to decrypt in memory and never stored.
+            </p>
+            <form
+              className="mt-4 flex flex-wrap items-center gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                onUnlock();
+              }}
+            >
+              <input
+                type="password"
+                autoFocus
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="File password"
+                className={`${inputCompactClass} w-56`}
+              />
+              <Button type="submit" size="sm" disabled={unlocking || password.length === 0}>
+                {unlocking ? 'Unlocking…' : 'Unlock & import'}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setLocked(null);
+                  setPassword('');
+                  setLockError(null);
+                }}
+              >
+                Cancel
+              </Button>
+            </form>
+            {lockError && (
+              <div className="mt-3">
+                <FormError error={lockError} />
+              </div>
+            )}
+          </div>
+        ) : (
+          <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-zinc-300 bg-zinc-50 px-6 py-14 text-center transition hover:border-brand-500 hover:bg-brand-50/40 dark:border-zinc-700 dark:bg-zinc-900/40">
+            <span className="text-sm font-medium">Drop an Excel/CSV bill here, or click to choose</span>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">.xlsx · .xls · .csv — any layout, any number of sheets</span>
+            <input
+              type="file"
+              accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+              className="sr-only"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) onFile(f);
+              }}
+            />
+          </label>
+        )}
       </div>
     );
   }
