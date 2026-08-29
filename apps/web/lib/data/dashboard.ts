@@ -119,6 +119,35 @@ export async function getDashboardData(orgId: string, projectId?: string): Promi
   return { counts, tasks };
 }
 
+/** The signed-in contractor/member's own assigned tasks as timeline rows — every
+ *  status (the Gantt needs done/active/overdue), shaped like getDashboardData rows.
+ *  RLS scopes to tasks the caller can read. */
+export async function listMyTimelineTasks(userId: string): Promise<DashboardTask[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('tasks')
+    .select(
+      'id, title, status, sla_status, project_id, planned_start_date, planned_end_date, due_date, actual_end_date, projects(name)',
+    )
+    .eq('assignee_id', userId);
+
+  type Row = {
+    id: string; title: string; status: TaskStatus; sla_status: TaskSlaStatus; project_id: string;
+    planned_start_date: string | null; planned_end_date: string | null; due_date: string | null;
+    actual_end_date: string | null;
+    projects: { name: string | null } | { name: string | null }[] | null;
+  };
+  return ((data ?? []) as unknown as Row[]).map((t) => {
+    const proj = Array.isArray(t.projects) ? t.projects[0] : t.projects;
+    return {
+      id: t.id, title: t.title, status: t.status, sla_status: t.sla_status,
+      project_id: t.project_id, projectName: proj?.name ?? 'Project', assigneeName: null,
+      planned_start_date: t.planned_start_date, planned_end_date: t.planned_end_date,
+      due_date: t.due_date, actual_end_date: t.actual_end_date,
+    } satisfies DashboardTask;
+  });
+}
+
 /** Portfolio timeline — ONE bar per project (not per task) for the all-projects
  *  dashboard. Span comes from the project's own start/end dates; status + SLA are
  *  rolled up from its tasks. Shaped as DashboardTask so it feeds TimelineOverview
