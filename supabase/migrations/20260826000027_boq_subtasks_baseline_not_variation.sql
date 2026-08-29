@@ -31,17 +31,32 @@ begin
 end $$;
 
 -- Backfill: BOQ-sourced subtasks wrongly flagged as pending/rejected variations.
+-- variation_status is a guarded workflow column (guard_workflow_transition), so
+-- the write must run with app.workflow_ctx set to the row's org_id — do it per
+-- org. (Empty on a fresh DB, so this is a no-op in CI; it corrects real prod rows.)
 create temporary table _fix on commit drop as
-  select id, task_id from public.task_subtasks
-  where boq_item_id is not null and is_variation = true and variation_status <> 'approved';
+  select id, task_id, org_id from public.task_subtasks
+  where boq_item_id is not null and is_variation = true and variation_status is distinct from 'approved';
 
-delete from public.approvals
-  where entity_type = 'task_variation' and entity_id in (select id from _fix);
+do $$
+declare v_org uuid;
+begin
+  for v_org in select distinct org_id from _fix loop
+    perform set_config('app.workflow_ctx', v_org::text, true);
 
-update public.task_subtasks
-  set is_variation = false, variation_status = null
-  where id in (select id from _fix);
+    delete from public.approvals
+      where entity_type = 'task_variation'
+        and entity_id in (select id from _fix where org_id = v_org);
 
+    update public.task_subtasks
+      set is_variation = false, variation_status = null
+      where id in (select id from _fix where org_id = v_org);
+  end loop;
+  perform set_config('app.workflow_ctx', '', true);
+end $$;
+
+-- Recompute awarded_cost_cents for the affected tasks (baseline + approved sum).
+-- awarded_cost_cents is NOT a guarded column, so this needs no workflow ctx.
 update public.tasks t
   set awarded_cost_cents = coalesce((
     select sum(s.cost_cents) from public.task_subtasks s
