@@ -1184,7 +1184,7 @@ set role authenticated;
 set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a9","role":"authenticated","aal":"aal1"}';
 select pg_temp.ok((select count(*) from public.projects where id = 'a2220000-0000-0000-0000-000000000000') = 1,
   'proj-member: active contributor can read the project');
-select pg_temp.ok(public.project_role('a2220000-0000-0000-0000-000000000000') = 'contributor',
+select pg_temp.ok(public.project_role('a2220000-0000-0000-0000-000000000000'::uuid) = 'contributor',
   'proj-member: active contributor resolves role = contributor');
 reset role;
 reset request.jwt.claims;
@@ -1197,9 +1197,9 @@ set role authenticated;
 set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a9","role":"authenticated","aal":"aal1"}';
 select pg_temp.ok((select count(*) from public.projects where id = 'a2220000-0000-0000-0000-000000000000') = 0,
   'proj-member: DISABLED member can no longer read the project');
-select pg_temp.ok(public.project_role('a2220000-0000-0000-0000-000000000000') is null,
+select pg_temp.ok(public.project_role('a2220000-0000-0000-0000-000000000000'::uuid) is null,
   'proj-member: DISABLED member resolves no project role');
-select pg_temp.ok(public.is_project_member('a2220000-0000-0000-0000-000000000000') = false,
+select pg_temp.ok(public.is_project_member('a2220000-0000-0000-0000-000000000000'::uuid) = false,
   'proj-member: DISABLED member is not a project member');
 reset role;
 reset request.jwt.claims;
