@@ -6,7 +6,7 @@ import { SubmitButton } from '@/components/ui/submit-button';
 import { FormError } from '@/components/ui/form-error';
 import { WEATHER_OPTIONS } from '@datumpro/shared/domain';
 
-import { inputClass } from '@/components/ui/form';
+import { inputClass, Req } from '@/components/ui/form';
 
 export function NewReportForm({ projectId, today }: { projectId: string; today: string }) {
   const [state, formAction] = useActionState(createReport, {});
@@ -16,7 +16,7 @@ export function NewReportForm({ projectId, today }: { projectId: string; today: 
       <FormError error={state.error} />
 
       <div>
-        <label className="mb-1 block text-sm font-medium">Date</label>
+        <label className="mb-1 block text-sm font-medium">Date<Req /></label>
         <input type="date" name="reportDate" defaultValue={today} required className={inputClass} />
       </div>
 
@@ -39,7 +39,7 @@ export function NewReportForm({ projectId, today }: { projectId: string; today: 
 
       <div>
         <label className="mb-1 block text-sm font-medium">Narrative</label>
-        <textarea name="narrative" rows={5} className={inputClass} placeholder="What happened on site today?" />
+        <textarea name="narrative" rows={5} className={inputClass} />
       </div>
 
       <div className="flex gap-2 pt-2">

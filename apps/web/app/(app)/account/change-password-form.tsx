@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { passwordIssue } from '@datumpro/shared/validation';
 import { Button } from '@/components/ui/button';
 
-import { inputCompactClass as inputClass } from '@/components/ui/form';
+import { inputCompactClass as inputClass, Req } from '@/components/ui/form';
 
 /** Change-password form for a signed-in user. We re-verify the CURRENT password
  *  (via signInWithPassword) before updating — Supabase's updateUser doesn't check
@@ -50,7 +50,7 @@ export function ChangePasswordForm({ email }: { email: string }) {
   return (
     <form onSubmit={submit} className="mt-3 space-y-3">
       <div>
-        <label className="mb-1 block text-xs font-medium">Current password</label>
+        <label className="mb-1 block text-xs font-medium">Current password<Req /></label>
         <input
           type="password"
           autoComplete="current-password"
@@ -61,7 +61,7 @@ export function ChangePasswordForm({ email }: { email: string }) {
         />
       </div>
       <div>
-        <label className="mb-1 block text-xs font-medium">New password</label>
+        <label className="mb-1 block text-xs font-medium">New password<Req /></label>
         <input
           type="password"
           autoComplete="new-password"
@@ -72,7 +72,7 @@ export function ChangePasswordForm({ email }: { email: string }) {
         />
       </div>
       <div>
-        <label className="mb-1 block text-xs font-medium">Confirm new password</label>
+        <label className="mb-1 block text-xs font-medium">Confirm new password<Req /></label>
         <input
           type="password"
           autoComplete="new-password"

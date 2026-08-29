@@ -4,7 +4,7 @@ import { useActionState } from 'react';
 import { createTender } from './actions';
 import { FormError } from '@/components/ui/form-error';
 import { SubmitButton } from '@/components/ui/submit-button';
-import { inputClass, labelClass } from '@/components/ui/form';
+import { inputClass, labelClass, Req } from '@/components/ui/form';
 
 interface Props {
   boqId: string;
@@ -22,7 +22,7 @@ export function CreateTenderForm({ boqId, defaultTitle = '' }: Props) {
 
       <div>
         <label htmlFor="tender-title" className={labelClass}>
-          Tender title
+          Tender title<Req />
         </label>
         <input
           id="tender-title"
@@ -31,7 +31,6 @@ export function CreateTenderForm({ boqId, defaultTitle = '' }: Props) {
           autoComplete="off"
           defaultValue={defaultTitle}
           className={inputClass}
-          placeholder="e.g. Earthworks Package — Tender 2026"
         />
       </div>
 

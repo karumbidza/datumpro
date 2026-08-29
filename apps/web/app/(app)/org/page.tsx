@@ -15,7 +15,7 @@ import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { ChevronRight, ShieldAlert } from '@/components/icons';
-import { inputClass } from '@/components/ui/form';
+import { inputClass, Req } from '@/components/ui/form';
 import { MembersPanel } from '@/components/org/members-panel';
 import { listOrgContractorDocuments } from '@/lib/data/contractor-documents';
 import { listProjects } from '@/lib/data/projects';
@@ -136,7 +136,7 @@ export default async function OrgPage({
               <form action={renameOrganization} className="mt-3 flex flex-wrap items-end gap-3">
                 <input type="hidden" name="orgId" value={orgId} />
                 <div className="min-w-56 flex-1">
-                  <label className="mb-1 block text-xs font-medium">Organisation name</label>
+                  <label className="mb-1 block text-xs font-medium">Organisation name<Req /></label>
                   <input name="name" required defaultValue={ctx.active.name} maxLength={120} className={inputClass} />
                 </div>
                 <Button type="submit">Save</Button>
@@ -193,9 +193,9 @@ export default async function OrgPage({
               </p>
               <form action={updateCompanyProfile} className="mt-3 grid gap-3 sm:grid-cols-2">
                 <input type="hidden" name="orgId" value={orgId} />
-                <Field label="Legal name" name="legalName" defaultValue={org.legal_name ?? ''} placeholder="Acme Construction (Pvt) Ltd" />
-                <Field label="Sector / industry" name="sector" defaultValue={org.sector ?? ''} placeholder="Civil engineering" />
-                <Field label="Country" name="country" defaultValue={org.country ?? ''} placeholder="Zimbabwe" />
+                <Field label="Legal name" name="legalName" defaultValue={org.legal_name ?? ''} />
+                <Field label="Sector / industry" name="sector" defaultValue={org.sector ?? ''} />
+                <Field label="Country" name="country" defaultValue={org.country ?? ''} />
                 <Field label="Registration number" name="registrationNumber" defaultValue={org.registration_number ?? ''} placeholder="CR-123456" />
                 <div className="sm:col-span-2">
                   <SubmitButton pendingText="Saving…">Save profile</SubmitButton>
@@ -301,7 +301,7 @@ export default async function OrgPage({
             <form action={addOrgDomain} className="mt-3 flex flex-wrap items-end gap-3">
               <input type="hidden" name="orgId" value={orgId} />
               <div className="min-w-56 flex-1">
-                <label className="mb-1 block text-xs font-medium">Add a domain</label>
+                <label className="mb-1 block text-xs font-medium">Add a domain<Req /></label>
                 <input name="domain" required placeholder="acme.com" className={inputClass} />
               </div>
               <SubmitButton pendingText="Adding…">Add domain</SubmitButton>

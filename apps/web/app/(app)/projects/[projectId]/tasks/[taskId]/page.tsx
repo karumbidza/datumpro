@@ -29,7 +29,7 @@ import { TaskTabs, type TaskTab } from '@/components/task/task-tabs';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { inputClass } from '@/components/ui/form';
+import { inputClass, Req } from '@/components/ui/form';
 import { STATUS_TONE } from '@/components/ui/tones';
 import { TASK_STATUS_LABELS, TASK_PRIORITY_LABELS, TASK_SLA_LABELS } from '@datumpro/shared/domain';
 import { formatShortDate } from '@/lib/date';
@@ -285,7 +285,7 @@ export default async function TaskDetailPage({
           >
             <input type="hidden" name="taskId" value={taskId} />
             <div className="min-w-48 flex-1">
-              <label className="mb-1 block text-xs font-medium">Starts after</label>
+              <label className="mb-1 block text-xs font-medium">Starts after<Req /></label>
               <select name="predecessorId" required defaultValue="" className={inputClass}>
                 <option value="" disabled>
                   Select a task…

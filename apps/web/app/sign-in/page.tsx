@@ -4,6 +4,7 @@ import { use, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { PASSWORD_MIN_LENGTH, passwordIssue } from '@datumpro/shared/validation';
 import { ForgotPasswordFlow } from './forgot-password-flow';
+import { Req } from '@/components/ui/form';
 
 // 48px min tap target (h-12) — comfortable for thumbs, per the mobile-first form spec.
 const fieldClass =
@@ -195,7 +196,7 @@ export default function SignInPage({
         <form onSubmit={passwordSignIn} className="mt-[18px] flex flex-col gap-3">
             <div>
               <label htmlFor="email" className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-                Work email
+                Work email<Req />
               </label>
               <div className={fieldClass}>
                 <MailIcon />
@@ -220,7 +221,7 @@ export default function SignInPage({
             </div>
             <div>
               <div className="mb-1.5 flex items-baseline justify-between">
-                <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Password</label>
+                <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Password<Req /></label>
                 <button
                   type="button"
                   onClick={() => {

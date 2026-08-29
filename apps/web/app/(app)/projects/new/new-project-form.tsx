@@ -18,7 +18,7 @@ import {
 import type { ClientOption } from '@/lib/data/clients';
 import type { CalendarOption } from '@/lib/data/calendars';
 import type { UnlinkedBoqOption } from '@/lib/data/boq';
-import { inputClass, labelClass } from '@/components/ui/form';
+import { inputClass, labelClass, Req } from '@/components/ui/form';
 
 type Member = { userId: string; name: string };
 type NewItem = { id: '__new'; name: string };
@@ -227,13 +227,12 @@ export function NewProjectForm({
         <div className={step === 1 ? 'space-y-4' : 'hidden'}>
           {/* Name */}
           <div>
-            <label className={labelClass}>Project name</label>
+            <label className={labelClass}>Project name<Req /></label>
             <input
               name="name"
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Riverside Office Block"
               className={inputClass}
             />
           </div>
@@ -247,7 +246,6 @@ export function NewProjectForm({
               name="description"
               rows={3}
               maxLength={2000}
-              placeholder="Scope, siting, anything the team should know up front…"
               className={inputClass}
             />
           </div>
@@ -322,7 +320,7 @@ export function NewProjectForm({
           {/* Project type + manager */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className={labelClass}>Project type</label>
+              <label className={labelClass}>Project type<Req /></label>
               <select
                 name="constructionType"
                 required
@@ -369,7 +367,7 @@ export function NewProjectForm({
           <div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label className={labelClass}>Start date</label>
+                <label className={labelClass}>Start date<Req /></label>
                 <input
                   type="date"
                   name="startDate"
@@ -380,7 +378,7 @@ export function NewProjectForm({
                 />
               </div>
               <div>
-                <label className={labelClass}>Duration</label>
+                <label className={labelClass}>Duration<Req /></label>
                 <div className="flex gap-2">
                   <input
                     type="number"
@@ -389,7 +387,6 @@ export function NewProjectForm({
                     value={durationValue}
                     onChange={(e) => setDurationValue(e.target.value)}
                     required
-                    placeholder="0"
                     className={`${inputClass} min-w-0 flex-1`}
                   />
                   <div className="flex shrink-0 overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800">
@@ -437,7 +434,7 @@ export function NewProjectForm({
               when the "(optional)" label wraps to a second line on narrow columns. */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-end">
             <div>
-              <label className={labelClass}>Currency</label>
+              <label className={labelClass}>Currency<Req /></label>
               <select name="currency" required value={currency} onChange={(e) => setCurrency(e.target.value)} className={inputClass}>
                 {CURRENCIES.map((c) => (
                   <option key={c} value={c}>

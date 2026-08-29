@@ -5,7 +5,7 @@ import { SubmitButton } from '@/components/ui/submit-button';
 
 export const metadata = { title: 'Government & Enterprise — DatumPro' };
 
-import { inputClass } from '@/components/ui/form';
+import { inputClass, Req } from '@/components/ui/form';
 
 const assurances: { title: string; body: string }[] = [
   {
@@ -82,8 +82,8 @@ export default async function EnterprisePage({
               </div>
               <div className="flex gap-3">
                 <div className="flex-1">
-                  <label htmlFor="orgName" className="mb-1 block text-xs font-medium">Organisation</label>
-                  <input id="orgName" name="orgName" required placeholder="e.g. Ministry of Public Works" className={inputClass} />
+                  <label htmlFor="orgName" className="mb-1 block text-xs font-medium">Organisation<Req /></label>
+                  <input id="orgName" name="orgName" required className={inputClass} />
                 </div>
                 <div>
                   <label htmlFor="buyerType" className="mb-1 block text-xs font-medium">Buyer type</label>
@@ -100,17 +100,17 @@ export default async function EnterprisePage({
               <div className="flex gap-3">
                 <div className="flex-1">
                   <label htmlFor="contactName" className="mb-1 block text-xs font-medium">Your name</label>
-                  <input id="contactName" name="contactName" placeholder="Full name" className={inputClass} />
+                  <input id="contactName" name="contactName" className={inputClass} />
                 </div>
                 <div className="flex-1">
-                  <label htmlFor="contactEmail" className="mb-1 block text-xs font-medium">Work email</label>
+                  <label htmlFor="contactEmail" className="mb-1 block text-xs font-medium">Work email<Req /></label>
                   <input id="contactEmail" name="contactEmail" type="email" required placeholder="you@org.gov" className={inputClass} />
                 </div>
               </div>
               <div className="flex gap-3">
                 <div className="flex-1">
                   <label htmlFor="country" className="mb-1 block text-xs font-medium">Country</label>
-                  <input id="country" name="country" placeholder="e.g. Zimbabwe" className={inputClass} />
+                  <input id="country" name="country" className={inputClass} />
                 </div>
                 <div className="flex-1">
                   <label htmlFor="teamSize" className="mb-1 block text-xs font-medium">Team size</label>

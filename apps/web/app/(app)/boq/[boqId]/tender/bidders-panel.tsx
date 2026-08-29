@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { BIDDER_STATUS_TONE } from '@/components/ui/tones';
 import { FormError } from '@/components/ui/form-error';
-import { inputClass, labelClass } from '@/components/ui/form';
+import { inputClass, labelClass, Req } from '@/components/ui/form';
 import { SubmitButton } from '@/components/ui/submit-button';
 
 export interface ContractorOption {
@@ -110,7 +110,7 @@ function InviteForm({
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className={labelClass} htmlFor="companyName">
-                Company name
+                Company name<Req />
               </label>
               <input
                 id="companyName"
@@ -118,12 +118,11 @@ function InviteForm({
                 required
                 autoComplete="organization"
                 className={inputClass}
-                placeholder="e.g. Apex Contractors Ltd"
               />
             </div>
             <div>
               <label className={labelClass} htmlFor="email">
-                Contact email
+                Contact email<Req />
               </label>
               <input
                 id="email"

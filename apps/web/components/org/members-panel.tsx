@@ -3,7 +3,7 @@ import { SubmitButton } from '@/components/ui/submit-button';
 import { INVITABLE_MEMBER_TYPES, MEMBER_TYPE_META } from '@datumpro/shared/access';
 import { inviteMember, revokeInvitation, resendInvitation } from '@/app/(app)/org/members/actions';
 import { MembersRoster } from '@/components/org/members-roster';
-import { inputCompactClass as inputClass } from '@/components/ui/form';
+import { inputCompactClass as inputClass, Req } from '@/components/ui/form';
 import type { ContractorDocRow } from '@/lib/data/contractor-documents';
 import type { OrgInvitationRow } from '@/lib/data/org-members';
 
@@ -32,7 +32,7 @@ export function MembersPanel({
         <form action={inviteMember} className="mt-3 flex flex-wrap items-end gap-3">
           <input type="hidden" name="orgId" value={orgId} />
           <div className="min-w-56 flex-1">
-            <label className="mb-1 block text-xs font-medium">Email</label>
+            <label className="mb-1 block text-xs font-medium">Email<Req /></label>
             <input type="email" name="email" required placeholder="name@company.com" className={inputClass} />
           </div>
           <div>

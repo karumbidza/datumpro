@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { PASSWORD_MIN_LENGTH, passwordIssue } from '@datumpro/shared/validation';
+import { Req } from '@/components/ui/form';
 
 // 48px min tap target (h-12) for comfortable thumb reach on mobile.
 const fieldClass =
@@ -57,7 +58,7 @@ export default function ResetPasswordPage() {
       <form onSubmit={submit} className="mt-6 flex flex-col gap-3">
         <div>
           <label htmlFor="new-password" className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-            New password
+            New password<Req />
           </label>
           <div className={fieldClass}>
             <input

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { inputClass, labelClass } from '@/components/ui/form';
+import { inputClass, labelClass, Req } from '@/components/ui/form';
 import { scheduleTasks } from './actions';
 
 /** PM picks the start date and runs the forward pass. Re-running is safe:
@@ -30,7 +30,7 @@ export function SchedulePanel({
       <input type="hidden" name="boqId" value={boqId} />
       <div>
         <label className={labelClass} htmlFor="schedule-start">
-          Programme start
+          Programme start<Req />
         </label>
         <input
           id="schedule-start"

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { createOrg } from '../actions';
-import { inputClass, labelClass, hintClass } from '@/components/ui/form';
+import { inputClass, labelClass, hintClass, Req } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
 
 type Step = 'details' | 'verify';
@@ -158,7 +158,7 @@ export function NewCompanyForm({
         <form onSubmit={verify} className="mt-6 space-y-3">
           <div>
             <label htmlFor="code" className={labelClass}>
-              Verification code
+              Verification code<Req />
             </label>
             <input
               id="code"
@@ -227,7 +227,7 @@ export function NewCompanyForm({
       <form onSubmit={continueFromDetails} className="mt-6 space-y-3">
         <div>
           <label htmlFor="fullName" className={labelClass}>
-            Your full name
+            Your full name<Req />
           </label>
           <input
             id="fullName"
@@ -235,7 +235,6 @@ export function NewCompanyForm({
             autoFocus
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            placeholder="e.g. Ada Lovelace"
             className={inputClass}
           />
           <p className={hintClass}>Shown across the app — on tasks, chat and your team roster.</p>
@@ -243,21 +242,20 @@ export function NewCompanyForm({
 
         <div>
           <label htmlFor="name" className={labelClass}>
-            Company name
+            Company name<Req />
           </label>
           <input
             id="name"
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Acme Construction"
             className={inputClass}
           />
         </div>
 
         <div>
           <label htmlFor="contactPhone" className={labelClass}>
-            Company phone
+            Company phone<Req />
           </label>
           <input
             id="contactPhone"
@@ -283,7 +281,6 @@ export function NewCompanyForm({
                 id="legalName"
                 value={legalName}
                 onChange={(e) => setLegalName(e.target.value)}
-                placeholder="e.g. Acme Construction (Private) Limited"
                 className={inputClass}
               />
             </div>
@@ -296,7 +293,6 @@ export function NewCompanyForm({
                   id="country"
                   value={country}
                   onChange={(e) => setCountry(e.target.value)}
-                  placeholder="e.g. Zimbabwe"
                   className={inputClass}
                 />
               </div>
@@ -322,7 +318,6 @@ export function NewCompanyForm({
                 id="registrationNumber"
                 value={registrationNumber}
                 onChange={(e) => setRegistrationNumber(e.target.value)}
-                placeholder="Company / entity reg. number"
                 className={inputClass}
               />
             </div>
