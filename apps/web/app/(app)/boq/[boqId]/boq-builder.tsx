@@ -26,6 +26,7 @@ import {
   type TenderStatus,
 } from '@datumpro/shared/domain';
 import { fmtMoney } from '@/lib/money';
+import { ChevronDown } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { BOQ_STATUS_TONE, TENDER_STATUS_TONE } from '@/components/ui/tones';
@@ -74,6 +75,14 @@ export function BoqBuilder({
   );
   const [deps, setDeps] = useState<Dep[]>(() => boq.deps.map((d) => ({ sectionId: d.sectionId, dependsOnId: d.dependsOnId })));
   const [depError, setDepError] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const toggleCollapsed = (id: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const [pending, start] = useTransition();
   const cur = boq.currency;
   const status = (boq.status as BoqStatus) ?? 'draft';
@@ -163,11 +172,25 @@ export function BoqBuilder({
   function renderSection(s: Section, depth: number, number: string): ReactElement[] {
     const my = itemsOf(s.id);
     const kids = childSections(s.id);
+    const isCollapsed = collapsed.has(s.id);
     const out: ReactElement[] = [];
 
     out.push(
       <tr key={`s-${s.id}`} className="bg-zinc-50 dark:bg-zinc-900/50" onDragOver={allowDrop} onDrop={canEdit ? (e) => onDropInto(e, s.id) : undefined}>
-        <td className={`${rowB} ${colB} px-2.5 py-2 text-center font-mono text-xs font-bold text-zinc-500`}>{number}</td>
+        <td className={`${rowB} ${colB} px-1 py-2 text-center font-mono text-xs font-bold text-zinc-500`}>
+          <div className="flex items-center justify-center gap-0.5">
+            <button
+              type="button"
+              onClick={() => toggleCollapsed(s.id)}
+              aria-label={isCollapsed ? 'Expand section' : 'Collapse section'}
+              aria-expanded={!isCollapsed}
+              className="rounded p-0.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+            >
+              <ChevronDown size={14} className={`transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
+            </button>
+            <span>{number}</span>
+          </div>
+        </td>
         <td className={`${rowB} ${colB} py-1.5 pr-2`} colSpan={5}>
           <div className="flex items-center gap-2" style={{ paddingLeft: depth * 18 }}>
             <input
@@ -238,6 +261,10 @@ export function BoqBuilder({
         </td>
       </tr>,
     );
+
+    // Collapsed: render only the section's own row; hide items, sub-sections,
+    // and their add affordances. Totals/entries are data-derived, so unchanged.
+    if (isCollapsed) return out;
 
     my.forEach((it, j) => {
       const badUnit = !isKnownUnit(it.uom);
@@ -451,7 +478,7 @@ export function BoqBuilder({
       )}
 
       {/* the bill */}
-      <div className="mt-4 overflow-x-auto rounded-lg border border-zinc-300 dark:border-zinc-700">
+      <div className="mt-4 max-h-[calc(100vh-15rem)] overflow-auto rounded-lg border border-zinc-300 dark:border-zinc-700">
         <table className="w-full min-w-[720px] border-collapse text-sm">
           <colgroup>
             <col className="w-16" />
@@ -463,16 +490,16 @@ export function BoqBuilder({
             <col className="w-32" />
             <col className="w-9" />
           </colgroup>
-          <thead>
+          <thead className="sticky top-0 z-20">
             <tr className="bg-zinc-100 text-[11px] uppercase tracking-wide text-zinc-500 dark:bg-zinc-800/70 dark:text-zinc-400">
-              <th className={`${colB} border-b border-zinc-300 px-2.5 py-2.5 text-left font-semibold dark:border-zinc-700`}>Item No</th>
-              <th className={`${colB} border-b border-zinc-300 px-2.5 py-2.5 text-left font-semibold dark:border-zinc-700`}>Description</th>
-              <th className={`${colB} border-b border-zinc-300 px-2.5 py-2.5 text-left font-semibold dark:border-zinc-700`}>Unit</th>
-              <th className={`${colB} border-b border-zinc-300 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700`}>Qty</th>
-              <th className={`${colB} border-b border-zinc-300 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700`}>Budget/Est</th>
-              <th className={`${colB} border-b border-zinc-300 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700`} title="Working days">Days</th>
-              <th className={`${colB} border-b border-zinc-300 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700`}>Total</th>
-              <th className="border-b border-zinc-300 dark:border-zinc-700" />
+              <th className={`${colB} border-b border-zinc-300 bg-zinc-100 px-2.5 py-2.5 text-left font-semibold dark:border-zinc-700 dark:bg-zinc-800`}>Item No</th>
+              <th className={`${colB} border-b border-zinc-300 bg-zinc-100 px-2.5 py-2.5 text-left font-semibold dark:border-zinc-700 dark:bg-zinc-800`}>Description</th>
+              <th className={`${colB} border-b border-zinc-300 bg-zinc-100 px-2.5 py-2.5 text-left font-semibold dark:border-zinc-700 dark:bg-zinc-800`}>Unit</th>
+              <th className={`${colB} border-b border-zinc-300 bg-zinc-100 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700 dark:bg-zinc-800`}>Qty</th>
+              <th className={`${colB} border-b border-zinc-300 bg-zinc-100 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700 dark:bg-zinc-800`}>Budget/Est</th>
+              <th className={`${colB} border-b border-zinc-300 bg-zinc-100 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700 dark:bg-zinc-800`} title="Working days">Days</th>
+              <th className={`${colB} border-b border-zinc-300 bg-zinc-100 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700 dark:bg-zinc-800`}>Total</th>
+              <th className="border-b border-zinc-300 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800" />
             </tr>
           </thead>
           <tbody>
