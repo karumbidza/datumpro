@@ -535,7 +535,7 @@ export function BoqImporter({ boqId, currency }: { boqId: string; currency: stri
         </div>
       </div>
 
-      <ReviewGrid rows={rows} setRow={setRow} currency={currency} />
+      <ReviewGrid boqId={boqId} rows={rows} setRow={setRow} currency={currency} />
 
       <label className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
         <input

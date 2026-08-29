@@ -1,18 +1,89 @@
 'use client';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fmtMoney } from '@/lib/money';
 import { type Row, type Kind, lineCents } from './grid-types';
 
 const DEFAULT_COL_W = [96, 72, 360, 72, 88, 104, 120, 120]; // Kind No Desc Unit Qty Rate Amount Total
+const MIN_COL_W = 48;
+const MAX_COL_W = 800;
 
-export function ReviewGrid({ rows, setRow, currency }: {
+export function ReviewGrid({ boqId, rows, setRow, currency }: {
+  boqId: string;
   rows: Row[];
   setRow: (i: number, patch: Partial<Row>) => void;
   currency: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [colWidths] = useState<number[]>(DEFAULT_COL_W);
+  const [colWidths, setColWidths] = useState<number[]>(DEFAULT_COL_W);
   const totalWidth = colWidths.reduce((a, b) => a + b, 0);
+
+  const LS_KEY = `boq-review-colw:${boqId}`;
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
+      if (Array.isArray(saved) && saved.length === DEFAULT_COL_W.length) setColWidths(saved);
+    } catch {
+      /* ignore malformed cache */
+    }
+  }, [LS_KEY]);
+  function persist(widths: number[]) {
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(widths));
+    } catch {
+      /* storage disabled/full — widths still apply this session */
+    }
+  }
+
+  function startColResize(i: number, e: React.PointerEvent) {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = colWidths[i] ?? DEFAULT_COL_W[i] ?? MIN_COL_W;
+    function move(ev: PointerEvent) {
+      const next = Math.min(MAX_COL_W, Math.max(MIN_COL_W, startW + (ev.clientX - startX)));
+      setColWidths((prev) => {
+        const out = [...prev];
+        out[i] = next;
+        return out;
+      });
+    }
+    function up() {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      setColWidths((prev) => {
+        persist(prev);
+        return prev;
+      });
+    }
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  }
+
+  function autoFitCol(i: number) {
+    const holder = autoFitCol as unknown as { _c?: HTMLCanvasElement };
+    const canvas = holder._c || (holder._c = document.createElement('canvas'));
+    const ctx = canvas.getContext('2d')!;
+    ctx.font = '13px ui-sans-serif, system-ui, sans-serif';
+    const pick = (r: Row): string =>
+      [
+        r.kind,
+        r.itemNo,
+        r.description,
+        r.unit,
+        r.qty ? String(r.qty) : '',
+        r.rate ? String(r.rate) : '',
+        r.amount ? String(r.amount) : '',
+        '',
+      ][i] || '';
+    let max = MIN_COL_W;
+    for (const r of rows) max = Math.max(max, ctx.measureText(pick(r)).width + 28);
+    const next = Math.min(MAX_COL_W, Math.ceil(max));
+    setColWidths((prev) => {
+      const out = [...prev];
+      out[i] = next;
+      persist(out);
+      return out;
+    });
+  }
   return (
     <div
       ref={scrollRef}
@@ -26,14 +97,70 @@ export function ReviewGrid({ rows, setRow, currency }: {
         </colgroup>
         <thead className="sticky top-0 z-20">
           <tr className="bg-zinc-100 text-left text-[11px] uppercase tracking-wide text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
-            <th className="border-b border-r border-zinc-300 px-2 py-2 dark:border-zinc-700">Kind</th>
-            <th className="border-b border-r border-zinc-300 px-2 py-2 dark:border-zinc-700">No.</th>
-            <th className="border-b border-r border-zinc-300 px-2 py-2 dark:border-zinc-700">Description</th>
-            <th className="border-b border-r border-zinc-300 px-2 py-2 dark:border-zinc-700">Unit</th>
-            <th className="border-b border-r border-zinc-300 px-2 py-2 text-right dark:border-zinc-700">Qty</th>
-            <th className="border-b border-r border-zinc-300 px-2 py-2 text-right dark:border-zinc-700">Rate</th>
-            <th className="border-b border-r border-zinc-300 px-2 py-2 text-right dark:border-zinc-700">Amount</th>
-            <th className="border-b border-zinc-300 px-2 py-2 text-right dark:border-zinc-700">Total</th>
+            <th className="relative border-b border-r border-zinc-300 px-2 py-2 dark:border-zinc-700">
+              Kind
+              <div
+                onPointerDown={(e) => startColResize(0, e)}
+                onDoubleClick={() => autoFitCol(0)}
+                className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-brand-400/50"
+              />
+            </th>
+            <th className="relative border-b border-r border-zinc-300 px-2 py-2 dark:border-zinc-700">
+              No.
+              <div
+                onPointerDown={(e) => startColResize(1, e)}
+                onDoubleClick={() => autoFitCol(1)}
+                className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-brand-400/50"
+              />
+            </th>
+            <th className="relative border-b border-r border-zinc-300 px-2 py-2 dark:border-zinc-700">
+              Description
+              <div
+                onPointerDown={(e) => startColResize(2, e)}
+                onDoubleClick={() => autoFitCol(2)}
+                className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-brand-400/50"
+              />
+            </th>
+            <th className="relative border-b border-r border-zinc-300 px-2 py-2 dark:border-zinc-700">
+              Unit
+              <div
+                onPointerDown={(e) => startColResize(3, e)}
+                onDoubleClick={() => autoFitCol(3)}
+                className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-brand-400/50"
+              />
+            </th>
+            <th className="relative border-b border-r border-zinc-300 px-2 py-2 text-right dark:border-zinc-700">
+              Qty
+              <div
+                onPointerDown={(e) => startColResize(4, e)}
+                onDoubleClick={() => autoFitCol(4)}
+                className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-brand-400/50"
+              />
+            </th>
+            <th className="relative border-b border-r border-zinc-300 px-2 py-2 text-right dark:border-zinc-700">
+              Rate
+              <div
+                onPointerDown={(e) => startColResize(5, e)}
+                onDoubleClick={() => autoFitCol(5)}
+                className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-brand-400/50"
+              />
+            </th>
+            <th className="relative border-b border-r border-zinc-300 px-2 py-2 text-right dark:border-zinc-700">
+              Amount
+              <div
+                onPointerDown={(e) => startColResize(6, e)}
+                onDoubleClick={() => autoFitCol(6)}
+                className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-brand-400/50"
+              />
+            </th>
+            <th className="relative border-b border-zinc-300 px-2 py-2 text-right dark:border-zinc-700">
+              Total
+              <div
+                onPointerDown={(e) => startColResize(7, e)}
+                onDoubleClick={() => autoFitCol(7)}
+                className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-brand-400/50"
+              />
+            </th>
           </tr>
         </thead>
         <tbody>
