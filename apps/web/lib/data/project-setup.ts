@@ -13,6 +13,13 @@ export interface SetupStatusRow {
 
 export type SetupItemKey = keyof SetupStatusRow;
 
+export interface ProjectSetup {
+  status: SetupStatusRow;
+  done: number;
+  total: number;
+  pct: number;
+}
+
 export interface SetupItem {
   key: SetupItemKey;
   label: string;
@@ -23,14 +30,14 @@ export interface SetupItem {
 }
 
 export const SETUP_ITEMS: SetupItem[] = [
-  { key: 'commercial_done', label: 'Commercial terms', hint: 'Contract value & currency', href: null },
-  { key: 'payment_terms_done', label: 'Payment terms', hint: 'Retention & payment days', href: null },
-  { key: 'team_done', label: 'Team', hint: 'Add your internal team', href: (id) => `/projects/${id}/team` },
-  { key: 'client_access_done', label: 'Client access', hint: 'Give the client access', href: (id) => `/projects/${id}/team` },
+  { key: 'commercial_done', label: 'Commercial terms', hint: 'Contract value & currency', href: (id) => `/projects/${id}/settings?tab=commercial` },
+  { key: 'payment_terms_done', label: 'Payment terms', hint: 'Retention & payment days', href: (id) => `/projects/${id}/settings?tab=commercial` },
+  { key: 'team_done', label: 'Team', hint: 'Add your internal team', href: (id) => `/projects/${id}/settings?tab=team` },
+  { key: 'client_access_done', label: 'Client access', hint: 'Give the client access', href: (id) => `/projects/${id}/settings?tab=team` },
   { key: 'permit_done', label: 'Building permit', hint: 'Coming soon', href: null },
   { key: 'insurance_done', label: 'Insurance', hint: 'Coming soon', href: null },
   { key: 'wbs_done', label: 'Work breakdown (WBS)', hint: 'Break the project into tasks', href: (id) => `/projects/${id}/tasks` },
-  { key: 'location_done', label: 'Site location', hint: 'Coming soon', href: null },
+  { key: 'location_done', label: 'Site location', hint: 'Add site coordinates', href: (id) => `/projects/${id}/settings?tab=status` },
 ];
 
 const EMPTY: SetupStatusRow = {
@@ -47,7 +54,7 @@ const EMPTY: SetupStatusRow = {
 /** Reads project_setup_status (RLS-scoped) and derives completion. */
 export async function getProjectSetup(
   projectId: string,
-): Promise<{ status: SetupStatusRow; done: number; total: number; pct: number }> {
+): Promise<ProjectSetup> {
   const supabase = await createClient();
   const { data } = await supabase
     .from('project_setup_status')

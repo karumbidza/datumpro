@@ -4,6 +4,7 @@ import type { ProjectRole, MemberType } from '@datumpro/shared/access';
 export interface ProjectMemberRow {
   userId: string;
   role: ProjectRole;
+  status: 'active' | 'disabled';
   name: string;
   email: string | null;
   memberType: MemberType;
@@ -87,11 +88,11 @@ export async function listProjectMembers(projectId: string): Promise<ProjectMemb
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('project_members')
-    .select('user_id, org_id, role')
+    .select('user_id, org_id, role, status')
     .eq('project_id', projectId)
     .order('created_at', { ascending: true });
   if (error) throw error;
-  const rows = (data ?? []) as { user_id: string; org_id: string; role: ProjectRole }[];
+  const rows = (data ?? []) as { user_id: string; org_id: string; role: ProjectRole; status: 'active' | 'disabled' }[];
   const ids = rows.map((r) => r.user_id);
   const [names, types] = await Promise.all([
     profileNames(ids),
@@ -100,6 +101,7 @@ export async function listProjectMembers(projectId: string): Promise<ProjectMemb
   return rows.map((r) => ({
     userId: r.user_id,
     role: r.role,
+    status: r.status,
     name: names.get(r.user_id)?.name ?? 'Member',
     email: names.get(r.user_id)?.email ?? null,
     memberType: types.get(r.user_id) ?? 'staff',
