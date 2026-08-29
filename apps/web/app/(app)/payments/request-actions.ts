@@ -83,6 +83,63 @@ export async function requestPayment(formData: FormData): Promise<Result> {
   return { ok: true };
 }
 
+/** The contractor claims their held retention back once the defects-liability
+ *  period has elapsed. One project-level request (no task) for up to the net
+ *  retention still owed, with a mandatory invoice. The DB re-checks releasability
+ *  and the cap in enforce_payment_request_insert; this mirrors it for a clean error. */
+export async function requestRetentionRelease(formData: FormData): Promise<Result> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Not signed in.' };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const title = String(formData.get('title') ?? '').trim() || 'Retention release';
+  const amountCents = Number(formData.get('amountCents'));
+  const invoicePath = (formData.get('invoicePath') as string) || null;
+  const invoiceName = (formData.get('invoiceName') as string) || null;
+  const note = (formData.get('note') as string)?.trim() || null;
+  if (!projectId) return { ok: false, error: 'Missing project.' };
+  if (!Number.isFinite(amountCents) || amountCents <= 0) return { ok: false, error: 'Enter a valid amount.' };
+  if (!invoicePath) return { ok: false, error: 'Attach your invoice to proceed.' };
+
+  // org_id is the project's — never trusted from the client.
+  const { data: proj } = await supabase.from('projects').select('org_id').eq('id', projectId).maybeSingle();
+  const orgId = (proj as { org_id: string } | null)?.org_id;
+  if (!orgId) return { ok: false, error: 'Project not found.' };
+
+  const [{ data: releasable }, { data: available }] = await Promise.all([
+    supabase.rpc('project_retention_releasable', { p_project_id: projectId }),
+    supabase.rpc('project_contractor_retention_available_cents', { p_project_id: projectId, p_contractor: user.id }),
+  ]);
+  if (!releasable) {
+    return { ok: false, error: 'Retention is not releasable yet — the defects-liability period has not elapsed.' };
+  }
+  const avail = (available as number | null) ?? 0;
+  if (avail <= 0) return { ok: false, error: 'No retention is available to release on this project.' };
+  if (amountCents > avail) return { ok: false, error: `You can release up to $${(avail / 100).toFixed(2)}.` };
+
+  const { error } = await supabase.from('contractor_payment_requests').insert({
+    org_id: orgId,
+    project_id: projectId,
+    task_id: null,
+    kind: 'retention',
+    contractor_id: user.id,
+    title,
+    amount_cents: amountCents,
+    note,
+    invoice_path: invoicePath,
+    invoice_name: invoiceName,
+    status: 'requested',
+  });
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath('/payments');
+  revalidatePath(`/projects/${projectId}/finance`);
+  return { ok: true };
+}
+
 /** The owning contractor withdraws their own still-pending request. This is a
  *  status change to 'cancelled', never a delete — payment records are permanent
  *  (ledger). The DB trigger enforces that only a 'requested' row can move here and

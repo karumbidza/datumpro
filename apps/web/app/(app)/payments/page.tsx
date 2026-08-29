@@ -4,6 +4,8 @@ import { PageHeader } from '@/components/ui/page-header';
 import { redirect } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { listMyOwed } from '@/lib/data/owed';
+import { listMyRetention } from '@/lib/data/retention';
+import { RequestRetentionForm } from '@/components/payments/request-retention-form';
 import { Card, CardTitle, CardValue } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { PAYMENT_REQUEST_TONE, CONTRACTOR_DOC_TONE } from '@/components/ui/tones';
@@ -24,11 +26,22 @@ export default async function MyPaymentsPage() {
   if (!user) redirect('/sign-in');
 
   const { tasks: owed, summary } = await listMyOwed(user.id);
-  const [{ rows: requests }, documents, myOrgs] = await Promise.all([
+  const [{ rows: requests }, documents, myOrgs, retention] = await Promise.all([
     listMyPaymentRequests(user.id),
     listMyDocuments(user.id),
     listMyOrgs(user.id),
+    listMyRetention(user.id),
   ]);
+  const retentionClaimable = retention
+    .filter((r) => r.releasable && r.availableCents > 0)
+    .map((r) => ({
+      projectId: r.projectId,
+      projectName: r.projectName,
+      orgId: r.orgId,
+      availableCents: r.availableCents,
+    }));
+  const fmtDate = (iso: string | null) =>
+    iso ? new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
 
   const requestTasks: RequestTask[] = owed.map((t) => ({
     taskId: t.taskId,
@@ -120,6 +133,47 @@ export default async function MyPaymentsPage() {
           </div>
         )}
       </section>
+
+      {/* Retention held back — releasable after the defects-liability period */}
+      {retention.length > 0 && (
+        <section className="mt-8">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold">Retention</h2>
+              <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                Held back from your claims as security for defects. Releasable once each project&apos;s
+                defects-liability period ends.
+              </p>
+            </div>
+            <RequestRetentionForm projects={retentionClaimable} />
+          </div>
+          <div className="divide-y divide-zinc-100 rounded-lg border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-950">
+            {retention.map((r) => (
+              <div key={r.projectId} className="p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="min-w-0 truncate text-sm font-medium">{r.projectName}</p>
+                  <div className="shrink-0 text-right">
+                    <p className="text-sm font-semibold tabular-nums">{formatUsd(r.availableCents)}</p>
+                    <p className="text-[11px] text-zinc-400 dark:text-zinc-500">held</p>
+                  </div>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+                  <span>Withheld {formatUsd(r.withheldCents)}</span>
+                  {r.deductedCents > 0 && (
+                    <span className="text-red-600 dark:text-red-400">Spent on repairs {formatUsd(r.deductedCents)}</span>
+                  )}
+                  {r.claimedCents > 0 && <span>Released/claimed {formatUsd(r.claimedCents)}</span>}
+                  {r.releasable ? (
+                    <span className="text-green-600 dark:text-green-400">Releasable now</span>
+                  ) : (
+                    <span>Releasable {r.releaseAt ? `from ${fmtDate(r.releaseAt)}` : 'after practical completion'}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Payment request history */}
       <section className="mt-8">

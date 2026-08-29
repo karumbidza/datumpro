@@ -1,6 +1,6 @@
 import 'server-only';
 import { createClient } from '@/lib/supabase/server';
-import type { PaymentRequestStatus } from '@datumpro/shared/domain';
+import type { PaymentRequestStatus, PaymentRequestKind } from '@datumpro/shared/domain';
 
 const MEDIA_BUCKET = 'project-media';
 
@@ -15,6 +15,7 @@ export type PaymentRequestRow = {
   title: string;
   amountCents: number;
   status: PaymentRequestStatus;
+  kind: PaymentRequestKind;
   note: string | null;
   reviewNote: string | null;
   invoiceUrl: string | null;
@@ -52,6 +53,7 @@ type RawRow = {
   title: string;
   amount_cents: number;
   status: PaymentRequestStatus;
+  kind: PaymentRequestKind;
   note: string | null;
   review_note: string | null;
   invoice_path: string | null;
@@ -79,6 +81,7 @@ async function hydrate(rows: RawRow[], names: Map<string, string>): Promise<Paym
       title: r.title,
       amountCents: r.amount_cents,
       status: r.status,
+      kind: r.kind ?? 'milestone',
       note: r.note,
       reviewNote: r.review_note,
       invoiceUrl: r.invoice_path ? urls.get(r.invoice_path) ?? null : null,
@@ -93,7 +96,7 @@ async function hydrate(rows: RawRow[], names: Map<string, string>): Promise<Paym
 }
 
 const SELECT =
-  'id, org_id, project_id, task_id, contractor_id, title, amount_cents, status, note, review_note, invoice_path, invoice_name, pop_path, pop_name, paid_at, paid_reference, created_at, projects(name)';
+  'id, org_id, project_id, task_id, contractor_id, title, amount_cents, status, kind, note, review_note, invoice_path, invoice_name, pop_path, pop_name, paid_at, paid_reference, created_at, projects(name)';
 
 /** The signed-in contractor's own requests (RLS also scopes to them). */
 export async function listMyPaymentRequests(

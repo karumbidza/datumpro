@@ -56,13 +56,15 @@ export interface ProjectEditRow extends ProjectRow {
   start_date: string | null;
   duration_working_days: number | null;
   retention_pct: number | null;
+  retention_period_months: number | null;
+  practical_completion_at: string | null;
   payment_terms_days: number | null;
   latitude: number | null;
   longitude: number | null;
 }
 
 const PROJECT_EDIT_COLUMNS =
-  `${PROJECT_COLUMNS}, construction_type, currency, client_id, duration_working_days, retention_pct, payment_terms_days, latitude, longitude`;
+  `${PROJECT_COLUMNS}, construction_type, currency, client_id, duration_working_days, retention_pct, retention_period_months, practical_completion_at, payment_terms_days, latitude, longitude`;
 
 export async function getProjectForEdit(projectId: string): Promise<ProjectEditRow | null> {
   const supabase = await createClient();

@@ -12,3 +12,14 @@ export const PAYMENT_REQUEST_STATUS_LABEL: Record<PaymentRequestStatus, string> 
   rejected: 'Rejected',
   cancelled: 'Withdrawn',
 };
+
+/** A payment request is either a progress claim (milestone-gated against a task)
+ *  or a retention release (the held retention, claimable once the defects-liability
+ *  period has elapsed). */
+export const PAYMENT_REQUEST_KINDS = ['milestone', 'retention'] as const;
+export type PaymentRequestKind = (typeof PAYMENT_REQUEST_KINDS)[number];
+
+export const PAYMENT_REQUEST_KIND_LABEL: Record<PaymentRequestKind, string> = {
+  milestone: 'Progress claim',
+  retention: 'Retention release',
+};

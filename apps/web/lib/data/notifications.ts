@@ -148,6 +148,44 @@ export async function notifyPaymentMilestone(supabase: SupabaseClient, taskId: s
   }
 }
 
+/** Practical completion recorded: tell each contractor holding retention when it
+ *  becomes releasable and how much. Best-effort — never breaks the completion. */
+export async function notifyRetentionReleaseScheduled(supabase: SupabaseClient, projectId: string): Promise<void> {
+  try {
+    const { getProjectRetention } = await import('@/lib/data/retention');
+    const { data: proj } = await supabase.from('projects').select('org_id, name').eq('id', projectId).maybeSingle();
+    const p = proj as { org_id: string; name: string } | null;
+    if (!p) return;
+    const retention = await getProjectRetention(projectId);
+    if (!retention) return;
+
+    const when = retention.releaseAt
+      ? new Date(retention.releaseAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+      : null;
+
+    await Promise.all(
+      retention.contractors
+        .filter((c) => c.availableCents > 0)
+        .map((c) => {
+          const usd = (c.availableCents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+          return notifyUser(supabase, {
+            orgId: p.org_id,
+            userId: c.contractorId,
+            type: 'retention_release_scheduled',
+            title: `Retention release scheduled — ${p.name}`,
+            body: when
+              ? `${p.name} reached practical completion. Your held retention (${usd}) becomes releasable on ${when}.`
+              : `${p.name} reached practical completion. Your held retention (${usd}) is now releasable.`,
+            link: '/payments',
+            entityId: projectId,
+          });
+        }),
+    );
+  } catch {
+    /* best-effort */
+  }
+}
+
 /** Notify every project manager of a project (used on accept/decline). */
 export async function notifyProjectManagers(
   supabase: SupabaseClient,
