@@ -1,6 +1,7 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { fmtMoney } from '@/lib/money';
+import { inputCompactClass } from '@/components/ui/form';
 import { type Row, type Kind, lineCents } from './grid-types';
 
 const DEFAULT_COL_W = [96, 72, 360, 72, 88, 104, 120, 120]; // Kind No Desc Unit Qty Rate Amount Total
@@ -22,6 +23,27 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
   const [active, setActive] = useState<{ row: number; col: number } | null>(null);
   const [band, setBand] = useState<{ rowTop: number; rowH: number; colLeft: number; colW: number } | null>(null);
   const totalWidth = colWidths.reduce((a, b) => a + b, 0);
+
+  const sections = useMemo(
+    () => rows.map((r, i) => ({ i, label: r.description, kind: r.kind })).filter((s) => s.kind === 'section'),
+    [rows],
+  );
+  const [navQuery, setNavQuery] = useState('');
+  const [navOpen, setNavOpen] = useState(false);
+  const filtered = navQuery
+    ? sections.filter((s) => s.label.toLowerCase().includes(navQuery.toLowerCase()))
+    : sections;
+
+  function jumpTo(rowIndex: number) {
+    const box = scrollRef.current;
+    const table = tableRef.current;
+    const tr = table?.tBodies[0]?.children[rowIndex] as HTMLElement | undefined;
+    const thead = table?.tHead ?? undefined;
+    if (!box || !tr) return;
+    box.scrollTop = tr.offsetTop - (thead?.offsetHeight ?? 0);
+    setNavOpen(false);
+    setNavQuery('');
+  }
 
   useEffect(() => {
     const table = tableRef.current;
@@ -133,9 +155,40 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
     });
   }
   return (
-    <div
-      ref={scrollRef}
-      onBlur={(e) => {
+    <div className="space-y-2">
+      <div className="relative max-w-xs">
+        <input
+          value={navQuery}
+          onChange={(e) => {
+            setNavQuery(e.target.value);
+            setNavOpen(true);
+          }}
+          onFocus={() => setNavOpen(true)}
+          onBlur={() => setTimeout(() => setNavOpen(false), 120)}
+          placeholder={`Jump to section… (${sections.length})`}
+          className={inputCompactClass}
+        />
+        {navOpen && filtered.length > 0 && (
+          <ul className="absolute z-40 mt-1 max-h-72 w-72 overflow-auto rounded-md border border-zinc-300 bg-white py-1 text-sm shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+            {filtered.slice(0, 200).map((s) => (
+              <li key={s.i}>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => jumpTo(s.i)}
+                  className="block w-full truncate px-3 py-1.5 text-left hover:bg-brand-50 dark:hover:bg-zinc-800"
+                >
+                  {s.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div
+        ref={scrollRef}
+        onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node)) setActive(null);
       }}
       className="relative max-h-[calc(100vh-16rem)] overflow-auto rounded-lg border border-zinc-300 dark:border-zinc-700"
@@ -324,6 +377,7 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
