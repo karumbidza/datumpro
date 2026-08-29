@@ -16,9 +16,29 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
   currency: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLTableElement>(null);
   const [colWidths, setColWidths] = useState<number[]>(DEFAULT_COL_W);
   const [rowHeights, setRowHeights] = useState<Map<number, number>>(new Map());
+  const [active, setActive] = useState<{ row: number; col: number } | null>(null);
+  const [band, setBand] = useState<{ rowTop: number; rowH: number; colLeft: number; colW: number } | null>(null);
   const totalWidth = colWidths.reduce((a, b) => a + b, 0);
+
+  useEffect(() => {
+    const table = tableRef.current;
+    if (!active || !table) {
+      setBand(null);
+      return;
+    }
+    const tbody = table.tBodies[0];
+    const tr = tbody?.children[active.row] as HTMLElement | undefined;
+    if (!tr) {
+      setBand(null);
+      return;
+    }
+    const colLeft = colWidths.slice(0, active.col).reduce((a, b) => a + b, 0);
+    const colW = colWidths[active.col] ?? 0;
+    setBand({ rowTop: tr.offsetTop, rowH: tr.offsetHeight, colLeft, colW });
+  }, [active, colWidths, rowHeights, rows.length]);
 
   const LS_KEY = `boq-review-colw:${boqId}`;
   useEffect(() => {
@@ -115,9 +135,24 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
   return (
     <div
       ref={scrollRef}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setActive(null);
+      }}
       className="relative max-h-[calc(100vh-16rem)] overflow-auto rounded-lg border border-zinc-300 dark:border-zinc-700"
     >
-      <table className="border-collapse text-sm" style={{ tableLayout: 'fixed', width: totalWidth }}>
+      {band && (
+        <>
+          <div
+            className="pointer-events-none absolute left-0 z-0 bg-brand-500/[0.06]"
+            style={{ top: band.rowTop, height: band.rowH, width: totalWidth }}
+          />
+          <div
+            className="pointer-events-none absolute top-0 z-0 bg-brand-500/[0.06]"
+            style={{ left: band.colLeft, width: band.colW, height: tableRef.current?.offsetHeight ?? 0 }}
+          />
+        </>
+      )}
+      <table ref={tableRef} className="relative z-10 border-collapse text-sm" style={{ tableLayout: 'fixed', width: totalWidth }}>
         <colgroup>
           {colWidths.map((w, i) => (
             <col key={i} style={{ width: w }} />
@@ -206,6 +241,7 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
                 <td className="relative border-b border-r border-zinc-200 p-0 dark:border-zinc-800">
                   <select
                     value={r.kind}
+                    onFocus={() => setActive({ row: i, col: 0 })}
                     onChange={(e) => setRow(i, { kind: e.target.value as Kind })}
                     className={`w-full bg-transparent px-2 py-1.5 text-xs font-medium outline-none ${isSection ? 'text-zinc-800 dark:text-zinc-200' : 'text-zinc-500'}`}
                   >
@@ -224,6 +260,7 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
                     value={isSection ? '' : r.itemNo}
                     disabled={disabled}
                     placeholder={isSection ? '' : '—'}
+                    onFocus={() => setActive({ row: i, col: 1 })}
                     onChange={(e) => setRow(i, { itemNo: e.target.value })}
                     className="w-16 bg-transparent px-2 py-1.5 font-mono text-xs outline-none focus:ring-1 focus:ring-inset focus:ring-brand-500"
                   />
@@ -231,6 +268,7 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
                 <td className="border-b border-r border-zinc-200 p-0 dark:border-zinc-800">
                   <textarea
                     value={r.description}
+                    onFocus={() => setActive({ row: i, col: 2 })}
                     onChange={(e) => setRow(i, { description: e.target.value })}
                     rows={1}
                     className={`h-full w-full resize-none bg-transparent px-2 py-1.5 leading-snug outline-none focus:ring-1 focus:ring-inset focus:ring-brand-500 ${isSection ? 'font-semibold' : ''}`}
@@ -240,6 +278,7 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
                   <input
                     value={isSection ? '' : r.unit}
                     disabled={disabled}
+                    onFocus={() => setActive({ row: i, col: 3 })}
                     onChange={(e) => setRow(i, { unit: e.target.value })}
                     className="w-full bg-transparent px-2 py-1.5 text-center outline-none focus:ring-1 focus:ring-inset focus:ring-brand-500 disabled:bg-transparent"
                   />
@@ -250,6 +289,7 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
                     disabled={disabled}
                     inputMode="decimal"
                     placeholder={isSection ? '' : '—'}
+                    onFocus={() => setActive({ row: i, col: 4 })}
                     onChange={(e) => setRow(i, { qty: Math.max(0, Number(e.target.value) || 0) })}
                     className="w-full bg-transparent px-2 py-1.5 text-right font-mono tabular-nums outline-none focus:ring-1 focus:ring-inset focus:ring-brand-500"
                   />
@@ -260,6 +300,7 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
                     disabled={disabled}
                     inputMode="decimal"
                     placeholder={isSection ? '' : '—'}
+                    onFocus={() => setActive({ row: i, col: 5 })}
                     onChange={(e) => setRow(i, { rate: Math.max(0, Number(e.target.value) || 0) })}
                     className="w-full bg-transparent px-2 py-1.5 text-right font-mono tabular-nums outline-none focus:ring-1 focus:ring-inset focus:ring-brand-500"
                   />
@@ -270,6 +311,7 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
                     disabled={disabled}
                     inputMode="decimal"
                     placeholder={isSection ? '' : '—'}
+                    onFocus={() => setActive({ row: i, col: 6 })}
                     onChange={(e) => setRow(i, { amount: Math.max(0, Number(e.target.value) || 0) })}
                     className={`w-full bg-transparent px-2 py-1.5 text-right font-mono tabular-nums outline-none focus:ring-1 focus:ring-inset focus:ring-brand-500 ${measured ? 'text-zinc-400' : ''}`}
                   />
