@@ -2,13 +2,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { fmtMoney } from '@/lib/money';
 import { inputCompactClass } from '@/components/ui/form';
+import { useColumnResize } from '@/lib/use-column-resize';
 import { type Row, type Kind, lineCents } from './grid-types';
 
 const DEFAULT_COL_W = [96, 72, 360, 72, 88, 104, 120, 120]; // Kind No Desc Unit Qty Rate Amount Total
-const MIN_COL_W = 48;
-const MAX_COL_W = 800;
 const MIN_ROW_H = 28;
 const MAX_ROW_H = 400;
+
+function colText(i: number, r: Row): string {
+  return (
+    [r.kind, r.itemNo, r.description, r.unit, r.qty ? String(r.qty) : '', r.rate ? String(r.rate) : '', r.amount ? String(r.amount) : '', ''][i] || ''
+  );
+}
 
 export function ReviewGrid({ boqId, rows, setRow, currency }: {
   boqId: string;
@@ -18,11 +23,14 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLTableElement>(null);
-  const [colWidths, setColWidths] = useState<number[]>(DEFAULT_COL_W);
+  const { widths: colWidths, totalWidth, startResize, autoFit } = useColumnResize(
+    `boq-review-colw:${boqId}`,
+    DEFAULT_COL_W,
+    { min: 48, max: 800 },
+  );
   const [rowHeights, setRowHeights] = useState<Map<number, number>>(new Map());
   const [active, setActive] = useState<{ row: number; col: number } | null>(null);
   const [band, setBand] = useState<{ rowTop: number; rowH: number; colLeft: number; colW: number } | null>(null);
-  const totalWidth = colWidths.reduce((a, b) => a + b, 0);
 
   const [metrics, setMetrics] = useState({ scrollTop: 0, scrollH: 0, clientH: 0 });
   function syncMetrics() {
@@ -110,82 +118,6 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
     const colW = colWidths[active.col] ?? 0;
     setBand({ rowTop: tr.offsetTop, rowH: tr.offsetHeight, colLeft, colW });
   }, [active, colWidths, rowHeights, rows.length]);
-
-  const LS_KEY = `boq-review-colw:${boqId}`;
-  useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
-      // Right length AND all finite numbers in range — a stale/junk array must
-      // not wedge the grid with NaN/zero-width columns.
-      if (
-        Array.isArray(saved) &&
-        saved.length === DEFAULT_COL_W.length &&
-        saved.every((n) => typeof n === 'number' && Number.isFinite(n) && n >= MIN_COL_W && n <= MAX_COL_W)
-      ) {
-        setColWidths(saved);
-      }
-    } catch {
-      /* ignore malformed cache */
-    }
-  }, [LS_KEY]);
-  function persist(widths: number[]) {
-    try {
-      localStorage.setItem(LS_KEY, JSON.stringify(widths));
-    } catch {
-      /* storage disabled/full — widths still apply this session */
-    }
-  }
-
-  function startColResize(i: number, e: React.PointerEvent) {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startW = colWidths[i] ?? DEFAULT_COL_W[i] ?? MIN_COL_W;
-    function move(ev: PointerEvent) {
-      const next = Math.min(MAX_COL_W, Math.max(MIN_COL_W, startW + (ev.clientX - startX)));
-      setColWidths((prev) => {
-        const out = [...prev];
-        out[i] = next;
-        return out;
-      });
-    }
-    function up() {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-      setColWidths((prev) => {
-        persist(prev);
-        return prev;
-      });
-    }
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-  }
-
-  function autoFitCol(i: number) {
-    const holder = autoFitCol as unknown as { _c?: HTMLCanvasElement };
-    const canvas = holder._c || (holder._c = document.createElement('canvas'));
-    const ctx = canvas.getContext('2d')!;
-    ctx.font = '13px ui-sans-serif, system-ui, sans-serif';
-    const pick = (r: Row): string =>
-      [
-        r.kind,
-        r.itemNo,
-        r.description,
-        r.unit,
-        r.qty ? String(r.qty) : '',
-        r.rate ? String(r.rate) : '',
-        r.amount ? String(r.amount) : '',
-        '',
-      ][i] || '';
-    let max = MIN_COL_W;
-    for (const r of rows) max = Math.max(max, ctx.measureText(pick(r)).width + 28);
-    const next = Math.min(MAX_COL_W, Math.ceil(max));
-    setColWidths((prev) => {
-      const out = [...prev];
-      out[i] = next;
-      persist(out);
-      return out;
-    });
-  }
 
   function startRowResize(i: number, e: React.PointerEvent) {
     e.preventDefault();
@@ -275,64 +207,64 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
             <th className="relative border-b border-r border-zinc-300 px-2 py-2 dark:border-zinc-700">
               Kind
               <div
-                onPointerDown={(e) => startColResize(0, e)}
-                onDoubleClick={() => autoFitCol(0)}
+                onPointerDown={(e) => startResize(0, e)}
+                onDoubleClick={() => autoFit(0, rows.map((r) => colText(0, r)))}
                 className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-brand-400/50"
               />
             </th>
             <th className="relative border-b border-r border-zinc-300 px-2 py-2 dark:border-zinc-700">
               No.
               <div
-                onPointerDown={(e) => startColResize(1, e)}
-                onDoubleClick={() => autoFitCol(1)}
+                onPointerDown={(e) => startResize(1, e)}
+                onDoubleClick={() => autoFit(1, rows.map((r) => colText(1, r)))}
                 className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-brand-400/50"
               />
             </th>
             <th className="relative border-b border-r border-zinc-300 px-2 py-2 dark:border-zinc-700">
               Description
               <div
-                onPointerDown={(e) => startColResize(2, e)}
-                onDoubleClick={() => autoFitCol(2)}
+                onPointerDown={(e) => startResize(2, e)}
+                onDoubleClick={() => autoFit(2, rows.map((r) => colText(2, r)))}
                 className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-brand-400/50"
               />
             </th>
             <th className="relative border-b border-r border-zinc-300 px-2 py-2 dark:border-zinc-700">
               Unit
               <div
-                onPointerDown={(e) => startColResize(3, e)}
-                onDoubleClick={() => autoFitCol(3)}
+                onPointerDown={(e) => startResize(3, e)}
+                onDoubleClick={() => autoFit(3, rows.map((r) => colText(3, r)))}
                 className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-brand-400/50"
               />
             </th>
             <th className="relative border-b border-r border-zinc-300 px-2 py-2 text-right dark:border-zinc-700">
               Qty
               <div
-                onPointerDown={(e) => startColResize(4, e)}
-                onDoubleClick={() => autoFitCol(4)}
+                onPointerDown={(e) => startResize(4, e)}
+                onDoubleClick={() => autoFit(4, rows.map((r) => colText(4, r)))}
                 className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-brand-400/50"
               />
             </th>
             <th className="relative border-b border-r border-zinc-300 px-2 py-2 text-right dark:border-zinc-700">
               Rate
               <div
-                onPointerDown={(e) => startColResize(5, e)}
-                onDoubleClick={() => autoFitCol(5)}
+                onPointerDown={(e) => startResize(5, e)}
+                onDoubleClick={() => autoFit(5, rows.map((r) => colText(5, r)))}
                 className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-brand-400/50"
               />
             </th>
             <th className="relative border-b border-r border-zinc-300 px-2 py-2 text-right dark:border-zinc-700">
               Amount
               <div
-                onPointerDown={(e) => startColResize(6, e)}
-                onDoubleClick={() => autoFitCol(6)}
+                onPointerDown={(e) => startResize(6, e)}
+                onDoubleClick={() => autoFit(6, rows.map((r) => colText(6, r)))}
                 className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-brand-400/50"
               />
             </th>
             <th className="relative border-b border-zinc-300 px-2 py-2 text-right dark:border-zinc-700">
               Total
               <div
-                onPointerDown={(e) => startColResize(7, e)}
-                onDoubleClick={() => autoFitCol(7)}
+                onPointerDown={(e) => startResize(7, e)}
+                onDoubleClick={() => autoFit(7, rows.map((r) => colText(7, r)))}
                 className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-brand-400/50"
               />
             </th>
