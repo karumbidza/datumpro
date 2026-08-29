@@ -1108,10 +1108,22 @@ select pg_temp.ok(
   (select count(*) from public.tasks where id = 'a5000000-0000-0000-0000-0000000000d1') = 0,
   'ledger: a draft task is still deletable (guard does not over-block)');
 
+-- Progress-linked payments: nothing is claimable at 0% progress; a completed task
+-- (100%) unlocks the full awarded value less retention. This also brings the task
+-- to a state where the ledger claims below can be raised.
+select pg_temp.ok(
+  public.task_payment_entitlement_cents('a5000000-0000-0000-0000-000000000003'::uuid) = 0,
+  'progress-pay: nothing claimable at 0% progress');
+update public.projects set retention_pct = 10 where id = 'a2220000-0000-0000-0000-000000000000';
+update public.tasks set status = 'done' where id = 'a5000000-0000-0000-0000-000000000003';
+select pg_temp.ok(
+  public.task_payment_entitlement_cents('a5000000-0000-0000-0000-000000000003'::uuid) = 225000,
+  'progress-pay: at 100% with 10% retention, entitlement = 250000 − 25000');
+
 -- Payment requests are permanent: an approved one cannot be deleted; a pending
 -- one is withdrawn by a status change to cancelled, never a delete.
 -- invoice_path is required by enforce_payment_request_insert; the task
--- a500…0003 is plan-approved, awarded 250000, and assigned to contractor a2.
+-- a500…0003 is now done (100%), awarded 250000, and assigned to contractor a2.
 insert into public.contractor_payment_requests
   (id, org_id, project_id, task_id, contractor_id, title, amount_cents, invoice_path, status) values
   ('a6000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000',

@@ -91,6 +91,63 @@ export async function notifyUser(
   });
 }
 
+/** Progress-linked payments: when a task crosses a payment milestone
+ *  (25/50/75/90/100%), tell finance (org owners/admins — the finance role is
+ *  folded into admin today) to anticipate a payment. Deduped via
+ *  tasks.payment_milestone_notified so each milestone announces once. Best-effort;
+ *  call it after any change that can move a task's progress. */
+export async function notifyPaymentMilestone(supabase: SupabaseClient, taskId: string): Promise<void> {
+  try {
+    const { data: task } = await supabase
+      .from('tasks')
+      .select('org_id, project_id, title, awarded_cost_cents, payment_milestone_notified')
+      .eq('id', taskId)
+      .maybeSingle();
+    if (!task) return;
+    const t = task as {
+      org_id: string; project_id: string; title: string;
+      awarded_cost_cents: number | null; payment_milestone_notified: number | null;
+    };
+    if (!t.awarded_cost_cents || t.awarded_cost_cents <= 0) return;
+
+    const { data: pct } = await supabase.rpc('task_progress_pct', { p_task_id: taskId });
+    const progress = (pct as number | null) ?? 0;
+    const milestone =
+      progress >= 100 ? 100 : progress >= 90 ? 90 : progress >= 75 ? 75 : progress >= 50 ? 50 : progress >= 25 ? 25 : 0;
+    if (milestone <= (t.payment_milestone_notified ?? 0)) return; // already announced
+
+    const { data: entitlement } = await supabase.rpc('task_payment_entitlement_cents', { p_task_id: taskId });
+    const usd = (((entitlement as number | null) ?? 0) / 100).toLocaleString('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    });
+
+    const { data: mgrs } = await supabase
+      .from('org_members')
+      .select('user_id')
+      .eq('org_id', t.org_id)
+      .eq('status', 'active')
+      .in('role', ['owner', 'admin']);
+
+    await Promise.all(
+      ((mgrs ?? []) as { user_id: string }[]).map((m) =>
+        notifyUser(supabase, {
+          orgId: t.org_id,
+          userId: m.user_id,
+          type: 'payment_anticipated',
+          title: `Payment coming up — ${t.title} is ${milestone}% complete`,
+          body: `About ${usd} becomes claimable (net of retention). Expect a payment request from the contractor.`,
+          link: `/projects/${t.project_id}/finance`,
+          entityId: taskId,
+        }),
+      ),
+    );
+    await supabase.from('tasks').update({ payment_milestone_notified: milestone }).eq('id', taskId);
+  } catch {
+    /* best-effort — never break the workflow that triggered it */
+  }
+}
+
 /** Notify every project manager of a project (used on accept/decline). */
 export async function notifyProjectManagers(
   supabase: SupabaseClient,

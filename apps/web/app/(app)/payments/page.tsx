@@ -47,11 +47,11 @@ export default async function MyPaymentsPage() {
       <PageHeader
         backHref="/dashboard"
         backLabel="Dashboard"
-        title="Finance"
+        title="Payments"
         subtitle={
           <>
-            Your overall statement — what you&apos;re owed across your approved plans. You can also raise a
-            payment request from each task&apos;s Payment tab.
+            What you&apos;re owed across your approved tasks. Payment unlocks as each task progresses —
+            claim from a task&apos;s Payment tab.
           </>
         }
       />

@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { createTaskSchema } from '@datumpro/shared/validation';
-import { notifyUser, notifyProjectManagers } from '@/lib/data/notifications';
+import { notifyUser, notifyProjectManagers, notifyPaymentMilestone } from '@/lib/data/notifications';
 import type { FormState } from '@/components/ui/form-error';
 
 async function requireUser() {
@@ -696,6 +696,8 @@ export async function toggleSubtask(formData: FormData) {
   }
   const { error } = await supabase.from('task_subtasks').update({ is_done: done }).eq('id', id);
   if (error) throw new Error(error.message);
+  // Progress may have crossed a payment milestone → tell finance to anticipate it.
+  if (done && taskId) await notifyPaymentMilestone(supabase, taskId);
   revalidatePath(`/projects/${projectId}/tasks/${taskId}`);
 }
 
@@ -730,6 +732,8 @@ export async function approveTask(formData: FormData) {
     .eq('id', taskId);
   if (error) throw new Error(error.message.includes('project manager') ? 'Only a project manager can approve this task' : error.message);
   await logActivity(supabase, task, user.id, 'status', `Approved — ${onTime ? 'on time' : 'late'}`);
+  // Task is now 100% — the final payment milestone; anticipate the closing claim.
+  await notifyPaymentMilestone(supabase, taskId);
   revalidatePath(`/projects/${task.project_id}/tasks/${taskId}`);
 }
 

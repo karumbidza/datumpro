@@ -66,10 +66,21 @@ export async function listMyOwed(userId: string): Promise<{ tasks: OwedTask[]; s
       pendingByTask.set(r.task_id, (pendingByTask.get(r.task_id) ?? 0) + r.amount_cents);
   }
 
+  // Progress-gated: what's actually claimable is the milestone entitlement (net of
+  // retention), not the full committed value.
+  const entitlementByTask = new Map<string, number>();
+  await Promise.all(
+    tasks.map(async (t) => {
+      const { data } = await supabase.rpc('task_payment_entitlement_cents', { p_task_id: t.id });
+      entitlementByTask.set(t.id, (data as number | null) ?? 0);
+    }),
+  );
+
   const owed: OwedTask[] = tasks.map((t) => {
     const committed = t.awarded_cost_cents ?? 0;
     const paid = paidByTask.get(t.id) ?? 0;
     const pending = pendingByTask.get(t.id) ?? 0;
+    const entitlement = entitlementByTask.get(t.id) ?? 0;
     return {
       taskId: t.id,
       title: t.title,
@@ -80,7 +91,7 @@ export async function listMyOwed(userId: string): Promise<{ tasks: OwedTask[]; s
       paidCents: paid,
       pendingCents: pending,
       outstandingCents: committed - paid,
-      requestableCents: Math.max(0, committed - paid - pending),
+      requestableCents: Math.max(0, entitlement - paid - pending),
     };
   });
 
@@ -153,6 +164,10 @@ export async function getTaskPaymentInfo(taskId: string): Promise<TaskPaymentInf
     else if (r.status === 'requested' || r.status === 'approved') pending += r.amount_cents;
   }
 
+  // Progress-gated: claimable now is the milestone entitlement (net of retention).
+  const { data: entitlement } = await supabase.rpc('task_payment_entitlement_cents', { p_task_id: taskId });
+  const claimable = Math.max(0, ((entitlement as number | null) ?? 0) - paid - pending);
+
   const paths = [...new Set(rows.map((r) => r.invoice_path).filter(Boolean))] as string[];
   const urlByPath = new Map<string, string>();
   if (paths.length) {
@@ -167,7 +182,7 @@ export async function getTaskPaymentInfo(taskId: string): Promise<TaskPaymentInf
     paidCents: paid,
     pendingCents: pending,
     outstandingCents: committed - paid,
-    requestableCents: Math.max(0, committed - paid - pending),
+    requestableCents: claimable,
     requests: rows.map((r) => ({
       id: r.id,
       title: r.title,
