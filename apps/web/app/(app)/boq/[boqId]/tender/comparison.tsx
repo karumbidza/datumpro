@@ -18,6 +18,19 @@ function fmtVariancePct(pct: number): string {
   return `${sign}${Math.abs(pct * 100).toFixed(1)}%`;
 }
 
+/** Gentle budget-sanity tint: green at/under budget, amber up to 2× budget, red
+ *  beyond. Empty when there's no budget to compare against. */
+function budgetTint(amountCents: number, budgetCents: number): string {
+  if (budgetCents <= 0) return '';
+  const ratio = amountCents / budgetCents;
+  if (ratio <= 1) return 'bg-green-50 dark:bg-green-500/10';
+  if (ratio <= 2) return 'bg-amber-50 dark:bg-amber-500/10';
+  return 'bg-red-50 dark:bg-red-500/10';
+}
+
+/** A bid total more than this multiple of budget forces an extra award confirm. */
+const OVER_BUDGET_GUARD_X = 2;
+
 export function Comparison({ data, boqId, canManage }: Props) {
   const { sections, bidders, currency, budgetTotalCents, awardedBidderId, status, tenderId } = data;
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -35,6 +48,18 @@ export function Comparison({ data, boqId, canManage }: Props) {
         <span className="text-zinc-300 dark:text-zinc-600">·</span>
         <span className="text-sm text-zinc-500 dark:text-zinc-400">
           {bidders.length} bidder{bidders.length === 1 ? '' : 's'}
+        </span>
+        <span className="text-zinc-300 dark:text-zinc-600">·</span>
+        <span className="flex flex-wrap items-center gap-2 text-[11px] text-zinc-400 dark:text-zinc-500">
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2.5 w-2.5 rounded-sm bg-green-100 dark:bg-green-500/20" />≤ budget
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2.5 w-2.5 rounded-sm bg-amber-100 dark:bg-amber-500/20" />≤ 2× budget
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2.5 w-2.5 rounded-sm bg-red-100 dark:bg-red-500/20" />&gt; 2×
+          </span>
         </span>
       </div>
 
@@ -132,11 +157,18 @@ export function Comparison({ data, boqId, canManage }: Props) {
                         <form
                           action={awardTender}
                           onSubmit={(e) => {
+                            const mult = budgetTotalCents > 0 ? bidder.totalCents / budgetTotalCents : 0;
+                            const overBudget = mult > OVER_BUDGET_GUARD_X;
+                            const warn = overBudget
+                              ? `⚠ This bid is ${mult.toFixed(1)}× the budget (${fmtMoney(bidder.totalCents, currency)} vs ${fmtMoney(budgetTotalCents, currency)}) — likely a data-entry error.\n\n`
+                              : '';
                             const tail =
                               ' All bidders are notified, then the delivery project and their tasks are generated.';
-                            const message = bidder.isComplete
-                              ? `Award this tender to ${bidder.companyName}?${tail}`
-                              : `${bidder.companyName} left ${unpricedCount} of ${bidder.totalLines} lines unpriced. Award anyway?${tail}`;
+                            const message =
+                              warn +
+                              (bidder.isComplete
+                                ? `Award this tender to ${bidder.companyName}?${tail}`
+                                : `${bidder.companyName} left ${unpricedCount} of ${bidder.totalLines} lines unpriced. Award anyway?${tail}`);
                             if (!window.confirm(message)) {
                               e.preventDefault();
                             }
@@ -191,16 +223,6 @@ export function Comparison({ data, boqId, canManage }: Props) {
 
                 {/* Item rows */}
                 {section.items.map((item, iIdx) => {
-                  // Compute lowest and highest amount among bidders for this row (ignore missing/noBid)
-                  const bidderAmounts = bidders.map((b) => {
-                    const rate = b.rates[item.itemId];
-                    if (!rate || rate.noBid) return null;
-                    return rate.amountCents;
-                  });
-                  const validAmounts = bidderAmounts.filter((a): a is number => a !== null);
-                  const minAmount = validAmounts.length >= 2 ? Math.min(...validAmounts) : null;
-                  const maxAmount = validAmounts.length >= 2 ? Math.max(...validAmounts) : null;
-
                   return (
                     <tr
                       key={item.itemId}
@@ -237,19 +259,10 @@ export function Comparison({ data, boqId, canManage }: Props) {
                           );
                         }
                         const amount = rate.amountCents;
-                        const isLowest = minAmount !== null && amount === minAmount;
-                        const isHighest = maxAmount !== null && amount === maxAmount && minAmount !== maxAmount;
-
                         return (
                           <td
                             key={bidder.bidderId}
-                            className={`border-r border-zinc-200 px-2.5 py-2 text-right font-mono tabular-nums last:border-r-0 dark:border-zinc-800 ${
-                              isLowest
-                                ? 'font-medium text-green-700 dark:text-green-400'
-                                : isHighest
-                                  ? 'font-medium text-red-600 dark:text-red-400'
-                                  : 'text-zinc-700 dark:text-zinc-300'
-                            }`}
+                            className={`border-r border-zinc-200 px-2.5 py-2 text-right font-mono tabular-nums text-zinc-700 last:border-r-0 dark:border-zinc-800 dark:text-zinc-300 ${budgetTint(amount, item.budgetAmountCents)}`}
                           >
                             {fmtMoney(amount, currency)}
                           </td>
@@ -274,7 +287,10 @@ export function Comparison({ data, boqId, canManage }: Props) {
               {bidders.map((bidder) => (
                 <td
                   key={bidder.bidderId}
-                  className={`border-l border-zinc-300 px-2.5 py-3 text-right font-mono tabular-nums dark:border-zinc-700 ${
+                  className={`border-l border-zinc-300 px-2.5 py-3 text-right font-mono tabular-nums dark:border-zinc-700 ${budgetTint(
+                    bidder.totalCents,
+                    budgetTotalCents,
+                  )} ${
                     awardedBidderId === bidder.bidderId
                       ? 'text-green-700 dark:text-green-400'
                       : bidder.rank === 1
