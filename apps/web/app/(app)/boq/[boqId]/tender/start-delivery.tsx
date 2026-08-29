@@ -21,6 +21,7 @@ export function StartDelivery({ tenderId, boqId, projects, linkedProject = null 
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<'new' | 'existing'>('new');
   const hasProjects = projects.length > 0;
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   if (linkedProject) {
     return (
@@ -32,6 +33,11 @@ export function StartDelivery({ tenderId, boqId, projects, linkedProject = null 
           This bill belongs to <span className="font-medium">{linkedProject.name}</span>. The winner is
           assigned to its tasks and prices move to the winning bid.
         </p>
+        <label className="mb-2 flex flex-col gap-0.5 text-xs text-zinc-600 dark:text-zinc-300">
+          Site start date
+          <input type="date" name="startDate" defaultValue={todayStr} min={todayStr}
+            className="w-44 rounded border border-zinc-300 bg-white px-2 py-1 text-sm dark:border-zinc-600 dark:bg-zinc-800" />
+        </label>
         <Button type="submit" size="sm">
           Assign winner to {linkedProject.name} →
         </Button>
@@ -117,6 +123,12 @@ export function StartDelivery({ tenderId, boqId, projects, linkedProject = null 
           </select>
         </div>
       )}
+
+      <label className="mb-2 flex flex-col gap-0.5 text-xs text-zinc-600 dark:text-zinc-300">
+        Site start date
+        <input type="date" name="startDate" defaultValue={todayStr} min={todayStr}
+          className="w-44 rounded border border-zinc-300 bg-white px-2 py-1 text-sm dark:border-zinc-600 dark:bg-zinc-800" />
+      </label>
 
       <div className="flex items-center justify-end gap-2">
         <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(false)}>
