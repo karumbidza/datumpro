@@ -1557,6 +1557,36 @@ select pg_temp.ok(
 reset role;
 reset request.jwt.claims;
 
+-- ── Weekly digest opt-in: self-service RPC flips only the caller's own flag ───
+--    (20260826000034) org_members is owner/admin-managed, so the toggle goes via
+--    set_weekly_digest_opt_in (SECURITY DEFINER, scoped to auth.uid()).
+reset role;
+reset request.jwt.claims;
+-- Default is on for everyone.
+select pg_temp.ok(
+  (select weekly_digest_opt_in from public.org_members
+     where org_id = 'a1110000-0000-0000-0000-000000000000'
+       and user_id = 'a0000000-0000-0000-0000-0000000000a2') = true,
+  'digest: opt-in defaults to true');
+
+-- Contractor a2 opts themselves out.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+select public.set_weekly_digest_opt_in('a1110000-0000-0000-0000-000000000000', false);
+reset role;
+reset request.jwt.claims;
+select pg_temp.ok(
+  (select weekly_digest_opt_in from public.org_members
+     where org_id = 'a1110000-0000-0000-0000-000000000000'
+       and user_id = 'a0000000-0000-0000-0000-0000000000a2') = false,
+  'digest: a member can opt themselves out');
+-- The owner a1's flag is untouched — the RPC only ever flips the caller's row.
+select pg_temp.ok(
+  (select weekly_digest_opt_in from public.org_members
+     where org_id = 'a1110000-0000-0000-0000-000000000000'
+       and user_id = 'a0000000-0000-0000-0000-0000000000a1') = true,
+  'digest: the toggle does not affect another member');
+
 -- ── Project member disable revokes project access ────────────────────────────
 -- A plain org member (not staff) added to a project as a contributor can see the
 -- project while active; disabling their membership (status='disabled') must drop
