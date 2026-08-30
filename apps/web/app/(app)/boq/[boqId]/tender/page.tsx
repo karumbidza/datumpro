@@ -14,6 +14,7 @@ import { BiddersPanel, type ContractorOption } from './bidders-panel';
 import { CreateTenderForm } from './create-tender-form';
 import { closeTender, unsealTender } from './actions';
 import { Comparison } from './comparison';
+import { TenderAudit } from './tender-audit';
 import { StartDelivery } from './start-delivery';
 
 export default async function TenderPage({
@@ -166,6 +167,12 @@ export default async function TenderPage({
           /* ── Tender unsealed — comparison matrix ── */
           comparison !== null ? (
             <div className="space-y-6">
+              {/* Audit trail — who was invited, who bid, when, and who won.
+                  Managers only; sits above the price comparison. */}
+              {canManage && (
+                <TenderAudit bidders={tender.bidders} awardedBidderId={comparison.awardedBidderId} />
+              )}
+
               <Comparison data={comparison} boqId={boqId} canManage={canManage} />
 
               {/* Delivery export — staff only, once the tender is awarded */}

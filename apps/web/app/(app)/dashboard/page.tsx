@@ -106,8 +106,8 @@ export default async function DashboardPage() {
       <PageContainer width="6xl" className="flex flex-col gap-8">
         {live}
         <Greeting
-          name={displayName}
-          subtitle={`${active.name} · ${formatLongDate(new Date())}`}
+          name={active.name}
+          subtitle={`${displayName} · ${formatLongDate(new Date())}`}
           action={newProject}
         />
         <KpiRow kpis={portfolio.kpis} />
@@ -138,8 +138,8 @@ export default async function DashboardPage() {
       <PageContainer width="6xl" className="space-y-8">
         {live}
         <Greeting
-          name={displayName}
-          subtitle={`Delivery overview · ${formatLongDate(new Date())}`}
+          name={active.name}
+          subtitle={`${displayName} · Delivery overview · ${formatLongDate(new Date())}`}
           action={newProject}
         />
         <DeliveryFocus approvals={approvals} blockers={blockers} overdue={overdue} />
@@ -167,7 +167,7 @@ export default async function DashboardPage() {
   return (
     <PageContainer width="6xl" className="space-y-8">
       {live}
-      <Greeting name={displayName} subtitle={`Your work · ${formatLongDate(new Date())}`} />
+      <Greeting name={active.name} subtitle={`${displayName} · Your work · ${formatLongDate(new Date())}`} />
       {approvals.length > 0 && <ApprovalsInbox items={approvals} />}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Assigned" value={String(tStats.assigned)} />

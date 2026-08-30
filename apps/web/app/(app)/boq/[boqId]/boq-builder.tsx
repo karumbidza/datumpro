@@ -478,6 +478,22 @@ export function BoqBuilder({
         </div>
       </div>
 
+      {/* Awarded → the bill is locked (read-only). Point managers at the tender
+          audit; further changes go through delivery variations. */}
+      {boq.tenderStatus === 'awarded' && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-900 dark:bg-amber-950/30">
+          <p className="text-sm text-amber-800 dark:text-amber-300">
+            This bill has been awarded — it&apos;s locked from editing. Changes now happen through delivery variations.
+          </p>
+          <Link
+            href={`/boq/${boq.id}/tender`}
+            className="text-sm font-medium text-amber-700 hover:underline dark:text-amber-400"
+          >
+            View tender audit →
+          </Link>
+        </div>
+      )}
+
       {/* Linked + approved + tasks not yet generated → point at the one place
           that generates them (the project BOQ tab). */}
       {boq.projectId && status === 'approved' && !projectTasksGenerated && (

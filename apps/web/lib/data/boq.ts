@@ -19,6 +19,21 @@ export interface BoqListRow {
   totalCents: number;
   projectId: string | null;
   projectName: string | null;
+  /** Latest live tender's status, so the list can show "Awarded"/"Out to tender".
+   *  Null when the bill has never been (live-)tendered. */
+  tenderStatus: TenderStatus | null;
+}
+
+// Only these tender states read as "tendered" in the list — a draft/cancelled
+// tender reads as no tender at all. Mirrors getBoqDetail's liveTender set.
+const LIVE_TENDER = new Set(['open', 'closed', 'awarded']);
+
+/** Picks the newest tender's status, but only when it's a live state. */
+function latestLiveTenderStatus(
+  tenders: { status: string; created_at: string }[] | null,
+): TenderStatus | null {
+  const latest = (tenders ?? []).slice().sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+  return latest && LIVE_TENDER.has(latest.status) ? (latest.status as TenderStatus) : null;
 }
 
 /** All bills in the org, newest first — the Estimates index. RLS scopes to the
@@ -29,7 +44,7 @@ export async function listBoqs(orgId: string): Promise<BoqListRow[]> {
     .from('boqs')
     .select(
       'id, name, client_name, industry, status, currency, boq_date, updated_at, project_id, projects(name), ' +
-        'boq_sections(boq_items(amount_cents))',
+        'boq_tenders(status, created_at), boq_sections(boq_items(amount_cents))',
     )
     .eq('org_id', orgId)
     .order('updated_at', { ascending: false });
@@ -45,6 +60,7 @@ export async function listBoqs(orgId: string): Promise<BoqListRow[]> {
     updated_at: string;
     project_id: string | null;
     projects: { name: string } | null;
+    boq_tenders: { status: string; created_at: string }[] | null;
     boq_sections: { boq_items: { amount_cents: number | string | null }[] | null }[] | null;
   };
 
@@ -63,6 +79,7 @@ export async function listBoqs(orgId: string): Promise<BoqListRow[]> {
       totalCents: items.reduce((a, it) => a + n(it.amount_cents), 0),
       projectId: r.project_id,
       projectName: r.projects?.name ?? null,
+      tenderStatus: latestLiveTenderStatus(r.boq_tenders),
     };
   });
 }
@@ -211,12 +228,7 @@ export async function getBoqDetail(orgId: string, boqId: string): Promise<BoqDet
 
   // Latest tender wins; only surface live states (a draft/cancelled tender reads
   // as "not out to tender").
-  const latestTender = (b.boq_tenders ?? [])
-    .slice()
-    .sort((a, c) => c.created_at.localeCompare(a.created_at))[0];
-  const liveTender = new Set(['open', 'closed', 'awarded']);
-  const tenderStatus =
-    latestTender && liveTender.has(latestTender.status) ? (latestTender.status as TenderStatus) : null;
+  const tenderStatus = latestLiveTenderStatus(b.boq_tenders);
 
   return {
     id: b.id,
