@@ -63,8 +63,8 @@ export function Comparison({ data, boqId, canManage }: Props) {
         </span>
       </div>
 
-      {/* Comparison matrix */}
-      <div className="overflow-x-auto rounded-lg border border-zinc-300 dark:border-zinc-700">
+      {/* Comparison matrix — bounded scroll box + sticky header, like the BOQ tables */}
+      <div className="max-h-[calc(100vh-14rem)] overflow-auto rounded-lg border border-zinc-300 dark:border-zinc-700">
         <table className="w-full border-collapse text-sm" style={{ minWidth: `${420 + bidders.length * 180}px` }}>
           <colgroup>
             <col className="w-16" />
@@ -79,8 +79,8 @@ export function Comparison({ data, boqId, canManage }: Props) {
           </colgroup>
 
           {/* ── Column headers ── */}
-          <thead>
-            <tr className="bg-zinc-100 text-[11px] uppercase tracking-wide text-zinc-500 dark:bg-zinc-800/70 dark:text-zinc-400">
+          <thead className="sticky top-0 z-20">
+            <tr className="bg-zinc-100 text-[11px] uppercase tracking-wide text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
               <th className="border-b border-r border-zinc-300 px-2.5 py-2.5 text-left font-semibold dark:border-zinc-700">
                 Item No
               </th>
