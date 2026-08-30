@@ -207,6 +207,10 @@ export default function SignInPage({
                   autoFocus={!fromInvite}
                   autoComplete="email"
                   value={email}
+                  readOnly={fromInvite}
+                  disabled={fromInvite}
+                  tabIndex={fromInvite ? -1 : undefined}
+                  aria-label={fromInvite ? 'Invited email (locked)' : undefined}
                   onChange={(e) => {
                     setEmail(e.target.value);
                     if (emailError) setEmailError(null); // clear as they correct it
@@ -214,10 +218,18 @@ export default function SignInPage({
                   onBlur={(e) => setEmailError(emailProblem(e.target.value))}
                   aria-invalid={emailError ? true : undefined}
                   placeholder="you@company.com"
-                  className={inputClass}
+                  className={`${inputClass}${
+                    fromInvite ? ' pointer-events-none cursor-not-allowed select-none text-zinc-500 dark:text-zinc-400' : ''
+                  }`}
                 />
               </div>
-              {emailError && <p className="mt-1.5 text-xs text-red-500">{emailError}</p>}
+              {fromInvite ? (
+                <p className="mt-1.5 text-xs text-zinc-400 dark:text-zinc-500">
+                  Locked to your invited address — just set a password to continue.
+                </p>
+              ) : (
+                emailError && <p className="mt-1.5 text-xs text-red-500">{emailError}</p>
+              )}
             </div>
             <div>
               <div className="mb-1.5 flex items-baseline justify-between">
