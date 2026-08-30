@@ -10,11 +10,18 @@ import { PageHeader } from '@/components/ui/page-header';
 import { theadRowClass, thClass } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { BOQ_STATUS_TONE } from '@/components/ui/tones';
+import { BOQ_STATUS_TONE, TENDER_STATUS_TONE } from '@/components/ui/tones';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FileText } from '@/components/icons';
-import { BOQ_STATUS_LABELS, type BoqStatus } from '@datumpro/shared/domain';
+import { BOQ_STATUS_LABELS, TENDER_STATUS_LABELS, type BoqStatus, type TenderStatus } from '@datumpro/shared/domain';
 import { fmtMoney } from '@/lib/money';
+
+// Friendlier list labels than the raw tender status ("open" → "Out to tender").
+const TENDER_LIST_LABEL: Partial<Record<TenderStatus, string>> = {
+  open: 'Out to tender',
+  closed: 'Tender closed',
+  awarded: 'Awarded',
+};
 
 export default async function BoqIndexPage() {
   const user = await getAuthUser();
@@ -104,9 +111,16 @@ export default async function BoqIndexPage() {
                   </td>
                   <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400">{b.industry ?? '—'}</td>
                   <td className="px-4 py-3">
-                    <Badge tone={BOQ_STATUS_TONE[(b.status as BoqStatus)] ?? 'neutral'}>
-                      {BOQ_STATUS_LABELS[(b.status as BoqStatus)] ?? b.status}
-                    </Badge>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge tone={BOQ_STATUS_TONE[(b.status as BoqStatus)] ?? 'neutral'}>
+                        {BOQ_STATUS_LABELS[(b.status as BoqStatus)] ?? b.status}
+                      </Badge>
+                      {b.tenderStatus && (
+                        <Badge tone={TENDER_STATUS_TONE[b.tenderStatus] ?? 'neutral'}>
+                          {TENDER_LIST_LABEL[b.tenderStatus] ?? TENDER_STATUS_LABELS[b.tenderStatus]}
+                        </Badge>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     {b.projectId ? (

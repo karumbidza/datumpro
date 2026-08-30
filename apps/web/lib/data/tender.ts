@@ -14,6 +14,7 @@ export interface BidderRow {
   companyName: string;
   contactEmail: string;
   status: BidderStatus;
+  invitedAt: string | null;
   submittedAt: string | null;
   userId: string | null;
 }
@@ -88,7 +89,7 @@ export async function getTenderForOwner(
 
   const { data: bidders } = await supabase
     .from('boq_bidders')
-    .select('id, company_name, contact_email, status, submitted_at, user_id')
+    .select('id, company_name, contact_email, status, invited_at, submitted_at, user_id')
     .eq('tender_id', t.id)
     .order('invited_at', { ascending: true });
 
@@ -97,6 +98,7 @@ export async function getTenderForOwner(
     company_name: string;
     contact_email: string;
     status: BidderStatus;
+    invited_at: string | null;
     submitted_at: string | null;
     user_id: string | null;
   };
@@ -106,6 +108,7 @@ export async function getTenderForOwner(
     companyName: b.company_name,
     contactEmail: b.contact_email,
     status: b.status,
+    invitedAt: b.invited_at,
     submittedAt: b.submitted_at,
     userId: b.user_id,
   }));

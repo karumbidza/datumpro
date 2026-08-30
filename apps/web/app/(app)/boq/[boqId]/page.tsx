@@ -15,7 +15,10 @@ export default async function BoqPage({ params }: { params: Promise<{ boqId: str
   const boq = await getBoqDetail(ctx.active.orgId, boqId);
   if (!boq) notFound();
 
-  const canEdit = ['owner', 'admin', 'pm'].includes(ctx.active.role);
+  // An awarded bill is locked: the tender is settled, so its priced lines are the
+  // contract baseline and must not drift. Managers still view it (read-only) and
+  // reach the tender audit; changes now happen through delivery variations.
+  const canEdit = ['owner', 'admin', 'pm'].includes(ctx.active.role) && boq.tenderStatus !== 'awarded';
   // Linked bill: fetch whether its tasks were already generated (drives the
   // "generate tasks" banner shown once the bill is approved).
   const projectBoq = boq.projectId ? await getProjectBoq(ctx.active.orgId, boq.projectId) : null;
