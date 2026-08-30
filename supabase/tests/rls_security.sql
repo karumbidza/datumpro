@@ -1513,6 +1513,50 @@ select pg_temp.ok(
 reset role;
 reset request.jwt.claims;
 
+-- ── Snagging: a member can raise & see; the assignee acts; a non-member cannot ─
+--    (20260826000033) snags mirror site_diary — members/staff read; the raiser,
+--    the assignee, or a manager write. The per-project number is set by trigger.
+reset role;
+reset request.jwt.claims;
+-- Contractor a2 (a project A member) raises a snag assigned to themselves.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+insert into public.snags (id, org_id, project_id, title, severity, assignee_id, raised_by) values
+  ('ae000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000', 'Grout cracking to tiling', 'major',
+   'a0000000-0000-0000-0000-0000000000a2','a0000000-0000-0000-0000-0000000000a2');
+select pg_temp.ok(
+  (select count(*) from public.snags where id = 'ae000000-0000-0000-0000-000000000001') = 1,
+  'snags: a project member can raise a snag and see it');
+select pg_temp.ok(
+  (select number from public.snags where id = 'ae000000-0000-0000-0000-000000000001') = 1,
+  'snags: the per-project number trigger assigns #1');
+-- The assignee marks it fixed (RLS update permits the assignee).
+update public.snags set status = 'fixed', fixed_at = now()
+  where id = 'ae000000-0000-0000-0000-000000000001';
+select pg_temp.ok(
+  (select status from public.snags where id = 'ae000000-0000-0000-0000-000000000001') = 'fixed',
+  'snags: the assignee can mark a snag fixed');
+insert into public.snag_photos (snag_id, org_id, project_id, storage_path, uploaded_by) values
+  ('ae000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000',
+   'a1110000-0000-0000-0000-000000000000/a2220000-0000-0000-0000-000000000000/snags/ae000000-0000-0000-0000-000000000001/x.jpg',
+   'a0000000-0000-0000-0000-0000000000a2');
+select pg_temp.ok(
+  (select count(*) from public.snag_photos where snag_id = 'ae000000-0000-0000-0000-000000000001') = 1,
+  'snags: a member can attach a photo to a snag');
+reset role;
+reset request.jwt.claims;
+
+-- Org-B outsider b1 cannot see the snag.
+set role authenticated;
+set request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-0000000000b1","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.snags where id = 'ae000000-0000-0000-0000-000000000001') = 0,
+  'snags: a non-member cannot see the snag');
+reset role;
+reset request.jwt.claims;
+
 -- ── Project member disable revokes project access ────────────────────────────
 -- A plain org member (not staff) added to a project as a contributor can see the
 -- project while active; disabling their membership (status='disabled') must drop
