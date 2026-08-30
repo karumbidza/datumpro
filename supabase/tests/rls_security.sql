@@ -1597,6 +1597,43 @@ select pg_temp.ok(
 reset role;
 reset request.jwt.claims;
 
+-- ── RFIs: a member raises & sees; the responder answers; outsiders can't ─────
+--    (20260826000036) rfis mirror snags — members/staff read; raiser, responder
+--    or a manager write. The per-project number is set by trigger.
+reset role;
+reset request.jwt.claims;
+-- Contractor a2 (a project A member) raises an RFI, assigned to themselves.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+insert into public.rfis (id, org_id, project_id, subject, discipline, priority, assignee_id, raised_by) values
+  ('bf000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000', 'Grid C beam depth vs. M&E duct', 'structural', 'high',
+   'a0000000-0000-0000-0000-0000000000a2','a0000000-0000-0000-0000-0000000000a2');
+select pg_temp.ok(
+  (select count(*) from public.rfis where id = 'bf000000-0000-0000-0000-000000000001') = 1,
+  'rfis: a project member can raise an RFI and see it');
+select pg_temp.ok(
+  (select number from public.rfis where id = 'bf000000-0000-0000-0000-000000000001') = 1,
+  'rfis: the per-project number trigger assigns #1');
+-- The responder answers it (RLS update permits the assignee).
+update public.rfis set answer = 'Coordinate the duct below the beam soffit.', answered_at = now(),
+       answered_by = 'a0000000-0000-0000-0000-0000000000a2', status = 'answered'
+  where id = 'bf000000-0000-0000-0000-000000000001';
+select pg_temp.ok(
+  (select status from public.rfis where id = 'bf000000-0000-0000-0000-000000000001') = 'answered',
+  'rfis: the responder can record an answer');
+reset role;
+reset request.jwt.claims;
+
+-- Org-B outsider b1 cannot see the RFI.
+set role authenticated;
+set request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-0000000000b1","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.rfis where id = 'bf000000-0000-0000-0000-000000000001') = 0,
+  'rfis: a non-member cannot see the RFI');
+reset role;
+reset request.jwt.claims;
+
 -- ── Weekly digest opt-in: self-service RPC flips only the caller's own flag ───
 --    (20260826000034) org_members is owner/admin-managed, so the toggle goes via
 --    set_weekly_digest_opt_in (SECURITY DEFINER, scoped to auth.uid()).

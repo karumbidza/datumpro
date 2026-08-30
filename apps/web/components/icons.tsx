@@ -298,6 +298,14 @@ export const Layers: IconComponent = (p) => (
   </Icon>
 );
 
+export const HelpCircle: IconComponent = (p) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+    <path d="M12 17h.01" />
+  </Icon>
+);
+
 export const Menu: IconComponent = (p) => (
   <Icon {...p}>
     <path d="M4 6h16" />
