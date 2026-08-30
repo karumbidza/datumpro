@@ -502,7 +502,7 @@ export function BoqBuilder({
 
       {/* the bill */}
       <div className="mt-4 max-h-[calc(100vh-15rem)] overflow-auto rounded-lg border border-zinc-300 dark:border-zinc-700">
-        <table className="border-collapse text-sm" style={{ tableLayout: 'fixed', width: totalWidth }}>
+        <table className="border-collapse text-sm" style={{ tableLayout: 'fixed', width: '100%', minWidth: totalWidth }}>
           <colgroup>
             {widths.map((w, i) => (
               <col key={i} style={{ width: w }} />
