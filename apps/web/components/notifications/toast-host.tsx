@@ -71,6 +71,9 @@ export function ToastHost({
         for (const r of ((data ?? []) as NotificationRow[]).slice().reverse()) push(r);
       }
 
+      // Bail if the component unmounted while we awaited above — otherwise we'd
+      // subscribe on a channel the cleanup already removed (a leaked subscription).
+      if (!live) return;
       // Live inserts (dedup vs catch-up handled by enqueueToast's id check).
       channel
         .on(

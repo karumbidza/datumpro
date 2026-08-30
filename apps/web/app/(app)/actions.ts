@@ -29,9 +29,12 @@ export async function signOut() {
  *  notification toasts so a click drops you into the event in the right org
  *  context. Only same-origin app paths are allowed (open-redirect guard). */
 export async function switchOrgAndOpen(orgId: string, link: string) {
-  // Reject anything that isn't a plain in-app path (blocks "//evil.com" and
-  // absolute URLs); fall back to the dashboard.
-  const target = link.startsWith('/') && !link.startsWith('//') ? link : '/dashboard';
+  // Reject anything that isn't a plain in-app path (blocks "//evil.com", absolute
+  // URLs, and backslash tricks like "/\evil.com" that some browsers normalise to
+  // protocol-relative). `link` comes from notify()'s free-text p_link, so a shared-
+  // org peer can influence it — the guard is load-bearing. Fall back to dashboard.
+  const target =
+    link.startsWith('/') && !link.startsWith('//') && !link.includes('\\') ? link : '/dashboard';
   if (orgId) {
     const cookieStore = await cookies();
     cookieStore.set(ACTIVE_ORG_COOKIE, orgId, {
