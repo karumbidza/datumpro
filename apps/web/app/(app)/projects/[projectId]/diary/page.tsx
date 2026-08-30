@@ -1,5 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
-import { getAuthUser } from '@/lib/data/org';
+import { getAuthUser, getActiveContext } from '@/lib/data/org';
 import { getProject } from '@/lib/data/projects';
 import { myProjectRole } from '@/lib/data/members';
 import { myOrgRole } from '@/lib/data/tasks';
@@ -21,6 +21,10 @@ export default async function ProjectDiaryPage({
 
   const project = await getProject(projectId);
   if (!project) notFound();
+
+  // Internal register — external observers (client/viewer) may not see it.
+  const ctx = await getActiveContext();
+  if (ctx?.active?.memberType === 'client' || ctx?.active?.memberType === 'viewer') notFound();
 
   const [orgRole, projectRole, entries] = await Promise.all([
     myOrgRole(project.org_id),

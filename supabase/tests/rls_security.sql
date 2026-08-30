@@ -1830,6 +1830,97 @@ with ins as (
 select pg_temp.ok((select is_variation from ins) = true,
   'boq-baseline: subtask added without ctx into an approved task is a variation');
 
+-- ── Register visibility & role hardening (20260826000039) ────────────────────
+-- Snags/RFIs/diary are internal: client/viewer see nothing; a contractor sees
+-- only snags they raised or are assigned; only PM/org-staff may verify a snag.
+reset role;
+reset request.jwt.claims;
+-- A client and a SECOND contractor on project a222 (a9 is the first contractor).
+insert into auth.users (id, email) values
+  ('a0000000-0000-0000-0000-0000000000e1','reg-client@test.dev'),
+  ('a0000000-0000-0000-0000-0000000000e2','reg-contractor2@test.dev');
+insert into public.org_members (org_id, user_id, role, member_type, status) values
+  ('a1110000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000e1','viewer','client','active'),
+  ('a1110000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000e2','member','contractor','active');
+insert into public.project_members (org_id, project_id, user_id, role, status) values
+  ('a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000e1','client','active'),
+  ('a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000e2','contributor','active');
+-- Two defects: one owned by contractor a9, one by contractor e2.
+insert into public.snags (id, org_id, project_id, number, title, raised_by, assignee_id) values
+  ('a6660000-0000-0000-0000-0000000000f1','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000',9001,'A9 defect',
+   'a0000000-0000-0000-0000-0000000000a9','a0000000-0000-0000-0000-0000000000a9'),
+  ('a6660000-0000-0000-0000-0000000000f2','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000',9002,'E2 defect',
+   'a0000000-0000-0000-0000-0000000000e2','a0000000-0000-0000-0000-0000000000e2');
+
+-- Scope assertions to the two defects seeded here (f1=a9's, f2=e2's) so they're
+-- robust against snags seeded by other sections on this shared project.
+
+-- Contractor a9 sees ONLY their own defect (f1), not e2's (f2).
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a9","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.snags
+     where id in ('a6660000-0000-0000-0000-0000000000f1','a6660000-0000-0000-0000-0000000000f2')) = 1,
+  'registers: a contractor sees only their own snags');
+select pg_temp.ok(
+  (select coalesce(bool_and(
+      raised_by = 'a0000000-0000-0000-0000-0000000000a9'::uuid
+      or assignee_id = 'a0000000-0000-0000-0000-0000000000a9'::uuid), true)
+     from public.snags
+     where id in ('a6660000-0000-0000-0000-0000000000f1','a6660000-0000-0000-0000-0000000000f2')),
+  'registers: every snag a contractor sees is their own');
+reset role;
+reset request.jwt.claims;
+
+-- Client sees NEITHER defect.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000e1","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.snags
+     where id in ('a6660000-0000-0000-0000-0000000000f1','a6660000-0000-0000-0000-0000000000f2')) = 0,
+  'registers: a client sees no snags');
+reset role;
+reset request.jwt.claims;
+
+-- Org staff (owner a1) sees BOTH defects.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.snags
+     where id in ('a6660000-0000-0000-0000-0000000000f1','a6660000-0000-0000-0000-0000000000f2')) = 2,
+  'registers: org staff sees all snags on the project');
+reset role;
+reset request.jwt.claims;
+
+-- The verify guard: contractor a9 CANNOT mark their own defect verified.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a9","role":"authenticated","aal":"aal1"}';
+do $$
+declare blocked boolean := false;
+begin
+  begin
+    update public.snags set status = 'verified'
+      where id = 'a6660000-0000-0000-0000-0000000000f1';
+  exception when others then blocked := true;
+  end;
+  if not blocked then raise exception 'FAIL: a contractor was able to self-verify a snag'; end if;
+  raise notice 'PASS: registers: a contractor cannot verify a snag (guard fired)';
+end $$;
+reset role;
+reset request.jwt.claims;
+
+-- …but org staff CAN verify.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+update public.snags set status = 'verified' where id = 'a6660000-0000-0000-0000-0000000000f2';
+select pg_temp.ok(
+  (select status from public.snags where id = 'a6660000-0000-0000-0000-0000000000f2') = 'verified',
+  'registers: org staff can verify a snag');
+reset role;
+reset request.jwt.claims;
+
 rollback;
 
 \echo '────────────────────────────────────────────'

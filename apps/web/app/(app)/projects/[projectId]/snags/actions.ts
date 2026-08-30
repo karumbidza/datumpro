@@ -27,6 +27,24 @@ function text(v: FormDataEntryValue | null): string | null {
   return s || null;
 }
 
+/** A friendly manager check mirroring the DB trigger's
+ *  `is_org_staff(org_id) OR project_role = 'pm'` gate. The trigger is the real
+ *  enforcement — this just turns a raw DB exception into a clean error. */
+async function isProjectManager(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  orgId: string,
+  projectId: string,
+): Promise<boolean> {
+  const [orgRes, projRes] = await Promise.all([
+    supabase.from('org_members').select('role').eq('org_id', orgId).eq('user_id', userId).eq('status', 'active').maybeSingle(),
+    supabase.from('project_members').select('role').eq('project_id', projectId).eq('user_id', userId).maybeSingle(),
+  ]);
+  const orgRole = (orgRes.data as { role: string } | null)?.role;
+  const projectRole = (projRes.data as { role: string } | null)?.role;
+  return orgRole === 'owner' || orgRole === 'admin' || projectRole === 'pm';
+}
+
 const SEVERITIES = ['minor', 'major', 'critical'] as const;
 
 /** Raise a defect against the project and (optionally) assign a contractor, who
@@ -169,10 +187,17 @@ export async function markSnagFixed(formData: FormData): Promise<Result> {
 
 /** A manager confirms the fix. Terminal, good outcome. */
 export async function verifySnag(formData: FormData): Promise<Result> {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   const id = String(formData.get('id') ?? '');
   const projectId = String(formData.get('projectId') ?? '');
   if (!id || !projectId) return { ok: false, error: 'Missing snag.' };
+
+  const { data: snag } = await supabase.from('snags').select('org_id').eq('id', id).maybeSingle();
+  const s = snag as { org_id: string } | null;
+  if (!s) return { ok: false, error: 'Snag not found.' };
+  if (!(await isProjectManager(supabase, user.id, s.org_id, projectId)))
+    return { ok: false, error: 'Only a project manager can verify or reopen a defect.' };
+
   const { error } = await supabase
     .from('snags')
     .update({ status: 'verified', verified_at: new Date().toISOString(), updated_at: new Date().toISOString() })
@@ -191,6 +216,9 @@ export async function reopenSnag(formData: FormData): Promise<Result> {
 
   const { data: snag } = await supabase.from('snags').select('org_id, number, title, assignee_id').eq('id', id).maybeSingle();
   const s = snag as { org_id: string; number: number; title: string; assignee_id: string | null } | null;
+  if (!s) return { ok: false, error: 'Snag not found.' };
+  if (!(await isProjectManager(supabase, user.id, s.org_id, projectId)))
+    return { ok: false, error: 'Only a project manager can verify or reopen a defect.' };
 
   const { error } = await supabase
     .from('snags')
