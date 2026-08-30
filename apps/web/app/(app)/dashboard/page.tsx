@@ -1,9 +1,11 @@
 import Link from 'next/link';
 import { PageContainer } from '@/components/shell/page-container';
-import type { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveContext } from '@/lib/data/org';
+import { getWorkPulseSignals } from '@/lib/data/work-pulse';
+import { WorkPulseGreeting } from '@/components/dashboard/work-pulse-greeting';
+import type { WorkPulseData } from '@datumpro/shared/domain';
 import { getPortfolioTimeline, getDashboardData, listMyTimelineTasks } from '@/lib/data/dashboard';
 import { getPortfolioData, listMyUpcomingTasks } from '@/lib/data/portfolio';
 import {
@@ -22,7 +24,6 @@ import { Button } from '@/components/ui/button';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { joinOrgByDomain } from './join-actions';
 import { LiveRefresh } from '@/components/live-refresh';
-import { formatLongDate } from '@/lib/date';
 import { can } from '@datumpro/shared/access';
 import { formatUsd } from '@datumpro/shared/domain';
 
@@ -72,10 +73,20 @@ export default async function DashboardPage() {
   const { active } = ctx;
   const canCreate = can(active.role, 'project:create');
   const persona = homePersona(active.role);
-  const [displayName, approvals] = await Promise.all([
+  const [displayName, approvals, pulseSignals] = await Promise.all([
     resolveDisplayName(ctx.userId, ctx.email),
     listPendingApprovals(active.orgId, ctx.userId, active.role),
+    getWorkPulseSignals(active.orgId, ctx.userId),
   ]);
+
+  // Work Pulse greeting data — real signals; overall progress is filled per persona.
+  const firstName = displayName.split(' ')[0] || displayName;
+  const pulse = (overallProgressPct: number | null): WorkPulseData => ({
+    firstName,
+    pendingApprovals: approvals.length,
+    overallProgressPct,
+    ...pulseSignals,
+  });
 
   const newProject = canCreate ? (
     <Link href="/projects/new">
@@ -105,11 +116,7 @@ export default async function DashboardPage() {
     return (
       <PageContainer width="6xl" className="flex flex-col gap-8">
         {live}
-        <Greeting
-          name={active.name}
-          subtitle={`${displayName} · ${formatLongDate(new Date())}`}
-          action={newProject}
-        />
+        <WorkPulseGreeting data={pulse(portfolio.kpis.overallProgressPct)} context={active.name} action={newProject} />
         <KpiRow kpis={portfolio.kpis} />
         <TimelineOverview tasks={projectTimeline} unit="project" />
         {approvals.length > 0 && <ApprovalsInbox items={approvals} />}
@@ -137,11 +144,7 @@ export default async function DashboardPage() {
     return (
       <PageContainer width="6xl" className="space-y-8">
         {live}
-        <Greeting
-          name={active.name}
-          subtitle={`${displayName} · Delivery overview · ${formatLongDate(new Date())}`}
-          action={newProject}
-        />
+        <WorkPulseGreeting data={pulse(null)} context="Delivery overview" action={newProject} />
         <DeliveryFocus approvals={approvals} blockers={blockers} overdue={overdue} />
         <TimelineOverview tasks={timelineTasks} unit="task" />
       </PageContainer>
@@ -167,7 +170,7 @@ export default async function DashboardPage() {
   return (
     <PageContainer width="6xl" className="space-y-8">
       {live}
-      <Greeting name={active.name} subtitle={`${displayName} · Your work · ${formatLongDate(new Date())}`} />
+      <WorkPulseGreeting data={pulse(null)} context="Your work" />
       {approvals.length > 0 && <ApprovalsInbox items={approvals} />}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Assigned" value={String(tStats.assigned)} />
@@ -193,20 +196,6 @@ export default async function DashboardPage() {
         </Card>
       )}
     </PageContainer>
-  );
-}
-
-function Greeting({ name, subtitle, action }: { name: string; subtitle: string; action?: ReactNode }) {
-  return (
-    <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-      <div>
-        <h1 className="mb-1 text-xl font-semibold tracking-tight text-zinc-900 dark:text-white sm:text-2xl">
-          {name}
-        </h1>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">{subtitle}</p>
-      </div>
-      {action}
-    </div>
   );
 }
 
