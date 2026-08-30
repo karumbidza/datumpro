@@ -149,7 +149,7 @@ export async function runWeeklyDigest(now: Date = new Date()): Promise<{ recipie
 
   for (const [orgId, orgMembers] of byOrg) {
     // One batch of reads per org, then everything is computed in memory.
-    const [tasksRes, pmRes, extRes, varRes] = await Promise.all([
+    const [tasksRes, pmRes, extRes, varRes, rfiRes, snagRes, aiRes] = await Promise.all([
       admin
         .from('tasks')
         .select('id, title, status, due_date, sla_status, assignee_id, actual_end_date, project_id, projects(name)')
@@ -157,6 +157,9 @@ export async function runWeeklyDigest(now: Date = new Date()): Promise<{ recipie
       admin.from('project_members').select('user_id, project_id').eq('org_id', orgId).eq('role', 'pm'),
       admin.from('task_extension_requests').select('project_id').eq('org_id', orgId).eq('status', 'pending'),
       admin.from('variation_orders').select('project_id').eq('org_id', orgId).eq('status', 'submitted'),
+      admin.from('rfis').select('assignee_id, raised_by, status').eq('org_id', orgId),
+      admin.from('snags').select('assignee_id, raised_by, status').eq('org_id', orgId),
+      admin.from('action_items').select('assignee_id, status').eq('org_id', orgId).eq('status', 'open'),
     ]);
 
     const tasks = (tasksRes.data ?? []) as TaskRow[];
@@ -176,6 +179,28 @@ export async function runWeeklyDigest(now: Date = new Date()): Promise<{ recipie
       pmByUser.set(r.user_id, set);
     }
 
+    // Register actions awaiting each user (RFIs, snags, to-dos), computed in memory.
+    const reg = new Map<string, { rfisToAnswer: number; rfisToReview: number; snagsToFix: number; snagsToVerify: number; todos: number }>();
+    const regFor = (userId: string) => {
+      let r = reg.get(userId);
+      if (!r) {
+        r = { rfisToAnswer: 0, rfisToReview: 0, snagsToFix: 0, snagsToVerify: 0, todos: 0 };
+        reg.set(userId, r);
+      }
+      return r;
+    };
+    for (const r of (rfiRes.data ?? []) as { assignee_id: string | null; raised_by: string | null; status: string }[]) {
+      if (r.assignee_id && (r.status === 'open' || r.status === 'reopened')) regFor(r.assignee_id).rfisToAnswer++;
+      else if (r.raised_by && r.status === 'answered') regFor(r.raised_by).rfisToReview++;
+    }
+    for (const s of (snagRes.data ?? []) as { assignee_id: string | null; raised_by: string | null; status: string }[]) {
+      if (s.assignee_id && (s.status === 'open' || s.status === 'reopened')) regFor(s.assignee_id).snagsToFix++;
+      else if (s.raised_by && s.status === 'fixed') regFor(s.raised_by).snagsToVerify++;
+    }
+    for (const a of (aiRes.data ?? []) as { assignee_id: string | null }[]) {
+      if (a.assignee_id) regFor(a.assignee_id).todos++;
+    }
+
     const profiles = await resolveProfiles(admin, orgMembers.map((m) => m.user_id));
 
     for (const m of orgMembers) {
@@ -183,8 +208,10 @@ export async function runWeeklyDigest(now: Date = new Date()): Promise<{ recipie
       if (!profile?.email) continue;
 
       const s = signalsFor(m.user_id, m.role, tasks, pmByUser.get(m.user_id) ?? new Set(), approvalsByProject, morning);
+      const rc = regFor(m.user_id);
+      const registerTotal = rc.rfisToAnswer + rc.rfisToReview + rc.snagsToFix + rc.snagsToVerify + rc.todos;
       const hasSomething =
-        s.overdueTasks + s.dueTodayTasks + s.dueSoonTasks + s.upcomingTasks + s.blockedTasks + s.pendingApprovals + s.completedThisWeek >
+        s.overdueTasks + s.dueTodayTasks + s.dueSoonTasks + s.upcomingTasks + s.blockedTasks + s.pendingApprovals + s.completedThisWeek + registerTotal >
         0;
       if (!hasSomething) continue; // don't email a blank week
 
@@ -205,6 +232,11 @@ export async function runWeeklyDigest(now: Date = new Date()): Promise<{ recipie
         blocked: s.blockedTasks,
         completedThisWeek: s.completedThisWeek,
         nextDeadlineIso: s.nextDeadlineIso,
+        rfisToAnswer: rc.rfisToAnswer,
+        rfisToReview: rc.rfisToReview,
+        snagsToFix: rc.snagsToFix,
+        snagsToVerify: rc.snagsToVerify,
+        todos: rc.todos,
         dashboardUrl: `${appUrl()}/dashboard`,
         unsubscribeUrl,
       });
