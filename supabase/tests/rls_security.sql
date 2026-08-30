@@ -1388,6 +1388,37 @@ select pg_temp.ok(
 reset role;
 reset request.jwt.claims;
 
+-- ── Project events: meetings/site visits scoped to project members ───────────
+--    (20260826000029) a2 is a member of project A; b1 is in org B (a non-member).
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+insert into public.project_events (id, org_id, project_id, title, kind, starts_at, created_by) values
+  ('aa000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000','Site meeting','site_visit', now() + interval '2 days',
+   'a0000000-0000-0000-0000-0000000000a2');
+select pg_temp.ok(
+  (select count(*) from public.project_events where id = 'aa000000-0000-0000-0000-000000000001') = 1,
+  'events: a project member can schedule and see an event');
+-- Add an attendee (added_by self), then save the minutes.
+insert into public.event_attendees (event_id, org_id, project_id, user_id, added_by) values
+  ('aa000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000a2','a0000000-0000-0000-0000-0000000000a2');
+update public.project_events set notes = 'Discussed the phase 2 BOQ' where id = 'aa000000-0000-0000-0000-000000000001';
+select pg_temp.ok(
+  (select notes from public.project_events where id = 'aa000000-0000-0000-0000-000000000001') = 'Discussed the phase 2 BOQ',
+  'events: the organiser can save meeting notes');
+reset role;
+reset request.jwt.claims;
+
+-- A user from another org cannot see the project's events.
+set role authenticated;
+set request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-0000000000b1","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.project_events where id = 'aa000000-0000-0000-0000-000000000001') = 0,
+  'events: a non-member cannot see the project''s events');
+reset role;
+reset request.jwt.claims;
+
 -- ── Project member disable revokes project access ────────────────────────────
 -- A plain org member (not staff) added to a project as a contributor can see the
 -- project while active; disabling their membership (status='disabled') must drop

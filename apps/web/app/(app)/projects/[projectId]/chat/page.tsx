@@ -7,8 +7,10 @@ import { listChatRoster } from '@/lib/data/chat-roster';
 import { myOrgRole } from '@/lib/data/tasks';
 import { getProjectConversationId, listMessages, othersMaxReadSeq } from '@/lib/data/chat';
 import { listProjectActionItems } from '@/lib/data/action-items';
+import { listProjectEvents } from '@/lib/data/events';
 import { ChatPanel } from '@/components/chat/chat-panel';
 import { ChatActionItems } from '@/components/chat/chat-action-items';
+import { ChatEvents } from '@/components/chat/chat-events';
 import { Card } from '@/components/ui/card';
 
 export default async function ProjectChatPage({
@@ -42,24 +44,33 @@ export default async function ProjectChatPage({
         </div>
       ) : (
         await (async () => {
-          const [messages, roster, orgRole, projectRole, othersRead, actionItems] = await Promise.all([
+          const [messages, roster, orgRole, projectRole, othersRead, actionItems, events] = await Promise.all([
             listMessages(conversationId, user.id),
             listChatRoster(projectId),
             myOrgRole(project.org_id),
             myProjectRole(projectId),
             othersMaxReadSeq(conversationId, user.id),
             listProjectActionItems(projectId),
+            listProjectEvents(projectId),
           ]);
           const names = Object.fromEntries(roster.map((m) => [m.userId, m.name]));
           const meName = names[user.id] ?? user.email?.split('@')[0] ?? 'You';
           const canModerate = orgRole === 'owner' || orgRole === 'admin' || projectRole === 'pm';
           return (
             <>
-              <div className="mt-3">
+              <div className="mt-3 grid gap-3 lg:grid-cols-2">
                 <ChatActionItems
                   projectId={projectId}
                   conversationId={conversationId}
                   items={actionItems}
+                  members={roster.map((m) => ({ userId: m.userId, name: m.name }))}
+                  canManage={canModerate}
+                  currentUserId={user.id}
+                />
+                <ChatEvents
+                  projectId={projectId}
+                  conversationId={conversationId}
+                  events={events}
                   members={roster.map((m) => ({ userId: m.userId, name: m.name }))}
                   canManage={canModerate}
                   currentUserId={user.id}
