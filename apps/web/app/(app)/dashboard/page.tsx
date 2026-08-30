@@ -18,6 +18,7 @@ import { listMyActionInbox } from '@/lib/data/action-inbox';
 import { WhatNeedsMe } from '@/components/dashboard/what-needs-me';
 import { TimelineOverview } from '@/components/dashboard/timeline-overview';
 import { KpiRow } from '@/components/dashboard/kpi-row';
+import { StatCards } from '@/components/dashboard/stat-cards';
 import { UpcomingTasksTable } from '@/components/dashboard/portfolio-tables';
 import { DeliveryFocus } from '@/components/dashboard/delivery-focus';
 import { ApprovalsInbox } from '@/components/dashboard/approvals-inbox';
@@ -181,12 +182,14 @@ export default async function DashboardPage() {
       <WorkPulseGreeting data={pulse(null)} context={`${active.name} · Your work`} />
       {approvals.length > 0 && <ApprovalsInbox items={approvals} />}
       <WhatNeedsMe inbox={inbox} />
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Assigned" value={String(tStats.assigned)} />
-        <Stat label="In progress" value={String(tStats.inProgress)} />
-        <Stat label="Overdue" value={String(tStats.overdue)} tone="amber" />
-        <Stat label="Done" value={String(tStats.done)} tone="green" />
-      </div>
+      <StatCards
+        cells={[
+          { label: 'Assigned', value: String(tStats.assigned) },
+          { label: 'In progress', value: String(tStats.inProgress) },
+          { label: 'Overdue', value: String(tStats.overdue), tone: 'amber' },
+          { label: 'Done', value: String(tStats.done), tone: 'green' },
+        ]}
+      />
       <TimelineOverview tasks={myTimeline} unit="task" />
       <UpcomingTasksTable tasks={myUpcoming} />
       {hasPay && (
