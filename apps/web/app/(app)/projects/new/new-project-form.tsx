@@ -365,7 +365,7 @@ export function NewProjectForm({
 
           {/* Start date + duration, live end-date helper under the row */}
           <div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[0.85fr_1.15fr]">
               <div>
                 <label className={labelClass}>Start date<Req /></label>
                 <input
@@ -387,7 +387,7 @@ export function NewProjectForm({
                     value={durationValue}
                     onChange={(e) => setDurationValue(e.target.value)}
                     required
-                    className={`${inputClass} min-w-0 flex-1`}
+                    className={`${inputClass} min-w-0 flex-1 text-center`}
                   />
                   <div className="flex shrink-0 overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800">
                     {(['weeks', 'days'] as const).map((u) => (
@@ -395,7 +395,7 @@ export function NewProjectForm({
                         key={u}
                         type="button"
                         onClick={() => setDurationUnit(u)}
-                        className={`px-3 text-sm capitalize ${
+                        className={`px-2.5 text-sm capitalize ${
                           durationUnit === u
                             ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
                             : 'text-zinc-500 dark:text-zinc-400'
@@ -430,8 +430,7 @@ export function NewProjectForm({
             </select>
           </div>
 
-          {/* Currency + contract value — items-end keeps the two inputs aligned even
-              when the "(optional)" label wraps to a second line on narrow columns. */}
+          {/* Currency + contract value — items-end keeps the two inputs bottom-aligned. */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-end">
             <div>
               <label className={labelClass}>Currency<Req /></label>
@@ -445,7 +444,7 @@ export function NewProjectForm({
             </div>
             <div>
               <label className={labelClass}>
-                Contract value ({currency}) <span className="font-normal text-zinc-500 dark:text-zinc-400">(optional)</span>
+                Contract value ({currency})
               </label>
               <input type="number" name="contractValue" min={0} step="0.01" placeholder="0.00" className={inputClass} />
             </div>
