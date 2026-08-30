@@ -421,3 +421,55 @@ export async function getConversationAbout(conversationId: string): Promise<Chat
     createdAt: c.created_at,
   };
 }
+
+/** A pinned message, for the right-rail Pinned tab. */
+export interface PinnedMessage {
+  pinId: string;
+  messageId: string;
+  body: string | null;
+  senderName: string | null;
+  createdAt: string;
+  pinnedByName: string | null;
+}
+
+/** Messages pinned in a conversation (newest pin first). Pins on deleted messages
+ *  are dropped. RLS scopes to chat members. */
+export async function listPinnedMessages(conversationId: string): Promise<PinnedMessage[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('message_pins')
+    .select('id, message_id, pinned_by, created_at, messages(body, sender_id, deleted_at)')
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: false });
+
+  type Row = {
+    id: string;
+    message_id: string;
+    pinned_by: string | null;
+    created_at: string;
+    messages: { body: string | null; sender_id: string; deleted_at: string | null }
+      | { body: string | null; sender_id: string; deleted_at: string | null }[]
+      | null;
+  };
+  const msg = (m: Row['messages']) => (Array.isArray(m) ? m[0] : m) ?? null;
+  const rows = ((data ?? []) as Row[]).filter((r) => {
+    const m = msg(r.messages);
+    return m && !m.deleted_at;
+  });
+  if (rows.length === 0) return [];
+
+  const names = await resolveNames([
+    ...new Set(rows.flatMap((r) => [msg(r.messages)!.sender_id, r.pinned_by].filter(Boolean) as string[])),
+  ]);
+  return rows.map((r) => {
+    const m = msg(r.messages)!;
+    return {
+      pinId: r.id,
+      messageId: r.message_id,
+      body: m.body,
+      senderName: names.get(m.sender_id) ?? null,
+      createdAt: r.created_at,
+      pinnedByName: r.pinned_by ? (names.get(r.pinned_by) ?? null) : null,
+    };
+  });
+}

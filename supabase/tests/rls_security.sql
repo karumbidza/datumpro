@@ -1448,6 +1448,35 @@ select pg_temp.ok(
      where project_id = 'a2220000-0000-0000-0000-000000000000' and type = 'project') = 'Phase 2 coordination',
   'about: a manager can edit the chat topic');
 
+-- ── Pinned messages: a member can pin & see; a non-member cannot ─────────────
+--    (20260826000031) message_pins mirror reactions — scope is denormalized from
+--    the parent message and RLS double-gates via can_access_chat.
+reset role;
+reset request.jwt.claims;
+-- Contractor a2 (a project A member) posts a message in the project chat, then pins it.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+insert into public.messages (id, conversation_id, sender_id, body)
+select 'ab000000-0000-0000-0000-000000000001', c.id, 'a0000000-0000-0000-0000-0000000000a2', 'Key decision'
+  from public.conversations c
+  where c.project_id = 'a2220000-0000-0000-0000-000000000000' and c.type = 'project';
+insert into public.message_pins (message_id, pinned_by) values
+  ('ab000000-0000-0000-0000-000000000001','a0000000-0000-0000-0000-0000000000a2');
+select pg_temp.ok(
+  (select count(*) from public.message_pins where message_id = 'ab000000-0000-0000-0000-000000000001') = 1,
+  'pins: a member can pin a message and see it');
+reset role;
+reset request.jwt.claims;
+
+-- A user from another org cannot see the pin.
+set role authenticated;
+set request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-0000000000b1","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.message_pins where message_id = 'ab000000-0000-0000-0000-000000000001') = 0,
+  'pins: a non-member cannot see the pin');
+reset role;
+reset request.jwt.claims;
+
 -- ── Project member disable revokes project access ────────────────────────────
 -- A plain org member (not staff) added to a project as a contributor can see the
 -- project while active; disabling their membership (status='disabled') must drop
