@@ -7,6 +7,7 @@ import {
   CheckSquare,
   ClipboardList,
   ShieldAlert,
+  GanttChart,
   DollarSign,
   Wallet,
   MessageSquare,
@@ -51,6 +52,7 @@ export function computeNav(
       { name: 'Overview', href: `/projects/${id}`, icon: LayoutDashboard },
       { name: 'Tasks', href: `/projects/${id}/tasks`, icon: CheckSquare },
       { name: 'Calendar', href: `/projects/${id}/calendar`, icon: Calendar },
+      { name: 'Programme', href: `/projects/${id}/programme`, icon: GanttChart },
       { name: 'Site Diary', href: `/projects/${id}/diary`, icon: ClipboardList },
       { name: 'Snagging', href: `/projects/${id}/snags`, icon: ShieldAlert },
     ];
