@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, Users, GanttChart } from '@/components/icons';
 import { parseDate, startOfDay, formatDayMonth } from '@/lib/date';
-import type { CalendarTask } from '@/lib/data/project-calendar';
+import type { CalendarTask, CalendarMarker } from '@/lib/data/project-calendar';
 import type { CalendarActionItem } from '@/lib/data/action-items';
 import { EVENT_KIND_LABEL, type CalendarEvent } from '@/lib/data/events-types';
 import type { TaskPriority } from '@datumpro/shared/domain';
@@ -72,11 +72,13 @@ export function ProjectCalendar({
   tasks,
   actionItems = [],
   events = [],
+  markers = [],
   projectId,
 }: {
   tasks: CalendarTask[];
   actionItems?: CalendarActionItem[];
   events?: CalendarEvent[];
+  markers?: CalendarMarker[];
   projectId: string;
 }) {
   const today = startOfDay(new Date());
@@ -124,6 +126,34 @@ export function ProjectCalendar({
         .filter(({ item, due }) => item.status === 'open' && due < today)
         .sort((a, b) => a.due.getTime() - b.due.getTime()),
     [todosWithDay, today],
+  );
+
+  // Register markers (RFI / snag due dates and transmittal issue dates) keyed by day.
+  const markersWithDay = useMemo(
+    () =>
+      markers
+        .map((m) => ({ m, day: parseDate(m.date) }))
+        .filter((x): x is { m: CalendarMarker; day: Date } => x.day !== null)
+        .map((x) => ({ m: x.m, day: startOfDay(x.day) })),
+    [markers],
+  );
+  const markersForDate = (date: Date) => markersWithDay.filter(({ day }) => isSameDay(day, date)).map(({ m }) => m);
+  const dueMarkersForDate = (date: Date) => markersForDate(date).filter((m) => m.isDeadline).length;
+  const recordMarkersForDate = (date: Date) => markersForDate(date).filter((m) => !m.isDeadline).length;
+  const upcomingDeadlineMarkers = useMemo(
+    () =>
+      markersWithDay
+        .filter(({ m, day }) => m.isDeadline && day >= today)
+        .sort((a, b) => a.day.getTime() - b.day.getTime())
+        .slice(0, 5),
+    [markersWithDay, today],
+  );
+  const overdueDeadlineMarkers = useMemo(
+    () =>
+      markersWithDay
+        .filter(({ m, day }) => m.isDeadline && day < today)
+        .sort((a, b) => a.day.getTime() - b.day.getTime()),
+    [markersWithDay, today],
   );
 
   const windows = useMemo(
@@ -174,6 +204,7 @@ export function ProjectCalendar({
   const selectedTasks = tasksForDate(selectedDate);
   const selectedTodos = todosForDate(selectedDate);
   const selectedEvents = eventsForDate(selectedDate);
+  const selectedMarkers = markersForDate(selectedDate);
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
@@ -207,10 +238,14 @@ export function ProjectCalendar({
               const dayTasks = tasksForDate(day);
               const dayTodos = openTodosForDate(day);
               const dayEvents = eventsForDate(day).filter((e) => e.status === 'scheduled').length;
+              const dayDue = dueMarkersForDate(day);
+              const dayRecords = recordMarkersForDate(day);
               const isSelected = isSameDay(day, selectedDate);
               const hasOverdue =
                 day < today &&
-                (dayTasks.some((t) => t.status !== 'done') || todosForDate(day).some((a) => a.status === 'open'));
+                (dayTasks.some((t) => t.status !== 'done') ||
+                  todosForDate(day).some((a) => a.status === 'open') ||
+                  dayDue > 0);
               return (
                 <button
                   key={day.toISOString()}
@@ -237,6 +272,16 @@ export function ProjectCalendar({
                   {dayEvents > 0 && (
                     <span className="text-[10px] text-violet-600 dark:text-violet-400">
                       {dayEvents} event{dayEvents === 1 ? '' : 's'}
+                    </span>
+                  )}
+                  {dayDue > 0 && (
+                    <span className="text-[10px] text-rose-600 dark:text-rose-400">
+                      {dayDue} due
+                    </span>
+                  )}
+                  {dayRecords > 0 && (
+                    <span className="text-[10px] text-sky-600 dark:text-sky-400">
+                      {dayRecords} sent
                     </span>
                   )}
                 </button>
@@ -355,6 +400,41 @@ export function ProjectCalendar({
                   {a.assigneeName && <p className="text-xs text-zinc-500 dark:text-zinc-400">For {a.assigneeName}</p>}
                 </Link>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Register items on the selected day (RFIs, snags due, transmittals) */}
+        {selectedMarkers.length > 0 && (
+          <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+            <h3 className="mb-3 text-sm font-medium text-zinc-900 dark:text-white">
+              Registers on {selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </h3>
+            <div className="space-y-2">
+              {selectedMarkers.map((m) => {
+                const overdueMarker = m.isDeadline && selectedDate < today;
+                return (
+                  <Link
+                    key={m.id}
+                    href={m.href}
+                    className={`block rounded border-l-4 p-3 transition ${
+                      overdueMarker
+                        ? 'border-red-300 bg-red-50 hover:bg-red-100 dark:border-red-500 dark:bg-red-900/20 dark:hover:bg-red-900/30'
+                        : m.isDeadline
+                          ? 'border-rose-300 bg-zinc-50 hover:bg-zinc-100 dark:border-rose-500 dark:bg-zinc-800/40 dark:hover:bg-zinc-800'
+                          : 'border-sky-300 bg-zinc-50 hover:bg-zinc-100 dark:border-sky-500 dark:bg-zinc-800/40 dark:hover:bg-zinc-800'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2 text-sm">
+                      <span className="text-zinc-900 dark:text-white">{m.title}</span>
+                      {overdueMarker && (
+                        <span className="shrink-0 rounded bg-red-200 px-2 py-0.5 text-xs text-red-900 dark:bg-red-500">Overdue</span>
+                      )}
+                    </div>
+                    {m.subtitle && <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">{m.subtitle}</p>}
+                  </Link>
+                );
+              })}
             </div>
           </div>
         )}
@@ -484,6 +564,50 @@ export function ProjectCalendar({
                   <p className="text-xs text-zinc-600 dark:text-zinc-400">
                     {formatDayMonth(startOfDay(new Date(ev.startsAt)))} · {eventTime(ev.startsAt)}
                     {ev.location ? ` · ${ev.location}` : ''}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(upcomingDeadlineMarkers.length > 0 || overdueDeadlineMarkers.length > 0) && (
+          <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-zinc-900 dark:text-white">
+              <Clock size={16} /> RFI &amp; snag deadlines
+            </h3>
+            <div className="space-y-2">
+              {overdueDeadlineMarkers.map(({ m, day }) => (
+                <Link
+                  key={m.id}
+                  href={m.href}
+                  className="block rounded-lg bg-red-50 p-3 transition hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30"
+                >
+                  <div className="flex justify-between gap-2 text-sm text-zinc-900 dark:text-white">
+                    <span>{m.title}</span>
+                    <span className="shrink-0 rounded bg-red-200 px-2 py-0.5 text-xs text-red-900 dark:bg-red-500">Overdue</span>
+                  </div>
+                  <p className="truncate text-xs text-red-600 dark:text-red-300">
+                    Due {formatDayMonth(day)}
+                    {m.subtitle ? ` · ${m.subtitle}` : ''}
+                  </p>
+                </Link>
+              ))}
+              {upcomingDeadlineMarkers.map(({ m, day }) => (
+                <Link
+                  key={m.id}
+                  href={m.href}
+                  className="block rounded-lg bg-zinc-50 p-3 transition hover:bg-zinc-100 dark:bg-zinc-800/40 dark:hover:bg-zinc-800"
+                >
+                  <div className="flex items-start justify-between gap-2 text-sm">
+                    <span className="text-zinc-900 dark:text-white">{m.title}</span>
+                    <span className="shrink-0 rounded bg-rose-50 px-2 py-0.5 text-xs text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">
+                      {m.kind === 'rfi_due' ? 'RFI' : 'Snag'}
+                    </span>
+                  </div>
+                  <p className="truncate text-xs text-zinc-600 dark:text-zinc-400">
+                    Due {formatDayMonth(day)}
+                    {m.subtitle ? ` · ${m.subtitle}` : ''}
                   </p>
                 </Link>
               ))}
