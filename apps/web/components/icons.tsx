@@ -290,6 +290,14 @@ export const ClipboardList: IconComponent = (p) => (
   </Icon>
 );
 
+export const Layers: IconComponent = (p) => (
+  <Icon {...p}>
+    <path d="M12 2 2 7l10 5 10-5-10-5Z" />
+    <path d="m2 17 10 5 10-5" />
+    <path d="m2 12 10 5 10-5" />
+  </Icon>
+);
+
 export const Menu: IconComponent = (p) => (
   <Icon {...p}>
     <path d="M4 6h16" />
