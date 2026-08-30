@@ -14,6 +14,8 @@ import {
   listManagedProjects,
 } from '@/lib/data/home';
 import { listMyOwed } from '@/lib/data/owed';
+import { listMyActionInbox } from '@/lib/data/action-inbox';
+import { WhatNeedsMe } from '@/components/dashboard/what-needs-me';
 import { TimelineOverview } from '@/components/dashboard/timeline-overview';
 import { KpiRow } from '@/components/dashboard/kpi-row';
 import { StatCards } from '@/components/dashboard/stat-cards';
@@ -74,10 +76,11 @@ export default async function DashboardPage() {
   const { active } = ctx;
   const canCreate = can(active.role, 'project:create');
   const persona = homePersona(active.role);
-  const [displayName, approvals, pulseSignals] = await Promise.all([
+  const [displayName, approvals, pulseSignals, inbox] = await Promise.all([
     resolveDisplayName(ctx.userId, ctx.email),
     listPendingApprovals(active.orgId, ctx.userId, active.role),
     getWorkPulseSignals(active.orgId, ctx.userId),
+    listMyActionInbox(active.orgId, ctx.userId),
   ]);
 
   // Work Pulse greeting data — real signals; overall progress is filled per persona.
@@ -104,6 +107,9 @@ export default async function DashboardPage() {
         { table: 'contractor_payment_requests', filter: `org_id=eq.${active.orgId}` },
         { table: 'projects', filter: `org_id=eq.${active.orgId}` },
         { table: 'approvals', filter: `org_id=eq.${active.orgId}` },
+        { table: 'rfis', filter: `org_id=eq.${active.orgId}` },
+        { table: 'snags', filter: `org_id=eq.${active.orgId}` },
+        { table: 'action_items', filter: `org_id=eq.${active.orgId}` },
       ]}
     />
   );
@@ -121,6 +127,7 @@ export default async function DashboardPage() {
         <KpiRow kpis={portfolio.kpis} />
         <TimelineOverview tasks={projectTimeline} unit="project" />
         {approvals.length > 0 && <ApprovalsInbox items={approvals} />}
+        <WhatNeedsMe inbox={inbox} />
         <UpcomingTasksTable tasks={portfolio.upcomingTasks} />
       </PageContainer>
     );
@@ -147,6 +154,7 @@ export default async function DashboardPage() {
         {live}
         <WorkPulseGreeting data={pulse(null)} context={`${active.name} · Delivery overview`} action={newProject} />
         <DeliveryFocus approvals={approvals} blockers={blockers} overdue={overdue} />
+        <WhatNeedsMe inbox={inbox} />
         <TimelineOverview tasks={timelineTasks} unit="task" />
       </PageContainer>
     );
@@ -173,6 +181,7 @@ export default async function DashboardPage() {
       {live}
       <WorkPulseGreeting data={pulse(null)} context={`${active.name} · Your work`} />
       {approvals.length > 0 && <ApprovalsInbox items={approvals} />}
+      <WhatNeedsMe inbox={inbox} />
       <StatCards
         cells={[
           { label: 'Assigned', value: String(tStats.assigned) },

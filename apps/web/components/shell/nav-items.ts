@@ -5,6 +5,13 @@ import {
   Building,
   Calendar,
   CheckSquare,
+  ClipboardList,
+  ShieldAlert,
+  GanttChart,
+  Layers,
+  HelpCircle,
+  FileEdit,
+  Send,
   DollarSign,
   Wallet,
   MessageSquare,
@@ -45,10 +52,24 @@ export function computeNav(
     // Settings (team + setup) are management surfaces — hidden from a contractor
     // whose only role here is doing the assigned work.
     const manages = canManageMembers || managedProjectIds.includes(id);
+    // Site diary, Snagging and RFIs are internal registers — hidden from external
+    // observers (client/viewer). The page guards + DB RLS are the real enforcement.
+    const isExternalObserver = memberType === 'client' || memberType === 'viewer';
     const items: NavItem[] = [
       { name: 'Overview', href: `/projects/${id}`, icon: LayoutDashboard },
       { name: 'Tasks', href: `/projects/${id}/tasks`, icon: CheckSquare },
       { name: 'Calendar', href: `/projects/${id}/calendar`, icon: Calendar },
+      { name: 'Programme', href: `/projects/${id}/programme`, icon: GanttChart },
+      ...(isExternalObserver
+        ? []
+        : [
+            { name: 'Site Diary', href: `/projects/${id}/diary`, icon: ClipboardList },
+            { name: 'Snagging', href: `/projects/${id}/snags`, icon: ShieldAlert },
+          ]),
+      { name: 'Drawings', href: `/projects/${id}/drawings`, icon: Layers },
+      ...(isExternalObserver ? [] : [{ name: 'RFIs', href: `/projects/${id}/rfis`, icon: HelpCircle }]),
+      { name: 'Variations', href: `/projects/${id}/variations`, icon: FileEdit },
+      { name: 'Transmittals', href: `/projects/${id}/transmittals`, icon: Send },
     ];
     if (manages) {
       items.push({ name: 'Finance', href: `/projects/${id}/finance`, icon: DollarSign });

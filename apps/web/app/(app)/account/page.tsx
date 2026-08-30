@@ -4,7 +4,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveContext, getAuthUser } from '@/lib/data/org';
-import { updateDisplayName } from './actions';
+import { updateDisplayName, setWeeklyDigest } from './actions';
 import { ChangePasswordForm } from './change-password-form';
 import { signOut } from '@/app/(app)/actions';
 import { Card, CardTitle } from '@/components/ui/card';
@@ -31,6 +31,18 @@ export default async function AccountPage() {
   // Only users with an email/password identity can change a password; Google-only
   // accounts have none, so the reauth step (verify current password) can't apply.
   const hasPasswordLogin = (user.identities ?? []).some((i) => i.provider === 'email');
+
+  // Weekly-digest opt-in for the active org (defaults on).
+  let digestOn = true;
+  if (ctx?.active) {
+    const { data: mem } = await supabase
+      .from('org_members')
+      .select('weekly_digest_opt_in')
+      .eq('org_id', ctx.active.orgId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    digestOn = (mem as { weekly_digest_opt_in: boolean } | null)?.weekly_digest_opt_in ?? true;
+  }
 
   return (
     <PageContainer width="xl">
@@ -102,6 +114,23 @@ export default async function AccountPage() {
           Manage 2FA →
         </Link>
       </Card>
+
+      {ctx?.active && (
+        <Card className="mt-4">
+          <CardTitle>Email preferences</CardTitle>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            The weekly digest is a Monday summary of your week on <strong>{ctx.active.name}</strong> — what&apos;s overdue,
+            approvals waiting, deadlines this week, and anything blocked. It&apos;s currently{' '}
+            <strong>{digestOn ? 'on' : 'off'}</strong>.
+          </p>
+          <form action={setWeeklyDigest} className="mt-3">
+            <input type="hidden" name="next" value={String(!digestOn)} />
+            <Button type="submit" variant={digestOn ? 'secondary' : 'primary'}>
+              {digestOn ? 'Turn off weekly digest' : 'Turn on weekly digest'}
+            </Button>
+          </form>
+        </Card>
+      )}
 
       {ctx?.memberships && ctx.memberships.length > 0 && (
         <Card className="mt-4">

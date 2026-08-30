@@ -1,6 +1,7 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import {
   listMessagesBefore,
@@ -168,4 +169,50 @@ export async function markRead(conversationId: string, uptoSeq: number) {
     p_upto_seq: uptoSeq,
   });
   if (error) throw new Error(error.message);
+}
+
+/** Edit the chat's About Topic (topic / description / note). The conversations_write
+ *  RLS policy restricts this to org staff or the project PM (the "canModerate" set),
+ *  so a non-manager's update simply affects no rows. */
+export async function updateChatAbout(formData: FormData): Promise<{ ok: boolean; error?: string }> {
+  const { supabase } = await requireUser();
+  const conversationId = String(formData.get('conversationId') ?? '');
+  const projectId = String(formData.get('projectId') ?? '');
+  if (!conversationId || !projectId) return { ok: false, error: 'Missing conversation.' };
+  const topic = (formData.get('topic') as string)?.trim() || null;
+  const description = (formData.get('description') as string)?.trim() || null;
+  const note = (formData.get('note') as string)?.trim() || null;
+
+  const { error } = await supabase
+    .from('conversations')
+    .update({ topic, description, note })
+    .eq('id', conversationId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/projects/${projectId}/chat`);
+  return { ok: true };
+}
+
+/** Pin a message (any conversation member may). Scope columns are filled by the
+ *  child_denormalize trigger; RLS re-checks membership. */
+export async function pinMessage(formData: FormData): Promise<{ ok: boolean; error?: string }> {
+  const { supabase, user } = await requireUser();
+  const messageId = String(formData.get('messageId') ?? '');
+  const projectId = String(formData.get('projectId') ?? '');
+  if (!messageId || !projectId) return { ok: false, error: 'Missing message.' };
+  const { error } = await supabase.from('message_pins').insert({ message_id: messageId, pinned_by: user.id });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/projects/${projectId}/chat`);
+  return { ok: true };
+}
+
+/** Unpin a message (the pinner or a manager, enforced by RLS). */
+export async function unpinMessage(formData: FormData): Promise<{ ok: boolean; error?: string }> {
+  const { supabase } = await requireUser();
+  const messageId = String(formData.get('messageId') ?? '');
+  const projectId = String(formData.get('projectId') ?? '');
+  if (!messageId || !projectId) return { ok: false, error: 'Missing message.' };
+  const { error } = await supabase.from('message_pins').delete().eq('message_id', messageId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/projects/${projectId}/chat`);
+  return { ok: true };
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import {
   sendMessage,
@@ -13,14 +14,16 @@ import {
   loadSince,
   loadOne,
   getMemberActivity,
+  pinMessage,
+  unpinMessage,
   type AttachmentInput,
 } from '@/app/(app)/projects/[projectId]/chat/actions';
-import type { ChatAttachment, ChatMessage, ChatSearchResult } from '@/lib/data/chat';
+import type { ChatAttachment, ChatMessage, ChatSearchResult, ConversationFile, ChatAbout, PinnedMessage } from '@/lib/data/chat';
 import type { RosterMember } from '@/lib/data/chat-roster';
 import { Button } from '@/components/ui/button';
 import { MessageCircle, Paperclip, Mic, Square, X, Download, FileText, Search, Users } from '@/components/icons';
 import { NotifyToggle } from '@/components/chat/notify-toggle';
-import { PeopleRail } from '@/components/chat/people-rail';
+import { ChatRail } from '@/components/chat/chat-rail';
 
 const EMOJIS = ['👍', '❤️', '😂', '🎉', '✅'];
 const MAX_FILE_BYTES = 50 * 1024 * 1024; // 50 MB per file
@@ -39,8 +42,15 @@ interface Props {
   subtitle?: string;
   className?: string;
   /** Roster for the People rail. When provided, the panel renders the two-pane
-   *  layout (conversation + presence rail). Omit for a bare conversation. */
+   *  layout (conversation + right rail). Omit for a bare conversation. */
   members?: RosterMember[];
+  /** Files shared in the conversation — the rail's Files tab. */
+  sharedFiles?: ConversationFile[];
+  /** The conversation's About Topic — the rail's About tab. */
+  about?: ChatAbout | null;
+  /** Pinned messages (rail Pinned tab) and their ids (per-message pin state). */
+  pinnedMessages?: PinnedMessage[];
+  pinnedMessageIds?: string[];
 }
 
 type AttachmentKind = AttachmentInput['kind'];
@@ -180,7 +190,23 @@ export function ChatPanel({
   subtitle,
   className = '',
   members,
+  sharedFiles,
+  about,
+  pinnedMessages,
+  pinnedMessageIds,
 }: Props) {
+  const router = useRouter();
+  const pinnedSet = useMemo(() => new Set(pinnedMessageIds ?? []), [pinnedMessageIds]);
+  const togglePin = useCallback(
+    async (messageId: string) => {
+      const fd = new FormData();
+      fd.set('messageId', messageId);
+      fd.set('projectId', projectId);
+      await (pinnedSet.has(messageId) ? unpinMessage(fd) : pinMessage(fd));
+      router.refresh();
+    },
+    [projectId, pinnedSet, router],
+  );
   const supabase = useMemo(() => createClient(), []);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [othersRead, setOthersRead] = useState(othersReadSeq);
@@ -807,6 +833,14 @@ export function ChatPanel({
                     >
                       Reply
                     </button>
+                    <button
+                      onClick={() => togglePin(m.id)}
+                      className={`text-[11px] hover:text-zinc-700 dark:hover:text-zinc-200 ${
+                        pinnedSet.has(m.id) ? 'text-brand-600 dark:text-brand-400' : 'text-zinc-400 dark:text-zinc-500'
+                      }`}
+                    >
+                      {pinnedSet.has(m.id) ? 'Unpin' : 'Pin'}
+                    </button>
                     {mine && (
                       <button
                         onClick={() => {
@@ -968,7 +1002,17 @@ export function ChatPanel({
         <>
           {/* Desktop rail — always visible ≥ lg */}
           <aside className="hidden min-h-0 w-[300px] flex-shrink-0 flex-col border-l border-zinc-200 bg-white lg:flex dark:border-zinc-800 dark:bg-zinc-950">
-            <PeopleRail {...railProps} />
+            <ChatRail
+              people={railProps}
+              projectId={projectId}
+              conversationId={conversationId}
+              files={sharedFiles ?? []}
+              about={about ?? null}
+              canEditAbout={canModerate}
+              pinned={pinnedMessages ?? []}
+              onUnpin={togglePin}
+              onFind={() => setSearchOpen(true)}
+            />
           </aside>
 
           {/* Mobile — slide-over sheet from the right */}
@@ -976,12 +1020,26 @@ export function ChatPanel({
             <div className="fixed inset-0 z-40 flex lg:hidden">
               <button
                 type="button"
-                aria-label="Close people"
+                aria-label="Close panel"
                 onClick={() => setRailOpen(false)}
                 className="flex-1 bg-black/30"
               />
               <aside className="flex w-full max-w-[340px] flex-col bg-white shadow-xl dark:bg-zinc-950">
-                <PeopleRail {...railProps} onClose={() => setRailOpen(false)} />
+                <ChatRail
+                  people={railProps}
+                  projectId={projectId}
+                  conversationId={conversationId}
+                  files={sharedFiles ?? []}
+                  about={about ?? null}
+                  canEditAbout={canModerate}
+                  pinned={pinnedMessages ?? []}
+                  onUnpin={togglePin}
+                  onFind={() => {
+                    setRailOpen(false);
+                    setSearchOpen(true);
+                  }}
+                  onClose={() => setRailOpen(false)}
+                />
               </aside>
             </div>
           )}

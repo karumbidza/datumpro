@@ -4,7 +4,9 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, Users, GanttChart } from '@/components/icons';
 import { parseDate, startOfDay, formatDayMonth } from '@/lib/date';
-import type { CalendarTask } from '@/lib/data/project-calendar';
+import type { CalendarTask, CalendarMarker } from '@/lib/data/project-calendar';
+import type { CalendarActionItem } from '@/lib/data/action-items';
+import { EVENT_KIND_LABEL, type CalendarEvent } from '@/lib/data/events-types';
 import type { TaskPriority } from '@datumpro/shared/domain';
 
 /* Priority accents — the app-wide colour language (see ui/tones.ts): urgent red,
@@ -62,10 +64,97 @@ function formatRange(start: Date, end: Date): string {
   return isSameDay(start, end) ? formatDayMonth(end) : `${formatDayMonth(start)} – ${formatDayMonth(end)}`;
 }
 
-export function ProjectCalendar({ tasks, projectId }: { tasks: CalendarTask[]; projectId: string }) {
+function eventTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+export function ProjectCalendar({
+  tasks,
+  actionItems = [],
+  events = [],
+  markers = [],
+  projectId,
+}: {
+  tasks: CalendarTask[];
+  actionItems?: CalendarActionItem[];
+  events?: CalendarEvent[];
+  markers?: CalendarMarker[];
+  projectId: string;
+}) {
   const today = startOfDay(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date(today.getFullYear(), today.getMonth(), 1));
+
+  // Events keyed by their local start day (a timestamp, so bucket in local time).
+  const eventsWithDay = useMemo(
+    () => events.map((e) => ({ ev: e, day: startOfDay(new Date(e.startsAt)) })),
+    [events],
+  );
+  const eventsForDate = (date: Date) => eventsWithDay.filter(({ day }) => isSameDay(day, date)).map(({ ev }) => ev);
+  const upcomingEvents = useMemo(
+    () =>
+      eventsWithDay
+        .filter(({ ev }) => ev.status === 'scheduled' && new Date(ev.startsAt).getTime() >= Date.now())
+        .sort((a, b) => new Date(a.ev.startsAt).getTime() - new Date(b.ev.startsAt).getTime())
+        .slice(0, 5),
+    [eventsWithDay],
+  );
+
+  // To-dos (action items) keyed by their due day.
+  const todosWithDay = useMemo(
+    () =>
+      actionItems
+        .map((a) => ({ item: a, due: parseDate(a.dueDate) }))
+        .filter((x): x is { item: CalendarActionItem; due: Date } => x.due !== null)
+        .map((x) => ({ item: x.item, due: startOfDay(x.due) })),
+    [actionItems],
+  );
+  const todosForDate = (date: Date) => todosWithDay.filter(({ due }) => isSameDay(due, date)).map(({ item }) => item);
+  const openTodosForDate = (date: Date) =>
+    todosWithDay.filter(({ item, due }) => item.status === 'open' && isSameDay(due, date)).length;
+  const upcomingTodos = useMemo(
+    () =>
+      todosWithDay
+        .filter(({ item, due }) => item.status === 'open' && due >= today)
+        .sort((a, b) => a.due.getTime() - b.due.getTime())
+        .slice(0, 5),
+    [todosWithDay, today],
+  );
+  const overdueTodos = useMemo(
+    () =>
+      todosWithDay
+        .filter(({ item, due }) => item.status === 'open' && due < today)
+        .sort((a, b) => a.due.getTime() - b.due.getTime()),
+    [todosWithDay, today],
+  );
+
+  // Register markers (RFI / snag due dates and transmittal issue dates) keyed by day.
+  const markersWithDay = useMemo(
+    () =>
+      markers
+        .map((m) => ({ m, day: parseDate(m.date) }))
+        .filter((x): x is { m: CalendarMarker; day: Date } => x.day !== null)
+        .map((x) => ({ m: x.m, day: startOfDay(x.day) })),
+    [markers],
+  );
+  const markersForDate = (date: Date) => markersWithDay.filter(({ day }) => isSameDay(day, date)).map(({ m }) => m);
+  const dueMarkersForDate = (date: Date) => markersForDate(date).filter((m) => m.isDeadline).length;
+  const recordMarkersForDate = (date: Date) => markersForDate(date).filter((m) => !m.isDeadline).length;
+  const upcomingDeadlineMarkers = useMemo(
+    () =>
+      markersWithDay
+        .filter(({ m, day }) => m.isDeadline && day >= today)
+        .sort((a, b) => a.day.getTime() - b.day.getTime())
+        .slice(0, 5),
+    [markersWithDay, today],
+  );
+  const overdueDeadlineMarkers = useMemo(
+    () =>
+      markersWithDay
+        .filter(({ m, day }) => m.isDeadline && day < today)
+        .sort((a, b) => a.day.getTime() - b.day.getTime()),
+    [markersWithDay, today],
+  );
 
   const windows = useMemo(
     () => tasks.map((t) => ({ task: t, win: taskWindow(t) })).filter((x) => x.win !== null) as {
@@ -113,6 +202,9 @@ export function ProjectCalendar({ tasks, projectId }: { tasks: CalendarTask[]; p
 
   const monthLabel = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const selectedTasks = tasksForDate(selectedDate);
+  const selectedTodos = todosForDate(selectedDate);
+  const selectedEvents = eventsForDate(selectedDate);
+  const selectedMarkers = markersForDate(selectedDate);
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
@@ -144,8 +236,16 @@ export function ProjectCalendar({ tasks, projectId }: { tasks: CalendarTask[]; p
             {monthDays.map((day, i) => {
               if (!day) return <div key={`pad-${i}`} />;
               const dayTasks = tasksForDate(day);
+              const dayTodos = openTodosForDate(day);
+              const dayEvents = eventsForDate(day).filter((e) => e.status === 'scheduled').length;
+              const dayDue = dueMarkersForDate(day);
+              const dayRecords = recordMarkersForDate(day);
               const isSelected = isSameDay(day, selectedDate);
-              const hasOverdue = day < today && dayTasks.some((t) => t.status !== 'done');
+              const hasOverdue =
+                day < today &&
+                (dayTasks.some((t) => t.status !== 'done') ||
+                  todosForDate(day).some((a) => a.status === 'open') ||
+                  dayDue > 0);
               return (
                 <button
                   key={day.toISOString()}
@@ -162,6 +262,26 @@ export function ProjectCalendar({ tasks, projectId }: { tasks: CalendarTask[]; p
                   {dayTasks.length > 0 && (
                     <span className="text-[10px] text-brand-600 dark:text-brand-500">
                       {dayTasks.length} task{dayTasks.length === 1 ? '' : 's'}
+                    </span>
+                  )}
+                  {dayTodos > 0 && (
+                    <span className="text-[10px] text-amber-600 dark:text-amber-400">
+                      {dayTodos} to-do{dayTodos === 1 ? '' : 's'}
+                    </span>
+                  )}
+                  {dayEvents > 0 && (
+                    <span className="text-[10px] text-violet-600 dark:text-violet-400">
+                      {dayEvents} event{dayEvents === 1 ? '' : 's'}
+                    </span>
+                  )}
+                  {dayDue > 0 && (
+                    <span className="text-[10px] text-rose-600 dark:text-rose-400">
+                      {dayDue} due
+                    </span>
+                  )}
+                  {dayRecords > 0 && (
+                    <span className="text-[10px] text-sky-600 dark:text-sky-400">
+                      {dayRecords} sent
                     </span>
                   )}
                 </button>
@@ -210,6 +330,108 @@ export function ProjectCalendar({ tasks, projectId }: { tasks: CalendarTask[]; p
                         </span>
                       )}
                     </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Events on the selected day */}
+        {selectedEvents.length > 0 && (
+          <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-medium text-zinc-900 dark:text-white">
+                Events on {selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </h3>
+              <Link href={`/projects/${projectId}/chat`} className="text-sm text-brand-500 transition hover:text-brand-600">
+                Open chat
+              </Link>
+            </div>
+            <div className="space-y-2">
+              {selectedEvents.map((ev) => (
+                <Link
+                  key={ev.id}
+                  href={`/projects/${projectId}/chat`}
+                  className="block rounded border-l-4 border-violet-300 bg-zinc-50 p-3 transition hover:bg-zinc-100 dark:border-violet-500 dark:bg-zinc-800/40 dark:hover:bg-zinc-800"
+                >
+                  <div className="flex items-center justify-between gap-2 text-sm">
+                    <span className={ev.status === 'cancelled' ? 'text-zinc-400 line-through dark:text-zinc-500' : 'text-zinc-900 dark:text-white'}>
+                      {ev.title}
+                    </span>
+                    <span className="shrink-0 rounded bg-violet-50 px-2 py-0.5 text-xs text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
+                      {EVENT_KIND_LABEL[ev.kind]}
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {eventTime(ev.startsAt)}
+                    {ev.location ? ` · ${ev.location}` : ''}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* To-dos due on the selected day */}
+        {selectedTodos.length > 0 && (
+          <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-medium text-zinc-900 dark:text-white">
+                To-dos due {selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </h3>
+              <Link href={`/projects/${projectId}/chat`} className="text-sm text-brand-500 transition hover:text-brand-600">
+                Open chat
+              </Link>
+            </div>
+            <div className="space-y-2">
+              {selectedTodos.map((a) => (
+                <Link
+                  key={a.id}
+                  href={`/projects/${projectId}/chat`}
+                  className="block rounded border-l-4 border-amber-300 bg-zinc-50 p-3 transition hover:bg-zinc-100 dark:border-amber-500 dark:bg-zinc-800/40 dark:hover:bg-zinc-800"
+                >
+                  <div className="flex items-center justify-between gap-2 text-sm">
+                    <span className={a.status === 'done' ? 'text-zinc-400 line-through dark:text-zinc-500' : 'text-zinc-900 dark:text-white'}>
+                      {a.title}
+                    </span>
+                    {a.status === 'done' && <span className="shrink-0 text-xs text-green-600 dark:text-green-400">Done</span>}
+                  </div>
+                  {a.assigneeName && <p className="text-xs text-zinc-500 dark:text-zinc-400">For {a.assigneeName}</p>}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Register items on the selected day (RFIs, snags due, transmittals) */}
+        {selectedMarkers.length > 0 && (
+          <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+            <h3 className="mb-3 text-sm font-medium text-zinc-900 dark:text-white">
+              Registers on {selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </h3>
+            <div className="space-y-2">
+              {selectedMarkers.map((m) => {
+                const overdueMarker = m.isDeadline && selectedDate < today;
+                return (
+                  <Link
+                    key={m.id}
+                    href={m.href}
+                    className={`block rounded border-l-4 p-3 transition ${
+                      overdueMarker
+                        ? 'border-red-300 bg-red-50 hover:bg-red-100 dark:border-red-500 dark:bg-red-900/20 dark:hover:bg-red-900/30'
+                        : m.isDeadline
+                          ? 'border-rose-300 bg-zinc-50 hover:bg-zinc-100 dark:border-rose-500 dark:bg-zinc-800/40 dark:hover:bg-zinc-800'
+                          : 'border-sky-300 bg-zinc-50 hover:bg-zinc-100 dark:border-sky-500 dark:bg-zinc-800/40 dark:hover:bg-zinc-800'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2 text-sm">
+                      <span className="text-zinc-900 dark:text-white">{m.title}</span>
+                      {overdueMarker && (
+                        <span className="shrink-0 rounded bg-red-200 px-2 py-0.5 text-xs text-red-900 dark:bg-red-500">Overdue</span>
+                      )}
+                    </div>
+                    {m.subtitle && <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">{m.subtitle}</p>}
                   </Link>
                 );
               })}
@@ -273,6 +495,122 @@ export function ProjectCalendar({ tasks, projectId }: { tasks: CalendarTask[]; p
               {overdue.length > 5 && (
                 <p className="text-center text-xs text-zinc-500 dark:text-zinc-400">+{overdue.length - 5} more</p>
               )}
+            </div>
+          </div>
+        )}
+
+        {(upcomingTodos.length > 0 || overdueTodos.length > 0) && (
+          <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-zinc-900 dark:text-white">
+              <Clock size={16} /> To-dos
+            </h3>
+            <div className="space-y-2">
+              {overdueTodos.map(({ item, due }) => (
+                <Link
+                  key={item.id}
+                  href={`/projects/${projectId}/chat`}
+                  className="block rounded-lg bg-red-50 p-3 transition hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30"
+                >
+                  <div className="flex justify-between gap-2 text-sm text-zinc-900 dark:text-white">
+                    <span>{item.title}</span>
+                    <span className="shrink-0 rounded bg-red-200 px-2 py-0.5 text-xs text-red-900 dark:bg-red-500">Overdue</span>
+                  </div>
+                  <p className="text-xs text-red-600 dark:text-red-300">
+                    Due {formatDayMonth(due)}
+                    {item.assigneeName ? ` · ${item.assigneeName}` : ''}
+                  </p>
+                </Link>
+              ))}
+              {upcomingTodos.map(({ item, due }) => (
+                <Link
+                  key={item.id}
+                  href={`/projects/${projectId}/chat`}
+                  className="block rounded-lg bg-zinc-50 p-3 transition hover:bg-zinc-100 dark:bg-zinc-800/40 dark:hover:bg-zinc-800"
+                >
+                  <div className="flex items-start justify-between gap-2 text-sm">
+                    <span className="text-zinc-900 dark:text-white">{item.title}</span>
+                    <span className="shrink-0 rounded bg-amber-50 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
+                      To-do
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                    Due {formatDayMonth(due)}
+                    {item.assigneeName ? ` · ${item.assigneeName}` : ''}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {upcomingEvents.length > 0 && (
+          <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-zinc-900 dark:text-white">
+              <CalendarIcon size={16} /> Upcoming events
+            </h3>
+            <div className="space-y-2">
+              {upcomingEvents.map(({ ev }) => (
+                <Link
+                  key={ev.id}
+                  href={`/projects/${projectId}/chat`}
+                  className="block rounded-lg bg-zinc-50 p-3 transition hover:bg-zinc-100 dark:bg-zinc-800/40 dark:hover:bg-zinc-800"
+                >
+                  <div className="flex items-start justify-between gap-2 text-sm">
+                    <span className="text-zinc-900 dark:text-white">{ev.title}</span>
+                    <span className="shrink-0 rounded bg-violet-50 px-2 py-0.5 text-xs text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
+                      {EVENT_KIND_LABEL[ev.kind]}
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                    {formatDayMonth(startOfDay(new Date(ev.startsAt)))} · {eventTime(ev.startsAt)}
+                    {ev.location ? ` · ${ev.location}` : ''}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(upcomingDeadlineMarkers.length > 0 || overdueDeadlineMarkers.length > 0) && (
+          <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-zinc-900 dark:text-white">
+              <Clock size={16} /> RFI &amp; snag deadlines
+            </h3>
+            <div className="space-y-2">
+              {overdueDeadlineMarkers.map(({ m, day }) => (
+                <Link
+                  key={m.id}
+                  href={m.href}
+                  className="block rounded-lg bg-red-50 p-3 transition hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30"
+                >
+                  <div className="flex justify-between gap-2 text-sm text-zinc-900 dark:text-white">
+                    <span>{m.title}</span>
+                    <span className="shrink-0 rounded bg-red-200 px-2 py-0.5 text-xs text-red-900 dark:bg-red-500">Overdue</span>
+                  </div>
+                  <p className="truncate text-xs text-red-600 dark:text-red-300">
+                    Due {formatDayMonth(day)}
+                    {m.subtitle ? ` · ${m.subtitle}` : ''}
+                  </p>
+                </Link>
+              ))}
+              {upcomingDeadlineMarkers.map(({ m, day }) => (
+                <Link
+                  key={m.id}
+                  href={m.href}
+                  className="block rounded-lg bg-zinc-50 p-3 transition hover:bg-zinc-100 dark:bg-zinc-800/40 dark:hover:bg-zinc-800"
+                >
+                  <div className="flex items-start justify-between gap-2 text-sm">
+                    <span className="text-zinc-900 dark:text-white">{m.title}</span>
+                    <span className="shrink-0 rounded bg-rose-50 px-2 py-0.5 text-xs text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">
+                      {m.kind === 'rfi_due' ? 'RFI' : 'Snag'}
+                    </span>
+                  </div>
+                  <p className="truncate text-xs text-zinc-600 dark:text-zinc-400">
+                    Due {formatDayMonth(day)}
+                    {m.subtitle ? ` · ${m.subtitle}` : ''}
+                  </p>
+                </Link>
+              ))}
             </div>
           </div>
         )}

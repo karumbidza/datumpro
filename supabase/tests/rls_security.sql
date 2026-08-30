@@ -1350,6 +1350,406 @@ exception when insufficient_privilege then
   raise notice 'PASS: advance: delete blocked';
 end $$;
 
+-- ── Action items: lightweight chat to-dos, scoped to project members ─────────
+--    (20260826000028) a2 is a member of project A; b1 is in org B (a non-member).
+reset role;
+reset request.jwt.claims;
+
+-- A project member raises a to-do (RLS insert: created_by = self + member of scope).
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+insert into public.action_items (id, org_id, project_id, title, assignee_id, created_by, due_date) values
+  ('a9000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000','Send the revised BOQ',
+   'a0000000-0000-0000-0000-0000000000a2','a0000000-0000-0000-0000-0000000000a2', current_date + 3);
+select pg_temp.ok(
+  (select count(*) from public.action_items where id = 'a9000000-0000-0000-0000-000000000001') = 1,
+  'action-items: a project member can raise and see a to-do');
+reset role;
+reset request.jwt.claims;
+
+-- A user from another org cannot see the project's to-dos.
+set role authenticated;
+set request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-0000000000b1","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.action_items where id = 'a9000000-0000-0000-0000-000000000001') = 0,
+  'action-items: a non-member cannot see the project''s to-dos');
+reset role;
+reset request.jwt.claims;
+
+-- The assignee marks it done.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+update public.action_items set status = 'done', done_at = now(), done_by = 'a0000000-0000-0000-0000-0000000000a2'
+  where id = 'a9000000-0000-0000-0000-000000000001';
+select pg_temp.ok(
+  (select status from public.action_items where id = 'a9000000-0000-0000-0000-000000000001') = 'done',
+  'action-items: the assignee can mark a to-do done');
+reset role;
+reset request.jwt.claims;
+
+-- ── Project events: meetings/site visits scoped to project members ───────────
+--    (20260826000029) a2 is a member of project A; b1 is in org B (a non-member).
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+insert into public.project_events (id, org_id, project_id, title, kind, starts_at, created_by) values
+  ('aa000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000','Site meeting','site_visit', now() + interval '2 days',
+   'a0000000-0000-0000-0000-0000000000a2');
+select pg_temp.ok(
+  (select count(*) from public.project_events where id = 'aa000000-0000-0000-0000-000000000001') = 1,
+  'events: a project member can schedule and see an event');
+-- Add an attendee (added_by self), then save the minutes.
+insert into public.event_attendees (event_id, org_id, project_id, user_id, added_by) values
+  ('aa000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000a2','a0000000-0000-0000-0000-0000000000a2');
+update public.project_events set notes = 'Discussed the phase 2 BOQ' where id = 'aa000000-0000-0000-0000-000000000001';
+select pg_temp.ok(
+  (select notes from public.project_events where id = 'aa000000-0000-0000-0000-000000000001') = 'Discussed the phase 2 BOQ',
+  'events: the organiser can save meeting notes');
+reset role;
+reset request.jwt.claims;
+
+-- A user from another org cannot see the project's events.
+set role authenticated;
+set request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-0000000000b1","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.project_events where id = 'aa000000-0000-0000-0000-000000000001') = 0,
+  'events: a non-member cannot see the project''s events');
+reset role;
+reset request.jwt.claims;
+
+-- ── Chat About Topic: only managers (org staff / project PM) may edit ────────
+--    (20260826000030) conversations_write gates topic/description/note. Project A's
+--    chat conversation is auto-created by the create_project_chat trigger.
+reset role;
+reset request.jwt.claims;
+-- A contractor (a2) cannot change the topic — the RLS update matches no rows.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+update public.conversations set topic = 'hijack'
+  where project_id = 'a2220000-0000-0000-0000-000000000000' and type = 'project';
+reset role;
+reset request.jwt.claims;
+select pg_temp.ok(
+  coalesce((select topic from public.conversations
+     where project_id = 'a2220000-0000-0000-0000-000000000000' and type = 'project'), '') <> 'hijack',
+  'about: a contractor cannot edit the chat topic');
+
+-- The owner (a1, org staff) can.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+update public.conversations set topic = 'Phase 2 coordination'
+  where project_id = 'a2220000-0000-0000-0000-000000000000' and type = 'project';
+reset role;
+reset request.jwt.claims;
+select pg_temp.ok(
+  (select topic from public.conversations
+     where project_id = 'a2220000-0000-0000-0000-000000000000' and type = 'project') = 'Phase 2 coordination',
+  'about: a manager can edit the chat topic');
+
+-- ── Pinned messages: a member can pin & see; a non-member cannot ─────────────
+--    (20260826000031) message_pins mirror reactions — scope is denormalized from
+--    the parent message and RLS double-gates via can_access_chat.
+reset role;
+reset request.jwt.claims;
+-- Contractor a2 (a project A member) posts a message in the project chat, then pins it.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+insert into public.messages (id, conversation_id, sender_id, body)
+select 'ab000000-0000-0000-0000-000000000001', c.id, 'a0000000-0000-0000-0000-0000000000a2', 'Key decision'
+  from public.conversations c
+  where c.project_id = 'a2220000-0000-0000-0000-000000000000' and c.type = 'project';
+insert into public.message_pins (message_id, pinned_by) values
+  ('ab000000-0000-0000-0000-000000000001','a0000000-0000-0000-0000-0000000000a2');
+select pg_temp.ok(
+  (select count(*) from public.message_pins where message_id = 'ab000000-0000-0000-0000-000000000001') = 1,
+  'pins: a member can pin a message and see it');
+reset role;
+reset request.jwt.claims;
+
+-- A user from another org cannot see the pin.
+set role authenticated;
+set request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-0000000000b1","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.message_pins where message_id = 'ab000000-0000-0000-0000-000000000001') = 0,
+  'pins: a non-member cannot see the pin');
+reset role;
+reset request.jwt.claims;
+
+-- ── Site diary: a member can log & see; a non-member cannot ──────────────────
+--    (20260826000032) site_diary_entries mirror project_events — members/staff
+--    read; the author or a manager writes. A photo row denormalizes scope from
+--    the entry's org.
+reset role;
+reset request.jwt.claims;
+-- Contractor a2 (a project A member) logs today's diary and attaches a photo row.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+insert into public.site_diary_entries (id, org_id, project_id, entry_date, weather, labour_count, notes, created_by) values
+  ('ad000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000', current_date, 'Overcast', 12, 'Poured slab grid C4-C7',
+   'a0000000-0000-0000-0000-0000000000a2');
+select pg_temp.ok(
+  (select count(*) from public.site_diary_entries where id = 'ad000000-0000-0000-0000-000000000001') = 1,
+  'diary: a project member can log an entry and see it');
+insert into public.site_diary_photos (entry_id, org_id, project_id, storage_path, uploaded_by) values
+  ('ad000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000',
+   'a1110000-0000-0000-0000-000000000000/a2220000-0000-0000-0000-000000000000/diary/ad000000-0000-0000-0000-000000000001/x.jpg',
+   'a0000000-0000-0000-0000-0000000000a2');
+select pg_temp.ok(
+  (select count(*) from public.site_diary_photos where entry_id = 'ad000000-0000-0000-0000-000000000001') = 1,
+  'diary: the author can attach a photo to their entry');
+reset role;
+reset request.jwt.claims;
+
+-- A user from another org cannot see the diary entry.
+set role authenticated;
+set request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-0000000000b1","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.site_diary_entries where id = 'ad000000-0000-0000-0000-000000000001') = 0,
+  'diary: a non-member cannot see the entry');
+reset role;
+reset request.jwt.claims;
+
+-- ── Snagging: a member can raise & see; the assignee acts; a non-member cannot ─
+--    (20260826000033) snags mirror site_diary — members/staff read; the raiser,
+--    the assignee, or a manager write. The per-project number is set by trigger.
+reset role;
+reset request.jwt.claims;
+-- Contractor a2 (a project A member) raises a snag assigned to themselves.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+insert into public.snags (id, org_id, project_id, title, severity, assignee_id, raised_by) values
+  ('ae000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000', 'Grout cracking to tiling', 'major',
+   'a0000000-0000-0000-0000-0000000000a2','a0000000-0000-0000-0000-0000000000a2');
+select pg_temp.ok(
+  (select count(*) from public.snags where id = 'ae000000-0000-0000-0000-000000000001') = 1,
+  'snags: a project member can raise a snag and see it');
+select pg_temp.ok(
+  (select number from public.snags where id = 'ae000000-0000-0000-0000-000000000001') = 1,
+  'snags: the per-project number trigger assigns #1');
+-- The assignee marks it fixed (RLS update permits the assignee).
+update public.snags set status = 'fixed', fixed_at = now()
+  where id = 'ae000000-0000-0000-0000-000000000001';
+select pg_temp.ok(
+  (select status from public.snags where id = 'ae000000-0000-0000-0000-000000000001') = 'fixed',
+  'snags: the assignee can mark a snag fixed');
+insert into public.snag_photos (snag_id, org_id, project_id, storage_path, uploaded_by) values
+  ('ae000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000',
+   'a1110000-0000-0000-0000-000000000000/a2220000-0000-0000-0000-000000000000/snags/ae000000-0000-0000-0000-000000000001/x.jpg',
+   'a0000000-0000-0000-0000-0000000000a2');
+select pg_temp.ok(
+  (select count(*) from public.snag_photos where snag_id = 'ae000000-0000-0000-0000-000000000001') = 1,
+  'snags: a member can attach a photo to a snag');
+reset role;
+reset request.jwt.claims;
+
+-- Org-B outsider b1 cannot see the snag.
+set role authenticated;
+set request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-0000000000b1","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.snags where id = 'ae000000-0000-0000-0000-000000000001') = 0,
+  'snags: a non-member cannot see the snag');
+reset role;
+reset request.jwt.claims;
+
+-- ── Drawings register: managers write; members read; outsiders can't ─────────
+--    (20260826000035) drawings + drawing_revisions — the controlled register.
+reset role;
+reset request.jwt.claims;
+-- Owner a1 (org staff) adds a drawing and issues Rev A.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+insert into public.drawings (id, org_id, project_id, number, title, discipline, created_by) values
+  ('af000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000', 'S-101', 'Foundation plan', 'structural',
+   'a0000000-0000-0000-0000-0000000000a1');
+insert into public.drawing_revisions (id, drawing_id, org_id, project_id, revision, status, storage_path, uploaded_by) values
+  ('af000000-0000-0000-0000-0000000000a1','af000000-0000-0000-0000-000000000001',
+   'a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','A','for_construction',
+   'a1110000-0000-0000-0000-000000000000/a2220000-0000-0000-0000-000000000000/drawings/af000000-0000-0000-0000-000000000001/revA.pdf',
+   'a0000000-0000-0000-0000-0000000000a1');
+select pg_temp.ok(
+  (select count(*) from public.drawings where id = 'af000000-0000-0000-0000-000000000001') = 1,
+  'drawings: a manager can add a drawing and see it');
+reset role;
+reset request.jwt.claims;
+
+-- Contractor a2 (a project A member) can view the register and download.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.drawing_revisions where drawing_id = 'af000000-0000-0000-0000-000000000001') = 1,
+  'drawings: a project member can view a drawing revision');
+reset role;
+reset request.jwt.claims;
+
+-- Org-B outsider b1 cannot see the drawing.
+set role authenticated;
+set request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-0000000000b1","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.drawings where id = 'af000000-0000-0000-0000-000000000001') = 0,
+  'drawings: a non-member cannot see the drawing');
+reset role;
+reset request.jwt.claims;
+
+-- ── RFIs: a member raises & sees; the responder answers; outsiders can't ─────
+--    (20260826000036) rfis mirror snags — members/staff read; raiser, responder
+--    or a manager write. The per-project number is set by trigger.
+reset role;
+reset request.jwt.claims;
+-- Contractor a2 (a project A member) raises an RFI, assigned to themselves.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+insert into public.rfis (id, org_id, project_id, subject, discipline, priority, assignee_id, raised_by) values
+  ('bf000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000', 'Grid C beam depth vs. M&E duct', 'structural', 'high',
+   'a0000000-0000-0000-0000-0000000000a2','a0000000-0000-0000-0000-0000000000a2');
+select pg_temp.ok(
+  (select count(*) from public.rfis where id = 'bf000000-0000-0000-0000-000000000001') = 1,
+  'rfis: a project member can raise an RFI and see it');
+select pg_temp.ok(
+  (select number from public.rfis where id = 'bf000000-0000-0000-0000-000000000001') = 1,
+  'rfis: the per-project number trigger assigns #1');
+-- The responder answers it (RLS update permits the assignee).
+update public.rfis set answer = 'Coordinate the duct below the beam soffit.', answered_at = now(),
+       answered_by = 'a0000000-0000-0000-0000-0000000000a2', status = 'answered'
+  where id = 'bf000000-0000-0000-0000-000000000001';
+select pg_temp.ok(
+  (select status from public.rfis where id = 'bf000000-0000-0000-0000-000000000001') = 'answered',
+  'rfis: the responder can record an answer');
+reset role;
+reset request.jwt.claims;
+
+-- Org-B outsider b1 cannot see the RFI.
+set role authenticated;
+set request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-0000000000b1","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.rfis where id = 'bf000000-0000-0000-0000-000000000001') = 0,
+  'rfis: a non-member cannot see the RFI');
+reset role;
+reset request.jwt.claims;
+
+-- ── Variations: a member raises (submitted); a manager decides; outsiders can't ─
+--    (20260826000037) variation_orders gains a per-project number trigger. RLS is
+--    the existing can_view_project (read) / can_manage_project (approve) gate.
+reset role;
+reset request.jwt.claims;
+-- Contractor a2 (a project A member) raises a submitted variation.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+insert into public.variation_orders (id, org_id, project_id, description, cost_impact_cents, time_impact_days, status, created_by) values
+  ('c9000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000', 'Add waterproofing to the basement retaining wall', 1240000, 5, 'submitted',
+   'a0000000-0000-0000-0000-0000000000a2');
+select pg_temp.ok(
+  (select count(*) from public.variation_orders where id = 'c9000000-0000-0000-0000-000000000001') = 1,
+  'variations: a project member can raise a submitted variation and see it');
+select pg_temp.ok(
+  (select number from public.variation_orders where id = 'c9000000-0000-0000-0000-000000000001') = 1,
+  'variations: the per-project number trigger assigns #1');
+reset role;
+reset request.jwt.claims;
+
+-- The owner a1 (a manager) approves it.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+update public.variation_orders
+   set status = 'approved', approved_by = 'a0000000-0000-0000-0000-0000000000a1', approved_at = now(), decided_at = now()
+ where id = 'c9000000-0000-0000-0000-000000000001';
+reset role;
+reset request.jwt.claims;
+select pg_temp.ok(
+  (select status from public.variation_orders where id = 'c9000000-0000-0000-0000-000000000001') = 'approved',
+  'variations: a manager can approve a variation');
+
+-- Org-B outsider b1 cannot see it.
+set role authenticated;
+set request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-0000000000b1","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.variation_orders where id = 'c9000000-0000-0000-0000-000000000001') = 0,
+  'variations: a non-member cannot see the variation');
+reset role;
+reset request.jwt.claims;
+
+-- ── Transmittals: managers issue; members read; outsiders can't ──────────────
+--    (20260826000038) transmittals + transmittal_items — the controlled register.
+reset role;
+reset request.jwt.claims;
+-- Owner a1 (a manager) issues a transmittal with one item.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+insert into public.transmittals (id, org_id, project_id, recipient, purpose, method, issued_by) values
+  ('ca000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000', 'Quill Contractors', 'for_construction', 'email',
+   'a0000000-0000-0000-0000-0000000000a1');
+insert into public.transmittal_items (id, transmittal_id, org_id, project_id, drawing_number, revision, title) values
+  ('ca000000-0000-0000-0000-0000000000a1','ca000000-0000-0000-0000-000000000001',
+   'a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','S-101','A','Foundation plan');
+select pg_temp.ok(
+  (select count(*) from public.transmittals where id = 'ca000000-0000-0000-0000-000000000001') = 1,
+  'transmittals: a manager can issue a transmittal and see it');
+select pg_temp.ok(
+  (select number from public.transmittals where id = 'ca000000-0000-0000-0000-000000000001') = 1,
+  'transmittals: the per-project number trigger assigns #1');
+select pg_temp.ok(
+  (select count(*) from public.transmittal_items where transmittal_id = 'ca000000-0000-0000-0000-000000000001') = 1,
+  'transmittals: an item is recorded against the transmittal');
+reset role;
+reset request.jwt.claims;
+
+-- Contractor a2 (a project A member) can view the register.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.transmittals where id = 'ca000000-0000-0000-0000-000000000001') = 1,
+  'transmittals: a project member can view a transmittal');
+reset role;
+reset request.jwt.claims;
+
+-- Org-B outsider b1 cannot see it.
+set role authenticated;
+set request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-0000000000b1","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.transmittals where id = 'ca000000-0000-0000-0000-000000000001') = 0,
+  'transmittals: a non-member cannot see the transmittal');
+reset role;
+reset request.jwt.claims;
+
+-- ── Weekly digest opt-in: self-service RPC flips only the caller's own flag ───
+--    (20260826000034) org_members is owner/admin-managed, so the toggle goes via
+--    set_weekly_digest_opt_in (SECURITY DEFINER, scoped to auth.uid()).
+reset role;
+reset request.jwt.claims;
+-- Default is on for everyone.
+select pg_temp.ok(
+  (select weekly_digest_opt_in from public.org_members
+     where org_id = 'a1110000-0000-0000-0000-000000000000'
+       and user_id = 'a0000000-0000-0000-0000-0000000000a2') = true,
+  'digest: opt-in defaults to true');
+
+-- Contractor a2 opts themselves out.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+select public.set_weekly_digest_opt_in('a1110000-0000-0000-0000-000000000000', false);
+reset role;
+reset request.jwt.claims;
+select pg_temp.ok(
+  (select weekly_digest_opt_in from public.org_members
+     where org_id = 'a1110000-0000-0000-0000-000000000000'
+       and user_id = 'a0000000-0000-0000-0000-0000000000a2') = false,
+  'digest: a member can opt themselves out');
+-- The owner a1's flag is untouched — the RPC only ever flips the caller's row.
+select pg_temp.ok(
+  (select weekly_digest_opt_in from public.org_members
+     where org_id = 'a1110000-0000-0000-0000-000000000000'
+       and user_id = 'a0000000-0000-0000-0000-0000000000a1') = true,
+  'digest: the toggle does not affect another member');
+
 -- ── Project member disable revokes project access ────────────────────────────
 -- A plain org member (not staff) added to a project as a contributor can see the
 -- project while active; disabling their membership (status='disabled') must drop
@@ -1429,6 +1829,97 @@ with ins as (
   returning is_variation)
 select pg_temp.ok((select is_variation from ins) = true,
   'boq-baseline: subtask added without ctx into an approved task is a variation');
+
+-- ── Register visibility & role hardening (20260826000039) ────────────────────
+-- Snags/RFIs/diary are internal: client/viewer see nothing; a contractor sees
+-- only snags they raised or are assigned; only PM/org-staff may verify a snag.
+reset role;
+reset request.jwt.claims;
+-- A client and a SECOND contractor on project a222 (a9 is the first contractor).
+insert into auth.users (id, email) values
+  ('a0000000-0000-0000-0000-0000000000e1','reg-client@test.dev'),
+  ('a0000000-0000-0000-0000-0000000000e2','reg-contractor2@test.dev');
+insert into public.org_members (org_id, user_id, role, member_type, status) values
+  ('a1110000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000e1','viewer','client','active'),
+  ('a1110000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000e2','member','contractor','active');
+insert into public.project_members (org_id, project_id, user_id, role, status) values
+  ('a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000e1','client','active'),
+  ('a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000e2','contributor','active');
+-- Two defects: one owned by contractor a9, one by contractor e2.
+insert into public.snags (id, org_id, project_id, number, title, raised_by, assignee_id) values
+  ('a6660000-0000-0000-0000-0000000000f1','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000',9001,'A9 defect',
+   'a0000000-0000-0000-0000-0000000000a9','a0000000-0000-0000-0000-0000000000a9'),
+  ('a6660000-0000-0000-0000-0000000000f2','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000',9002,'E2 defect',
+   'a0000000-0000-0000-0000-0000000000e2','a0000000-0000-0000-0000-0000000000e2');
+
+-- Scope assertions to the two defects seeded here (f1=a9's, f2=e2's) so they're
+-- robust against snags seeded by other sections on this shared project.
+
+-- Contractor a9 sees ONLY their own defect (f1), not e2's (f2).
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a9","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.snags
+     where id in ('a6660000-0000-0000-0000-0000000000f1','a6660000-0000-0000-0000-0000000000f2')) = 1,
+  'registers: a contractor sees only their own snags');
+select pg_temp.ok(
+  (select coalesce(bool_and(
+      raised_by = 'a0000000-0000-0000-0000-0000000000a9'::uuid
+      or assignee_id = 'a0000000-0000-0000-0000-0000000000a9'::uuid), true)
+     from public.snags
+     where id in ('a6660000-0000-0000-0000-0000000000f1','a6660000-0000-0000-0000-0000000000f2')),
+  'registers: every snag a contractor sees is their own');
+reset role;
+reset request.jwt.claims;
+
+-- Client sees NEITHER defect.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000e1","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.snags
+     where id in ('a6660000-0000-0000-0000-0000000000f1','a6660000-0000-0000-0000-0000000000f2')) = 0,
+  'registers: a client sees no snags');
+reset role;
+reset request.jwt.claims;
+
+-- Org staff (owner a1) sees BOTH defects.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.snags
+     where id in ('a6660000-0000-0000-0000-0000000000f1','a6660000-0000-0000-0000-0000000000f2')) = 2,
+  'registers: org staff sees all snags on the project');
+reset role;
+reset request.jwt.claims;
+
+-- The verify guard: contractor a9 CANNOT mark their own defect verified.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a9","role":"authenticated","aal":"aal1"}';
+do $$
+declare blocked boolean := false;
+begin
+  begin
+    update public.snags set status = 'verified'
+      where id = 'a6660000-0000-0000-0000-0000000000f1';
+  exception when others then blocked := true;
+  end;
+  if not blocked then raise exception 'FAIL: a contractor was able to self-verify a snag'; end if;
+  raise notice 'PASS: registers: a contractor cannot verify a snag (guard fired)';
+end $$;
+reset role;
+reset request.jwt.claims;
+
+-- …but org staff CAN verify.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+update public.snags set status = 'verified' where id = 'a6660000-0000-0000-0000-0000000000f2';
+select pg_temp.ok(
+  (select status from public.snags where id = 'a6660000-0000-0000-0000-0000000000f2') = 'verified',
+  'registers: org staff can verify a snag');
+reset role;
+reset request.jwt.claims;
 
 rollback;
 
