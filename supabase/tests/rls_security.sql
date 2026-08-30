@@ -1634,6 +1634,48 @@ select pg_temp.ok(
 reset role;
 reset request.jwt.claims;
 
+-- ── Variations: a member raises (submitted); a manager decides; outsiders can't ─
+--    (20260826000037) variation_orders gains a per-project number trigger. RLS is
+--    the existing can_view_project (read) / can_manage_project (approve) gate.
+reset role;
+reset request.jwt.claims;
+-- Contractor a2 (a project A member) raises a submitted variation.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+insert into public.variation_orders (id, org_id, project_id, description, cost_impact_cents, time_impact_days, status, created_by) values
+  ('c9000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000', 'Add waterproofing to the basement retaining wall', 1240000, 5, 'submitted',
+   'a0000000-0000-0000-0000-0000000000a2');
+select pg_temp.ok(
+  (select count(*) from public.variation_orders where id = 'c9000000-0000-0000-0000-000000000001') = 1,
+  'variations: a project member can raise a submitted variation and see it');
+select pg_temp.ok(
+  (select number from public.variation_orders where id = 'c9000000-0000-0000-0000-000000000001') = 1,
+  'variations: the per-project number trigger assigns #1');
+reset role;
+reset request.jwt.claims;
+
+-- The owner a1 (a manager) approves it.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+update public.variation_orders
+   set status = 'approved', approved_by = 'a0000000-0000-0000-0000-0000000000a1', approved_at = now(), decided_at = now()
+ where id = 'c9000000-0000-0000-0000-000000000001';
+reset role;
+reset request.jwt.claims;
+select pg_temp.ok(
+  (select status from public.variation_orders where id = 'c9000000-0000-0000-0000-000000000001') = 'approved',
+  'variations: a manager can approve a variation');
+
+-- Org-B outsider b1 cannot see it.
+set role authenticated;
+set request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-0000000000b1","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.variation_orders where id = 'c9000000-0000-0000-0000-000000000001') = 0,
+  'variations: a non-member cannot see the variation');
+reset role;
+reset request.jwt.claims;
+
 -- ── Weekly digest opt-in: self-service RPC flips only the caller's own flag ───
 --    (20260826000034) org_members is owner/admin-managed, so the toggle goes via
 --    set_weekly_digest_opt_in (SECURITY DEFINER, scoped to auth.uid()).

@@ -306,6 +306,14 @@ export const HelpCircle: IconComponent = (p) => (
   </Icon>
 );
 
+export const FileEdit: IconComponent = (p) => (
+  <Icon {...p}>
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h5" />
+    <path d="M14 2v5h5" />
+    <path d="M18.4 12.6a1.4 1.4 0 0 1 2 2L16 19l-3 1 1-3 4.4-4.4Z" />
+  </Icon>
+);
+
 export const Menu: IconComponent = (p) => (
   <Icon {...p}>
     <path d="M4 6h16" />
