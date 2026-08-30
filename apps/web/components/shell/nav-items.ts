@@ -5,6 +5,7 @@ import {
   Building,
   Calendar,
   CheckSquare,
+  ClipboardList,
   DollarSign,
   Wallet,
   MessageSquare,
@@ -49,6 +50,7 @@ export function computeNav(
       { name: 'Overview', href: `/projects/${id}`, icon: LayoutDashboard },
       { name: 'Tasks', href: `/projects/${id}/tasks`, icon: CheckSquare },
       { name: 'Calendar', href: `/projects/${id}/calendar`, icon: Calendar },
+      { name: 'Site Diary', href: `/projects/${id}/diary`, icon: ClipboardList },
     ];
     if (manages) {
       items.push({ name: 'Finance', href: `/projects/${id}/finance`, icon: DollarSign });
