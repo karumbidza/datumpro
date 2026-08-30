@@ -314,6 +314,13 @@ export const FileEdit: IconComponent = (p) => (
   </Icon>
 );
 
+export const Send: IconComponent = (p) => (
+  <Icon {...p}>
+    <path d="M22 2 11 13" />
+    <path d="M22 2 15 22l-4-9-9-4 20-7Z" />
+  </Icon>
+);
+
 export const Menu: IconComponent = (p) => (
   <Icon {...p}>
     <path d="M4 6h16" />

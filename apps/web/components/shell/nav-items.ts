@@ -11,6 +11,7 @@ import {
   Layers,
   HelpCircle,
   FileEdit,
+  Send,
   DollarSign,
   Wallet,
   MessageSquare,
@@ -61,6 +62,7 @@ export function computeNav(
       { name: 'Drawings', href: `/projects/${id}/drawings`, icon: Layers },
       { name: 'RFIs', href: `/projects/${id}/rfis`, icon: HelpCircle },
       { name: 'Variations', href: `/projects/${id}/variations`, icon: FileEdit },
+      { name: 'Transmittals', href: `/projects/${id}/transmittals`, icon: Send },
     ];
     if (manages) {
       items.push({ name: 'Finance', href: `/projects/${id}/finance`, icon: DollarSign });

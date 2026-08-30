@@ -1676,6 +1676,50 @@ select pg_temp.ok(
 reset role;
 reset request.jwt.claims;
 
+-- ── Transmittals: managers issue; members read; outsiders can't ──────────────
+--    (20260826000038) transmittals + transmittal_items — the controlled register.
+reset role;
+reset request.jwt.claims;
+-- Owner a1 (a manager) issues a transmittal with one item.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+insert into public.transmittals (id, org_id, project_id, recipient, purpose, method, issued_by) values
+  ('ca000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000', 'Quill Contractors', 'for_construction', 'email',
+   'a0000000-0000-0000-0000-0000000000a1');
+insert into public.transmittal_items (id, transmittal_id, org_id, project_id, drawing_number, revision, title) values
+  ('ca000000-0000-0000-0000-0000000000a1','ca000000-0000-0000-0000-000000000001',
+   'a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','S-101','A','Foundation plan');
+select pg_temp.ok(
+  (select count(*) from public.transmittals where id = 'ca000000-0000-0000-0000-000000000001') = 1,
+  'transmittals: a manager can issue a transmittal and see it');
+select pg_temp.ok(
+  (select number from public.transmittals where id = 'ca000000-0000-0000-0000-000000000001') = 1,
+  'transmittals: the per-project number trigger assigns #1');
+select pg_temp.ok(
+  (select count(*) from public.transmittal_items where transmittal_id = 'ca000000-0000-0000-0000-000000000001') = 1,
+  'transmittals: an item is recorded against the transmittal');
+reset role;
+reset request.jwt.claims;
+
+-- Contractor a2 (a project A member) can view the register.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.transmittals where id = 'ca000000-0000-0000-0000-000000000001') = 1,
+  'transmittals: a project member can view a transmittal');
+reset role;
+reset request.jwt.claims;
+
+-- Org-B outsider b1 cannot see it.
+set role authenticated;
+set request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-0000000000b1","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.transmittals where id = 'ca000000-0000-0000-0000-000000000001') = 0,
+  'transmittals: a non-member cannot see the transmittal');
+reset role;
+reset request.jwt.claims;
+
 -- ── Weekly digest opt-in: self-service RPC flips only the caller's own flag ───
 --    (20260826000034) org_members is owner/admin-managed, so the toggle goes via
 --    set_weekly_digest_opt_in (SECURITY DEFINER, scoped to auth.uid()).
