@@ -325,3 +325,99 @@ async function resolveNames(ids: string[]): Promise<Map<string, string>> {
     ]),
   );
 }
+
+/** One shared file in a conversation, for the right-rail Files/Media view. */
+export interface ConversationFile {
+  id: string;
+  kind: AttachmentKind;
+  url: string | null;
+  mime: string | null;
+  filename: string | null;
+  sizeBytes: number | null;
+  createdAt: string;
+  senderName: string | null;
+}
+
+/** Every attachment shared in a conversation (newest first), signed for viewing.
+ *  Attachments on deleted messages are excluded. RLS scopes to chat members. */
+export async function listConversationAttachments(conversationId: string): Promise<ConversationFile[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('message_attachments')
+    .select('id, kind, storage_path, mime, filename, size_bytes, created_at, messages(sender_id, deleted_at)')
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: false });
+
+  type Row = {
+    id: string;
+    kind: string;
+    storage_path: string;
+    mime: string | null;
+    filename: string | null;
+    size_bytes: number | null;
+    created_at: string;
+    messages: { sender_id: string; deleted_at: string | null } | { sender_id: string; deleted_at: string | null }[] | null;
+  };
+  const msg = (m: Row['messages']) => (Array.isArray(m) ? m[0] : m) ?? null;
+  const rows = ((data ?? []) as Row[]).filter((r) => {
+    const m = msg(r.messages);
+    return m && !m.deleted_at;
+  });
+  if (rows.length === 0) return [];
+
+  const paths = [...new Set(rows.map((r) => r.storage_path))];
+  const { data: signed } = await supabase.storage.from('chat-media').createSignedUrls(paths, 60 * 60);
+  const urlByPath = new Map<string, string>();
+  for (const s of (signed ?? []) as { path: string | null; signedUrl: string | null }[]) {
+    if (s.path && s.signedUrl) urlByPath.set(s.path, s.signedUrl);
+  }
+  const names = await resolveNames([...new Set(rows.map((r) => msg(r.messages)!.sender_id))]);
+
+  return rows.map((r) => ({
+    id: r.id,
+    kind: (['image', 'video', 'audio', 'document'].includes(r.kind) ? r.kind : 'document') as AttachmentKind,
+    url: urlByPath.get(r.storage_path) ?? null,
+    mime: r.mime,
+    filename: r.filename,
+    sizeBytes: r.size_bytes,
+    createdAt: r.created_at,
+    senderName: names.get(msg(r.messages)!.sender_id) ?? null,
+  }));
+}
+
+/** The "About Topic" of a conversation for the right-rail. */
+export interface ChatAbout {
+  title: string | null;
+  topic: string | null;
+  description: string | null;
+  note: string | null;
+  createdByName: string | null;
+  createdAt: string | null;
+}
+
+export async function getConversationAbout(conversationId: string): Promise<ChatAbout> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('conversations')
+    .select('title, topic, description, note, created_by, created_at')
+    .eq('id', conversationId)
+    .maybeSingle();
+  const c = data as {
+    title: string | null;
+    topic: string | null;
+    description: string | null;
+    note: string | null;
+    created_by: string | null;
+    created_at: string | null;
+  } | null;
+  if (!c) return { title: null, topic: null, description: null, note: null, createdByName: null, createdAt: null };
+  const names = c.created_by ? await resolveNames([c.created_by]) : new Map<string, string>();
+  return {
+    title: c.title,
+    topic: c.topic,
+    description: c.description,
+    note: c.note,
+    createdByName: c.created_by ? (names.get(c.created_by) ?? null) : null,
+    createdAt: c.created_at,
+  };
+}

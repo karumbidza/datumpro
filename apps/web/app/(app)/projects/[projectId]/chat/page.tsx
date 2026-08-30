@@ -5,7 +5,13 @@ import { getProject } from '@/lib/data/projects';
 import { myProjectRole } from '@/lib/data/members';
 import { listChatRoster } from '@/lib/data/chat-roster';
 import { myOrgRole } from '@/lib/data/tasks';
-import { getProjectConversationId, listMessages, othersMaxReadSeq } from '@/lib/data/chat';
+import {
+  getProjectConversationId,
+  listMessages,
+  othersMaxReadSeq,
+  listConversationAttachments,
+  getConversationAbout,
+} from '@/lib/data/chat';
 import { listProjectActionItems } from '@/lib/data/action-items';
 import { listProjectEvents } from '@/lib/data/events';
 import { ChatPanel } from '@/components/chat/chat-panel';
@@ -44,15 +50,18 @@ export default async function ProjectChatPage({
         </div>
       ) : (
         await (async () => {
-          const [messages, roster, orgRole, projectRole, othersRead, actionItems, events] = await Promise.all([
-            listMessages(conversationId, user.id),
-            listChatRoster(projectId),
-            myOrgRole(project.org_id),
-            myProjectRole(projectId),
-            othersMaxReadSeq(conversationId, user.id),
-            listProjectActionItems(projectId),
-            listProjectEvents(projectId),
-          ]);
+          const [messages, roster, orgRole, projectRole, othersRead, actionItems, events, sharedFiles, about] =
+            await Promise.all([
+              listMessages(conversationId, user.id),
+              listChatRoster(projectId),
+              myOrgRole(project.org_id),
+              myProjectRole(projectId),
+              othersMaxReadSeq(conversationId, user.id),
+              listProjectActionItems(projectId),
+              listProjectEvents(projectId),
+              listConversationAttachments(conversationId),
+              getConversationAbout(conversationId),
+            ]);
           const names = Object.fromEntries(roster.map((m) => [m.userId, m.name]));
           const meName = names[user.id] ?? user.email?.split('@')[0] ?? 'You';
           const canModerate = orgRole === 'owner' || orgRole === 'admin' || projectRole === 'pm';
@@ -89,6 +98,8 @@ export default async function ProjectChatPage({
                 canPost
                 canModerate={canModerate}
                 members={roster}
+                sharedFiles={sharedFiles}
+                about={about}
               />
             </>
           );
