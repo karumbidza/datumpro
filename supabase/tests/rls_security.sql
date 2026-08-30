@@ -1477,6 +1477,42 @@ select pg_temp.ok(
 reset role;
 reset request.jwt.claims;
 
+-- ── Site diary: a member can log & see; a non-member cannot ──────────────────
+--    (20260826000032) site_diary_entries mirror project_events — members/staff
+--    read; the author or a manager writes. A photo row denormalizes scope from
+--    the entry's org.
+reset role;
+reset request.jwt.claims;
+-- Contractor a2 (a project A member) logs today's diary and attaches a photo row.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+insert into public.site_diary_entries (id, org_id, project_id, entry_date, weather, labour_count, notes, created_by) values
+  ('ad000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000', current_date, 'Overcast', 12, 'Poured slab grid C4-C7',
+   'a0000000-0000-0000-0000-0000000000a2');
+select pg_temp.ok(
+  (select count(*) from public.site_diary_entries where id = 'ad000000-0000-0000-0000-000000000001') = 1,
+  'diary: a project member can log an entry and see it');
+insert into public.site_diary_photos (entry_id, org_id, project_id, storage_path, uploaded_by) values
+  ('ad000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000',
+   'a1110000-0000-0000-0000-000000000000/a2220000-0000-0000-0000-000000000000/diary/ad000000-0000-0000-0000-000000000001/x.jpg',
+   'a0000000-0000-0000-0000-0000000000a2');
+select pg_temp.ok(
+  (select count(*) from public.site_diary_photos where entry_id = 'ad000000-0000-0000-0000-000000000001') = 1,
+  'diary: the author can attach a photo to their entry');
+reset role;
+reset request.jwt.claims;
+
+-- A user from another org cannot see the diary entry.
+set role authenticated;
+set request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-0000000000b1","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.site_diary_entries where id = 'ad000000-0000-0000-0000-000000000001') = 0,
+  'diary: a non-member cannot see the entry');
+reset role;
+reset request.jwt.claims;
+
 -- ── Project member disable revokes project access ────────────────────────────
 -- A plain org member (not staff) added to a project as a contributor can see the
 -- project while active; disabling their membership (status='disabled') must drop
