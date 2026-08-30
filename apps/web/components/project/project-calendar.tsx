@@ -6,7 +6,7 @@ import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, Users, Gant
 import { parseDate, startOfDay, formatDayMonth } from '@/lib/date';
 import type { CalendarTask } from '@/lib/data/project-calendar';
 import type { CalendarActionItem } from '@/lib/data/action-items';
-import { EVENT_KIND_LABEL, type CalendarEvent } from '@/lib/data/events';
+import { EVENT_KIND_LABEL, type CalendarEvent } from '@/lib/data/events-types';
 import type { TaskPriority } from '@datumpro/shared/domain';
 
 /* Priority accents — the app-wide colour language (see ui/tones.ts): urgent red,

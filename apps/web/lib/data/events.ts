@@ -1,35 +1,9 @@
 import 'server-only';
 import { createClient } from '@/lib/supabase/server';
+import type { EventKind, ProjectEvent, CalendarEvent } from './events-types';
 
-export type EventKind = 'meeting' | 'site_visit' | 'inspection' | 'other';
-
-export interface EventAttendee {
-  userId: string;
-  name: string | null;
-}
-
-export interface ProjectEvent {
-  id: string;
-  projectId: string;
-  title: string;
-  detail: string | null;
-  kind: EventKind;
-  location: string | null;
-  startsAt: string; // ISO
-  endsAt: string | null;
-  notes: string | null;
-  status: 'scheduled' | 'cancelled';
-  createdBy: string | null;
-  createdByName: string | null;
-  attendees: EventAttendee[];
-}
-
-export const EVENT_KIND_LABEL: Record<EventKind, string> = {
-  meeting: 'Meeting',
-  site_visit: 'Site visit',
-  inspection: 'Inspection',
-  other: 'Event',
-};
+export type { EventKind, EventAttendee, ProjectEvent, CalendarEvent } from './events-types';
+export { EVENT_KIND_LABEL } from './events-types';
 
 type EventRow = {
   id: string;
@@ -107,15 +81,6 @@ export async function listProjectEvents(projectId: string): Promise<ProjectEvent
 }
 
 /** What the calendar needs — events with their local start (bucketed client-side). */
-export interface CalendarEvent {
-  id: string;
-  title: string;
-  kind: EventKind;
-  startsAt: string; // ISO
-  status: 'scheduled' | 'cancelled';
-  location: string | null;
-}
-
 export async function listCalendarEvents(projectId: string): Promise<CalendarEvent[]> {
   const supabase = await createClient();
   const { data } = await supabase

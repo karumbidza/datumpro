@@ -4,7 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { inputCompactClass as inputClass } from '@/components/ui/form';
-import { EVENT_KIND_LABEL, type ProjectEvent, type EventKind } from '@/lib/data/events';
+import { EVENT_KIND_LABEL, type ProjectEvent, type EventKind } from '@/lib/data/events-types';
 import {
   createEvent,
   updateEvent,
