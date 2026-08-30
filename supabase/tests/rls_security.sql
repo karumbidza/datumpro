@@ -1419,6 +1419,35 @@ select pg_temp.ok(
 reset role;
 reset request.jwt.claims;
 
+-- ── Chat About Topic: only managers (org staff / project PM) may edit ────────
+--    (20260826000030) conversations_write gates topic/description/note. Project A's
+--    chat conversation is auto-created by the create_project_chat trigger.
+reset role;
+reset request.jwt.claims;
+-- A contractor (a2) cannot change the topic — the RLS update matches no rows.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+update public.conversations set topic = 'hijack'
+  where project_id = 'a2220000-0000-0000-0000-000000000000' and type = 'project';
+reset role;
+reset request.jwt.claims;
+select pg_temp.ok(
+  coalesce((select topic from public.conversations
+     where project_id = 'a2220000-0000-0000-0000-000000000000' and type = 'project'), '') <> 'hijack',
+  'about: a contractor cannot edit the chat topic');
+
+-- The owner (a1, org staff) can.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+update public.conversations set topic = 'Phase 2 coordination'
+  where project_id = 'a2220000-0000-0000-0000-000000000000' and type = 'project';
+reset role;
+reset request.jwt.claims;
+select pg_temp.ok(
+  (select topic from public.conversations
+     where project_id = 'a2220000-0000-0000-0000-000000000000' and type = 'project') = 'Phase 2 coordination',
+  'about: a manager can edit the chat topic');
+
 -- ── Project member disable revokes project access ────────────────────────────
 -- A plain org member (not staff) added to a project as a contributor can see the
 -- project while active; disabling their membership (status='disabled') must drop

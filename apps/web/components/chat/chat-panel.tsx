@@ -15,12 +15,12 @@ import {
   getMemberActivity,
   type AttachmentInput,
 } from '@/app/(app)/projects/[projectId]/chat/actions';
-import type { ChatAttachment, ChatMessage, ChatSearchResult } from '@/lib/data/chat';
+import type { ChatAttachment, ChatMessage, ChatSearchResult, ConversationFile, ChatAbout } from '@/lib/data/chat';
 import type { RosterMember } from '@/lib/data/chat-roster';
 import { Button } from '@/components/ui/button';
 import { MessageCircle, Paperclip, Mic, Square, X, Download, FileText, Search, Users } from '@/components/icons';
 import { NotifyToggle } from '@/components/chat/notify-toggle';
-import { PeopleRail } from '@/components/chat/people-rail';
+import { ChatRail } from '@/components/chat/chat-rail';
 
 const EMOJIS = ['👍', '❤️', '😂', '🎉', '✅'];
 const MAX_FILE_BYTES = 50 * 1024 * 1024; // 50 MB per file
@@ -39,8 +39,12 @@ interface Props {
   subtitle?: string;
   className?: string;
   /** Roster for the People rail. When provided, the panel renders the two-pane
-   *  layout (conversation + presence rail). Omit for a bare conversation. */
+   *  layout (conversation + right rail). Omit for a bare conversation. */
   members?: RosterMember[];
+  /** Files shared in the conversation — the rail's Files tab. */
+  sharedFiles?: ConversationFile[];
+  /** The conversation's About Topic — the rail's About tab. */
+  about?: ChatAbout | null;
 }
 
 type AttachmentKind = AttachmentInput['kind'];
@@ -180,6 +184,8 @@ export function ChatPanel({
   subtitle,
   className = '',
   members,
+  sharedFiles,
+  about,
 }: Props) {
   const supabase = useMemo(() => createClient(), []);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
@@ -968,7 +974,14 @@ export function ChatPanel({
         <>
           {/* Desktop rail — always visible ≥ lg */}
           <aside className="hidden min-h-0 w-[300px] flex-shrink-0 flex-col border-l border-zinc-200 bg-white lg:flex dark:border-zinc-800 dark:bg-zinc-950">
-            <PeopleRail {...railProps} />
+            <ChatRail
+              people={railProps}
+              projectId={projectId}
+              conversationId={conversationId}
+              files={sharedFiles ?? []}
+              about={about ?? null}
+              canEditAbout={canModerate}
+            />
           </aside>
 
           {/* Mobile — slide-over sheet from the right */}
@@ -976,12 +989,20 @@ export function ChatPanel({
             <div className="fixed inset-0 z-40 flex lg:hidden">
               <button
                 type="button"
-                aria-label="Close people"
+                aria-label="Close panel"
                 onClick={() => setRailOpen(false)}
                 className="flex-1 bg-black/30"
               />
               <aside className="flex w-full max-w-[340px] flex-col bg-white shadow-xl dark:bg-zinc-950">
-                <PeopleRail {...railProps} onClose={() => setRailOpen(false)} />
+                <ChatRail
+                  people={railProps}
+                  projectId={projectId}
+                  conversationId={conversationId}
+                  files={sharedFiles ?? []}
+                  about={about ?? null}
+                  canEditAbout={canModerate}
+                  onClose={() => setRailOpen(false)}
+                />
               </aside>
             </div>
           )}
