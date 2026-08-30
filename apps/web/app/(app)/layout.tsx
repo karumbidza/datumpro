@@ -5,6 +5,7 @@ import { getActiveContext, getSidebarData } from '@/lib/data/org';
 import { createClient } from '@/lib/supabase/server';
 import { Sidebar } from '@/components/shell/sidebar';
 import { MobileNav } from '@/components/shell/mobile-nav';
+import { ToastHost } from '@/components/notifications/toast-host';
 
 /** Authenticated app shell. Renders the persistent sidebar around every page in
  *  this route group. Users with no org membership fall through to the page
@@ -52,6 +53,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       >
         Skip to content
       </a>
+      <ToastHost userId={ctx.userId} activeOrgId={ctx.active.orgId} orgs={ctx.memberships} />
       <Sidebar
         projects={projects}
         orgs={ctx.memberships}
