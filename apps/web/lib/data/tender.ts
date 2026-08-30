@@ -566,14 +566,19 @@ export interface MyTenderInvite {
 
 export async function listMyTenderInvites(userId: string): Promise<MyTenderInvite[]> {
   const supabase = await createClient();
-  const { data } = await supabase
+  // Disambiguate the embed: boq_bidders has TWO FK relationships to boq_tenders
+  // (tender_id, and boq_tenders.awarded_bidder_id → boq_bidders.id). Without the
+  // explicit constraint hint PostgREST errors (PGRST201) and every contractor
+  // sees an empty tender list. Pin it to the invite relationship.
+  const { data, error } = await supabase
     .from('boq_bidders')
     .select(
       'id, invite_token, status, tender_id, ' +
-        'boq_tenders(id, title, close_at, status, awarded_bidder_id)',
+        'boq_tenders!boq_bidders_tender_id_org_id_fkey(id, title, close_at, status, awarded_bidder_id)',
     )
     .eq('user_id', userId)
     .neq('status', 'withdrawn');
+  if (error) console.error('[tender] listMyTenderInvites failed:', error.message);
 
   type Row = {
     id: string;
