@@ -8,6 +8,7 @@ import {
   ClipboardList,
   ShieldAlert,
   GanttChart,
+  Layers,
   DollarSign,
   Wallet,
   MessageSquare,
@@ -55,6 +56,7 @@ export function computeNav(
       { name: 'Programme', href: `/projects/${id}/programme`, icon: GanttChart },
       { name: 'Site Diary', href: `/projects/${id}/diary`, icon: ClipboardList },
       { name: 'Snagging', href: `/projects/${id}/snags`, icon: ShieldAlert },
+      { name: 'Drawings', href: `/projects/${id}/drawings`, icon: Layers },
     ];
     if (manages) {
       items.push({ name: 'Finance', href: `/projects/${id}/finance`, icon: DollarSign });

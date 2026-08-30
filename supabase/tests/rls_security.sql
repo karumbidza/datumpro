@@ -1557,6 +1557,46 @@ select pg_temp.ok(
 reset role;
 reset request.jwt.claims;
 
+-- ── Drawings register: managers write; members read; outsiders can't ─────────
+--    (20260826000035) drawings + drawing_revisions — the controlled register.
+reset role;
+reset request.jwt.claims;
+-- Owner a1 (org staff) adds a drawing and issues Rev A.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+insert into public.drawings (id, org_id, project_id, number, title, discipline, created_by) values
+  ('af000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000', 'S-101', 'Foundation plan', 'structural',
+   'a0000000-0000-0000-0000-0000000000a1');
+insert into public.drawing_revisions (id, drawing_id, org_id, project_id, revision, status, storage_path, uploaded_by) values
+  ('af000000-0000-0000-0000-0000000000a1','af000000-0000-0000-0000-000000000001',
+   'a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','A','for_construction',
+   'a1110000-0000-0000-0000-000000000000/a2220000-0000-0000-0000-000000000000/drawings/af000000-0000-0000-0000-000000000001/revA.pdf',
+   'a0000000-0000-0000-0000-0000000000a1');
+select pg_temp.ok(
+  (select count(*) from public.drawings where id = 'af000000-0000-0000-0000-000000000001') = 1,
+  'drawings: a manager can add a drawing and see it');
+reset role;
+reset request.jwt.claims;
+
+-- Contractor a2 (a project A member) can view the register and download.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.drawing_revisions where drawing_id = 'af000000-0000-0000-0000-000000000001') = 1,
+  'drawings: a project member can view a drawing revision');
+reset role;
+reset request.jwt.claims;
+
+-- Org-B outsider b1 cannot see the drawing.
+set role authenticated;
+set request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-0000000000b1","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.drawings where id = 'af000000-0000-0000-0000-000000000001') = 0,
+  'drawings: a non-member cannot see the drawing');
+reset role;
+reset request.jwt.claims;
+
 -- ── Weekly digest opt-in: self-service RPC flips only the caller's own flag ───
 --    (20260826000034) org_members is owner/admin-managed, so the toggle goes via
 --    set_weekly_digest_opt_in (SECURITY DEFINER, scoped to auth.uid()).
