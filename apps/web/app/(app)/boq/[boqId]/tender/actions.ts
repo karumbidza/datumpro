@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveContext } from '@/lib/data/org';
+import { notifyUser } from '@/lib/data/notifications';
 import { createTenderSchema, inviteBidderSchema } from '@datumpro/shared/validation';
 import type { FormState } from '@/components/ui/form-error';
 import { sendEmail } from '@/lib/email/resend';
@@ -121,9 +122,21 @@ export async function inviteBidder(_prev: FormState, formData: FormData): Promis
         acceptUrl,
       });
       await sendEmail({ to: d.email, subject, html });
+      // In-app notification for an invited EXISTING member (a by-email invite of a
+      // brand-new contractor has no account to notify — the email is their signal).
+      if (d.userId) {
+        await notifyUser(supabase, {
+          orgId,
+          userId: d.userId,
+          type: 'tender_invite',
+          title: `Invited to price: ${tenderTitle}`,
+          body: `${orgName} invited you to submit a bid — open Tenders to price it.`,
+          link: `/tender/${token}`,
+        });
+      }
     } catch (e) {
       if (isRedirect(e)) throw e;
-      console.error('[tender] invite email failed:', e);
+      console.error('[tender] invite email/notify failed:', e);
     }
   }
 
