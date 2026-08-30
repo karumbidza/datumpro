@@ -11,6 +11,7 @@ import {
   othersMaxReadSeq,
   listConversationAttachments,
   getConversationAbout,
+  listPinnedMessages,
 } from '@/lib/data/chat';
 import { listProjectActionItems } from '@/lib/data/action-items';
 import { listProjectEvents } from '@/lib/data/events';
@@ -50,7 +51,7 @@ export default async function ProjectChatPage({
         </div>
       ) : (
         await (async () => {
-          const [messages, roster, orgRole, projectRole, othersRead, actionItems, events, sharedFiles, about] =
+          const [messages, roster, orgRole, projectRole, othersRead, actionItems, events, sharedFiles, about, pinned] =
             await Promise.all([
               listMessages(conversationId, user.id),
               listChatRoster(projectId),
@@ -61,6 +62,7 @@ export default async function ProjectChatPage({
               listProjectEvents(projectId),
               listConversationAttachments(conversationId),
               getConversationAbout(conversationId),
+              listPinnedMessages(conversationId),
             ]);
           const names = Object.fromEntries(roster.map((m) => [m.userId, m.name]));
           const meName = names[user.id] ?? user.email?.split('@')[0] ?? 'You';
@@ -100,6 +102,8 @@ export default async function ProjectChatPage({
                 members={roster}
                 sharedFiles={sharedFiles}
                 about={about}
+                pinnedMessages={pinned}
+                pinnedMessageIds={pinned.map((p) => p.messageId)}
               />
             </>
           );

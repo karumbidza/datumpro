@@ -191,3 +191,28 @@ export async function updateChatAbout(formData: FormData): Promise<{ ok: boolean
   revalidatePath(`/projects/${projectId}/chat`);
   return { ok: true };
 }
+
+/** Pin a message (any conversation member may). Scope columns are filled by the
+ *  child_denormalize trigger; RLS re-checks membership. */
+export async function pinMessage(formData: FormData): Promise<{ ok: boolean; error?: string }> {
+  const { supabase, user } = await requireUser();
+  const messageId = String(formData.get('messageId') ?? '');
+  const projectId = String(formData.get('projectId') ?? '');
+  if (!messageId || !projectId) return { ok: false, error: 'Missing message.' };
+  const { error } = await supabase.from('message_pins').insert({ message_id: messageId, pinned_by: user.id });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/projects/${projectId}/chat`);
+  return { ok: true };
+}
+
+/** Unpin a message (the pinner or a manager, enforced by RLS). */
+export async function unpinMessage(formData: FormData): Promise<{ ok: boolean; error?: string }> {
+  const { supabase } = await requireUser();
+  const messageId = String(formData.get('messageId') ?? '');
+  const projectId = String(formData.get('projectId') ?? '');
+  if (!messageId || !projectId) return { ok: false, error: 'Missing message.' };
+  const { error } = await supabase.from('message_pins').delete().eq('message_id', messageId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/projects/${projectId}/chat`);
+  return { ok: true };
+}

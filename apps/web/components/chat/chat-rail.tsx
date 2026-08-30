@@ -1,15 +1,16 @@
 'use client';
 
 import { useState, type ComponentProps, type FormEvent } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { PeopleRail } from '@/components/chat/people-rail';
-import { FileText, ImageIcon, Download, X } from '@/components/icons';
+import { FileText, ImageIcon, Download, X, Search, Plus, Calendar } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { inputCompactClass as inputClass } from '@/components/ui/form';
-import type { ConversationFile, ChatAbout } from '@/lib/data/chat';
+import type { ConversationFile, ChatAbout, PinnedMessage } from '@/lib/data/chat';
 import { updateChatAbout } from '@/app/(app)/projects/[projectId]/chat/actions';
 
-type RailTab = 'people' | 'files' | 'about';
+type RailTab = 'people' | 'pinned' | 'files' | 'about';
 type PeopleProps = Omit<ComponentProps<typeof PeopleRail>, 'onClose'>;
 
 function fmtBytes(n: number | null): string {
@@ -180,8 +181,63 @@ function AboutRail({
   );
 }
 
-/** The chat right-rail: People (presence + detail), Shared files, and About Topic,
- *  swapped by a small tab strip. Reuses the existing 300px rail shell. */
+function PinnedRail({ pinned, onUnpin }: { pinned: PinnedMessage[]; onUnpin: (messageId: string) => void }) {
+  if (pinned.length === 0) {
+    return <p className="p-4 text-sm text-zinc-400 dark:text-zinc-500">Nothing pinned. Hover a message and choose Pin to keep it here.</p>;
+  }
+  return (
+    <ul className="divide-y divide-zinc-100 dark:divide-zinc-800/70">
+      {pinned.map((p) => (
+        <li key={p.pinId} className="px-4 py-2.5">
+          <div className="flex items-start justify-between gap-2">
+            <p className="min-w-0 text-sm text-zinc-800 dark:text-zinc-100">
+              {p.body ? (p.body.length > 140 ? `${p.body.slice(0, 140)}…` : p.body) : <span className="italic text-zinc-400">Attachment</span>}
+            </p>
+            <button
+              type="button"
+              onClick={() => onUnpin(p.messageId)}
+              className="shrink-0 text-[11px] text-zinc-400 hover:text-red-500 hover:underline"
+            >
+              Unpin
+            </button>
+          </div>
+          <p className="mt-0.5 text-[11px] text-zinc-400 dark:text-zinc-500">
+            {p.senderName ?? 'Member'} · {fmtDate(p.createdAt)}
+          </p>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function QuickActions({ projectId, onFind, onFiles }: { projectId: string; onFind?: () => void; onFiles: () => void }) {
+  const item = 'flex flex-1 flex-col items-center gap-1 rounded-md py-1.5 text-[11px] text-zinc-600 transition hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800';
+  return (
+    <div className="flex items-stretch gap-1 border-b border-zinc-200 px-2 py-1.5 dark:border-zinc-800">
+      {onFind && (
+        <button type="button" onClick={onFind} className={item}>
+          <Search size={16} />
+          Find
+        </button>
+      )}
+      <button type="button" onClick={onFiles} className={item}>
+        <FileText size={16} />
+        Files
+      </button>
+      <Link href={`/projects/${projectId}/calendar`} className={item}>
+        <Calendar size={16} />
+        Schedule
+      </Link>
+      <Link href={`/projects/${projectId}/settings?tab=team`} className={item}>
+        <Plus size={16} />
+        Add
+      </Link>
+    </div>
+  );
+}
+
+/** The chat right-rail: People, Pinned, Shared files, and About Topic, swapped by a
+ *  tab strip, plus a Quick Actions row. Reuses the existing 300px rail shell. */
 export function ChatRail({
   people,
   projectId,
@@ -189,6 +245,9 @@ export function ChatRail({
   files,
   about,
   canEditAbout,
+  pinned,
+  onUnpin,
+  onFind,
   onClose,
 }: {
   people: PeopleProps;
@@ -197,18 +256,23 @@ export function ChatRail({
   files: ConversationFile[];
   about: ChatAbout | null;
   canEditAbout: boolean;
+  pinned: PinnedMessage[];
+  onUnpin: (messageId: string) => void;
+  onFind?: () => void;
   onClose?: () => void;
 }) {
   const [tab, setTab] = useState<RailTab>('people');
   const TABS: { key: RailTab; label: string }[] = [
     { key: 'people', label: 'People' },
+    { key: 'pinned', label: `Pinned${pinned.length ? ` ${pinned.length}` : ''}` },
     { key: 'files', label: `Files${files.length ? ` ${files.length}` : ''}` },
     { key: 'about', label: 'About' },
   ];
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center gap-1 border-b border-zinc-200 px-2 py-1.5 dark:border-zinc-800">
+      <QuickActions projectId={projectId} onFind={onFind} onFiles={() => setTab('files')} />
+      <div className="flex items-center gap-1 overflow-x-auto border-b border-zinc-200 px-2 py-1.5 dark:border-zinc-800">
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -232,6 +296,11 @@ export function ChatRail({
 
       <div className="flex min-h-0 flex-1 flex-col">
         {tab === 'people' && <PeopleRail {...people} onClose={onClose} />}
+        {tab === 'pinned' && (
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <PinnedRail pinned={pinned} onUnpin={onUnpin} />
+          </div>
+        )}
         {tab === 'files' && (
           <div className="min-h-0 flex-1 overflow-y-auto">
             <FilesRail files={files} />

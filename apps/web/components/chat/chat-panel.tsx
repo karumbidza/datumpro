@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import {
   sendMessage,
@@ -13,9 +14,11 @@ import {
   loadSince,
   loadOne,
   getMemberActivity,
+  pinMessage,
+  unpinMessage,
   type AttachmentInput,
 } from '@/app/(app)/projects/[projectId]/chat/actions';
-import type { ChatAttachment, ChatMessage, ChatSearchResult, ConversationFile, ChatAbout } from '@/lib/data/chat';
+import type { ChatAttachment, ChatMessage, ChatSearchResult, ConversationFile, ChatAbout, PinnedMessage } from '@/lib/data/chat';
 import type { RosterMember } from '@/lib/data/chat-roster';
 import { Button } from '@/components/ui/button';
 import { MessageCircle, Paperclip, Mic, Square, X, Download, FileText, Search, Users } from '@/components/icons';
@@ -45,6 +48,9 @@ interface Props {
   sharedFiles?: ConversationFile[];
   /** The conversation's About Topic — the rail's About tab. */
   about?: ChatAbout | null;
+  /** Pinned messages (rail Pinned tab) and their ids (per-message pin state). */
+  pinnedMessages?: PinnedMessage[];
+  pinnedMessageIds?: string[];
 }
 
 type AttachmentKind = AttachmentInput['kind'];
@@ -186,7 +192,21 @@ export function ChatPanel({
   members,
   sharedFiles,
   about,
+  pinnedMessages,
+  pinnedMessageIds,
 }: Props) {
+  const router = useRouter();
+  const pinnedSet = useMemo(() => new Set(pinnedMessageIds ?? []), [pinnedMessageIds]);
+  const togglePin = useCallback(
+    async (messageId: string) => {
+      const fd = new FormData();
+      fd.set('messageId', messageId);
+      fd.set('projectId', projectId);
+      await (pinnedSet.has(messageId) ? unpinMessage(fd) : pinMessage(fd));
+      router.refresh();
+    },
+    [projectId, pinnedSet, router],
+  );
   const supabase = useMemo(() => createClient(), []);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [othersRead, setOthersRead] = useState(othersReadSeq);
@@ -813,6 +833,14 @@ export function ChatPanel({
                     >
                       Reply
                     </button>
+                    <button
+                      onClick={() => togglePin(m.id)}
+                      className={`text-[11px] hover:text-zinc-700 dark:hover:text-zinc-200 ${
+                        pinnedSet.has(m.id) ? 'text-brand-600 dark:text-brand-400' : 'text-zinc-400 dark:text-zinc-500'
+                      }`}
+                    >
+                      {pinnedSet.has(m.id) ? 'Unpin' : 'Pin'}
+                    </button>
                     {mine && (
                       <button
                         onClick={() => {
@@ -981,6 +1009,9 @@ export function ChatPanel({
               files={sharedFiles ?? []}
               about={about ?? null}
               canEditAbout={canModerate}
+              pinned={pinnedMessages ?? []}
+              onUnpin={togglePin}
+              onFind={() => setSearchOpen(true)}
             />
           </aside>
 
@@ -1001,6 +1032,12 @@ export function ChatPanel({
                   files={sharedFiles ?? []}
                   about={about ?? null}
                   canEditAbout={canModerate}
+                  pinned={pinnedMessages ?? []}
+                  onUnpin={togglePin}
+                  onFind={() => {
+                    setRailOpen(false);
+                    setSearchOpen(true);
+                  }}
                   onClose={() => setRailOpen(false)}
                 />
               </aside>
