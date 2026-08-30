@@ -1350,6 +1350,44 @@ exception when insufficient_privilege then
   raise notice 'PASS: advance: delete blocked';
 end $$;
 
+-- ── Action items: lightweight chat to-dos, scoped to project members ─────────
+--    (20260826000028) a2 is a member of project A; b1 is in org B (a non-member).
+reset role;
+reset request.jwt.claims;
+
+-- A project member raises a to-do (RLS insert: created_by = self + member of scope).
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+insert into public.action_items (id, org_id, project_id, title, assignee_id, created_by, due_date) values
+  ('a9000000-0000-0000-0000-000000000001','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000','Send the revised BOQ',
+   'a0000000-0000-0000-0000-0000000000a2','a0000000-0000-0000-0000-0000000000a2', current_date + 3);
+select pg_temp.ok(
+  (select count(*) from public.action_items where id = 'a9000000-0000-0000-0000-000000000001') = 1,
+  'action-items: a project member can raise and see a to-do');
+reset role;
+reset request.jwt.claims;
+
+-- A user from another org cannot see the project's to-dos.
+set role authenticated;
+set request.jwt.claims = '{"sub":"b0000000-0000-0000-0000-0000000000b1","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.action_items where id = 'a9000000-0000-0000-0000-000000000001') = 0,
+  'action-items: a non-member cannot see the project''s to-dos');
+reset role;
+reset request.jwt.claims;
+
+-- The assignee marks it done.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
+update public.action_items set status = 'done', done_at = now(), done_by = 'a0000000-0000-0000-0000-0000000000a2'
+  where id = 'a9000000-0000-0000-0000-000000000001';
+select pg_temp.ok(
+  (select status from public.action_items where id = 'a9000000-0000-0000-0000-000000000001') = 'done',
+  'action-items: the assignee can mark a to-do done');
+reset role;
+reset request.jwt.claims;
+
 -- ── Project member disable revokes project access ────────────────────────────
 -- A plain org member (not staff) added to a project as a contributor can see the
 -- project while active; disabling their membership (status='disabled') must drop

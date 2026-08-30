@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, Users, GanttChart } from '@/components/icons';
 import { parseDate, startOfDay, formatDayMonth } from '@/lib/date';
 import type { CalendarTask } from '@/lib/data/project-calendar';
+import type { CalendarActionItem } from '@/lib/data/action-items';
 import type { TaskPriority } from '@datumpro/shared/domain';
 
 /* Priority accents — the app-wide colour language (see ui/tones.ts): urgent red,
@@ -62,10 +63,46 @@ function formatRange(start: Date, end: Date): string {
   return isSameDay(start, end) ? formatDayMonth(end) : `${formatDayMonth(start)} – ${formatDayMonth(end)}`;
 }
 
-export function ProjectCalendar({ tasks, projectId }: { tasks: CalendarTask[]; projectId: string }) {
+export function ProjectCalendar({
+  tasks,
+  actionItems = [],
+  projectId,
+}: {
+  tasks: CalendarTask[];
+  actionItems?: CalendarActionItem[];
+  projectId: string;
+}) {
   const today = startOfDay(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date(today.getFullYear(), today.getMonth(), 1));
+
+  // To-dos (action items) keyed by their due day.
+  const todosWithDay = useMemo(
+    () =>
+      actionItems
+        .map((a) => ({ item: a, due: parseDate(a.dueDate) }))
+        .filter((x): x is { item: CalendarActionItem; due: Date } => x.due !== null)
+        .map((x) => ({ item: x.item, due: startOfDay(x.due) })),
+    [actionItems],
+  );
+  const todosForDate = (date: Date) => todosWithDay.filter(({ due }) => isSameDay(due, date)).map(({ item }) => item);
+  const openTodosForDate = (date: Date) =>
+    todosWithDay.filter(({ item, due }) => item.status === 'open' && isSameDay(due, date)).length;
+  const upcomingTodos = useMemo(
+    () =>
+      todosWithDay
+        .filter(({ item, due }) => item.status === 'open' && due >= today)
+        .sort((a, b) => a.due.getTime() - b.due.getTime())
+        .slice(0, 5),
+    [todosWithDay, today],
+  );
+  const overdueTodos = useMemo(
+    () =>
+      todosWithDay
+        .filter(({ item, due }) => item.status === 'open' && due < today)
+        .sort((a, b) => a.due.getTime() - b.due.getTime()),
+    [todosWithDay, today],
+  );
 
   const windows = useMemo(
     () => tasks.map((t) => ({ task: t, win: taskWindow(t) })).filter((x) => x.win !== null) as {
@@ -113,6 +150,7 @@ export function ProjectCalendar({ tasks, projectId }: { tasks: CalendarTask[]; p
 
   const monthLabel = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const selectedTasks = tasksForDate(selectedDate);
+  const selectedTodos = todosForDate(selectedDate);
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
@@ -144,8 +182,11 @@ export function ProjectCalendar({ tasks, projectId }: { tasks: CalendarTask[]; p
             {monthDays.map((day, i) => {
               if (!day) return <div key={`pad-${i}`} />;
               const dayTasks = tasksForDate(day);
+              const dayTodos = openTodosForDate(day);
               const isSelected = isSameDay(day, selectedDate);
-              const hasOverdue = day < today && dayTasks.some((t) => t.status !== 'done');
+              const hasOverdue =
+                day < today &&
+                (dayTasks.some((t) => t.status !== 'done') || todosForDate(day).some((a) => a.status === 'open'));
               return (
                 <button
                   key={day.toISOString()}
@@ -162,6 +203,11 @@ export function ProjectCalendar({ tasks, projectId }: { tasks: CalendarTask[]; p
                   {dayTasks.length > 0 && (
                     <span className="text-[10px] text-brand-600 dark:text-brand-500">
                       {dayTasks.length} task{dayTasks.length === 1 ? '' : 's'}
+                    </span>
+                  )}
+                  {dayTodos > 0 && (
+                    <span className="text-[10px] text-amber-600 dark:text-amber-400">
+                      {dayTodos} to-do{dayTodos === 1 ? '' : 's'}
                     </span>
                   )}
                 </button>
@@ -213,6 +259,37 @@ export function ProjectCalendar({ tasks, projectId }: { tasks: CalendarTask[]; p
                   </Link>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {/* To-dos due on the selected day */}
+        {selectedTodos.length > 0 && (
+          <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-medium text-zinc-900 dark:text-white">
+                To-dos due {selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </h3>
+              <Link href={`/projects/${projectId}/chat`} className="text-sm text-brand-500 transition hover:text-brand-600">
+                Open chat
+              </Link>
+            </div>
+            <div className="space-y-2">
+              {selectedTodos.map((a) => (
+                <Link
+                  key={a.id}
+                  href={`/projects/${projectId}/chat`}
+                  className="block rounded border-l-4 border-amber-300 bg-zinc-50 p-3 transition hover:bg-zinc-100 dark:border-amber-500 dark:bg-zinc-800/40 dark:hover:bg-zinc-800"
+                >
+                  <div className="flex items-center justify-between gap-2 text-sm">
+                    <span className={a.status === 'done' ? 'text-zinc-400 line-through dark:text-zinc-500' : 'text-zinc-900 dark:text-white'}>
+                      {a.title}
+                    </span>
+                    {a.status === 'done' && <span className="shrink-0 text-xs text-green-600 dark:text-green-400">Done</span>}
+                  </div>
+                  {a.assigneeName && <p className="text-xs text-zinc-500 dark:text-zinc-400">For {a.assigneeName}</p>}
+                </Link>
+              ))}
             </div>
           </div>
         )}
@@ -273,6 +350,50 @@ export function ProjectCalendar({ tasks, projectId }: { tasks: CalendarTask[]; p
               {overdue.length > 5 && (
                 <p className="text-center text-xs text-zinc-500 dark:text-zinc-400">+{overdue.length - 5} more</p>
               )}
+            </div>
+          </div>
+        )}
+
+        {(upcomingTodos.length > 0 || overdueTodos.length > 0) && (
+          <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-zinc-900 dark:text-white">
+              <Clock size={16} /> To-dos
+            </h3>
+            <div className="space-y-2">
+              {overdueTodos.map(({ item, due }) => (
+                <Link
+                  key={item.id}
+                  href={`/projects/${projectId}/chat`}
+                  className="block rounded-lg bg-red-50 p-3 transition hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30"
+                >
+                  <div className="flex justify-between gap-2 text-sm text-zinc-900 dark:text-white">
+                    <span>{item.title}</span>
+                    <span className="shrink-0 rounded bg-red-200 px-2 py-0.5 text-xs text-red-900 dark:bg-red-500">Overdue</span>
+                  </div>
+                  <p className="text-xs text-red-600 dark:text-red-300">
+                    Due {formatDayMonth(due)}
+                    {item.assigneeName ? ` · ${item.assigneeName}` : ''}
+                  </p>
+                </Link>
+              ))}
+              {upcomingTodos.map(({ item, due }) => (
+                <Link
+                  key={item.id}
+                  href={`/projects/${projectId}/chat`}
+                  className="block rounded-lg bg-zinc-50 p-3 transition hover:bg-zinc-100 dark:bg-zinc-800/40 dark:hover:bg-zinc-800"
+                >
+                  <div className="flex items-start justify-between gap-2 text-sm">
+                    <span className="text-zinc-900 dark:text-white">{item.title}</span>
+                    <span className="shrink-0 rounded bg-amber-50 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
+                      To-do
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                    Due {formatDayMonth(due)}
+                    {item.assigneeName ? ` · ${item.assigneeName}` : ''}
+                  </p>
+                </Link>
+              ))}
             </div>
           </div>
         )}

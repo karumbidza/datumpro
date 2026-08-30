@@ -6,7 +6,9 @@ import { myProjectRole } from '@/lib/data/members';
 import { listChatRoster } from '@/lib/data/chat-roster';
 import { myOrgRole } from '@/lib/data/tasks';
 import { getProjectConversationId, listMessages, othersMaxReadSeq } from '@/lib/data/chat';
+import { listProjectActionItems } from '@/lib/data/action-items';
 import { ChatPanel } from '@/components/chat/chat-panel';
+import { ChatActionItems } from '@/components/chat/chat-action-items';
 import { Card } from '@/components/ui/card';
 
 export default async function ProjectChatPage({
@@ -40,31 +42,44 @@ export default async function ProjectChatPage({
         </div>
       ) : (
         await (async () => {
-          const [messages, roster, orgRole, projectRole, othersRead] = await Promise.all([
+          const [messages, roster, orgRole, projectRole, othersRead, actionItems] = await Promise.all([
             listMessages(conversationId, user.id),
             listChatRoster(projectId),
             myOrgRole(project.org_id),
             myProjectRole(projectId),
             othersMaxReadSeq(conversationId, user.id),
+            listProjectActionItems(projectId),
           ]);
           const names = Object.fromEntries(roster.map((m) => [m.userId, m.name]));
           const meName = names[user.id] ?? user.email?.split('@')[0] ?? 'You';
           const canModerate = orgRole === 'owner' || orgRole === 'admin' || projectRole === 'pm';
           return (
-            <ChatPanel
-              className="mt-3 min-h-0 flex-1"
-              title="Project Chat"
-              conversationId={conversationId}
-              orgId={project.org_id}
-              projectId={projectId}
-              currentUserId={user.id}
-              meName={meName}
-              initialMessages={messages}
-              othersReadSeq={othersRead}
-              canPost
-              canModerate={canModerate}
-              members={roster}
-            />
+            <>
+              <div className="mt-3">
+                <ChatActionItems
+                  projectId={projectId}
+                  conversationId={conversationId}
+                  items={actionItems}
+                  members={roster.map((m) => ({ userId: m.userId, name: m.name }))}
+                  canManage={canModerate}
+                  currentUserId={user.id}
+                />
+              </div>
+              <ChatPanel
+                className="mt-3 min-h-0 flex-1"
+                title="Project Chat"
+                conversationId={conversationId}
+                orgId={project.org_id}
+                projectId={projectId}
+                currentUserId={user.id}
+                meName={meName}
+                initialMessages={messages}
+                othersReadSeq={othersRead}
+                canPost
+                canModerate={canModerate}
+                members={roster}
+              />
+            </>
           );
         })()
       )}
