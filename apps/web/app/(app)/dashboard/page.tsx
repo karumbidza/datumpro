@@ -144,7 +144,7 @@ export default async function DashboardPage() {
     return (
       <PageContainer width="6xl" className="space-y-8">
         {live}
-        <WorkPulseGreeting data={pulse(null)} context="Delivery overview" action={newProject} />
+        <WorkPulseGreeting data={pulse(null)} context={`${active.name} · Delivery overview`} action={newProject} />
         <DeliveryFocus approvals={approvals} blockers={blockers} overdue={overdue} />
         <TimelineOverview tasks={timelineTasks} unit="task" />
       </PageContainer>
@@ -170,7 +170,7 @@ export default async function DashboardPage() {
   return (
     <PageContainer width="6xl" className="space-y-8">
       {live}
-      <WorkPulseGreeting data={pulse(null)} context="Your work" />
+      <WorkPulseGreeting data={pulse(null)} context={`${active.name} · Your work`} />
       {approvals.length > 0 && <ApprovalsInbox items={approvals} />}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Assigned" value={String(tStats.assigned)} />
