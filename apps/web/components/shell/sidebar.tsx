@@ -224,9 +224,14 @@ function OrgSwitcher({ orgs, activeOrgId }: { orgs: OrgMembershipSummary[]; acti
         className="flex w-full items-center justify-between gap-2 rounded px-1 py-0.5 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800"
         title="Switch organisation"
       >
-        <span className="flex min-w-0 items-center gap-2">
+        <span className="flex min-w-0 items-center gap-1.5">
           {active && <OrgAvatar org={active} size={18} />}
           <span className="truncate text-[11px] font-medium text-zinc-600 dark:text-zinc-300">{activeName}</span>
+          {active && (
+            <span className="shrink-0 rounded bg-brand-100 px-1 text-[9px] font-semibold uppercase leading-4 tracking-wide text-brand-700 dark:bg-brand-500/25 dark:text-brand-300">
+              {membershipLabel(active)}
+            </span>
+          )}
         </span>
         <ChevronDown size={12} className="shrink-0 text-zinc-400 dark:text-zinc-500" />
       </button>
