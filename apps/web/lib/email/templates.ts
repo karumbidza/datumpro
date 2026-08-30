@@ -155,6 +155,68 @@ export function digestEmail(opts: {
   };
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function shortDate(iso: string): string {
+  const [, m, d] = iso.split('-');
+  const mi = Number(m) - 1;
+  if (mi < 0 || mi > 11 || !d) return iso;
+  return `${MONTHS[mi]} ${Number(d)}`;
+}
+
+/** The Monday "your week" Work Pulse digest. Heading + insight come from the
+ *  shared engine; the body is a compact list of the counts that are non-zero. */
+export function weeklyDigestEmail(opts: {
+  greeting: string; // "Good morning, Allen"
+  insight: string; // the one prioritised sentence
+  glance: string | null;
+  overdue: number;
+  dueThisWeek: number;
+  approvals: number;
+  blocked: number;
+  completedThisWeek: number;
+  nextDeadlineIso: string | null;
+  dashboardUrl: string;
+  unsubscribeUrl?: string;
+}) {
+  const rows: { label: string; value: string; accent?: string }[] = [];
+  if (opts.overdue > 0) rows.push({ label: 'Overdue', value: String(opts.overdue), accent: '#dc2626' });
+  if (opts.approvals > 0) rows.push({ label: 'Awaiting your approval', value: String(opts.approvals), accent: '#4f46e5' });
+  if (opts.dueThisWeek > 0) rows.push({ label: 'Due this week', value: String(opts.dueThisWeek) });
+  if (opts.blocked > 0) rows.push({ label: 'Blocked', value: String(opts.blocked), accent: '#ea580c' });
+  if (opts.completedThisWeek > 0) rows.push({ label: 'Completed last week', value: String(opts.completedThisWeek), accent: '#16a34a' });
+  if (opts.nextDeadlineIso) rows.push({ label: 'Next deadline', value: shortDate(opts.nextDeadlineIso) });
+
+  const body = rows.length
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;color:#3f3f46">
+         ${rows
+           .map(
+             (r) =>
+               `<tr>
+                  <td style="padding:6px 0;border-bottom:1px solid #f4f4f5">${r.label}</td>
+                  <td align="right" style="padding:6px 0;border-bottom:1px solid #f4f4f5;font-weight:700;color:${r.accent ?? '#18181b'}">${r.value}</td>
+                </tr>`,
+           )
+           .join('')}
+       </table>`
+    : '';
+
+  const unsub = opts.unsubscribeUrl
+    ? ` <a href="${opts.unsubscribeUrl}" style="color:#a1a1aa;text-decoration:underline">Unsubscribe from the weekly digest</a>.`
+    : '';
+
+  return {
+    subject: 'Your week on DatumPro',
+    html: layout({
+      heading: opts.greeting,
+      intro: opts.insight,
+      bodyHtml: body,
+      ctaLabel: 'Open my dashboard',
+      ctaHref: opts.dashboardUrl,
+      footnote: `Weekly summary from DatumPro.${unsub}`,
+    }),
+  };
+}
+
 export function enterpriseRequestEmail(opts: {
   orgName: string;
   buyerType?: string | null;
