@@ -6,6 +6,7 @@ import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, Users, Gant
 import { parseDate, startOfDay, formatDayMonth } from '@/lib/date';
 import type { CalendarTask } from '@/lib/data/project-calendar';
 import type { CalendarActionItem } from '@/lib/data/action-items';
+import { EVENT_KIND_LABEL, type CalendarEvent } from '@/lib/data/events';
 import type { TaskPriority } from '@datumpro/shared/domain';
 
 /* Priority accents — the app-wide colour language (see ui/tones.ts): urgent red,
@@ -63,18 +64,39 @@ function formatRange(start: Date, end: Date): string {
   return isSameDay(start, end) ? formatDayMonth(end) : `${formatDayMonth(start)} – ${formatDayMonth(end)}`;
 }
 
+function eventTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
 export function ProjectCalendar({
   tasks,
   actionItems = [],
+  events = [],
   projectId,
 }: {
   tasks: CalendarTask[];
   actionItems?: CalendarActionItem[];
+  events?: CalendarEvent[];
   projectId: string;
 }) {
   const today = startOfDay(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date(today.getFullYear(), today.getMonth(), 1));
+
+  // Events keyed by their local start day (a timestamp, so bucket in local time).
+  const eventsWithDay = useMemo(
+    () => events.map((e) => ({ ev: e, day: startOfDay(new Date(e.startsAt)) })),
+    [events],
+  );
+  const eventsForDate = (date: Date) => eventsWithDay.filter(({ day }) => isSameDay(day, date)).map(({ ev }) => ev);
+  const upcomingEvents = useMemo(
+    () =>
+      eventsWithDay
+        .filter(({ ev }) => ev.status === 'scheduled' && new Date(ev.startsAt).getTime() >= Date.now())
+        .sort((a, b) => new Date(a.ev.startsAt).getTime() - new Date(b.ev.startsAt).getTime())
+        .slice(0, 5),
+    [eventsWithDay],
+  );
 
   // To-dos (action items) keyed by their due day.
   const todosWithDay = useMemo(
@@ -151,6 +173,7 @@ export function ProjectCalendar({
   const monthLabel = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const selectedTasks = tasksForDate(selectedDate);
   const selectedTodos = todosForDate(selectedDate);
+  const selectedEvents = eventsForDate(selectedDate);
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
@@ -183,6 +206,7 @@ export function ProjectCalendar({
               if (!day) return <div key={`pad-${i}`} />;
               const dayTasks = tasksForDate(day);
               const dayTodos = openTodosForDate(day);
+              const dayEvents = eventsForDate(day).filter((e) => e.status === 'scheduled').length;
               const isSelected = isSameDay(day, selectedDate);
               const hasOverdue =
                 day < today &&
@@ -208,6 +232,11 @@ export function ProjectCalendar({
                   {dayTodos > 0 && (
                     <span className="text-[10px] text-amber-600 dark:text-amber-400">
                       {dayTodos} to-do{dayTodos === 1 ? '' : 's'}
+                    </span>
+                  )}
+                  {dayEvents > 0 && (
+                    <span className="text-[10px] text-violet-600 dark:text-violet-400">
+                      {dayEvents} event{dayEvents === 1 ? '' : 's'}
                     </span>
                   )}
                 </button>
@@ -259,6 +288,42 @@ export function ProjectCalendar({
                   </Link>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {/* Events on the selected day */}
+        {selectedEvents.length > 0 && (
+          <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-medium text-zinc-900 dark:text-white">
+                Events on {selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </h3>
+              <Link href={`/projects/${projectId}/chat`} className="text-sm text-brand-500 transition hover:text-brand-600">
+                Open chat
+              </Link>
+            </div>
+            <div className="space-y-2">
+              {selectedEvents.map((ev) => (
+                <Link
+                  key={ev.id}
+                  href={`/projects/${projectId}/chat`}
+                  className="block rounded border-l-4 border-violet-300 bg-zinc-50 p-3 transition hover:bg-zinc-100 dark:border-violet-500 dark:bg-zinc-800/40 dark:hover:bg-zinc-800"
+                >
+                  <div className="flex items-center justify-between gap-2 text-sm">
+                    <span className={ev.status === 'cancelled' ? 'text-zinc-400 line-through dark:text-zinc-500' : 'text-zinc-900 dark:text-white'}>
+                      {ev.title}
+                    </span>
+                    <span className="shrink-0 rounded bg-violet-50 px-2 py-0.5 text-xs text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
+                      {EVENT_KIND_LABEL[ev.kind]}
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {eventTime(ev.startsAt)}
+                    {ev.location ? ` · ${ev.location}` : ''}
+                  </p>
+                </Link>
+              ))}
             </div>
           </div>
         )}
@@ -391,6 +456,34 @@ export function ProjectCalendar({
                   <p className="text-xs text-zinc-600 dark:text-zinc-400">
                     Due {formatDayMonth(due)}
                     {item.assigneeName ? ` · ${item.assigneeName}` : ''}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {upcomingEvents.length > 0 && (
+          <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-zinc-900 dark:text-white">
+              <CalendarIcon size={16} /> Upcoming events
+            </h3>
+            <div className="space-y-2">
+              {upcomingEvents.map(({ ev }) => (
+                <Link
+                  key={ev.id}
+                  href={`/projects/${projectId}/chat`}
+                  className="block rounded-lg bg-zinc-50 p-3 transition hover:bg-zinc-100 dark:bg-zinc-800/40 dark:hover:bg-zinc-800"
+                >
+                  <div className="flex items-start justify-between gap-2 text-sm">
+                    <span className="text-zinc-900 dark:text-white">{ev.title}</span>
+                    <span className="shrink-0 rounded bg-violet-50 px-2 py-0.5 text-xs text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
+                      {EVENT_KIND_LABEL[ev.kind]}
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                    {formatDayMonth(startOfDay(new Date(ev.startsAt)))} · {eventTime(ev.startsAt)}
+                    {ev.location ? ` · ${ev.location}` : ''}
                   </p>
                 </Link>
               ))}
