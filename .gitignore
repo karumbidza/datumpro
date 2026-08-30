@@ -32,6 +32,9 @@ design_handoff_datumpro_ui/
 bid panel redesign/
 .superpowers/
 
+# dev-process design docs (specs/plans) — kept local, not shipped in the repo
+docs/superpowers/
+
 # Downloaded OAuth / service-account credential files — never commit
 client_secret*.json
 *-credentials.json
