@@ -8,6 +8,7 @@ import { TENDER_STATUS_LABELS } from '@datumpro/shared/domain';
 import { PageContainer } from '@/components/shell/page-container';
 import { Badge } from '@/components/ui/badge';
 import { TENDER_STATUS_TONE } from '@/components/ui/tones';
+import { LocalDateTime } from '@/components/ui/local-datetime';
 import { Button } from '@/components/ui/button';
 import { BiddersPanel, type ContractorOption } from './bidders-panel';
 import { CreateTenderForm } from './create-tender-form';
@@ -106,15 +107,7 @@ export default async function TenderPage({
 
       {tender?.closeAt && (
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Closing{' '}
-          {new Date(tender.closeAt).toLocaleDateString(undefined, {
-            weekday: 'short',
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
+          Closing <LocalDateTime iso={tender.closeAt} />
         </p>
       )}
 
