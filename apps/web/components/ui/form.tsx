@@ -6,11 +6,11 @@ import type { InputHTMLAttributes, LabelHTMLAttributes, SelectHTMLAttributes, Te
  * below in new code. Never re-declare a local inputClass.
  */
 export const inputClass =
-  'w-full rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm outline-none transition focus:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/25 dark:border-zinc-800';
+  'w-full rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 outline-none transition focus:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/25 dark:border-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500';
 
 /** Dense tables/inline rows — same recipe, tighter padding. */
 export const inputCompactClass =
-  'w-full rounded-md border border-zinc-200 bg-transparent px-2.5 py-1.5 text-sm outline-none transition focus:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/25 dark:border-zinc-800';
+  'w-full rounded-md border border-zinc-200 bg-transparent px-2.5 py-1.5 text-sm text-zinc-900 placeholder:text-zinc-400 outline-none transition focus:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/25 dark:border-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500';
 
 export const labelClass = 'mb-1 block text-sm font-medium';
 
