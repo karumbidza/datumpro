@@ -57,9 +57,8 @@ export function TenderAudit({
                   }`}
                 >
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5 font-medium text-zinc-900 dark:text-zinc-100">
+                    <div className="font-medium text-zinc-900 dark:text-zinc-100">
                       {b.companyName}
-                      {won && <span title="Awarded the tender">🏆</span>}
                     </div>
                     <p className="text-xs text-zinc-500 dark:text-zinc-400">{b.contactEmail}</p>
                   </td>

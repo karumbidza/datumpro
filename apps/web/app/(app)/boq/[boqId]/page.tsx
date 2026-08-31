@@ -24,7 +24,7 @@ export default async function BoqPage({ params }: { params: Promise<{ boqId: str
   const projectBoq = boq.projectId ? await getProjectBoq(ctx.active.orgId, boq.projectId) : null;
 
   return (
-    <PageContainer width="7xl">
+    <PageContainer width="full">
       <Link href="/boq" className="text-xs text-zinc-500 hover:underline dark:text-zinc-400">
         ← BOQ
       </Link>

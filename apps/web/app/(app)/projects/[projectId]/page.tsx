@@ -38,7 +38,7 @@ export default async function ProjectOverviewPage({
   ]);
 
   return (
-    <PageContainer width="6xl" className="flex flex-col gap-8">
+    <PageContainer width="full" className="flex flex-col gap-8">
       <LiveRefresh
         subscriptions={[
           { table: 'tasks', filter: `project_id=eq.${projectId}` },

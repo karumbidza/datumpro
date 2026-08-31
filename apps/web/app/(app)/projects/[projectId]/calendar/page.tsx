@@ -30,7 +30,7 @@ export default async function ProjectCalendarPage({
   ]);
 
   return (
-    <PageContainer width="6xl" className="space-y-8">
+    <PageContainer width="full" className="space-y-8">
       <LiveRefresh
         subscriptions={[
           { table: 'tasks', filter: `project_id=eq.${projectId}` },

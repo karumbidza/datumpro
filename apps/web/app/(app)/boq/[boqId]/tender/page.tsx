@@ -74,7 +74,7 @@ export default async function TenderPage({
   }
 
   return (
-    <PageContainer width="4xl">
+    <PageContainer width="full">
       {/* Back link */}
       <Link href={`/boq/${boqId}`} className="text-xs text-zinc-500 hover:underline dark:text-zinc-400">
         ← BOQ{boq ? ` — ${boq.name}` : ''}

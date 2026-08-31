@@ -32,7 +32,7 @@ export default async function OrgFinancePage() {
       <PageHeader
         backHref="/dashboard"
         backLabel="Dashboard"
-        title="Finance"
+        title="Payments"
         subtitle={<>Contractor payments across every project in {ctx.active.name}.</>}
       />
 
