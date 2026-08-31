@@ -163,8 +163,10 @@ function LinkEditor({
   const [type, setType] = useState<DependencyType>(initialType);
   const [lag, setLag] = useState(String(initialLag));
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function run(action: typeof updateDependency | typeof deleteDependency, withFields: boolean) {
+    setError(null);
     setBusy(true);
     try {
       const fd = new FormData();
@@ -175,8 +177,14 @@ function LinkEditor({
         fd.set('type', type);
         fd.set('lagDays', String(Number.parseInt(lag, 10) || 0));
       }
-      await action(fd);
+      const res = await action(fd);
+      if (!res.ok) {
+        setError(res.error ?? 'Could not update dependency');
+        return;
+      }
       onDone();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not update dependency');
     } finally {
       setBusy(false);
     }
@@ -215,6 +223,7 @@ function LinkEditor({
           Cancel
         </button>
       </div>
+      {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
     </div>
   );
 }
