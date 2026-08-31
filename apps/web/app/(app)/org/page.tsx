@@ -79,7 +79,7 @@ export default async function OrgPage({
         .select('id, domain, verified_at, verification_token')
         .eq('org_id', orgId)
         .order('created_at', { ascending: true }),
-      listProjects().catch(() => []),
+      listProjects(orgId).catch(() => []),
       listOrgContractorDocuments(orgId),
     ]);
   const projects = projectRows.map((p) => ({ id: p.id, name: p.name }));
