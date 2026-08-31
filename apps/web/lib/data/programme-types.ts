@@ -26,6 +26,9 @@ export interface ProgrammeEdge {
   successorId: string;
   lagDays: number;
   type: DependencyType;
+  /** A driving link on the critical path: both ends critical and this link is
+   *  the binding constraint on the successor's start/finish. */
+  critical: boolean;
 }
 
 export interface UnscheduledTask {

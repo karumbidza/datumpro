@@ -618,6 +618,9 @@ export function Programme({
                       <marker id="pm-arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
                         <path d="M0,0 L6,3 L0,6 Z" className="fill-zinc-400 dark:fill-zinc-500" />
                       </marker>
+                      <marker id="pm-arrow-crit" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                        <path d="M0,0 L6,3 L0,6 Z" className="fill-red-500" />
+                      </marker>
                     </defs>
                     {data.edges.map((e, i) => {
                       const pi = rowIndexById.get(e.predecessorId);
@@ -636,16 +639,16 @@ export function Programme({
                       const y2 = si * ROW_H + ROW_H / 2;
                       const midX = Math.max(x1 + 8, x2 - 8);
                       const d = `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`;
-                      const crit = pt.critical && st.critical;
+                      const crit = e.critical;
                       const showTag = e.type !== 'fs' || e.lagDays !== 0;
                       return (
                         <g key={i}>
                           <path
                             d={d}
                             fill="none"
-                            className={crit ? 'stroke-red-400/80' : 'stroke-zinc-300 dark:stroke-zinc-600'}
-                            strokeWidth={1.5}
-                            markerEnd="url(#pm-arrow)"
+                            className={crit ? 'stroke-red-500' : 'stroke-zinc-300 dark:stroke-zinc-600'}
+                            strokeWidth={crit ? 2 : 1.5}
+                            markerEnd={crit ? 'url(#pm-arrow-crit)' : 'url(#pm-arrow)'}
                           />
                           {showTag && (
                             <text x={midX + 3} y={(y1 + y2) / 2 - 3} fontSize={9} className="fill-zinc-500 dark:fill-zinc-400">
@@ -801,6 +804,7 @@ export function Programme({
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-zinc-500 dark:text-zinc-400">
         <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm ring-2 ring-red-500" /> Critical path</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-0.5 w-4 rounded bg-red-500" /> Driving link</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-brand-500" /> In progress</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> Done</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-orange-500" /> Blocked</span>
