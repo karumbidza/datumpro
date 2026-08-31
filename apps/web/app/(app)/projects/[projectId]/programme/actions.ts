@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { computeProjectPlan } from '@/lib/data/schedule-engine';
 
 type Result = { ok: boolean; error?: string };
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
@@ -23,17 +24,6 @@ function isBackdated(startDate: string): boolean {
   return startDate < today();
 }
 
-// UTC-based date arithmetic on YYYY-MM-DD strings, so day shifts never drift
-// across timezones (mirrors the rest of the scheduling code).
-function shiftIso(iso: string, days: number): string {
-  const d = new Date(`${iso}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-function diffDays(a: string, b: string): number {
-  return Math.round((Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`)) / 86_400_000);
-}
-
 const DEP_TYPES = ['fs', 'ss', 'ff', 'sf'] as const;
 type DepType = (typeof DEP_TYPES)[number];
 function parseType(value: unknown): DepType {
@@ -48,14 +38,15 @@ function revalidate(projectId: string, taskId?: string) {
 }
 
 /**
- * Cascade dependents forward so no successor starts before its predecessor
- * finishes (+lag) — the opt-in "auto-schedule" behaviour. Finish-to-start only,
- * calendar days, bars inclusive: a successor may start the day AFTER the
- * predecessor's end, plus its lag. Only tasks with a real planned window are
- * moved; durations are preserved. A pass cap guards against a bad-data loop
- * (the DB cycle trigger already blocks true cycles at insert time).
+ * Realign the whole programme through the unified working-day CPM engine — the
+ * opt-in "auto-schedule" behaviour. Delegates to `computeProjectPlan`, which runs
+ * the shared critical-path engine over the project's tasks + dependencies
+ * (honouring FS/SS/FF/SF + lag on working days, pinning started tasks and never
+ * backdating) and returns each task's planned window as working-day ISO dates.
+ * Persists only the windows that actually changed.
  *
- * Returns the number of tasks it shifted. A no-op when auto-schedule is off.
+ * Returns the number of tasks it shifted. A no-op when auto-schedule is off or the
+ * dependency graph has a cycle.
  */
 async function cascadeProject(supabase: SupabaseClient, projectId: string): Promise<number> {
   const { data: projectData } = await supabase
@@ -65,83 +56,40 @@ async function cascadeProject(supabase: SupabaseClient, projectId: string): Prom
     .maybeSingle();
   if (!((projectData as { auto_schedule: boolean } | null)?.auto_schedule)) return 0;
 
-  const { data: taskData } = await supabase
+  const plan = await computeProjectPlan(supabase, projectId);
+  if (plan.length === 0) return 0;
+
+  const { data: storedData } = await supabase
     .from('tasks')
-    .select('id, planned_start_date, planned_end_date, due_date')
-    .eq('project_id', projectId);
-  const rows = (taskData ?? []) as {
+    .select('id, planned_start_date, planned_end_date')
+    .in(
+      'id',
+      plan.map((p) => p.id),
+    );
+  const stored = new Map<string, { start: string | null; end: string | null }>();
+  for (const r of (storedData ?? []) as {
     id: string;
     planned_start_date: string | null;
     planned_end_date: string | null;
-    due_date: string | null;
-  }[];
-  if (rows.length === 0) return 0;
-
-  const ids = rows.map((r) => r.id);
-  const { data: depData } = await supabase
-    .from('task_dependencies')
-    .select('predecessor_id, successor_id, lag_days, type')
-    .in('successor_id', ids);
-  const edges = (depData ?? []) as { predecessor_id: string; successor_id: string; lag_days: number; type: string | null }[];
-  if (edges.length === 0) return 0;
-
-  // Working window per task: only fully-planned tasks are movable.
-  type Win = { start: string; end: string; scheduled: boolean };
-  const win = new Map<string, Win>();
-  for (const r of rows) {
-    const end = r.planned_end_date ?? r.due_date;
-    if (r.planned_start_date && end) {
-      win.set(r.id, { start: r.planned_start_date, end: end < r.planned_start_date ? r.planned_start_date : end, scheduled: !!r.planned_end_date });
-    } else if (end) {
-      win.set(r.id, { start: end, end, scheduled: false });
-    }
+  }[]) {
+    stored.set(r.id, { start: r.planned_start_date, end: r.planned_end_date });
   }
 
-  const shifted = new Set<string>();
-  const maxPasses = rows.length + 1;
-  for (let pass = 0; pass < maxPasses; pass++) {
-    let changed = false;
-    for (const e of edges) {
-      const pred = win.get(e.predecessor_id);
-      const succ = win.get(e.successor_id);
-      if (!pred || !succ || !succ.scheduled) continue; // only move real windows
-      const lag = e.lag_days || 0;
-      const type = e.type ?? 'fs';
-      // Each type constrains a different successor anchor. fs/ss pin the start;
-      // ff/sf pin the finish. Shift the successor forward (preserving duration)
-      // only when its anchor sits earlier than the relationship allows.
-      let delta = 0;
-      if (type === 'ss') {
-        const minStart = shiftIso(pred.start, lag);
-        if (succ.start < minStart) delta = diffDays(minStart, succ.start);
-      } else if (type === 'ff') {
-        const minEnd = shiftIso(pred.end, lag);
-        if (succ.end < minEnd) delta = diffDays(minEnd, succ.end);
-      } else if (type === 'sf') {
-        const minEnd = shiftIso(pred.start, lag);
-        if (succ.end < minEnd) delta = diffDays(minEnd, succ.end);
-      } else {
-        const minStart = shiftIso(pred.end, 1 + lag);
-        if (succ.start < minStart) delta = diffDays(minStart, succ.start);
-      }
-      if (delta > 0) {
-        succ.start = shiftIso(succ.start, delta);
-        succ.end = shiftIso(succ.end, delta);
-        shifted.add(e.successor_id);
-        changed = true;
-      }
-    }
-    if (!changed) break;
-  }
-
-  for (const id of shifted) {
-    const w = win.get(id)!;
-    await supabase
+  let changed = 0;
+  for (const { id, start, end } of plan) {
+    const current = stored.get(id);
+    if (current && start === current.start && end === current.end) continue;
+    const { error } = await supabase
       .from('tasks')
-      .update({ planned_start_date: w.start, planned_end_date: w.end, due_date: w.end })
+      .update({ planned_start_date: start, planned_end_date: end, due_date: end })
       .eq('id', id);
+    if (error) {
+      console.error(`cascadeProject: failed to update task ${id}`, error.message);
+      return changed;
+    }
+    changed++;
   }
-  return shifted.size;
+  return changed;
 }
 
 /** Move a task's bar on the programme: sets the planned window and keeps the due
@@ -286,6 +234,36 @@ export async function setBaseline(formData: FormData): Promise<Result> {
 
   const { error } = await supabase.rpc('set_project_baseline', { p_project_id: projectId });
   if (error) return { ok: false, error: error.message };
+
+  revalidate(projectId);
+  return { ok: true };
+}
+
+/**
+ * Recompute the WHOLE programme through the unified working-day CPM engine and
+ * write it — the manager's explicit "reschedule from today" action. Runs
+ * `computeProjectPlan` (FS/SS/FF/SF + lag on working days, started tasks pinned,
+ * never backdating) and persists every task's window (planned start/end + due
+ * date). Unlike the auto-schedule cascade this ignores the `auto_schedule` gate —
+ * it's a deliberate user action. Writes go through the migration-044 DB trigger,
+ * which enforces manager-only and surfaces its own error to non-managers. Returns
+ * an error if the dependency graph has a cycle.
+ */
+export async function rescheduleProject(formData: FormData): Promise<Result> {
+  const { supabase } = await requireUser();
+  const projectId = String(formData.get('projectId') ?? '');
+  if (!projectId) return { ok: false, error: 'Missing project.' };
+
+  const plan = await computeProjectPlan(supabase, projectId);
+  if (plan.length === 0) return { ok: false, error: 'Couldn’t schedule — check for a dependency loop.' };
+
+  for (const { id, start, end } of plan) {
+    const { error } = await supabase
+      .from('tasks')
+      .update({ planned_start_date: start, planned_end_date: end, due_date: end })
+      .eq('id', id);
+    if (error) return { ok: false, error: error.message };
+  }
 
   revalidate(projectId);
   return { ok: true };

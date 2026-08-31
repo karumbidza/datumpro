@@ -11,3 +11,4 @@ export * from './documents';
 export * from './tender';
 export * from './work-pulse';
 export * from './notification-toast';
+export * from './working-days';
