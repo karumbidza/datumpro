@@ -926,7 +926,7 @@ export function Programme({
             <span className="min-w-0 flex-1 truncate text-xs text-zinc-700 dark:text-zinc-200">
               {titleById.get(otherId) ?? 'Task'}
               <span className="ml-1.5 text-[11px] text-zinc-400 dark:text-zinc-500">
-                {typeLabel(e.type)}{e.lagDays ? `, +${e.lagDays}d` : ''}
+                {typeLabel(e.type)}{e.lagDays ? `, ${e.lagDays > 0 ? '+' : ''}${e.lagDays}d` : ''}
               </span>
             </span>
             {canModerate && (
