@@ -14,6 +14,9 @@ export interface ProgrammeTask {
   assigneeName: string | null;
   startIso: string; // YYYY-MM-DD, resolved window start
   endIso: string; // YYYY-MM-DD, resolved window end (inclusive)
+  /** The captured baseline window, when the project has been baselined. */
+  baselineStartIso: string | null;
+  baselineEndIso: string | null;
   /** True when the task has a real planned window (not just a single due-day fallback). */
   scheduled: boolean;
   critical: boolean;
@@ -49,4 +52,6 @@ export interface ProgrammeData {
   hasCycle: boolean;
   /** Per-project opt-in: moving a task cascades its dependents forward. */
   autoSchedule: boolean;
+  /** When the programme was last baselined (ISO), or null if never. */
+  baselinedAt: string | null;
 }
