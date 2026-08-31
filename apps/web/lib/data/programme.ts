@@ -35,17 +35,21 @@ const EMPTY: ProgrammeData = {
   projectedFinish: null,
   baselineFinish: null,
   hasCycle: false,
+  autoSchedule: false,
 };
 
 /** Everything the programme/Gantt view needs: each task's bar window, the
  *  critical-path + float from the CPM engine, the dependency edges to draw, and
  *  the project start / projected-vs-baseline finish. RLS scopes the reads. */
 export async function getProgrammeData(projectId: string): Promise<ProgrammeData> {
-  const [calendarTasks, schedule] = await Promise.all([
+  const supabase = await createClient();
+  const [calendarTasks, schedule, projectRes] = await Promise.all([
     listCalendarTasks(projectId),
     getProjectSchedule(projectId),
+    supabase.from('projects').select('auto_schedule').eq('id', projectId).maybeSingle(),
   ]);
-  if (calendarTasks.length === 0) return EMPTY;
+  const autoSchedule = ((projectRes.data as { auto_schedule: boolean } | null)?.auto_schedule) ?? false;
+  if (calendarTasks.length === 0) return { ...EMPTY, autoSchedule };
 
   const tasks: ProgrammeTask[] = [];
   const unscheduled: UnscheduledTask[] = [];
@@ -109,5 +113,6 @@ export async function getProgrammeData(projectId: string): Promise<ProgrammeData
     projectedFinish: schedule?.projectedFinish ?? null,
     baselineFinish: schedule?.baselineFinish ?? null,
     hasCycle: schedule?.schedule.hasCycle ?? false,
+    autoSchedule,
   };
 }
