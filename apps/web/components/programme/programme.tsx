@@ -34,7 +34,7 @@ function depTag(type: DependencyType, lag: number): string {
 const DAY_W = 26; // px per day
 const ROW_H = 34; // px per task row
 const LABEL_W = 200; // left label column
-const AXIS_H = 34; // date axis header
+const AXIS_H = 46; // date axis header (week date row + day-of-week row)
 const PAD_DAYS = 3; // breathing room either side of the range
 
 const STATUS_BAR: Record<TaskStatus, string> = {
@@ -327,10 +327,18 @@ export function Programme({
     for (let i = 0; i <= totalDays; i += 7) {
       ticks.push({ x: i * DAY_W, label: formatDayMonth(addDays(start, i)) });
     }
+    // One marker per day for the day-of-week header row (weekends flagged so they
+    // read as non-working). Dates are local-time (see @/lib/date) → getDay().
+    const DOW = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+    const days: { x: number; dow: string; weekend: boolean }[] = [];
+    for (let i = 0; i < totalDays; i++) {
+      const wd = addDays(start, i).getDay();
+      days.push({ x: i * DAY_W, dow: DOW[wd]!, weekend: wd === 0 || wd === 6 });
+    }
     const today = todayIso();
     const todayX = parseDate(today) && parseDate(today)! >= start ? offset(today) * DAY_W : null;
     const withinRange = todayX != null && todayX <= width;
-    return { start, totalDays, width, offset, ticks, todayX: withinRange ? todayX : null };
+    return { start, totalDays, width, offset, ticks, days, todayX: withinRange ? todayX : null };
   }, [data.rangeStartIso, data.rangeEndIso]);
 
   const rowIndexById = useMemo(() => {
@@ -785,7 +793,7 @@ export function Programme({
         <div className="flex">
           {/* Labels — task name + assignee */}
           <div className="shrink-0 border-r border-zinc-200 dark:border-zinc-800" style={{ width: LABEL_W }}>
-            <div style={{ height: AXIS_H }} className="border-b border-zinc-200 bg-zinc-50 px-3 text-[11px] font-medium uppercase tracking-wide leading-[34px] text-zinc-400 dark:border-zinc-800 dark:bg-zinc-900/40">
+            <div style={{ height: AXIS_H }} className="border-b border-zinc-200 bg-zinc-50 px-3 text-[11px] font-medium uppercase tracking-wide leading-[46px] text-zinc-400 dark:border-zinc-800 dark:bg-zinc-900/40">
               Task
             </div>
             {data.tasks.map((t) => (
@@ -816,9 +824,26 @@ export function Programme({
               <div className="relative" style={{ width: geom.width }}>
                 {/* Axis */}
                 <div style={{ height: AXIS_H }} className="relative border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/40">
+                  {/* Week/date labels — top row */}
                   {geom.ticks.map((tick, i) => (
-                    <div key={i} className="absolute top-0 h-full border-l border-zinc-200 pl-1 text-[10px] leading-[34px] text-zinc-400 dark:border-zinc-800" style={{ left: tick.x }}>
+                    <div
+                      key={i}
+                      className="absolute top-0 border-l border-zinc-200 pl-1 text-[10px] font-medium leading-[24px] text-zinc-500 dark:border-zinc-800 dark:text-zinc-400"
+                      style={{ left: tick.x, height: 24 }}
+                    >
                       {tick.label}
+                    </div>
+                  ))}
+                  {/* Day-of-week — one per day, bottom row (weekends muted) */}
+                  {geom.days.map((d, i) => (
+                    <div
+                      key={`dow-${i}`}
+                      className={`absolute text-center text-[9px] uppercase leading-[20px] ${
+                        d.weekend ? 'text-zinc-300 dark:text-zinc-600' : 'text-zinc-400 dark:text-zinc-500'
+                      }`}
+                      style={{ left: d.x, top: 24, width: DAY_W, height: 20 }}
+                    >
+                      {d.dow}
                     </div>
                   ))}
                 </div>
