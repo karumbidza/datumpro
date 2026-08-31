@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { computeProjectPlan } from '@/lib/data/schedule-engine';
 
-type Result = { ok: boolean; error?: string };
+type Result = { ok: boolean; error?: string; cascaded?: number };
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
 async function requireUser() {
@@ -126,9 +126,9 @@ export async function rescheduleTask(formData: FormData): Promise<Result> {
     .eq('id', taskId);
   if (error) return { ok: false, error: error.message };
 
-  await cascadeProject(supabase, projectId);
+  const cascaded = await cascadeProject(supabase, projectId);
   revalidate(projectId, taskId);
-  return { ok: true };
+  return { ok: true, cascaded };
 }
 
 /** Link two tasks: a finish-to-start dependency (predecessor must finish before
@@ -165,9 +165,9 @@ export async function createDependency(formData: FormData): Promise<Result> {
     return { ok: false, error: error.message };
   }
 
-  await cascadeProject(supabase, projectId);
+  const cascaded = await cascadeProject(supabase, projectId);
   revalidate(projectId);
-  return { ok: true };
+  return { ok: true, cascaded };
 }
 
 /** Remove a finish-to-start link between two tasks. */
@@ -206,9 +206,9 @@ export async function updateDependency(formData: FormData): Promise<Result> {
     .eq('successor_id', successorId);
   if (error) return { ok: false, error: error.message };
 
-  await cascadeProject(supabase, projectId);
+  const cascaded = await cascadeProject(supabase, projectId);
   revalidate(projectId);
-  return { ok: true };
+  return { ok: true, cascaded };
 }
 
 /** Persist a new row order for the programme. The client sends the full ordered

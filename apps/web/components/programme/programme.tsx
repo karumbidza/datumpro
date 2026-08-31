@@ -161,7 +161,7 @@ function LinkEditor({
   succTitle: string;
   initialType: DependencyType;
   initialLag: number;
-  onDone: () => void;
+  onDone: (cascaded?: number) => void;
   onCancel: () => void;
 }) {
   const [type, setType] = useState<DependencyType>(initialType);
@@ -188,7 +188,7 @@ function LinkEditor({
         setError(res.error ?? failMsg);
         return;
       }
-      onDone();
+      onDone(res.cascaded);
     } catch (err) {
       setError(err instanceof Error ? err.message : failMsg);
     } finally {
@@ -437,6 +437,9 @@ export function Programme({
         return;
       }
       setPreview((p) => (p && p.taskId === taskId ? null : p));
+      if (res.cascaded && res.cascaded > 0) {
+        flash(`${res.cascaded} dependent task${res.cascaded === 1 ? '' : 's'} rescheduled`);
+      }
       router.refresh();
     } finally {
       writingRef.current = false;
@@ -1057,8 +1060,11 @@ export function Programme({
                         succTitle={titleById.get(linkMenu.successorId) ?? 'Task'}
                         initialType={linkMenu.type}
                         initialLag={linkMenu.lag}
-                        onDone={() => {
+                        onDone={(cascaded) => {
                           setLinkMenu(null);
+                          if (cascaded && cascaded > 0) {
+                            flash(`${cascaded} dependent task${cascaded === 1 ? '' : 's'} rescheduled`);
+                          }
                           router.refresh();
                         }}
                         onCancel={() => setLinkMenu(null)}
@@ -1082,8 +1088,11 @@ export function Programme({
                         succTitle={titleById.get(pendingLink.successorId) ?? 'Task'}
                         initialType="fs"
                         initialLag={0}
-                        onDone={() => {
+                        onDone={(cascaded) => {
                           setPendingLink(null);
+                          if (cascaded && cascaded > 0) {
+                            flash(`${cascaded} dependent task${cascaded === 1 ? '' : 's'} rescheduled`);
+                          }
                           router.refresh();
                         }}
                         onCancel={() => setPendingLink(null)}
