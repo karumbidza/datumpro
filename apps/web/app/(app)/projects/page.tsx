@@ -19,7 +19,8 @@ export default async function ProjectsPage() {
   const user = await getAuthUser();
   if (!user) redirect('/sign-in');
 
-  const [projects, ctx] = await Promise.all([listProjectsOverview(), getActiveContext()]);
+  const ctx = await getActiveContext();
+  const projects = ctx?.active ? await listProjectsOverview(ctx.active.orgId) : [];
   const canCreate = ctx?.active ? can(ctx.active.role, 'project:create') : false;
 
   const totalTasks = projects.reduce((s, p) => s + p.totalTasks, 0);

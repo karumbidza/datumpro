@@ -28,11 +28,16 @@ export interface ProjectOverview {
 
 /** Portfolio overview: each project with its completion, timeline dates, and
  *  milestones positioned along the timeline. RLS scopes to what the user may see. */
-export async function listProjectsOverview(): Promise<ProjectOverview[]> {
+/** Projects in ONE org, newest first — the active-org portfolio. Scoped to
+ *  `orgId` on purpose: a manager who also belongs to other orgs must not see
+ *  those orgs' projects leak into this org's list (RLS alone would let a
+ *  cross-org project through). */
+export async function listProjectsOverview(orgId: string): Promise<ProjectOverview[]> {
   const supabase = await createClient();
   const { data: projectRows } = await supabase
     .from('projects')
     .select('id, name, client_name, status, priority, contract_value_cents, start_date, end_date')
+    .eq('org_id', orgId)
     .order('created_at', { ascending: false });
   const projects = (projectRows ?? []) as {
     id: string;

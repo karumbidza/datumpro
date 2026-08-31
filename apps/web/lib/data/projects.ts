@@ -24,11 +24,16 @@ const PROJECT_COLUMNS =
   'id, org_id, name, code, type, status, description, priority, client_name, contract_value_cents, start_date, end_date';
 
 /** RLS scopes every query to the caller's orgs — no manual org filter needed. */
-export async function listProjects(): Promise<ProjectRow[]> {
+/** Projects in ONE org (active-org scoped). Never list cross-org: a member of
+ *  several orgs must not see another org's projects here — RLS permits a
+ *  project a user is a member of regardless of the active org, so the query
+ *  must filter by `orgId` itself. */
+export async function listProjects(orgId: string): Promise<ProjectRow[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('projects')
     .select(PROJECT_COLUMNS)
+    .eq('org_id', orgId)
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data ?? []) as ProjectRow[];
