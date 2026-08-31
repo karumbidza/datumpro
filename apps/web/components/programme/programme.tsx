@@ -43,6 +43,9 @@ const STATUS_BAR: Record<TaskStatus, string> = {
   blocked: 'bg-orange-500',
   done: 'bg-emerald-500',
 };
+// A task that has started keeps its real dates — its bar can be reordered but not
+// dragged to a new time or resized (matches the engine + the migration-044 trigger).
+const STARTED_STATUSES: ReadonlySet<TaskStatus> = new Set<TaskStatus>(['in_progress', 'submitted', 'done']);
 const STATUS_LABEL: Record<TaskStatus, string> = {
   todo: 'To do',
   in_progress: 'In progress',
@@ -354,6 +357,11 @@ export function Programme({
 
   function startDrag(e: ReactPointerEvent, session: DragSession) {
     if (!canModerate) return;
+    // A started task keeps its real dates: don't begin a horizontal reschedule or a
+    // resize. A body 'move' still starts, but stays reorder-only (no date change).
+    const dragTask = data.tasks.find((t) => t.id === session.taskId);
+    const started = dragTask != null && STARTED_STATUSES.has(dragTask.status);
+    if (started && (session.mode === 'resize-start' || session.mode === 'resize-end')) return;
     e.preventDefault();
     e.stopPropagation();
     const startX = e.clientX;
@@ -385,7 +393,8 @@ export function Programme({
         const dx = ev.clientX - startX;
         const dy = ev.clientY - startY;
         if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
-        axis = Math.abs(dy) > Math.abs(dx) ? 'y' : 'x';
+        // Started tasks can be reordered but never rescheduled — lock to the y axis.
+        axis = started || Math.abs(dy) > Math.abs(dx) ? 'y' : 'x';
       }
 
       if (session.mode === 'move' && axis === 'y') {
@@ -768,6 +777,7 @@ export function Programme({
                     const width = Math.max(days * DAY_W - 3, 8);
                     const dragging = preview?.taskId === t.id;
                     const reordering = reorder?.taskId === t.id;
+                    const started = STARTED_STATUSES.has(t.status);
                     const floatW = !t.critical && t.floatDays > 0 && !dragging ? t.floatDays * DAY_W : 0;
                     const variance = t.baselineEndIso ? diffDaysIso(w.endIso, t.baselineEndIso) : 0;
                     const varianceText = variance > 0 ? ` · ${variance}d behind baseline` : variance < 0 ? ` · ${-variance}d ahead of baseline` : '';
@@ -800,7 +810,7 @@ export function Programme({
                             t.critical ? ' · critical' : t.floatDays > 0 ? ` · ${t.floatDays}d float` : ''
                           }${varianceText}${t.waitingOn.length ? ` · waiting on ${t.waitingOn.join(', ')}` : ''}`}
                         >
-                          {canModerate && (
+                          {canModerate && !started && (
                             <span
                               onPointerDown={(e) => startDrag(e, { mode: 'resize-start', taskId: t.id, origStart: w.startIso, origEnd: w.endIso })}
                               className="absolute left-0 top-0 z-10 h-full w-1.5 cursor-ew-resize opacity-0 group-hover:opacity-100"
@@ -809,11 +819,11 @@ export function Programme({
                           )}
                           <span
                             onPointerDown={(e) => startDrag(e, { mode: 'move', taskId: t.id, origStart: w.startIso, origEnd: w.endIso })}
-                            className={`flex h-full min-w-0 flex-1 items-center px-1.5 ${canModerate ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
+                            className={`flex h-full min-w-0 flex-1 items-center px-1.5 ${canModerate ? (started ? 'cursor-default' : 'cursor-grab active:cursor-grabbing') : 'cursor-default'}`}
                           >
                             <span className="truncate">{t.title}</span>
                           </span>
-                          {canModerate && (
+                          {canModerate && !started && (
                             <span
                               onPointerDown={(e) => startDrag(e, { mode: 'resize-end', taskId: t.id, origStart: w.startIso, origEnd: w.endIso })}
                               className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-ew-resize opacity-0 group-hover:opacity-100"
