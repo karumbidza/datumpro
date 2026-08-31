@@ -246,7 +246,7 @@ function QuickActions({
     const links = [
       { href: `/projects/${projectId}/diary`, icon: ClipboardList, label: 'Diary' },
       { href: `/projects/${projectId}/drawings`, icon: Layers, label: 'Drawings' },
-      { href: `/projects/${projectId}/transmittals`, icon: Send, label: 'Transmittals' },
+      { href: `/projects/${projectId}/transmittals`, icon: Send, label: 'Transit' },
       { href: `/projects/${projectId}/snags`, icon: ShieldAlert, label: 'Snags' },
       { href: `/projects/${projectId}/rfis`, icon: HelpCircle, label: 'RFIs' },
     ];
