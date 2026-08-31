@@ -43,12 +43,17 @@ const EMPTY: ProgrammeData = {
  *  the project start / projected-vs-baseline finish. RLS scopes the reads. */
 export async function getProgrammeData(projectId: string): Promise<ProgrammeData> {
   const supabase = await createClient();
-  const [calendarTasks, schedule, projectRes] = await Promise.all([
+  const [calendarTasks, schedule, projectRes, orderRes] = await Promise.all([
     listCalendarTasks(projectId),
     getProjectSchedule(projectId),
     supabase.from('projects').select('auto_schedule').eq('id', projectId).maybeSingle(),
+    supabase.from('tasks').select('id, programme_order').eq('project_id', projectId),
   ]);
   const autoSchedule = ((projectRes.data as { auto_schedule: boolean } | null)?.auto_schedule) ?? false;
+  const orderById = new Map<string, number>();
+  for (const r of (orderRes.data ?? []) as { id: string; programme_order: number | null }[]) {
+    if (r.programme_order != null) orderById.set(r.id, r.programme_order);
+  }
   if (calendarTasks.length === 0) return { ...EMPTY, autoSchedule };
 
   const tasks: ProgrammeTask[] = [];
@@ -82,11 +87,14 @@ export async function getProgrammeData(projectId: string): Promise<ProgrammeData
     if (!rangeEndIso || win.endIso > rangeEndIso) rangeEndIso = win.endIso;
   }
 
-  // Sort by start, then critical first, then title — a readable programme order.
+  // Stable manual order (programme_order), falling back to start then title for
+  // tasks not yet placed. Rows keep their position when a bar is rescheduled;
+  // only an explicit drag-to-reorder changes programme_order.
+  const orderOf = (id: string) => orderById.get(id) ?? Number.POSITIVE_INFINITY;
   tasks.sort(
     (a, b) =>
+      orderOf(a.id) - orderOf(b.id) ||
       a.startIso.localeCompare(b.startIso) ||
-      Number(b.critical) - Number(a.critical) ||
       a.title.localeCompare(b.title),
   );
 

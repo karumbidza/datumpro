@@ -14,6 +14,7 @@ import {
   deleteDependency,
   updateDependency,
   setAutoSchedule,
+  reorderProgramme,
 } from '@/app/(app)/projects/[projectId]/programme/actions';
 
 const DEP_OPTIONS: { value: DependencyType; label: string }[] = [
@@ -229,7 +230,8 @@ export function Programme({
   const router = useRouter();
   const [selected, setSelected] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ taskId: string; startIso: string; endIso: string } | null>(null);
-  const [link, setLink] = useState<{ fromId: string; fromEdge: 'start' | 'finish'; x: number; y: number } | null>(null);
+  const [link, setLink] = useState<{ fromId: string; fromEdge: 'start' | 'finish'; x: number; y: number; overId: string | null } | null>(null);
+  const [reorder, setReorder] = useState<{ taskId: string; overIndex: number } | null>(null);
   const [linkMenu, setLinkMenu] = useState<{ predecessorId: string; successorId: string; type: DependencyType; lag: number; x: number; y: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const rowsRef = useRef<HTMLDivElement>(null);
@@ -305,12 +307,30 @@ export function Programme({
     router.refresh();
   }
 
-  function taskAtClientY(clientY: number): ProgrammeTask | null {
+  function indexAtClientY(clientY: number): number | null {
     const rows = rowsRef.current;
     if (!rows) return null;
     const rect = rows.getBoundingClientRect();
     const idx = Math.floor((clientY - rect.top) / ROW_H);
-    return idx >= 0 && idx < data.tasks.length ? data.tasks[idx]! : null;
+    return Math.max(0, Math.min(data.tasks.length - 1, idx));
+  }
+  function taskAtClientY(clientY: number): ProgrammeTask | null {
+    const idx = indexAtClientY(clientY);
+    return idx == null ? null : data.tasks[idx]!;
+  }
+
+  async function runReorder(taskId: string, toIndex: number) {
+    const ids = data.tasks.map((t) => t.id);
+    const from = ids.indexOf(taskId);
+    if (from === -1 || from === toIndex) return;
+    ids.splice(from, 1);
+    ids.splice(toIndex, 0, taskId);
+    const fd = new FormData();
+    fd.set('projectId', projectId);
+    fd.set('orderedIds', ids.join(','));
+    const res = await reorderProgramme(fd);
+    if (!res.ok) flash(res.error ?? 'Could not reorder');
+    router.refresh();
   }
 
   function startDrag(e: ReactPointerEvent, session: DragSession) {
@@ -318,7 +338,11 @@ export function Programme({
     e.preventDefault();
     e.stopPropagation();
     const startX = e.clientX;
+    const startY = e.clientY;
     let moved = false;
+    // For a bar-body drag, the dominant axis decides: horizontal = reschedule,
+    // vertical = reorder the row. Locked once the gesture passes the threshold.
+    let axis: 'x' | 'y' | undefined;
     let cur = { startIso: session.origStart, endIso: session.origEnd };
 
     const onMove = (ev: globalThis.PointerEvent) => {
@@ -327,9 +351,31 @@ export function Programme({
         if (!rows) return;
         const rect = rows.getBoundingClientRect();
         moved = true;
-        setLink({ fromId: session.taskId, fromEdge: session.fromEdge!, x: ev.clientX - rect.left, y: ev.clientY - rect.top });
+        const over = taskAtClientY(ev.clientY);
+        setLink({
+          fromId: session.taskId,
+          fromEdge: session.fromEdge!,
+          x: ev.clientX - rect.left,
+          y: ev.clientY - rect.top,
+          overId: over && over.id !== session.taskId ? over.id : null,
+        });
         return;
       }
+
+      if (session.mode === 'move' && axis === undefined) {
+        const dx = ev.clientX - startX;
+        const dy = ev.clientY - startY;
+        if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+        axis = Math.abs(dy) > Math.abs(dx) ? 'y' : 'x';
+      }
+
+      if (session.mode === 'move' && axis === 'y') {
+        moved = true;
+        const idx = indexAtClientY(ev.clientY);
+        if (idx != null) setReorder({ taskId: session.taskId, overIndex: idx });
+        return;
+      }
+
       const days = Math.round((ev.clientX - startX) / DAY_W);
       if (days !== 0) moved = true;
       const t = todayIso();
@@ -368,6 +414,12 @@ export function Programme({
         }
         return;
       }
+      if (session.mode === 'move' && axis === 'y') {
+        const target = indexAtClientY(ev.clientY);
+        setReorder(null);
+        if (target != null) void runReorder(session.taskId, target);
+        return;
+      }
       setPreview(null);
       if (!moved) {
         setSelected((prev) => (prev === session.taskId ? null : session.taskId));
@@ -397,6 +449,13 @@ export function Programme({
   }
 
   const rowsH = data.tasks.length * ROW_H;
+  // "B starts after A" reading of the link being drawn (FS is the default).
+  const linkLabel = (() => {
+    if (!link) return null;
+    const src = titleById.get(link.fromId) ?? 'Task';
+    const tgt = link.overId ? (titleById.get(link.overId) ?? 'a task') : '…';
+    return link.fromEdge === 'finish' ? `${tgt} starts after ${src}` : `${src} starts after ${tgt}`;
+  })();
   const linkSourcePoint = (() => {
     if (!link || !geom) return null;
     const i = rowIndexById.get(link.fromId);
@@ -538,6 +597,20 @@ export function Programme({
                       <span className="absolute -top-0 left-1 text-[9px] font-medium text-brand-600 dark:text-brand-400">Today</span>
                     </div>
                   )}
+                  {/* Link target row highlight */}
+                  {link?.overId != null && rowIndexById.get(link.overId) != null && (
+                    <div
+                      className="pointer-events-none absolute left-0 z-0 bg-brand-500/10"
+                      style={{ top: rowIndexById.get(link.overId)! * ROW_H, height: ROW_H, width: geom.width }}
+                    />
+                  )}
+                  {/* Reorder drop indicator */}
+                  {reorder && (
+                    <div
+                      className="pointer-events-none absolute left-0 z-30 h-0.5 bg-brand-500"
+                      style={{ top: reorder.overIndex * ROW_H + ROW_H - 1, width: geom.width }}
+                    />
+                  )}
 
                   {/* Dependency arrows (+ invisible hit paths to remove them) */}
                   <svg className="pointer-events-none absolute inset-0" width={geom.width} height={rowsH}>
@@ -617,9 +690,10 @@ export function Programme({
                     const days = diffDaysIso(w.endIso, w.startIso) + 1;
                     const width = Math.max(days * DAY_W - 3, 8);
                     const dragging = preview?.taskId === t.id;
+                    const reordering = reorder?.taskId === t.id;
                     const floatW = !t.critical && t.floatDays > 0 && !dragging ? t.floatDays * DAY_W : 0;
                     return (
-                      <div key={t.id} className="group absolute" style={{ top: i * ROW_H + 6, left, height: ROW_H - 12 }}>
+                      <div key={t.id} className={`group absolute ${reordering ? 'opacity-40' : ''}`} style={{ top: i * ROW_H + 6, left, height: ROW_H - 12 }}>
                         {/* Float slack */}
                         {floatW > 0 && (
                           <div
@@ -684,6 +758,16 @@ export function Programme({
                     );
                   })}
 
+                  {/* Live "starts after" hint while drawing a link */}
+                  {link && linkLabel && (
+                    <div
+                      className="pointer-events-none absolute z-30 whitespace-nowrap rounded-md bg-zinc-900 px-2 py-1 text-[11px] font-medium text-white shadow-md dark:bg-zinc-100 dark:text-zinc-900"
+                      style={{ left: link.x + 10, top: link.y + 10 }}
+                    >
+                      {linkLabel}
+                    </div>
+                  )}
+
                   {/* Dependency editor popover */}
                   {linkMenu && (
                     <div
@@ -721,7 +805,7 @@ export function Programme({
         <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> Done</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-orange-500" /> Blocked</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-0.5 w-4 rounded bg-zinc-300 dark:bg-zinc-600" /> Float</span>
-        {canModerate && <span>· Drag a bar to move it, its edges to resize, the dots to link tasks, or a link to set its type</span>}
+        {canModerate && <span>· Drag a bar sideways to move it, up/down to reorder, its edges to resize, the dots to link tasks, or a link to set its type</span>}
       </div>
 
       {data.unscheduled.length > 0 && (
