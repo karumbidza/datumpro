@@ -30,7 +30,7 @@ export default async function ProjectProgrammePage({
   const canModerate = orgRole === 'owner' || orgRole === 'admin' || projectRole === 'pm';
 
   return (
-    <PageContainer width="6xl" className="space-y-6">
+    <PageContainer width="full" className="space-y-6">
       <LiveRefresh
         subscriptions={[
           { table: 'tasks', filter: `project_id=eq.${projectId}` },

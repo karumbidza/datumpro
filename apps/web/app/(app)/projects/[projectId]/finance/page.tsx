@@ -53,7 +53,7 @@ export default async function FinancePage({ params }: { params: Promise<{ projec
           { table: 'approvals', filter: `org_id=eq.${project.org_id}` },
         ]}
       />
-      <PageHeader backHref={`/projects/${projectId}`} backLabel={project.name} title="Finance" />
+      <PageHeader backHref={`/projects/${projectId}`} backLabel={project.name} title="Payments" />
 
       <section className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Card><CardTitle>Budget</CardTitle><CardValue>{formatUsd(budgetCents)}</CardValue></Card>

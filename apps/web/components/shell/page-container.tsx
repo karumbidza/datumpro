@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-type Width = 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | '6xl' | '7xl';
+type Width = 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | '6xl' | '7xl' | 'full';
 
 const MAX: Record<Width, string> = {
   lg: 'max-w-lg',
@@ -11,6 +11,9 @@ const MAX: Record<Width, string> = {
   '5xl': 'max-w-5xl',
   '6xl': 'max-w-6xl',
   '7xl': 'max-w-7xl',
+  // Full main width (minus the standard gutters) — for data-dense screens like the
+  // programme/Gantt, the BOQ, and the tender comparison.
+  full: 'max-w-none',
 };
 
 /** THE page gutter — the only padding system in the app. Every screen gets the

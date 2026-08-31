@@ -57,7 +57,7 @@ export function computeNav(
       { name: 'Variations', href: `/projects/${id}/variations`, icon: FileEdit },
     ];
     if (manages) {
-      items.push({ name: 'Finance', href: `/projects/${id}/finance`, icon: DollarSign });
+      items.push({ name: 'Payments', href: `/projects/${id}/finance`, icon: DollarSign });
       items.push({ name: 'BOQ', href: `/projects/${id}/boq`, icon: FileText });
     }
     items.push({ name: 'Chat', href: `/projects/${id}/chat`, icon: MessageSquare });
@@ -81,9 +81,9 @@ export function computeNav(
     // One "Finance" item: managers → the org finance hub; an assignee without
     // finance access → their own statement. Same label, role-appropriate target.
     ...(canViewFinance
-      ? [{ name: 'Finance', href: '/finance', icon: DollarSign }]
+      ? [{ name: 'Payments', href: '/finance', icon: DollarSign }]
       : showMyPayments
-        ? [{ name: 'Finance', href: '/payments', icon: Wallet }]
+        ? [{ name: 'Payments', href: '/payments', icon: Wallet }]
         : []),
     ...(canManageMembers
       ? [
