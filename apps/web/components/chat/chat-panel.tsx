@@ -51,6 +51,9 @@ interface Props {
   /** Pinned messages (rail Pinned tab) and their ids (per-message pin state). */
   pinnedMessages?: PinnedMessage[];
   pinnedMessageIds?: string[];
+  /** Main Project Chat only: the rail's action row becomes register shortcuts
+   *  (Diary / Drawings / Transmittals / Snags / RFIs). */
+  showRegisterLinks?: boolean;
 }
 
 type AttachmentKind = AttachmentInput['kind'];
@@ -226,6 +229,7 @@ export function ChatPanel({
   about,
   pinnedMessages,
   pinnedMessageIds,
+  showRegisterLinks,
 }: Props) {
   const router = useRouter();
   const pinnedSet = useMemo(() => new Set(pinnedMessageIds ?? []), [pinnedMessageIds]);
@@ -1081,6 +1085,7 @@ export function ChatPanel({
               pinned={pinnedMessages ?? []}
               onUnpin={togglePin}
               onFind={() => setSearchOpen(true)}
+              showRegisterLinks={showRegisterLinks}
             />
           </aside>
 
@@ -1108,6 +1113,7 @@ export function ChatPanel({
                     setSearchOpen(true);
                   }}
                   onClose={() => setRailOpen(false)}
+                  showRegisterLinks={showRegisterLinks}
                 />
               </aside>
             </div>

@@ -4,7 +4,20 @@ import { useState, type ComponentProps, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { PeopleRail } from '@/components/chat/people-rail';
-import { FileText, ImageIcon, Download, X, Search, Plus, Calendar } from '@/components/icons';
+import {
+  FileText,
+  ImageIcon,
+  Download,
+  X,
+  Search,
+  Plus,
+  Calendar,
+  ClipboardList,
+  Layers,
+  Send,
+  ShieldAlert,
+  HelpCircle,
+} from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { inputCompactClass as inputClass } from '@/components/ui/form';
 import type { ConversationFile, ChatAbout, PinnedMessage } from '@/lib/data/chat';
@@ -210,25 +223,61 @@ function PinnedRail({ pinned, onUnpin }: { pinned: PinnedMessage[]; onUnpin: (me
   );
 }
 
-function QuickActions({ projectId, onFind, onFiles }: { projectId: string; onFind?: () => void; onFiles: () => void }) {
-  const item = 'flex flex-1 flex-col items-center gap-1 rounded-md py-1.5 text-[11px] text-zinc-600 transition hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800';
+const quickItem =
+  'flex flex-col items-center gap-1 rounded-md py-1.5 text-[10px] leading-tight text-zinc-600 transition hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800';
+
+/** The rail's top action row. On the main Project Chat (`registerLinks`) it becomes
+ *  shortcuts into the construction registers; elsewhere (e.g. a task chat) it keeps
+ *  the generic Find / Files / Schedule / Add. */
+function QuickActions({
+  projectId,
+  onFind,
+  onFiles,
+  registerLinks,
+}: {
+  projectId: string;
+  onFind?: () => void;
+  onFiles: () => void;
+  registerLinks?: boolean;
+}) {
+  if (registerLinks) {
+    // Search stays in the chat header (the old rail "Find" duplicated it); Files
+    // remain reachable via the Files tab below.
+    const links = [
+      { href: `/projects/${projectId}/diary`, icon: ClipboardList, label: 'Diary' },
+      { href: `/projects/${projectId}/drawings`, icon: Layers, label: 'Drawings' },
+      { href: `/projects/${projectId}/transmittals`, icon: Send, label: 'Transmittals' },
+      { href: `/projects/${projectId}/snags`, icon: ShieldAlert, label: 'Snags' },
+      { href: `/projects/${projectId}/rfis`, icon: HelpCircle, label: 'RFIs' },
+    ];
+    return (
+      <div className="grid grid-cols-5 gap-0.5 border-b border-zinc-200 px-1.5 py-1.5 dark:border-zinc-800">
+        {links.map(({ href, icon: Icon, label }) => (
+          <Link key={href} href={href} className={quickItem} title={label}>
+            <Icon size={16} />
+            <span className="w-full break-words text-center">{label}</span>
+          </Link>
+        ))}
+      </div>
+    );
+  }
   return (
     <div className="flex items-stretch gap-1 border-b border-zinc-200 px-2 py-1.5 dark:border-zinc-800">
       {onFind && (
-        <button type="button" onClick={onFind} className={item}>
+        <button type="button" onClick={onFind} className={`flex-1 ${quickItem}`}>
           <Search size={16} />
           Find
         </button>
       )}
-      <button type="button" onClick={onFiles} className={item}>
+      <button type="button" onClick={onFiles} className={`flex-1 ${quickItem}`}>
         <FileText size={16} />
         Files
       </button>
-      <Link href={`/projects/${projectId}/calendar`} className={item}>
+      <Link href={`/projects/${projectId}/calendar`} className={`flex-1 ${quickItem}`}>
         <Calendar size={16} />
         Schedule
       </Link>
-      <Link href={`/projects/${projectId}/settings?tab=team`} className={item}>
+      <Link href={`/projects/${projectId}/settings?tab=team`} className={`flex-1 ${quickItem}`}>
         <Plus size={16} />
         Add
       </Link>
@@ -249,6 +298,7 @@ export function ChatRail({
   onUnpin,
   onFind,
   onClose,
+  showRegisterLinks,
 }: {
   people: PeopleProps;
   projectId: string;
@@ -260,6 +310,8 @@ export function ChatRail({
   onUnpin: (messageId: string) => void;
   onFind?: () => void;
   onClose?: () => void;
+  /** Main Project Chat only: swap the action row for register shortcuts. */
+  showRegisterLinks?: boolean;
 }) {
   const [tab, setTab] = useState<RailTab>('people');
   const TABS: { key: RailTab; label: string }[] = [
@@ -271,7 +323,7 @@ export function ChatRail({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <QuickActions projectId={projectId} onFind={onFind} onFiles={() => setTab('files')} />
+      <QuickActions projectId={projectId} onFind={onFind} onFiles={() => setTab('files')} registerLinks={showRegisterLinks} />
       <div className="flex items-center gap-1 overflow-x-auto border-b border-zinc-200 px-2 py-1.5 dark:border-zinc-800">
         {TABS.map((t) => (
           <button
