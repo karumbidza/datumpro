@@ -36,6 +36,7 @@ const EMPTY: ProgrammeData = {
   baselineFinish: null,
   hasCycle: false,
   autoSchedule: false,
+  baselinedAt: null,
 };
 
 /** Everything the programme/Gantt view needs: each task's bar window, the
@@ -46,15 +47,24 @@ export async function getProgrammeData(projectId: string): Promise<ProgrammeData
   const [calendarTasks, schedule, projectRes, orderRes] = await Promise.all([
     listCalendarTasks(projectId),
     getProjectSchedule(projectId),
-    supabase.from('projects').select('auto_schedule').eq('id', projectId).maybeSingle(),
-    supabase.from('tasks').select('id, programme_order').eq('project_id', projectId),
+    supabase.from('projects').select('auto_schedule, baselined_at').eq('id', projectId).maybeSingle(),
+    supabase.from('tasks').select('id, programme_order, baseline_start_date, baseline_end_date').eq('project_id', projectId),
   ]);
-  const autoSchedule = ((projectRes.data as { auto_schedule: boolean } | null)?.auto_schedule) ?? false;
+  const projectRow = projectRes.data as { auto_schedule: boolean; baselined_at: string | null } | null;
+  const autoSchedule = projectRow?.auto_schedule ?? false;
+  const baselinedAt = projectRow?.baselined_at ?? null;
   const orderById = new Map<string, number>();
-  for (const r of (orderRes.data ?? []) as { id: string; programme_order: number | null }[]) {
+  const baselineById = new Map<string, { start: string | null; end: string | null }>();
+  for (const r of (orderRes.data ?? []) as {
+    id: string;
+    programme_order: number | null;
+    baseline_start_date: string | null;
+    baseline_end_date: string | null;
+  }[]) {
     if (r.programme_order != null) orderById.set(r.id, r.programme_order);
+    if (r.baseline_start_date || r.baseline_end_date) baselineById.set(r.id, { start: r.baseline_start_date, end: r.baseline_end_date });
   }
-  if (calendarTasks.length === 0) return { ...EMPTY, autoSchedule };
+  if (calendarTasks.length === 0) return { ...EMPTY, autoSchedule, baselinedAt };
 
   const tasks: ProgrammeTask[] = [];
   const unscheduled: UnscheduledTask[] = [];
@@ -69,6 +79,7 @@ export async function getProgrammeData(projectId: string): Promise<ProgrammeData
       continue;
     }
     const meta = schedule?.meta[t.id];
+    const base = baselineById.get(t.id);
     tasks.push({
       id: t.id,
       title: t.title,
@@ -77,6 +88,8 @@ export async function getProgrammeData(projectId: string): Promise<ProgrammeData
       assigneeName: t.assigneeName,
       startIso: win.startIso,
       endIso: win.endIso,
+      baselineStartIso: base?.start ?? null,
+      baselineEndIso: base?.end ?? null,
       scheduled: win.scheduled,
       critical: meta?.critical ?? false,
       floatDays: meta?.floatDays ?? 0,
@@ -85,6 +98,9 @@ export async function getProgrammeData(projectId: string): Promise<ProgrammeData
     scheduledIds.add(t.id);
     if (!rangeStartIso || win.startIso < rangeStartIso) rangeStartIso = win.startIso;
     if (!rangeEndIso || win.endIso > rangeEndIso) rangeEndIso = win.endIso;
+    // Keep baseline ghosts inside the drawn range.
+    if (base?.start && (!rangeStartIso || base.start < rangeStartIso)) rangeStartIso = base.start;
+    if (base?.end && (!rangeEndIso || base.end > rangeEndIso)) rangeEndIso = base.end;
   }
 
   // Stable manual order (programme_order), falling back to start then title for
@@ -138,6 +154,12 @@ export async function getProgrammeData(projectId: string): Promise<ProgrammeData
       });
   }
 
+  // Prefer the true captured baseline finish; fall back to the planned-derived one.
+  let trueBaselineFinish: string | null = null;
+  for (const t of tasks) {
+    if (t.baselineEndIso && (!trueBaselineFinish || t.baselineEndIso > trueBaselineFinish)) trueBaselineFinish = t.baselineEndIso;
+  }
+
   return {
     tasks,
     unscheduled,
@@ -146,8 +168,9 @@ export async function getProgrammeData(projectId: string): Promise<ProgrammeData
     rangeEndIso,
     projectStart: schedule?.projectStart ?? null,
     projectedFinish: schedule?.projectedFinish ?? null,
-    baselineFinish: schedule?.baselineFinish ?? null,
+    baselineFinish: trueBaselineFinish ?? schedule?.baselineFinish ?? null,
     hasCycle: schedule?.schedule.hasCycle ?? false,
     autoSchedule,
+    baselinedAt,
   };
 }

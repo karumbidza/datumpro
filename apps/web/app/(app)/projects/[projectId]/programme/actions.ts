@@ -276,6 +276,21 @@ export async function reorderProgramme(formData: FormData): Promise<Result> {
   return { ok: true };
 }
 
+/** Capture the current plan as the programme baseline (snapshots every scheduled
+ *  task's planned window into its baseline columns). Managers only — the RPC
+ *  checks can_manage_project. Re-running re-baselines to the current plan. */
+export async function setBaseline(formData: FormData): Promise<Result> {
+  const { supabase } = await requireUser();
+  const projectId = String(formData.get('projectId') ?? '');
+  if (!projectId) return { ok: false, error: 'Missing project.' };
+
+  const { error } = await supabase.rpc('set_project_baseline', { p_project_id: projectId });
+  if (error) return { ok: false, error: error.message };
+
+  revalidate(projectId);
+  return { ok: true };
+}
+
 /** Toggle the project's opt-in auto-schedule cascade. RLS restricts to managers. */
 export async function setAutoSchedule(formData: FormData): Promise<Result> {
   const { supabase } = await requireUser();

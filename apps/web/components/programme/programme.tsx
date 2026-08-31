@@ -15,6 +15,7 @@ import {
   updateDependency,
   setAutoSchedule,
   reorderProgramme,
+  setBaseline,
 } from '@/app/(app)/projects/[projectId]/programme/actions';
 
 const DEP_OPTIONS: { value: DependencyType; label: string }[] = [
@@ -234,6 +235,7 @@ export function Programme({
   const [reorder, setReorder] = useState<{ taskId: string; overIndex: number } | null>(null);
   const [linkMenu, setLinkMenu] = useState<{ predecessorId: string; successorId: string; type: DependencyType; lag: number; x: number; y: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showBaseline, setShowBaseline] = useState(true);
   const rowsRef = useRef<HTMLDivElement>(null);
 
   const geom = useMemo(() => {
@@ -304,6 +306,14 @@ export function Programme({
     fd.set('enabled', String(!data.autoSchedule));
     const res = await setAutoSchedule(fd);
     if (!res.ok) flash(res.error ?? 'Could not change auto-schedule');
+    router.refresh();
+  }
+  async function runBaseline() {
+    if (data.baselinedAt && !window.confirm('Re-baseline to the current plan? This replaces the saved baseline.')) return;
+    const fd = new FormData();
+    fd.set('projectId', projectId);
+    const res = await setBaseline(fd);
+    if (!res.ok) flash(res.error ?? 'Could not set the baseline');
     router.refresh();
   }
 
@@ -491,29 +501,56 @@ export function Programme({
             )}
           </span>
         )}
-        {canModerate && (
-          <button
-            type="button"
-            role="switch"
-            aria-checked={data.autoSchedule}
-            onClick={toggleAuto}
-            className="ml-auto inline-flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300"
-            title="When on, moving a task shifts its dependent tasks forward so a successor never starts before its predecessor finishes."
-          >
-            <span
-              className={`relative h-4 w-7 shrink-0 rounded-full transition ${
-                data.autoSchedule ? 'bg-brand-500' : 'bg-zinc-300 dark:bg-zinc-600'
-              }`}
+        <div className="ml-auto flex flex-wrap items-center gap-3">
+          {data.baselinedAt && (
+            <button
+              type="button"
+              role="switch"
+              aria-checked={showBaseline}
+              onClick={() => setShowBaseline((v) => !v)}
+              className="inline-flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300"
+              title={`Baseline captured ${fmt(data.baselinedAt.slice(0, 10))}. Toggle the planned-vs-current comparison.`}
+            >
+              <span className={`relative h-4 w-7 shrink-0 rounded-full transition ${showBaseline ? 'bg-zinc-500' : 'bg-zinc-300 dark:bg-zinc-600'}`}>
+                <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${showBaseline ? 'left-3.5' : 'left-0.5'}`} />
+              </span>
+              Baseline
+            </button>
+          )}
+          {canModerate && (
+            <button
+              type="button"
+              onClick={runBaseline}
+              className="inline-flex items-center rounded-md border border-zinc-200 px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800/40"
+              title="Snapshot the current plan as the baseline to track slippage against."
+            >
+              {data.baselinedAt ? 'Update baseline' : 'Set baseline'}
+            </button>
+          )}
+          {canModerate && (
+            <button
+              type="button"
+              role="switch"
+              aria-checked={data.autoSchedule}
+              onClick={toggleAuto}
+              className="inline-flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300"
+              title="When on, moving a task shifts its dependent tasks forward so a successor never starts before its predecessor finishes."
             >
               <span
-                className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${
-                  data.autoSchedule ? 'left-3.5' : 'left-0.5'
+                className={`relative h-4 w-7 shrink-0 rounded-full transition ${
+                  data.autoSchedule ? 'bg-brand-500' : 'bg-zinc-300 dark:bg-zinc-600'
                 }`}
-              />
-            </span>
-            Auto-schedule dependents
-          </button>
-        )}
+              >
+                <span
+                  className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${
+                    data.autoSchedule ? 'left-3.5' : 'left-0.5'
+                  }`}
+                />
+              </span>
+              Auto-schedule dependents
+            </button>
+          )}
+        </div>
       </div>
 
       {data.hasCycle && (
@@ -612,6 +649,24 @@ export function Programme({
                     />
                   )}
 
+                  {/* Baseline ghosts — the frozen plan, drawn as a thin bar below each task */}
+                  {showBaseline &&
+                    data.tasks.map((t, i) => {
+                      if (!t.baselineStartIso || !t.baselineEndIso) return null;
+                      const bl = geom.offset(t.baselineStartIso) * DAY_W;
+                      const bdays = diffDaysIso(t.baselineEndIso, t.baselineStartIso) + 1;
+                      const bw = Math.max(bdays * DAY_W - 3, 6);
+                      const slipped = t.endIso > t.baselineEndIso;
+                      return (
+                        <div
+                          key={`bl-${t.id}`}
+                          className={`absolute rounded-sm ${slipped ? 'bg-red-400/40 dark:bg-red-500/40' : 'bg-zinc-400/50 dark:bg-zinc-500/50'}`}
+                          style={{ left: bl, top: i * ROW_H + ROW_H - 7, width: bw, height: 4 }}
+                          title={`Baseline: ${fmt(t.baselineStartIso)}–${fmt(t.baselineEndIso)}`}
+                        />
+                      );
+                    })}
+
                   {/* Dependency arrows (+ invisible hit paths to remove them) */}
                   <svg className="pointer-events-none absolute inset-0" width={geom.width} height={rowsH}>
                     <defs>
@@ -695,6 +750,8 @@ export function Programme({
                     const dragging = preview?.taskId === t.id;
                     const reordering = reorder?.taskId === t.id;
                     const floatW = !t.critical && t.floatDays > 0 && !dragging ? t.floatDays * DAY_W : 0;
+                    const variance = t.baselineEndIso ? diffDaysIso(w.endIso, t.baselineEndIso) : 0;
+                    const varianceText = variance > 0 ? ` · ${variance}d behind baseline` : variance < 0 ? ` · ${-variance}d ahead of baseline` : '';
                     return (
                       <div key={t.id} className={`group absolute ${reordering ? 'opacity-40' : ''}`} style={{ top: i * ROW_H + 6, left, height: ROW_H - 12 }}>
                         {/* Total float (slack) + its value */}
@@ -722,7 +779,7 @@ export function Programme({
                           } ${dragging ? 'ring-2 ring-brand-400' : ''}`}
                           title={`${t.title} · ${fmt(w.startIso)}–${fmt(w.endIso)} · ${STATUS_LABEL[t.status]}${
                             t.critical ? ' · critical' : t.floatDays > 0 ? ` · ${t.floatDays}d float` : ''
-                          }${t.waitingOn.length ? ` · waiting on ${t.waitingOn.join(', ')}` : ''}`}
+                          }${varianceText}${t.waitingOn.length ? ` · waiting on ${t.waitingOn.join(', ')}` : ''}`}
                         >
                           {canModerate && (
                             <span
@@ -817,6 +874,7 @@ export function Programme({
         <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> Done</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-orange-500" /> Blocked</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-0.5 w-4 rounded bg-zinc-300 dark:bg-zinc-600" /> Total float (slack days)</span>
+        {data.baselinedAt && <span className="inline-flex items-center gap-1.5"><span className="h-1 w-4 rounded-sm bg-zinc-400/60" /> Baseline (planned)</span>}
         {canModerate && <span>· Drag a bar sideways to move it, up/down to reorder, its edges to resize, the dots to link tasks, or a link to set its type</span>}
       </div>
 
