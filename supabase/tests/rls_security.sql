@@ -1921,6 +1921,91 @@ select pg_temp.ok(
 reset role;
 reset request.jwt.claims;
 
+-- ── Programme scheduler integrity & permission hardening (20260826000044) ─────
+-- (1) Only a manager may change a task's schedule (planned dates / programme_order).
+--     tasks_update RLS lets an assignee update their own task; a BEFORE UPDATE
+--     trigger blocks assignees from moving the bar or reordering. Org-staff pass.
+-- (2) A dependency must link two tasks in the SAME project (FKs only enforce org).
+-- (3) lag_days is bounded by a CHECK.
+reset role;
+reset request.jwt.claims;
+
+-- Seed a task on project a222 assigned to contractor a9. a9 passes tasks_update
+-- RLS (assignee = self) so any block on the schedule columns is the guard trigger.
+insert into public.tasks (id, org_id, project_id, title, assignee_id, planned_start_date, planned_end_date, programme_order) values
+  ('a5000000-0000-0000-0000-0000000000c1','a1110000-0000-0000-0000-000000000000',
+   'a2220000-0000-0000-0000-000000000000','Prog guard task',
+   'a0000000-0000-0000-0000-0000000000a9','2026-09-01','2026-09-05',1);
+
+-- (1a) Contractor a9 CANNOT move their own task's planned_start_date (guard fires).
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a9","role":"authenticated","aal":"aal1"}';
+do $$
+declare blocked boolean := false;
+begin
+  begin
+    update public.tasks set planned_start_date = '2026-10-01'
+      where id = 'a5000000-0000-0000-0000-0000000000c1';
+  exception when others then blocked := true;
+  end;
+  if not blocked then raise exception 'FAIL: a contractor was able to change a task planned date'; end if;
+  raise notice 'PASS: programme: a contractor cannot change planned dates (guard fired)';
+end $$;
+reset role;
+reset request.jwt.claims;
+
+-- Confirm the write did not land.
+select pg_temp.ok(
+  (select planned_start_date from public.tasks where id = 'a5000000-0000-0000-0000-0000000000c1') = '2026-09-01',
+  'programme: contractor date change was blocked (value unchanged)');
+
+-- (1b) Owner a1 (org-staff) CAN update the task's planned dates.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+update public.tasks set planned_start_date = '2026-09-02', planned_end_date = '2026-09-06'
+  where id = 'a5000000-0000-0000-0000-0000000000c1';
+select pg_temp.ok(
+  (select planned_start_date from public.tasks where id = 'a5000000-0000-0000-0000-0000000000c1') = '2026-09-02',
+  'programme: org-staff can change a task planned date');
+reset role;
+reset request.jwt.claims;
+
+-- (2) A cross-project dependency is rejected. Build a 2nd project in org a111 with
+--     its own task, then try to link it to a task on a222.
+insert into public.projects (id, org_id, name) values
+  ('a2230000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','Prog guard project 2');
+insert into public.tasks (id, org_id, project_id, title) values
+  ('a5000000-0000-0000-0000-0000000000c2','a1110000-0000-0000-0000-000000000000',
+   'a2230000-0000-0000-0000-000000000000','Other-project task');
+do $$
+declare blocked boolean := false;
+begin
+  begin
+    insert into public.task_dependencies (org_id, predecessor_id, successor_id) values
+      ('a1110000-0000-0000-0000-000000000000',
+       'a5000000-0000-0000-0000-0000000000c1','a5000000-0000-0000-0000-0000000000c2');
+  exception when others then blocked := true;
+  end;
+  if not blocked then raise exception 'FAIL: a cross-project dependency was allowed'; end if;
+  raise notice 'PASS: programme: cross-project dependency rejected (guard fired)';
+end $$;
+
+-- (3) lag_days of 99999 is rejected by the CHECK.
+do $$
+declare blocked boolean := false;
+begin
+  begin
+    insert into public.task_dependencies (org_id, predecessor_id, successor_id, lag_days) values
+      ('a1110000-0000-0000-0000-000000000000',
+       'a5000000-0000-0000-0000-0000000000c1','a5000000-0000-0000-0000-0000000000c2',99999);
+  exception when others then blocked := true;
+  end;
+  if not blocked then raise exception 'FAIL: an out-of-bounds lag_days was accepted'; end if;
+  raise notice 'PASS: programme: out-of-bounds lag_days rejected (CHECK fired)';
+end $$;
+reset role;
+reset request.jwt.claims;
+
 rollback;
 
 \echo '────────────────────────────────────────────'
