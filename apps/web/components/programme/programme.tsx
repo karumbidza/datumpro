@@ -138,8 +138,11 @@ function RescheduleForm({
   );
 }
 
-/** Edit an existing dependency: change its relationship type / lag, or remove it. */
+/** Create a new dependency or edit an existing one: choose the relationship type /
+ *  lag; in edit mode you can also remove it. In create mode the same selector is
+ *  used at draw time so the link lands with the chosen type + lag instead of FS/0. */
 function LinkEditor({
+  mode = 'edit',
   projectId,
   predecessorId,
   successorId,
@@ -150,6 +153,7 @@ function LinkEditor({
   onDone,
   onCancel,
 }: {
+  mode?: 'create' | 'edit';
   projectId: string;
   predecessorId: string;
   successorId: string;
@@ -157,15 +161,17 @@ function LinkEditor({
   succTitle: string;
   initialType: DependencyType;
   initialLag: number;
-  onDone: () => void;
+  onDone: (cascaded?: number) => void;
   onCancel: () => void;
 }) {
   const [type, setType] = useState<DependencyType>(initialType);
   const [lag, setLag] = useState(String(initialLag));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isCreate = mode === 'create';
+  const failMsg = isCreate ? 'Could not link the tasks' : 'Could not update dependency';
 
-  async function run(action: typeof updateDependency | typeof deleteDependency, withFields: boolean) {
+  async function run(action: typeof createDependency | typeof updateDependency | typeof deleteDependency, withFields: boolean) {
     setError(null);
     setBusy(true);
     try {
@@ -179,12 +185,12 @@ function LinkEditor({
       }
       const res = await action(fd);
       if (!res.ok) {
-        setError(res.error ?? 'Could not update dependency');
+        setError(res.error ?? failMsg);
         return;
       }
-      onDone();
+      onDone(res.cascaded);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not update dependency');
+      setError(err instanceof Error ? err.message : failMsg);
     } finally {
       setBusy(false);
     }
@@ -192,6 +198,7 @@ function LinkEditor({
 
   return (
     <div className="w-56 text-xs">
+      {isCreate && <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-zinc-400">New link</p>}
       <p className="mb-2 text-zinc-500 dark:text-zinc-400">
         <span className="text-zinc-700 dark:text-zinc-200">{predTitle}</span>
         {' → '}
@@ -208,17 +215,19 @@ function LinkEditor({
       <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Lag (days)</label>
       <input type="number" value={lag} onChange={(e) => setLag(e.target.value)} className={`${inputClass} mb-2`} />
       <div className="flex items-center justify-between gap-2">
-        <Button type="button" size="sm" disabled={busy} onClick={() => run(updateDependency, true)}>
-          {busy ? 'Saving…' : 'Save'}
+        <Button type="button" size="sm" disabled={busy} onClick={() => run(isCreate ? createDependency : updateDependency, true)}>
+          {busy ? 'Saving…' : isCreate ? 'Create' : 'Save'}
         </Button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => run(deleteDependency, false)}
-          className="text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
-        >
-          Remove
-        </button>
+        {!isCreate && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => run(deleteDependency, false)}
+            className="text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
+          >
+            Remove
+          </button>
+        )}
         <button type="button" onClick={onCancel} className="text-zinc-500 hover:underline dark:text-zinc-400">
           Cancel
         </button>
@@ -250,6 +259,9 @@ export function Programme({
   const [link, setLink] = useState<{ fromId: string; fromEdge: 'start' | 'finish'; x: number; y: number; overId: string | null } | null>(null);
   const [reorder, setReorder] = useState<{ taskId: string; overIndex: number } | null>(null);
   const [linkMenu, setLinkMenu] = useState<{ predecessorId: string; successorId: string; type: DependencyType; lag: number; x: number; y: number } | null>(null);
+  // A link drag has landed on a valid target: show the create-mode picker at the drop
+  // so the user chooses type + lag before the dependency is written (instead of FS/0).
+  const [pendingLink, setPendingLink] = useState<{ predecessorId: string; successorId: string; x: number; y: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showBaseline, setShowBaseline] = useState(true);
   const rowsRef = useRef<HTMLDivElement>(null);
@@ -334,6 +346,70 @@ export function Programme({
 
   const selectedTask = data.tasks.find((t) => t.id === selected) ?? null;
 
+  // Adjacency over the dependency graph, both directions, for reachability walks.
+  const depGraph = useMemo(() => {
+    const successors = new Map<string, string[]>(); // pred -> [succ]
+    const predecessors = new Map<string, string[]>(); // succ -> [pred]
+    const push = (m: Map<string, string[]>, k: string, v: string) => {
+      const arr = m.get(k);
+      if (arr) arr.push(v);
+      else m.set(k, [v]);
+    };
+    for (const e of data.edges) {
+      push(successors, e.predecessorId, e.successorId);
+      push(predecessors, e.successorId, e.predecessorId);
+    }
+    return { successors, predecessors };
+  }, [data.edges]);
+
+  // Every node reachable from `from` by following `edges` (a visited set guards
+  // against a graph that already contains a cycle).
+  function reachable(from: string, edges: Map<string, string[]>): Set<string> {
+    const seen = new Set<string>();
+    const stack = [from];
+    while (stack.length) {
+      const n = stack.pop()!;
+      for (const next of edges.get(n) ?? []) {
+        if (!seen.has(next)) {
+          seen.add(next);
+          stack.push(next);
+        }
+      }
+    }
+    return seen;
+  }
+
+  // The set of task ids that would be an invalid drop for the in-flight link drag,
+  // mirroring the DB's self/duplicate/cycle guards so we stop offering them. Keyed on
+  // the drag source + which edge it was drawn from (the edge flips pred/succ). Computed
+  // once when a link drag starts (`computeInvalidTargets`) and memoized while it lasts.
+  const computeInvalidTargets = (src: string, fromEdge: 'start' | 'finish'): Set<string> => {
+    const invalid = new Set<string>();
+    invalid.add(src); // self
+    if (fromEdge === 'finish') {
+      // Would create src → target: duplicate if target is already a direct successor,
+      // cycle if target is an ancestor of src (src is reachable from target).
+      for (const s of depGraph.successors.get(src) ?? []) invalid.add(s);
+      for (const t of reachable(src, depGraph.predecessors)) invalid.add(t);
+    } else {
+      // Would create target → src: duplicate if target is already a direct predecessor,
+      // cycle if target is a descendant of src (target reachable from src).
+      for (const p of depGraph.predecessors.get(src) ?? []) invalid.add(p);
+      for (const t of reachable(src, depGraph.successors)) invalid.add(t);
+    }
+    return invalid;
+  };
+  // Live invalid set for the render pass, recomputed only when the drag source /
+  // edge changes; empty when no link drag is in flight.
+  const invalidTargets = useMemo(
+    () => (link ? computeInvalidTargets(link.fromId, link.fromEdge) : new Set<string>()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [link?.fromId, link?.fromEdge, depGraph],
+  );
+  // A ref the pointer-move/up handlers read synchronously — it is seeded the moment a
+  // link drag begins, so the very first move already knows the invalid targets.
+  const invalidTargetsRef = useRef<Set<string>>(new Set());
+
   // The window to draw for a task: its previewed window while it's being dragged.
   const winOf = (t: ProgrammeTask): { startIso: string; endIso: string } =>
     preview && preview.taskId === t.id ? { startIso: preview.startIso, endIso: preview.endIso } : { startIso: t.startIso, endIso: t.endIso };
@@ -361,19 +437,13 @@ export function Programme({
         return;
       }
       setPreview((p) => (p && p.taskId === taskId ? null : p));
+      if (res.cascaded && res.cascaded > 0) {
+        flash(`${res.cascaded} dependent task${res.cascaded === 1 ? '' : 's'} rescheduled`);
+      }
       router.refresh();
     } finally {
       writingRef.current = false;
     }
-  }
-  async function runLink(predecessorId: string, successorId: string) {
-    const fd = new FormData();
-    fd.set('projectId', projectId);
-    fd.set('predecessorId', predecessorId);
-    fd.set('successorId', successorId);
-    const res = await createDependency(fd);
-    if (!res.ok) flash(res.error ?? 'Could not link the tasks');
-    router.refresh();
   }
   async function toggleAuto() {
     const fd = new FormData();
@@ -449,6 +519,10 @@ export function Programme({
     e.stopPropagation();
     // Suspend live-refresh for the lifetime of this gesture.
     draggingRef.current = true;
+    // Seed the invalid-target set for a link drag so the first move already knows
+    // which bars are un-droppable (self / duplicate / cycle).
+    invalidTargetsRef.current =
+      session.mode === 'link' ? computeInvalidTargets(session.taskId, session.fromEdge!) : new Set<string>();
     const startX = e.clientX;
     const startY = e.clientY;
     let moved = false;
@@ -464,12 +538,14 @@ export function Programme({
         const rect = rows.getBoundingClientRect();
         moved = true;
         const over = taskAtClientY(ev.clientY);
+        // Only a valid target lights up the drop highlight; invalid ones (self /
+        // duplicate / cycle) are surfaced as dimmed + not-allowed bars instead.
         setLink({
           fromId: session.taskId,
           fromEdge: session.fromEdge!,
           x: ev.clientX - rect.left,
           y: ev.clientY - rect.top,
-          overId: over && over.id !== session.taskId ? over.id : null,
+          overId: over && !invalidTargetsRef.current.has(over.id) ? over.id : null,
         });
         return;
       }
@@ -521,11 +597,17 @@ export function Programme({
       endDrag();
       if (session.mode === 'link') {
         const target = taskAtClientY(ev.clientY);
+        const rows = rowsRef.current;
+        const invalid = invalidTargetsRef.current;
         setLink(null);
-        if (target && target.id !== session.taskId) {
+        invalidTargetsRef.current = new Set();
+        // Only a valid target opens the picker; self / duplicate / cycle drops are ignored.
+        if (target && !invalid.has(target.id) && rows) {
           const predecessorId = session.fromEdge === 'finish' ? session.taskId : target.id;
           const successorId = session.fromEdge === 'finish' ? target.id : session.taskId;
-          void runLink(predecessorId, successorId);
+          // Defer creation: open the picker at the drop so the user chooses type + lag.
+          const rect = rows.getBoundingClientRect();
+          setPendingLink({ predecessorId, successorId, x: ev.clientX - rect.left, y: ev.clientY - rect.top });
         }
         return;
       }
@@ -868,12 +950,19 @@ export function Programme({
                     const width = Math.max(days * DAY_W - 3, 8);
                     const dragging = preview?.taskId === t.id;
                     const reordering = reorder?.taskId === t.id;
+                    // During a link drag, a self/duplicate/cycle target is un-droppable:
+                    // dim it and show a not-allowed cursor (and never highlight it).
+                    const linkInvalid = link != null && invalidTargets.has(t.id);
                     const started = STARTED_STATUSES.has(t.status);
                     const floatW = !t.critical && t.floatDays > 0 && !dragging ? t.floatDays * DAY_W : 0;
                     const variance = t.baselineEndIso ? diffDaysIso(w.endIso, t.baselineEndIso) : 0;
                     const varianceText = variance > 0 ? ` · ${variance}d behind baseline` : variance < 0 ? ` · ${-variance}d ahead of baseline` : '';
                     return (
-                      <div key={t.id} className={`group absolute ${reordering ? 'opacity-40' : ''}`} style={{ top: i * ROW_H + 6, left, height: ROW_H - 12 }}>
+                      <div
+                        key={t.id}
+                        className={`group absolute ${reordering ? 'opacity-40' : ''} ${linkInvalid ? 'cursor-not-allowed opacity-40' : ''}`}
+                        style={{ top: i * ROW_H + 6, left, height: ROW_H - 12 }}
+                      >
                         {/* Total float (slack) + its value */}
                         {floatW > 0 && (
                           <>
@@ -971,11 +1060,42 @@ export function Programme({
                         succTitle={titleById.get(linkMenu.successorId) ?? 'Task'}
                         initialType={linkMenu.type}
                         initialLag={linkMenu.lag}
-                        onDone={() => {
+                        onDone={(cascaded) => {
                           setLinkMenu(null);
+                          if (cascaded && cascaded > 0) {
+                            flash(`${cascaded} dependent task${cascaded === 1 ? '' : 's'} rescheduled`);
+                          }
                           router.refresh();
                         }}
                         onCancel={() => setLinkMenu(null)}
+                      />
+                    </div>
+                  )}
+
+                  {/* New-link picker (create mode) — appears at the drop of a link drag */}
+                  {pendingLink && (
+                    <div
+                      className="absolute z-20 -translate-x-1/2 rounded-lg border border-zinc-200 bg-white p-3 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+                      style={{ left: pendingLink.x, top: pendingLink.y + 6 }}
+                    >
+                      <LinkEditor
+                        key={`new-${pendingLink.predecessorId}-${pendingLink.successorId}`}
+                        mode="create"
+                        projectId={projectId}
+                        predecessorId={pendingLink.predecessorId}
+                        successorId={pendingLink.successorId}
+                        predTitle={titleById.get(pendingLink.predecessorId) ?? 'Task'}
+                        succTitle={titleById.get(pendingLink.successorId) ?? 'Task'}
+                        initialType="fs"
+                        initialLag={0}
+                        onDone={(cascaded) => {
+                          setPendingLink(null);
+                          if (cascaded && cascaded > 0) {
+                            flash(`${cascaded} dependent task${cascaded === 1 ? '' : 's'} rescheduled`);
+                          }
+                          router.refresh();
+                        }}
+                        onCancel={() => setPendingLink(null)}
                       />
                     </div>
                   )}
