@@ -34,6 +34,20 @@ function depTag(type: DependencyType, lag: number): string {
 function typeLabel(type: DependencyType): string {
   return DEP_OPTIONS.find((o) => o.value === type)?.label ?? type.toUpperCase();
 }
+// Plain-English sentence describing a dependency link for hover tooltips.
+function linkSentence(type: DependencyType, lagDays: number, predTitle: string, succTitle: string): string {
+  const pred = predTitle.length > 30 ? `${predTitle.slice(0, 30)}…` : predTitle;
+  const succ = succTitle.length > 30 ? `${succTitle.slice(0, 30)}…` : succTitle;
+  const dayWord = (n: number) => `${n} ${Math.abs(n) === 1 ? 'day' : 'days'}`;
+  const lagPhrase =
+    lagDays > 0 ? ` + ${dayWord(lagDays)}` : lagDays < 0 ? ` − ${dayWord(-lagDays)} overlap` : '';
+  switch (type) {
+    case 'fs': return `${succ} starts after ${pred} finishes${lagPhrase}`;
+    case 'ss': return `${succ} starts when ${pred} starts${lagPhrase}`;
+    case 'ff': return `${succ} finishes when ${pred} finishes${lagPhrase}`;
+    case 'sf': return `${succ} finishes when ${pred} starts${lagPhrase}`;
+  }
+}
 
 const DAY_W = 26; // px per day
 const ROW_H = 34; // px per task row
@@ -1047,8 +1061,12 @@ export function Programme({
                       const showTag = e.type !== 'fs' || e.lagDays !== 0;
                       // Dim edges not fully inside the selected task's chain.
                       const edgeDimmed = chainSet != null && !(chainSet.has(e.predecessorId) && chainSet.has(e.successorId));
+                      const predTitle = titleById.get(e.predecessorId) ?? 'Task';
+                      const succTitle = titleById.get(e.successorId) ?? 'Task';
+                      const tooltip = linkSentence(e.type, e.lagDays, predTitle, succTitle);
                       return (
                         <g key={i} className={edgeDimmed ? 'opacity-30' : ''}>
+                          <title>{tooltip}</title>
                           <path
                             d={d}
                             fill="none"
@@ -1072,7 +1090,7 @@ export function Programme({
                                 setLinkMenu({ predecessorId: e.predecessorId, successorId: e.successorId, type: e.type, lag: e.lagDays, x: midX, y: (y1 + y2) / 2 })
                               }
                             >
-                              <title>Edit dependency</title>
+                              <title>{tooltip}</title>
                             </path>
                           )}
                         </g>
