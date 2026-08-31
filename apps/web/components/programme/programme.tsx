@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { inputClass } from '@/components/ui/form';
-import { AlertTriangle, GanttChart } from '@/components/icons';
+import { AlertTriangle, GanttChart, HelpCircle } from '@/components/icons';
 import { parseDate, startOfDay, addDays, differenceInDays, formatDayMonth } from '@/lib/date';
 import type { TaskStatus, DependencyType } from '@datumpro/shared/domain';
 import type { ProgrammeData, ProgrammeTask } from '@/lib/data/programme-types';
@@ -29,6 +29,24 @@ const DEP_OPTIONS: { value: DependencyType; label: string }[] = [
 function depTag(type: DependencyType, lag: number): string {
   const base = type.toUpperCase();
   return lag > 0 ? `${base}+${lag}` : lag < 0 ? `${base}${lag}` : base;
+}
+// Human relationship label ("Finish → Start") for the relationships panel.
+function typeLabel(type: DependencyType): string {
+  return DEP_OPTIONS.find((o) => o.value === type)?.label ?? type.toUpperCase();
+}
+// Plain-English sentence describing a dependency link for hover tooltips.
+function linkSentence(type: DependencyType, lagDays: number, predTitle: string, succTitle: string): string {
+  const pred = predTitle.length > 30 ? `${predTitle.slice(0, 30)}…` : predTitle;
+  const succ = succTitle.length > 30 ? `${succTitle.slice(0, 30)}…` : succTitle;
+  const dayWord = (n: number) => `${n} ${Math.abs(n) === 1 ? 'day' : 'days'}`;
+  const lagPhrase =
+    lagDays > 0 ? ` + ${dayWord(lagDays)}` : lagDays < 0 ? ` − ${dayWord(-lagDays)} overlap` : '';
+  switch (type) {
+    case 'fs': return `${succ} starts after ${pred} finishes${lagPhrase}`;
+    case 'ss': return `${succ} starts when ${pred} starts${lagPhrase}`;
+    case 'ff': return `${succ} finishes when ${pred} finishes${lagPhrase}`;
+    case 'sf': return `${succ} finishes when ${pred} starts${lagPhrase}`;
+  }
 }
 
 const DAY_W = 26; // px per day
@@ -264,6 +282,7 @@ export function Programme({
   const [pendingLink, setPendingLink] = useState<{ predecessorId: string; successorId: string; x: number; y: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showBaseline, setShowBaseline] = useState(true);
+  const [showLegend, setShowLegend] = useState(false);
   const rowsRef = useRef<HTMLDivElement>(null);
   // A drag is in flight: while true the live subscription must not re-render the
   // bars out from under the active pointer handlers (they hold the drag's captured
@@ -414,6 +433,17 @@ export function Programme({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [link?.fromId, link?.fromEdge, depGraph],
   );
+  // When a task is selected, focus its full dependency chain: itself plus every
+  // transitive predecessor (ancestors) and successor (descendants). Everything
+  // outside this set is dimmed so "what it waits on / feeds into" is obvious.
+  const chainSet = useMemo(() => {
+    if (selected == null) return null;
+    const set = new Set<string>([selected]);
+    for (const t of reachable(selected, depGraph.successors)) set.add(t);
+    for (const t of reachable(selected, depGraph.predecessors)) set.add(t);
+    return set;
+  }, [selected, depGraph]);
+
   // A ref the pointer-move/up handlers read synchronously — it is seeded the moment a
   // link drag begins, so the very first move already knows the invalid targets.
   const invalidTargetsRef = useRef<Set<string>>(new Set());
@@ -501,6 +531,22 @@ export function Programme({
     fd.set('orderedIds', ids.join(','));
     const res = await reorderProgramme(fd);
     if (!res.ok) flash(res.error ?? 'Could not reorder');
+    router.refresh();
+  }
+
+  // Remove a dependency from the relationships panel (mirrors the LinkEditor's
+  // remove path). Confirms, calls deleteDependency, flashes on failure.
+  async function runUnlink(predecessorId: string, successorId: string) {
+    if (!window.confirm('Unlink these tasks?')) return;
+    const fd = new FormData();
+    fd.set('projectId', projectId);
+    fd.set('predecessorId', predecessorId);
+    fd.set('successorId', successorId);
+    const res = await deleteDependency(fd);
+    if (!res.ok) {
+      flash(res.error ?? 'Could not unlink');
+      return;
+    }
     router.refresh();
   }
 
@@ -759,8 +805,81 @@ export function Programme({
               Auto-schedule dependents
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => setShowLegend((v) => !v)}
+            aria-pressed={showLegend}
+            title="What the links mean"
+            className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition ${
+              showLegend
+                ? 'border-brand-300 bg-brand-50 text-brand-700 dark:border-brand-600 dark:bg-brand-500/10 dark:text-brand-300'
+                : 'border-zinc-200 text-zinc-500 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800/40'
+            }`}
+          >
+            <HelpCircle size={13} />
+            What the links mean
+          </button>
         </div>
       </div>
+
+      {/* Legend — relationship types + colour key */}
+      {showLegend && (
+        <div className="rounded-lg border border-zinc-200 bg-white p-3 shadow dark:border-zinc-700 dark:bg-zinc-900">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-zinc-400">What the links mean</span>
+            <button
+              type="button"
+              onClick={() => setShowLegend(false)}
+              aria-label="Close legend"
+              className="rounded p-0.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+            {/* Relationship types */}
+            <div>
+              <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.04em] text-zinc-400">Relationship types</p>
+              <ul className="space-y-1.5 text-xs text-zinc-700 dark:text-zinc-300">
+                <li>
+                  <span className="font-medium">Finish → Start</span>
+                  <span className="text-zinc-500 dark:text-zinc-400"> — successor starts after the predecessor finishes (the default).</span>
+                </li>
+                <li>
+                  <span className="font-medium">Start → Start</span>
+                  <span className="text-zinc-500 dark:text-zinc-400"> — they start together.</span>
+                </li>
+                <li>
+                  <span className="font-medium">Finish → Finish</span>
+                  <span className="text-zinc-500 dark:text-zinc-400"> — they finish together.</span>
+                </li>
+                <li>
+                  <span className="font-medium">Start → Finish</span>
+                  <span className="text-zinc-500 dark:text-zinc-400"> — successor finishes when the predecessor starts (rare).</span>
+                </li>
+              </ul>
+            </div>
+            {/* Colour key */}
+            <div>
+              <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.04em] text-zinc-400">Colour key</p>
+              <ul className="space-y-1.5 text-xs text-zinc-700 dark:text-zinc-300">
+                <li className="flex items-center gap-2">
+                  <span className="h-3 w-3 shrink-0 rounded-sm bg-red-500" />
+                  <span>Critical path — no float (any slip delays the finish).</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="h-1.5 w-5 shrink-0 rounded-sm bg-zinc-400/60" />
+                  <span>Baseline — the saved plan to track slippage against.</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="h-4 w-0.5 shrink-0 bg-brand-500" />
+                  <span>Today — the current date marker on the timeline.</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
 
       {data.hasCycle && (
         <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
@@ -787,6 +906,98 @@ export function Programme({
           onCancel={() => setSelected(null)}
         />
       )}
+
+      {/* Relationships panel — plain-English predecessors / successors for the
+          selected task, each with Edit (opens the link editor) and Unlink. */}
+      {selectedTask && (() => {
+        const waitsOn = data.edges.filter((e) => e.successorId === selected);
+        const feeds = data.edges.filter((e) => e.predecessorId === selected);
+        // Position the edit popover near the selected task's bar finish edge so it
+        // lands in view within the Gantt scroll area (x/y are rows-relative coords).
+        const openEdit = (e: (typeof data.edges)[number]) => {
+          const i = rowIndexById.get(selected!) ?? 0;
+          const t = data.tasks[i];
+          const x = t && geom ? (geom.offset(winOf(t).endIso) + 1) * DAY_W : 0;
+          const y = i * ROW_H + ROW_H / 2;
+          setLinkMenu({ predecessorId: e.predecessorId, successorId: e.successorId, type: e.type, lag: e.lagDays, x, y });
+        };
+        const Row = ({ e, otherId }: { e: (typeof data.edges)[number]; otherId: string }) => (
+          <li className="flex items-center gap-2 py-1">
+            <span className="min-w-0 flex-1 truncate text-xs text-zinc-700 dark:text-zinc-200">
+              {titleById.get(otherId) ?? 'Task'}
+              <span className="ml-1.5 text-[11px] text-zinc-400 dark:text-zinc-500">
+                {typeLabel(e.type)}{e.lagDays ? `, ${e.lagDays > 0 ? '+' : ''}${e.lagDays}d` : ''}
+              </span>
+            </span>
+            {canModerate && (
+              <span className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => openEdit(e)}
+                  className="text-[11px] text-zinc-500 hover:text-zinc-800 hover:underline dark:text-zinc-400 dark:hover:text-zinc-100"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void runUnlink(e.predecessorId, e.successorId)}
+                  className="text-[11px] text-red-600 hover:underline dark:text-red-400"
+                >
+                  Unlink
+                </button>
+              </span>
+            )}
+          </li>
+        );
+        return (
+          <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+            <div className="mb-2 flex items-center gap-2">
+              <span className="truncate text-sm font-medium text-zinc-800 dark:text-zinc-100">{selectedTask.title}</span>
+              <span className="text-[11px] uppercase tracking-[0.04em] text-zinc-400">Relationships</span>
+              <button
+                type="button"
+                onClick={() => setSelected(null)}
+                aria-label="Deselect task"
+                className="ml-auto shrink-0 rounded p-0.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+              >
+                ✕
+              </button>
+            </div>
+            {waitsOn.length === 0 && feeds.length === 0 ? (
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                No dependencies yet — drag from a bar&apos;s edge to link it.
+              </p>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-zinc-400">Waits on</p>
+                  {waitsOn.length === 0 ? (
+                    <p className="text-[11px] text-zinc-400 dark:text-zinc-500">Nothing</p>
+                  ) : (
+                    <ul className="divide-y divide-zinc-100 dark:divide-zinc-800/70">
+                      {waitsOn.map((e) => (
+                        <Row key={`${e.predecessorId}-${e.successorId}`} e={e} otherId={e.predecessorId} />
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div>
+                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-zinc-400">Feeds</p>
+                  {feeds.length === 0 ? (
+                    <p className="text-[11px] text-zinc-400 dark:text-zinc-500">Nothing</p>
+                  ) : (
+                    <ul className="divide-y divide-zinc-100 dark:divide-zinc-800/70">
+                      {feeds.map((e) => (
+                        <Row key={`${e.predecessorId}-${e.successorId}`} e={e} otherId={e.successorId} />
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* The chart: fixed label column + horizontally-scrolling timeline. */}
       <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
@@ -922,8 +1133,14 @@ export function Programme({
                       const d = `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`;
                       const crit = e.critical;
                       const showTag = e.type !== 'fs' || e.lagDays !== 0;
+                      // Dim edges not fully inside the selected task's chain.
+                      const edgeDimmed = chainSet != null && !(chainSet.has(e.predecessorId) && chainSet.has(e.successorId));
+                      const predTitle = titleById.get(e.predecessorId) ?? 'Task';
+                      const succTitle = titleById.get(e.successorId) ?? 'Task';
+                      const tooltip = linkSentence(e.type, e.lagDays, predTitle, succTitle);
                       return (
-                        <g key={i}>
+                        <g key={i} className={edgeDimmed ? 'opacity-30' : ''}>
+                          <title>{tooltip}</title>
                           <path
                             d={d}
                             fill="none"
@@ -947,7 +1164,7 @@ export function Programme({
                                 setLinkMenu({ predecessorId: e.predecessorId, successorId: e.successorId, type: e.type, lag: e.lagDays, x: midX, y: (y1 + y2) / 2 })
                               }
                             >
-                              <title>Edit dependency</title>
+                              <title>{tooltip}</title>
                             </path>
                           )}
                         </g>
@@ -978,6 +1195,8 @@ export function Programme({
                     // During a link drag, a self/duplicate/cycle target is un-droppable:
                     // dim it and show a not-allowed cursor (and never highlight it).
                     const linkInvalid = link != null && invalidTargets.has(t.id);
+                    // Dim bars outside the selected task's dependency chain.
+                    const chainDimmed = chainSet != null && !chainSet.has(t.id);
                     const started = STARTED_STATUSES.has(t.status);
                     const floatW = !t.critical && t.floatDays > 0 && !dragging ? t.floatDays * DAY_W : 0;
                     const variance = t.baselineEndIso ? diffDaysIso(w.endIso, t.baselineEndIso) : 0;
@@ -985,7 +1204,7 @@ export function Programme({
                     return (
                       <div
                         key={t.id}
-                        className={`group absolute ${reordering ? 'opacity-40' : ''} ${linkInvalid ? 'cursor-not-allowed opacity-40' : ''}`}
+                        className={`group absolute ${reordering ? 'opacity-40' : ''} ${linkInvalid ? 'cursor-not-allowed opacity-40' : ''} ${chainDimmed ? 'opacity-40' : ''}`}
                         style={{ top: i * ROW_H + 6, left, height: ROW_H - 12 }}
                       >
                         {/* Total float (slack) + its value */}
@@ -1010,7 +1229,9 @@ export function Programme({
                             STATUS_BAR[t.status]
                           } ${t.critical ? 'ring-2 ring-red-500 ring-offset-1 ring-offset-white dark:ring-offset-zinc-950' : ''} ${
                             t.scheduled ? '' : 'opacity-70'
-                          } ${dragging ? 'ring-2 ring-brand-400' : ''}`}
+                          } ${dragging ? 'ring-2 ring-brand-400' : ''} ${
+                            t.id === selected ? 'ring-2 ring-inset ring-brand-500' : ''
+                          }`}
                           title={`${t.title} · ${fmt(w.startIso)}–${fmt(w.endIso)} · ${STATUS_LABEL[t.status]}${
                             t.critical ? ' · critical' : t.floatDays > 0 ? ` · ${t.floatDays}d float` : ''
                           }${varianceText}${t.waitingOn.length ? ` · waiting on ${t.waitingOn.join(', ')}` : ''}`}
