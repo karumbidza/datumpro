@@ -69,6 +69,26 @@ export default async function ProjectChatPage({
           const canModerate = orgRole === 'owner' || orgRole === 'admin' || projectRole === 'pm';
           return (
             <>
+              {/* Messaging leads; the to-dos + events strip sits below it. */}
+              <ChatPanel
+                className="mt-3 min-h-0 flex-1"
+                title="Project Chat"
+                conversationId={conversationId}
+                orgId={project.org_id}
+                projectId={projectId}
+                currentUserId={user.id}
+                meName={meName}
+                initialMessages={messages}
+                othersReadSeq={othersRead}
+                canPost
+                canModerate={canModerate}
+                members={roster}
+                sharedFiles={sharedFiles}
+                about={about}
+                pinnedMessages={pinned}
+                pinnedMessageIds={pinned.map((p) => p.messageId)}
+                showRegisterLinks
+              />
               <div className="mt-3 grid gap-3 lg:grid-cols-2">
                 <ChatActionItems
                   projectId={projectId}
@@ -87,24 +107,6 @@ export default async function ProjectChatPage({
                   currentUserId={user.id}
                 />
               </div>
-              <ChatPanel
-                className="mt-3 min-h-0 flex-1"
-                title="Project Chat"
-                conversationId={conversationId}
-                orgId={project.org_id}
-                projectId={projectId}
-                currentUserId={user.id}
-                meName={meName}
-                initialMessages={messages}
-                othersReadSeq={othersRead}
-                canPost
-                canModerate={canModerate}
-                members={roster}
-                sharedFiles={sharedFiles}
-                about={about}
-                pinnedMessages={pinned}
-                pinnedMessageIds={pinned.map((p) => p.messageId)}
-              />
             </>
           );
         })()
