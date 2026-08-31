@@ -346,6 +346,70 @@ export function Programme({
 
   const selectedTask = data.tasks.find((t) => t.id === selected) ?? null;
 
+  // Adjacency over the dependency graph, both directions, for reachability walks.
+  const depGraph = useMemo(() => {
+    const successors = new Map<string, string[]>(); // pred -> [succ]
+    const predecessors = new Map<string, string[]>(); // succ -> [pred]
+    const push = (m: Map<string, string[]>, k: string, v: string) => {
+      const arr = m.get(k);
+      if (arr) arr.push(v);
+      else m.set(k, [v]);
+    };
+    for (const e of data.edges) {
+      push(successors, e.predecessorId, e.successorId);
+      push(predecessors, e.successorId, e.predecessorId);
+    }
+    return { successors, predecessors };
+  }, [data.edges]);
+
+  // Every node reachable from `from` by following `edges` (a visited set guards
+  // against a graph that already contains a cycle).
+  function reachable(from: string, edges: Map<string, string[]>): Set<string> {
+    const seen = new Set<string>();
+    const stack = [from];
+    while (stack.length) {
+      const n = stack.pop()!;
+      for (const next of edges.get(n) ?? []) {
+        if (!seen.has(next)) {
+          seen.add(next);
+          stack.push(next);
+        }
+      }
+    }
+    return seen;
+  }
+
+  // The set of task ids that would be an invalid drop for the in-flight link drag,
+  // mirroring the DB's self/duplicate/cycle guards so we stop offering them. Keyed on
+  // the drag source + which edge it was drawn from (the edge flips pred/succ). Computed
+  // once when a link drag starts (`computeInvalidTargets`) and memoized while it lasts.
+  const computeInvalidTargets = (src: string, fromEdge: 'start' | 'finish'): Set<string> => {
+    const invalid = new Set<string>();
+    invalid.add(src); // self
+    if (fromEdge === 'finish') {
+      // Would create src → target: duplicate if target is already a direct successor,
+      // cycle if target is an ancestor of src (src is reachable from target).
+      for (const s of depGraph.successors.get(src) ?? []) invalid.add(s);
+      for (const t of reachable(src, depGraph.predecessors)) invalid.add(t);
+    } else {
+      // Would create target → src: duplicate if target is already a direct predecessor,
+      // cycle if target is a descendant of src (target reachable from src).
+      for (const p of depGraph.predecessors.get(src) ?? []) invalid.add(p);
+      for (const t of reachable(src, depGraph.successors)) invalid.add(t);
+    }
+    return invalid;
+  };
+  // Live invalid set for the render pass, recomputed only when the drag source /
+  // edge changes; empty when no link drag is in flight.
+  const invalidTargets = useMemo(
+    () => (link ? computeInvalidTargets(link.fromId, link.fromEdge) : new Set<string>()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [link?.fromId, link?.fromEdge, depGraph],
+  );
+  // A ref the pointer-move/up handlers read synchronously — it is seeded the moment a
+  // link drag begins, so the very first move already knows the invalid targets.
+  const invalidTargetsRef = useRef<Set<string>>(new Set());
+
   // The window to draw for a task: its previewed window while it's being dragged.
   const winOf = (t: ProgrammeTask): { startIso: string; endIso: string } =>
     preview && preview.taskId === t.id ? { startIso: preview.startIso, endIso: preview.endIso } : { startIso: t.startIso, endIso: t.endIso };
@@ -452,6 +516,10 @@ export function Programme({
     e.stopPropagation();
     // Suspend live-refresh for the lifetime of this gesture.
     draggingRef.current = true;
+    // Seed the invalid-target set for a link drag so the first move already knows
+    // which bars are un-droppable (self / duplicate / cycle).
+    invalidTargetsRef.current =
+      session.mode === 'link' ? computeInvalidTargets(session.taskId, session.fromEdge!) : new Set<string>();
     const startX = e.clientX;
     const startY = e.clientY;
     let moved = false;
@@ -467,12 +535,14 @@ export function Programme({
         const rect = rows.getBoundingClientRect();
         moved = true;
         const over = taskAtClientY(ev.clientY);
+        // Only a valid target lights up the drop highlight; invalid ones (self /
+        // duplicate / cycle) are surfaced as dimmed + not-allowed bars instead.
         setLink({
           fromId: session.taskId,
           fromEdge: session.fromEdge!,
           x: ev.clientX - rect.left,
           y: ev.clientY - rect.top,
-          overId: over && over.id !== session.taskId ? over.id : null,
+          overId: over && !invalidTargetsRef.current.has(over.id) ? over.id : null,
         });
         return;
       }
@@ -525,8 +595,11 @@ export function Programme({
       if (session.mode === 'link') {
         const target = taskAtClientY(ev.clientY);
         const rows = rowsRef.current;
+        const invalid = invalidTargetsRef.current;
         setLink(null);
-        if (target && target.id !== session.taskId && rows) {
+        invalidTargetsRef.current = new Set();
+        // Only a valid target opens the picker; self / duplicate / cycle drops are ignored.
+        if (target && !invalid.has(target.id) && rows) {
           const predecessorId = session.fromEdge === 'finish' ? session.taskId : target.id;
           const successorId = session.fromEdge === 'finish' ? target.id : session.taskId;
           // Defer creation: open the picker at the drop so the user chooses type + lag.
@@ -874,12 +947,19 @@ export function Programme({
                     const width = Math.max(days * DAY_W - 3, 8);
                     const dragging = preview?.taskId === t.id;
                     const reordering = reorder?.taskId === t.id;
+                    // During a link drag, a self/duplicate/cycle target is un-droppable:
+                    // dim it and show a not-allowed cursor (and never highlight it).
+                    const linkInvalid = link != null && invalidTargets.has(t.id);
                     const started = STARTED_STATUSES.has(t.status);
                     const floatW = !t.critical && t.floatDays > 0 && !dragging ? t.floatDays * DAY_W : 0;
                     const variance = t.baselineEndIso ? diffDaysIso(w.endIso, t.baselineEndIso) : 0;
                     const varianceText = variance > 0 ? ` · ${variance}d behind baseline` : variance < 0 ? ` · ${-variance}d ahead of baseline` : '';
                     return (
-                      <div key={t.id} className={`group absolute ${reordering ? 'opacity-40' : ''}`} style={{ top: i * ROW_H + 6, left, height: ROW_H - 12 }}>
+                      <div
+                        key={t.id}
+                        className={`group absolute ${reordering ? 'opacity-40' : ''} ${linkInvalid ? 'cursor-not-allowed opacity-40' : ''}`}
+                        style={{ top: i * ROW_H + 6, left, height: ROW_H - 12 }}
+                      >
                         {/* Total float (slack) + its value */}
                         {floatW > 0 && (
                           <>
