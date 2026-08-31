@@ -18,11 +18,22 @@ import type { TaskStatus } from './tasks';
 
 const EPS = 1e-9;
 
+/**
+ * How two tasks are tied together (predecessor point → successor point):
+ *   fs — finish-to-start: successor can't START until predecessor FINISHES (+lag). The default.
+ *   ss — start-to-start:  successor can't START until predecessor STARTS (+lag).
+ *   ff — finish-to-finish: successor can't FINISH until predecessor FINISHES (+lag).
+ *   sf — start-to-finish: successor can't FINISH until predecessor STARTS (+lag). Rare.
+ */
+export type DependencyType = 'fs' | 'ss' | 'ff' | 'sf';
+
 export interface SchedDependency {
   /** A predecessor of the task carrying this dependency. */
   predecessorId: string;
-  /** Days that must elapse after the predecessor finishes before this can start. */
+  /** Days of lag (or lead, when negative) on the relationship. */
   lagDays: number;
+  /** Relationship type. Absent ⇒ finish-to-start (back-compat). */
+  type?: DependencyType;
 }
 
 export interface SchedTask {
@@ -61,6 +72,7 @@ export interface ScheduleResult {
 interface Edge {
   id: string;
   lag: number;
+  type: DependencyType;
 }
 
 /** Forward/backward CPM passes. Cycle-safe: returns hasCycle and an empty
@@ -81,8 +93,9 @@ export function computeSchedule(tasks: SchedTask[]): ScheduleResult {
   for (const t of tasks) {
     for (const d of t.dependencies) {
       if (!byId.has(d.predecessorId)) continue; // ignore dangling edges
-      successors.get(d.predecessorId)!.push({ id: t.id, lag: d.lagDays });
-      predecessors.get(t.id)!.push({ id: d.predecessorId, lag: d.lagDays });
+      const type = d.type ?? 'fs';
+      successors.get(d.predecessorId)!.push({ id: t.id, lag: d.lagDays, type });
+      predecessors.get(t.id)!.push({ id: d.predecessorId, lag: d.lagDays, type });
       indegree.set(t.id, (indegree.get(t.id) ?? 0) + 1);
     }
   }
@@ -103,30 +116,66 @@ export function computeSchedule(tasks: SchedTask[]): ScheduleResult {
     return { tasks: {}, projectDurationDays: 0, criticalPath: [], hasCycle: true };
   }
 
-  // Forward pass → ES/EF.
+  // Forward pass → ES/EF. Each predecessor edge imposes a minimum earliest start
+  // on the successor, per relationship type (finish/start anchor on each side).
   const es = new Map<string, number>();
   const ef = new Map<string, number>();
   for (const id of order) {
     let start = 0;
+    const d = dur(id);
     for (const p of predecessors.get(id)!) {
-      start = Math.max(start, (ef.get(p.id) ?? 0) + p.lag);
+      const pEs = es.get(p.id) ?? 0;
+      const pEf = ef.get(p.id) ?? 0;
+      let min: number;
+      switch (p.type) {
+        case 'ss':
+          min = pEs + p.lag;
+          break; // successor starts after predecessor starts
+        case 'ff':
+          min = pEf + p.lag - d;
+          break; // successor finishes after predecessor finishes
+        case 'sf':
+          min = pEs + p.lag - d;
+          break; // successor finishes after predecessor starts
+        default:
+          min = pEf + p.lag; // fs: successor starts after predecessor finishes
+      }
+      start = Math.max(start, min);
     }
     es.set(id, start);
-    ef.set(id, start + dur(id));
+    ef.set(id, start + d);
   }
   const projectDuration = ids.length ? Math.max(...ids.map((id) => ef.get(id) ?? 0)) : 0;
 
-  // Backward pass → LS/LF.
+  // Backward pass → LS/LF. Each successor edge caps this task's latest finish,
+  // the mirror of the forward rule for the relationship type.
   const lf = new Map<string, number>();
   const ls = new Map<string, number>();
   for (const id of [...order].reverse()) {
     const succ = successors.get(id)!;
+    const d = dur(id);
     let finish = succ.length ? Infinity : projectDuration;
     for (const s of succ) {
-      finish = Math.min(finish, (ls.get(s.id) ?? projectDuration) - s.lag);
+      const sLs = ls.get(s.id) ?? projectDuration;
+      const sLf = lf.get(s.id) ?? projectDuration;
+      let cap: number;
+      switch (s.type) {
+        case 'ss':
+          cap = sLs - s.lag + d;
+          break;
+        case 'ff':
+          cap = sLf - s.lag;
+          break;
+        case 'sf':
+          cap = sLf - s.lag + d;
+          break;
+        default:
+          cap = sLs - s.lag; // fs
+      }
+      finish = Math.min(finish, cap);
     }
     lf.set(id, finish);
-    ls.set(id, finish - dur(id));
+    ls.set(id, finish - d);
   }
 
   const out: Record<string, ScheduledTask> = {};

@@ -2,7 +2,9 @@
  *  `programme.ts` so the timeline client component can import the shapes without
  *  pulling a server module into the browser bundle. */
 
-import type { TaskStatus, TaskPriority } from '@datumpro/shared/domain';
+import type { TaskStatus, TaskPriority, DependencyType } from '@datumpro/shared/domain';
+
+export type { DependencyType };
 
 export interface ProgrammeTask {
   id: string;
@@ -23,6 +25,7 @@ export interface ProgrammeEdge {
   predecessorId: string;
   successorId: string;
   lagDays: number;
+  type: DependencyType;
 }
 
 export interface UnscheduledTask {
