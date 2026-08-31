@@ -251,6 +251,31 @@ export async function updateDependency(formData: FormData): Promise<Result> {
   return { ok: true };
 }
 
+/** Persist a new row order for the programme. The client sends the full ordered
+ *  list of task ids; each gets a sequential programme_order. RLS restricts writes
+ *  to managers. Rescheduling never touches this, so rows stay put until reordered. */
+export async function reorderProgramme(formData: FormData): Promise<Result> {
+  const { supabase } = await requireUser();
+  const projectId = String(formData.get('projectId') ?? '');
+  const ids = String(formData.get('orderedIds') ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (!projectId || ids.length === 0) return { ok: false, error: 'Missing order.' };
+
+  for (let i = 0; i < ids.length; i++) {
+    const { error } = await supabase
+      .from('tasks')
+      .update({ programme_order: i + 1 })
+      .eq('id', ids[i])
+      .eq('project_id', projectId);
+    if (error) return { ok: false, error: error.message };
+  }
+
+  revalidate(projectId);
+  return { ok: true };
+}
+
 /** Toggle the project's opt-in auto-schedule cascade. RLS restricts to managers. */
 export async function setAutoSchedule(formData: FormData): Promise<Result> {
   const { supabase } = await requireUser();
