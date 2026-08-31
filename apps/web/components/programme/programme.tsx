@@ -16,6 +16,7 @@ import {
   setAutoSchedule,
   reorderProgramme,
   setBaseline,
+  rescheduleProject,
 } from '@/app/(app)/projects/[projectId]/programme/actions';
 
 const DEP_OPTIONS: { value: DependencyType; label: string }[] = [
@@ -316,6 +317,14 @@ export function Programme({
     if (!res.ok) flash(res.error ?? 'Could not set the baseline');
     router.refresh();
   }
+  async function runRescheduleProject() {
+    if (!window.confirm('Reschedule the whole programme from today through the scheduler? This moves every task to its earliest working-day window.')) return;
+    const fd = new FormData();
+    fd.set('projectId', projectId);
+    const res = await rescheduleProject(fd);
+    if (!res.ok) flash(res.error ?? 'Could not reschedule the programme');
+    router.refresh();
+  }
 
   function indexAtClientY(clientY: number): number | null {
     const rows = rowsRef.current;
@@ -515,6 +524,16 @@ export function Programme({
                 <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${showBaseline ? 'left-3.5' : 'left-0.5'}`} />
               </span>
               Baseline
+            </button>
+          )}
+          {canModerate && (
+            <button
+              type="button"
+              onClick={runRescheduleProject}
+              className="inline-flex items-center rounded-md border border-zinc-200 px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800/40"
+              title="Recompute the whole programme through the scheduler, moving every task to its earliest working-day window from today."
+            >
+              Reschedule from today
             </button>
           )}
           {canModerate && (

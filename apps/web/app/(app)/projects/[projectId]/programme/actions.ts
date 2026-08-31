@@ -239,6 +239,36 @@ export async function setBaseline(formData: FormData): Promise<Result> {
   return { ok: true };
 }
 
+/**
+ * Recompute the WHOLE programme through the unified working-day CPM engine and
+ * write it — the manager's explicit "reschedule from today" action. Runs
+ * `computeProjectPlan` (FS/SS/FF/SF + lag on working days, started tasks pinned,
+ * never backdating) and persists every task's window (planned start/end + due
+ * date). Unlike the auto-schedule cascade this ignores the `auto_schedule` gate —
+ * it's a deliberate user action. Writes go through the migration-044 DB trigger,
+ * which enforces manager-only and surfaces its own error to non-managers. Returns
+ * an error if the dependency graph has a cycle.
+ */
+export async function rescheduleProject(formData: FormData): Promise<Result> {
+  const { supabase } = await requireUser();
+  const projectId = String(formData.get('projectId') ?? '');
+  if (!projectId) return { ok: false, error: 'Missing project.' };
+
+  const plan = await computeProjectPlan(supabase, projectId);
+  if (plan.length === 0) return { ok: false, error: 'Couldn’t schedule — check for a dependency loop.' };
+
+  for (const { id, start, end } of plan) {
+    const { error } = await supabase
+      .from('tasks')
+      .update({ planned_start_date: start, planned_end_date: end, due_date: end })
+      .eq('id', id);
+    if (error) return { ok: false, error: error.message };
+  }
+
+  revalidate(projectId);
+  return { ok: true };
+}
+
 /** Toggle the project's opt-in auto-schedule cascade. RLS restricts to managers. */
 export async function setAutoSchedule(formData: FormData): Promise<Result> {
   const { supabase } = await requireUser();
