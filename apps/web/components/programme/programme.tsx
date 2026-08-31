@@ -414,6 +414,17 @@ export function Programme({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [link?.fromId, link?.fromEdge, depGraph],
   );
+  // When a task is selected, focus its full dependency chain: itself plus every
+  // transitive predecessor (ancestors) and successor (descendants). Everything
+  // outside this set is dimmed so "what it waits on / feeds into" is obvious.
+  const chainSet = useMemo(() => {
+    if (selected == null) return null;
+    const set = new Set<string>([selected]);
+    for (const t of reachable(selected, depGraph.successors)) set.add(t);
+    for (const t of reachable(selected, depGraph.predecessors)) set.add(t);
+    return set;
+  }, [selected, depGraph]);
+
   // A ref the pointer-move/up handlers read synchronously — it is seeded the moment a
   // link drag begins, so the very first move already knows the invalid targets.
   const invalidTargetsRef = useRef<Set<string>>(new Set());
@@ -922,8 +933,10 @@ export function Programme({
                       const d = `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`;
                       const crit = e.critical;
                       const showTag = e.type !== 'fs' || e.lagDays !== 0;
+                      // Dim edges not fully inside the selected task's chain.
+                      const edgeDimmed = chainSet != null && !(chainSet.has(e.predecessorId) && chainSet.has(e.successorId));
                       return (
-                        <g key={i}>
+                        <g key={i} className={edgeDimmed ? 'opacity-30' : ''}>
                           <path
                             d={d}
                             fill="none"
@@ -978,6 +991,8 @@ export function Programme({
                     // During a link drag, a self/duplicate/cycle target is un-droppable:
                     // dim it and show a not-allowed cursor (and never highlight it).
                     const linkInvalid = link != null && invalidTargets.has(t.id);
+                    // Dim bars outside the selected task's dependency chain.
+                    const chainDimmed = chainSet != null && !chainSet.has(t.id);
                     const started = STARTED_STATUSES.has(t.status);
                     const floatW = !t.critical && t.floatDays > 0 && !dragging ? t.floatDays * DAY_W : 0;
                     const variance = t.baselineEndIso ? diffDaysIso(w.endIso, t.baselineEndIso) : 0;
@@ -985,7 +1000,7 @@ export function Programme({
                     return (
                       <div
                         key={t.id}
-                        className={`group absolute ${reordering ? 'opacity-40' : ''} ${linkInvalid ? 'cursor-not-allowed opacity-40' : ''}`}
+                        className={`group absolute ${reordering ? 'opacity-40' : ''} ${linkInvalid ? 'cursor-not-allowed opacity-40' : ''} ${chainDimmed ? 'opacity-40' : ''}`}
                         style={{ top: i * ROW_H + 6, left, height: ROW_H - 12 }}
                       >
                         {/* Total float (slack) + its value */}
@@ -1010,7 +1025,9 @@ export function Programme({
                             STATUS_BAR[t.status]
                           } ${t.critical ? 'ring-2 ring-red-500 ring-offset-1 ring-offset-white dark:ring-offset-zinc-950' : ''} ${
                             t.scheduled ? '' : 'opacity-70'
-                          } ${dragging ? 'ring-2 ring-brand-400' : ''}`}
+                          } ${dragging ? 'ring-2 ring-brand-400' : ''} ${
+                            t.id === selected ? 'ring-2 ring-inset ring-brand-500' : ''
+                          }`}
                           title={`${t.title} · ${fmt(w.startIso)}–${fmt(w.endIso)} · ${STATUS_LABEL[t.status]}${
                             t.critical ? ' · critical' : t.floatDays > 0 ? ` · ${t.floatDays}d float` : ''
                           }${varianceText}${t.waitingOn.length ? ` · waiting on ${t.waitingOn.join(', ')}` : ''}`}
