@@ -118,3 +118,12 @@ describe('inclusiveDays', () => {
     expect(inclusiveDays('2026-06-01', '2026-06-01')).toBe(1);
   });
 });
+
+it('pins a started task to its offset and pushes its FS successor after it', () => {
+  const r = computeSchedule([
+    { id: 'a', durationDays: 3, status: 'in_progress', weight: 1, dependencies: [], pinnedStartOffset: 5 },
+    { id: 'b', durationDays: 2, status: 'todo', weight: 1, dependencies: [{ predecessorId: 'a', lagDays: 0, type: 'fs' }] },
+  ]);
+  expect(r.tasks['a']!.es).toBe(5); // pinned, not 0
+  expect(r.tasks['b']!.es).toBe(8); // after a's finish (5+3)
+});

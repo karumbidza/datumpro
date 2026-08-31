@@ -48,6 +48,9 @@ export interface SchedTask {
   /** ISO dates used only for the planned-% (schedule) baseline. */
   plannedStart?: string | null;
   plannedEnd?: string | null;
+  /** Floor for earliest start (working-day offset); pins started tasks so they
+   *  hold their real date instead of floating to their earliest. */
+  pinnedStartOffset?: number;
 }
 
 export interface ScheduledTask {
@@ -142,6 +145,8 @@ export function computeSchedule(tasks: SchedTask[]): ScheduleResult {
       }
       start = Math.max(start, min);
     }
+    const pin = byId.get(id)?.pinnedStartOffset;
+    if (pin != null) start = Math.max(start, pin);
     es.set(id, start);
     ef.set(id, start + d);
   }
