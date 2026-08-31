@@ -138,8 +138,11 @@ function RescheduleForm({
   );
 }
 
-/** Edit an existing dependency: change its relationship type / lag, or remove it. */
+/** Create a new dependency or edit an existing one: choose the relationship type /
+ *  lag; in edit mode you can also remove it. In create mode the same selector is
+ *  used at draw time so the link lands with the chosen type + lag instead of FS/0. */
 function LinkEditor({
+  mode = 'edit',
   projectId,
   predecessorId,
   successorId,
@@ -150,6 +153,7 @@ function LinkEditor({
   onDone,
   onCancel,
 }: {
+  mode?: 'create' | 'edit';
   projectId: string;
   predecessorId: string;
   successorId: string;
@@ -164,8 +168,10 @@ function LinkEditor({
   const [lag, setLag] = useState(String(initialLag));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isCreate = mode === 'create';
+  const failMsg = isCreate ? 'Could not link the tasks' : 'Could not update dependency';
 
-  async function run(action: typeof updateDependency | typeof deleteDependency, withFields: boolean) {
+  async function run(action: typeof createDependency | typeof updateDependency | typeof deleteDependency, withFields: boolean) {
     setError(null);
     setBusy(true);
     try {
@@ -179,12 +185,12 @@ function LinkEditor({
       }
       const res = await action(fd);
       if (!res.ok) {
-        setError(res.error ?? 'Could not update dependency');
+        setError(res.error ?? failMsg);
         return;
       }
       onDone();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not update dependency');
+      setError(err instanceof Error ? err.message : failMsg);
     } finally {
       setBusy(false);
     }
@@ -192,6 +198,7 @@ function LinkEditor({
 
   return (
     <div className="w-56 text-xs">
+      {isCreate && <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-zinc-400">New link</p>}
       <p className="mb-2 text-zinc-500 dark:text-zinc-400">
         <span className="text-zinc-700 dark:text-zinc-200">{predTitle}</span>
         {' → '}
@@ -208,17 +215,19 @@ function LinkEditor({
       <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Lag (days)</label>
       <input type="number" value={lag} onChange={(e) => setLag(e.target.value)} className={`${inputClass} mb-2`} />
       <div className="flex items-center justify-between gap-2">
-        <Button type="button" size="sm" disabled={busy} onClick={() => run(updateDependency, true)}>
-          {busy ? 'Saving…' : 'Save'}
+        <Button type="button" size="sm" disabled={busy} onClick={() => run(isCreate ? createDependency : updateDependency, true)}>
+          {busy ? 'Saving…' : isCreate ? 'Create' : 'Save'}
         </Button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => run(deleteDependency, false)}
-          className="text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
-        >
-          Remove
-        </button>
+        {!isCreate && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => run(deleteDependency, false)}
+            className="text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
+          >
+            Remove
+          </button>
+        )}
         <button type="button" onClick={onCancel} className="text-zinc-500 hover:underline dark:text-zinc-400">
           Cancel
         </button>
@@ -250,6 +259,9 @@ export function Programme({
   const [link, setLink] = useState<{ fromId: string; fromEdge: 'start' | 'finish'; x: number; y: number; overId: string | null } | null>(null);
   const [reorder, setReorder] = useState<{ taskId: string; overIndex: number } | null>(null);
   const [linkMenu, setLinkMenu] = useState<{ predecessorId: string; successorId: string; type: DependencyType; lag: number; x: number; y: number } | null>(null);
+  // A link drag has landed on a valid target: show the create-mode picker at the drop
+  // so the user chooses type + lag before the dependency is written (instead of FS/0).
+  const [pendingLink, setPendingLink] = useState<{ predecessorId: string; successorId: string; x: number; y: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showBaseline, setShowBaseline] = useState(true);
   const rowsRef = useRef<HTMLDivElement>(null);
@@ -365,15 +377,6 @@ export function Programme({
     } finally {
       writingRef.current = false;
     }
-  }
-  async function runLink(predecessorId: string, successorId: string) {
-    const fd = new FormData();
-    fd.set('projectId', projectId);
-    fd.set('predecessorId', predecessorId);
-    fd.set('successorId', successorId);
-    const res = await createDependency(fd);
-    if (!res.ok) flash(res.error ?? 'Could not link the tasks');
-    router.refresh();
   }
   async function toggleAuto() {
     const fd = new FormData();
@@ -521,11 +524,14 @@ export function Programme({
       endDrag();
       if (session.mode === 'link') {
         const target = taskAtClientY(ev.clientY);
+        const rows = rowsRef.current;
         setLink(null);
-        if (target && target.id !== session.taskId) {
+        if (target && target.id !== session.taskId && rows) {
           const predecessorId = session.fromEdge === 'finish' ? session.taskId : target.id;
           const successorId = session.fromEdge === 'finish' ? target.id : session.taskId;
-          void runLink(predecessorId, successorId);
+          // Defer creation: open the picker at the drop so the user chooses type + lag.
+          const rect = rows.getBoundingClientRect();
+          setPendingLink({ predecessorId, successorId, x: ev.clientX - rect.left, y: ev.clientY - rect.top });
         }
         return;
       }
@@ -976,6 +982,31 @@ export function Programme({
                           router.refresh();
                         }}
                         onCancel={() => setLinkMenu(null)}
+                      />
+                    </div>
+                  )}
+
+                  {/* New-link picker (create mode) — appears at the drop of a link drag */}
+                  {pendingLink && (
+                    <div
+                      className="absolute z-20 -translate-x-1/2 rounded-lg border border-zinc-200 bg-white p-3 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+                      style={{ left: pendingLink.x, top: pendingLink.y + 6 }}
+                    >
+                      <LinkEditor
+                        key={`new-${pendingLink.predecessorId}-${pendingLink.successorId}`}
+                        mode="create"
+                        projectId={projectId}
+                        predecessorId={pendingLink.predecessorId}
+                        successorId={pendingLink.successorId}
+                        predTitle={titleById.get(pendingLink.predecessorId) ?? 'Task'}
+                        succTitle={titleById.get(pendingLink.successorId) ?? 'Task'}
+                        initialType="fs"
+                        initialLag={0}
+                        onDone={() => {
+                          setPendingLink(null);
+                          router.refresh();
+                        }}
+                        onCancel={() => setPendingLink(null)}
                       />
                     </div>
                   )}
