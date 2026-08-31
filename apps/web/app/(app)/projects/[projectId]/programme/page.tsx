@@ -5,7 +5,6 @@ import { myProjectRole } from '@/lib/data/members';
 import { myOrgRole } from '@/lib/data/tasks';
 import { getProgrammeData } from '@/lib/data/programme';
 import { Programme } from '@/components/programme/programme';
-import { LiveRefresh } from '@/components/live-refresh';
 import { PageContainer } from '@/components/shell/page-container';
 import { PageHeader } from '@/components/ui/page-header';
 
@@ -31,17 +30,11 @@ export default async function ProjectProgrammePage({
 
   return (
     <PageContainer width="full" className="space-y-6">
-      <LiveRefresh
-        subscriptions={[
-          { table: 'tasks', filter: `project_id=eq.${projectId}` },
-          { table: 'task_dependencies', filter: `org_id=eq.${project.org_id}` },
-        ]}
-      />
       <PageHeader
         title="Programme"
         subtitle={<>{project.name} — the schedule by date, with the critical path and dependencies</>}
       />
-      <Programme projectId={projectId} data={data} canModerate={canModerate} />
+      <Programme projectId={projectId} orgId={project.org_id} data={data} canModerate={canModerate} />
     </PageContainer>
   );
 }
