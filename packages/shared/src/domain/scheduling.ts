@@ -80,7 +80,10 @@ interface Edge {
 
 /** Forward/backward CPM passes. Cycle-safe: returns hasCycle and an empty
  *  schedule rather than looping forever (the DB already rejects cycles). */
-export function computeSchedule(tasks: SchedTask[]): ScheduleResult {
+export function computeSchedule(
+  tasks: SchedTask[],
+  opts?: { minStartOffset?: number },
+): ScheduleResult {
   const ids = tasks.map((t) => t.id);
   const byId = new Map(tasks.map((t) => [t.id, t]));
   const dur = (id: string) => Math.max(0, byId.get(id)?.durationDays ?? 0);
@@ -146,7 +149,8 @@ export function computeSchedule(tasks: SchedTask[]): ScheduleResult {
       start = Math.max(start, min);
     }
     const pin = byId.get(id)?.pinnedStartOffset;
-    if (pin != null) start = Math.max(start, pin);
+    if (pin != null) start = Math.max(start, pin); // pinned: hold real offset, may be < today
+    else if (opts?.minStartOffset != null) start = Math.max(start, opts.minStartOffset); // else: not before today
     es.set(id, start);
     ef.set(id, start + d);
   }

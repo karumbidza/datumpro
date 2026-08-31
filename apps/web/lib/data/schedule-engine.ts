@@ -26,7 +26,9 @@ function num(v: unknown): number | null {
  * Loads the project's org calendar, tasks, durations and dependencies, runs the
  * shared CPM engine (`computeSchedule`) to get earliest-start working-day offsets
  * honouring FS/SS/FF/SF + lag, then maps those offsets to real dates via the org
- * work calendar. Never backdates before today. Returns `[]` on a dependency cycle.
+ * work calendar. Un-started tasks never start before today; started tasks keep
+ * their real (possibly past) dates and are excluded from the returned list so
+ * callers never overwrite them. Returns `[]` on a dependency cycle.
  */
 export async function computeProjectPlan(
   supabase: SupabaseServerClient,
@@ -34,17 +36,15 @@ export async function computeProjectPlan(
 ): Promise<{ id: string; start: string; end: string }[]> {
   const today = new Date().toISOString().slice(0, 10);
 
-  // 1) Project — org + start floor (never before today).
+  // 1) Project — org (the baseline is derived from today + started tasks below).
   const { data: project } = await supabase
     .from('projects')
-    .select('org_id, start_date')
+    .select('org_id')
     .eq('id', projectId)
     .single();
   if (!project) return [];
 
   const orgId = project.org_id as string;
-  const rawStart = (project.start_date as string | null) ?? null;
-  const projectStart = rawStart && rawStart > today ? rawStart : today;
 
   // 2) Work calendar — org's row, else Mon–Fri default; ZW public holidays.
   const { data: calRow } = await supabase
@@ -111,13 +111,29 @@ export async function computeProjectPlan(
     depsBySuccessor.set(successorId, list);
   }
 
+  // Baseline = earliest of today and the min planned start among STARTED tasks
+  // that carry one, so a task begun in the past maps to its real (past) offset.
+  // If nothing started earlier, the baseline is today (no backdating of fresh work).
+  let baseline = today;
+  for (const t of tasks) {
+    if (!STARTED_STATUSES.has(t.status as string)) continue;
+    const ps = (t.planned_start_date as string | null) ?? null;
+    if (ps && ps < baseline) baseline = ps;
+  }
+
+  // Today's offset from the baseline (≥ 0): the floor for un-started tasks.
+  const minStartOffset = Math.max(0, workingDaysBetween(baseline, today, cal) - 1);
+
   // Working-day duration per task.
   const durationOf = new Map<string, number>();
+  const startedOf = new Map<string, boolean>();
   const schedTasks: SchedTask[] = tasks.map((t) => {
     const id = t.id as string;
     const plannedStart = (t.planned_start_date as string | null) ?? null;
     const plannedEnd = (t.planned_end_date as string | null) ?? null;
     const dueDate = (t.due_date as string | null) ?? null;
+    const started = STARTED_STATUSES.has(t.status as string);
+    startedOf.set(id, started);
 
     const agreed = num(t.agreed_duration_days);
     let duration: number;
@@ -129,10 +145,10 @@ export async function computeProjectPlan(
     }
     durationOf.set(id, duration);
 
-    // 5) Pin started tasks to their real start offset.
+    // 5) Pin started tasks to their real start offset (baseline ≤ plannedStart ⇒ ≥ 0).
     let pinnedStartOffset: number | undefined;
-    if (STARTED_STATUSES.has(t.status as string) && plannedStart) {
-      pinnedStartOffset = Math.max(0, workingDaysBetween(projectStart, plannedStart, cal) - 1);
+    if (started && plannedStart) {
+      pinnedStartOffset = Math.max(0, workingDaysBetween(baseline, plannedStart, cal) - 1);
     }
 
     return {
@@ -147,16 +163,20 @@ export async function computeProjectPlan(
     };
   });
 
-  // 6) Run the CPM engine.
-  const result = computeSchedule(schedTasks);
+  // 6) Run the CPM engine — floor un-pinned tasks at today's offset.
+  const result = computeSchedule(schedTasks, { minStartOffset });
   if (result.hasCycle) return [];
 
-  // 7) Map offsets → working-day dates.
-  return schedTasks.map((t) => {
-    const es = result.tasks[t.id]?.es ?? 0;
-    const start = addWorkingDays(projectStart, es, cal);
-    const duration = durationOf.get(t.id) ?? 1;
-    const end = addWorkingDays(start, Math.max(1, duration) - 1, cal);
-    return { id: t.id, start, end };
-  });
+  // 7) Map offsets → working-day dates. Started tasks stay as pins (so successors
+  // follow their real end) but are excluded from the output — callers must never
+  // overwrite a started task's real dates.
+  return schedTasks
+    .filter((t) => !startedOf.get(t.id))
+    .map((t) => {
+      const es = result.tasks[t.id]?.es ?? 0;
+      const start = addWorkingDays(baseline, es, cal);
+      const duration = durationOf.get(t.id) ?? 1;
+      const end = addWorkingDays(start, Math.max(1, duration) - 1, cal);
+      return { id: t.id, start, end };
+    });
 }
