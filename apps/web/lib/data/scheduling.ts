@@ -6,6 +6,7 @@ import {
   type SchedTask,
   type ScheduleResult,
   type ProgressResult,
+  type DependencyType,
 } from '@datumpro/shared/domain';
 import type { TaskStatus } from '@datumpro/shared/domain';
 import { myOrgRole } from '@/lib/data/tasks';
@@ -62,7 +63,7 @@ export async function getProjectSchedule(projectId: string): Promise<ProjectSche
   const ids = tasks.map((t) => t.id);
   const { data: depData } = await supabase
     .from('task_dependencies')
-    .select('predecessor_id, successor_id, lag_days')
+    .select('predecessor_id, successor_id, lag_days, type')
     .in('successor_id', ids);
 
   // Cost-weighted Earned Value only for viewers allowed to see costs (staff / the
@@ -81,10 +82,10 @@ export async function getProjectSchedule(projectId: string): Promise<ProjectSche
     }
   }
 
-  const depsBySuccessor = new Map<string, { predecessorId: string; lagDays: number }[]>();
-  for (const d of (depData ?? []) as { predecessor_id: string; successor_id: string; lag_days: number }[]) {
+  const depsBySuccessor = new Map<string, { predecessorId: string; lagDays: number; type: DependencyType }[]>();
+  for (const d of (depData ?? []) as { predecessor_id: string; successor_id: string; lag_days: number; type: DependencyType | null }[]) {
     const list = depsBySuccessor.get(d.successor_id) ?? [];
-    list.push({ predecessorId: d.predecessor_id, lagDays: d.lag_days });
+    list.push({ predecessorId: d.predecessor_id, lagDays: d.lag_days, type: d.type ?? 'fs' });
     depsBySuccessor.set(d.successor_id, list);
   }
 
@@ -111,8 +112,9 @@ export async function getProjectSchedule(projectId: string): Promise<ProjectSche
   const meta: Record<string, TaskScheduleMeta> = {};
   for (const id of ids) {
     const s = schedule.tasks[id];
+    // Only finish-to-start links "block" a start until the predecessor is done.
     const waitingOn = (depsBySuccessor.get(id) ?? [])
-      .filter((d) => statusById.get(d.predecessorId) !== 'done')
+      .filter((d) => d.type === 'fs' && statusById.get(d.predecessorId) !== 'done')
       .map((d) => titleById.get(d.predecessorId) ?? 'a task');
     meta[id] = { critical: s?.critical ?? false, floatDays: s?.float ?? 0, waitingOn };
   }

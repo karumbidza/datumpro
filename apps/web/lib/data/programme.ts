@@ -96,11 +96,11 @@ export async function getProgrammeData(projectId: string): Promise<ProgrammeData
     const supabase = await createClient();
     const { data: depData } = await supabase
       .from('task_dependencies')
-      .select('predecessor_id, successor_id, lag_days')
+      .select('predecessor_id, successor_id, lag_days, type')
       .in('successor_id', [...scheduledIds]);
-    edges = ((depData ?? []) as { predecessor_id: string; successor_id: string; lag_days: number }[])
+    edges = ((depData ?? []) as { predecessor_id: string; successor_id: string; lag_days: number; type: ProgrammeEdge['type'] | null }[])
       .filter((d) => scheduledIds.has(d.predecessor_id))
-      .map((d) => ({ predecessorId: d.predecessor_id, successorId: d.successor_id, lagDays: d.lag_days }));
+      .map((d) => ({ predecessorId: d.predecessor_id, successorId: d.successor_id, lagDays: d.lag_days, type: d.type ?? 'fs' }));
   }
 
   return {

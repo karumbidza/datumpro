@@ -6,14 +6,26 @@ import { Button } from '@/components/ui/button';
 import { inputClass } from '@/components/ui/form';
 import { AlertTriangle, GanttChart } from '@/components/icons';
 import { parseDate, startOfDay, addDays, differenceInDays, formatDayMonth } from '@/lib/date';
-import type { TaskStatus } from '@datumpro/shared/domain';
+import type { TaskStatus, DependencyType } from '@datumpro/shared/domain';
 import type { ProgrammeData, ProgrammeTask } from '@/lib/data/programme-types';
 import {
   rescheduleTask,
   createDependency,
   deleteDependency,
+  updateDependency,
   setAutoSchedule,
 } from '@/app/(app)/projects/[projectId]/programme/actions';
+
+const DEP_OPTIONS: { value: DependencyType; label: string }[] = [
+  { value: 'fs', label: 'Finish → Start' },
+  { value: 'ss', label: 'Start → Start' },
+  { value: 'ff', label: 'Finish → Finish' },
+  { value: 'sf', label: 'Start → Finish' },
+];
+function depTag(type: DependencyType, lag: number): string {
+  const base = type.toUpperCase();
+  return lag > 0 ? `${base}+${lag}` : lag < 0 ? `${base}${lag}` : base;
+}
 
 const DAY_W = 26; // px per day
 const ROW_H = 34; // px per task row
@@ -119,10 +131,92 @@ function RescheduleForm({
   );
 }
 
+/** Edit an existing dependency: change its relationship type / lag, or remove it. */
+function LinkEditor({
+  projectId,
+  predecessorId,
+  successorId,
+  predTitle,
+  succTitle,
+  initialType,
+  initialLag,
+  onDone,
+  onCancel,
+}: {
+  projectId: string;
+  predecessorId: string;
+  successorId: string;
+  predTitle: string;
+  succTitle: string;
+  initialType: DependencyType;
+  initialLag: number;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const [type, setType] = useState<DependencyType>(initialType);
+  const [lag, setLag] = useState(String(initialLag));
+  const [busy, setBusy] = useState(false);
+
+  async function run(action: typeof updateDependency | typeof deleteDependency, withFields: boolean) {
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.set('projectId', projectId);
+      fd.set('predecessorId', predecessorId);
+      fd.set('successorId', successorId);
+      if (withFields) {
+        fd.set('type', type);
+        fd.set('lagDays', String(Number.parseInt(lag, 10) || 0));
+      }
+      await action(fd);
+      onDone();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="w-56 text-xs">
+      <p className="mb-2 text-zinc-500 dark:text-zinc-400">
+        <span className="text-zinc-700 dark:text-zinc-200">{predTitle}</span>
+        {' → '}
+        <span className="text-zinc-700 dark:text-zinc-200">{succTitle}</span>
+      </p>
+      <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Relationship</label>
+      <select value={type} onChange={(e) => setType(e.target.value as DependencyType)} className={`${inputClass} mb-2`}>
+        {DEP_OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Lag (days)</label>
+      <input type="number" value={lag} onChange={(e) => setLag(e.target.value)} className={`${inputClass} mb-2`} />
+      <div className="flex items-center justify-between gap-2">
+        <Button type="button" size="sm" disabled={busy} onClick={() => run(updateDependency, true)}>
+          {busy ? 'Saving…' : 'Save'}
+        </Button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => run(deleteDependency, false)}
+          className="text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
+        >
+          Remove
+        </button>
+        <button type="button" onClick={onCancel} className="text-zinc-500 hover:underline dark:text-zinc-400">
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** The project programme: a Gantt timeline with a critical-path highlight, float,
  *  dependency arrows, a today marker and projected-vs-baseline finish. Managers can
  *  drag a bar to move it, drag its edges to resize, and drag between bars to link
- *  them (finish-to-start). With auto-schedule on, dependents cascade forward. */
+ *  them. Click a link to change its type (FS/SS/FF/SF) or lag. With auto-schedule
+ *  on, dependents cascade forward. */
 export function Programme({
   projectId,
   data,
@@ -136,7 +230,7 @@ export function Programme({
   const [selected, setSelected] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ taskId: string; startIso: string; endIso: string } | null>(null);
   const [link, setLink] = useState<{ fromId: string; fromEdge: 'start' | 'finish'; x: number; y: number } | null>(null);
-  const [linkMenu, setLinkMenu] = useState<{ predecessorId: string; successorId: string; x: number; y: number } | null>(null);
+  const [linkMenu, setLinkMenu] = useState<{ predecessorId: string; successorId: string; type: DependencyType; lag: number; x: number; y: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const rowsRef = useRef<HTMLDivElement>(null);
 
@@ -200,16 +294,6 @@ export function Programme({
     fd.set('successorId', successorId);
     const res = await createDependency(fd);
     if (!res.ok) flash(res.error ?? 'Could not link the tasks');
-    router.refresh();
-  }
-  async function runUnlink(predecessorId: string, successorId: string) {
-    setLinkMenu(null);
-    const fd = new FormData();
-    fd.set('projectId', projectId);
-    fd.set('predecessorId', predecessorId);
-    fd.set('successorId', successorId);
-    const res = await deleteDependency(fd);
-    if (!res.ok) flash(res.error ?? 'Could not remove the link');
     router.refresh();
   }
   async function toggleAuto() {
@@ -470,13 +554,17 @@ export function Programme({
                       const st = data.tasks[si]!;
                       const pw = winOf(pt);
                       const sw = winOf(st);
-                      const x1 = (geom.offset(pw.endIso) + 1) * DAY_W;
+                      // Each end attaches to the finish or start of its bar, per type.
+                      const predAtFinish = e.type === 'fs' || e.type === 'ff';
+                      const succAtStart = e.type === 'fs' || e.type === 'ss';
+                      const x1 = predAtFinish ? (geom.offset(pw.endIso) + 1) * DAY_W : geom.offset(pw.startIso) * DAY_W;
                       const y1 = pi * ROW_H + ROW_H / 2;
-                      const x2 = geom.offset(sw.startIso) * DAY_W;
+                      const x2 = succAtStart ? geom.offset(sw.startIso) * DAY_W : (geom.offset(sw.endIso) + 1) * DAY_W;
                       const y2 = si * ROW_H + ROW_H / 2;
                       const midX = Math.max(x1 + 8, x2 - 8);
                       const d = `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`;
                       const crit = pt.critical && st.critical;
+                      const showTag = e.type !== 'fs' || e.lagDays !== 0;
                       return (
                         <g key={i}>
                           <path
@@ -486,6 +574,11 @@ export function Programme({
                             strokeWidth={1.5}
                             markerEnd="url(#pm-arrow)"
                           />
+                          {showTag && (
+                            <text x={midX + 3} y={(y1 + y2) / 2 - 3} fontSize={9} className="fill-zinc-500 dark:fill-zinc-400">
+                              {depTag(e.type, e.lagDays)}
+                            </text>
+                          )}
                           {canModerate && (
                             <path
                               d={d}
@@ -494,10 +587,10 @@ export function Programme({
                               strokeWidth={11}
                               className="pointer-events-auto cursor-pointer"
                               onClick={() =>
-                                setLinkMenu({ predecessorId: e.predecessorId, successorId: e.successorId, x: midX, y: (y1 + y2) / 2 })
+                                setLinkMenu({ predecessorId: e.predecessorId, successorId: e.successorId, type: e.type, lag: e.lagDays, x: midX, y: (y1 + y2) / 2 })
                               }
                             >
-                              <title>Remove dependency</title>
+                              <title>Edit dependency</title>
                             </path>
                           )}
                         </g>
@@ -591,29 +684,27 @@ export function Programme({
                     );
                   })}
 
-                  {/* Remove-dependency popover */}
+                  {/* Dependency editor popover */}
                   {linkMenu && (
                     <div
-                      className="absolute z-20 -translate-x-1/2 rounded-lg border border-zinc-200 bg-white p-2 text-xs shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+                      className="absolute z-20 -translate-x-1/2 rounded-lg border border-zinc-200 bg-white p-3 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
                       style={{ left: linkMenu.x, top: linkMenu.y + 6 }}
                     >
-                      <p className="mb-1.5 max-w-[180px] text-zinc-500 dark:text-zinc-400">
-                        <span className="text-zinc-700 dark:text-zinc-200">{titleById.get(linkMenu.predecessorId) ?? 'Task'}</span>
-                        {' → '}
-                        <span className="text-zinc-700 dark:text-zinc-200">{titleById.get(linkMenu.successorId) ?? 'Task'}</span>
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => runUnlink(linkMenu.predecessorId, linkMenu.successorId)}
-                          className="rounded bg-red-500 px-2 py-1 font-medium text-white hover:bg-red-600"
-                        >
-                          Remove link
-                        </button>
-                        <button type="button" onClick={() => setLinkMenu(null)} className="text-zinc-500 hover:underline dark:text-zinc-400">
-                          Cancel
-                        </button>
-                      </div>
+                      <LinkEditor
+                        key={`${linkMenu.predecessorId}-${linkMenu.successorId}`}
+                        projectId={projectId}
+                        predecessorId={linkMenu.predecessorId}
+                        successorId={linkMenu.successorId}
+                        predTitle={titleById.get(linkMenu.predecessorId) ?? 'Task'}
+                        succTitle={titleById.get(linkMenu.successorId) ?? 'Task'}
+                        initialType={linkMenu.type}
+                        initialLag={linkMenu.lag}
+                        onDone={() => {
+                          setLinkMenu(null);
+                          router.refresh();
+                        }}
+                        onCancel={() => setLinkMenu(null)}
+                      />
                     </div>
                   )}
                 </div>
@@ -630,7 +721,7 @@ export function Programme({
         <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> Done</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-orange-500" /> Blocked</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-0.5 w-4 rounded bg-zinc-300 dark:bg-zinc-600" /> Float</span>
-        {canModerate && <span>· Drag a bar to move it, its edges to resize, or the dots to link tasks</span>}
+        {canModerate && <span>· Drag a bar to move it, its edges to resize, the dots to link tasks, or a link to set its type</span>}
       </div>
 
       {data.unscheduled.length > 0 && (

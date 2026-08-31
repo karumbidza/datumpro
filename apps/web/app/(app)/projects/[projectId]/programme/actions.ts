@@ -34,6 +34,13 @@ function diffDays(a: string, b: string): number {
   return Math.round((Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`)) / 86_400_000);
 }
 
+const DEP_TYPES = ['fs', 'ss', 'ff', 'sf'] as const;
+type DepType = (typeof DEP_TYPES)[number];
+function parseType(value: unknown): DepType {
+  const v = String(value ?? 'fs');
+  return (DEP_TYPES as readonly string[]).includes(v) ? (v as DepType) : 'fs';
+}
+
 function revalidate(projectId: string, taskId?: string) {
   revalidatePath(`/projects/${projectId}/programme`);
   revalidatePath(`/projects/${projectId}/calendar`);
@@ -73,9 +80,9 @@ async function cascadeProject(supabase: SupabaseClient, projectId: string): Prom
   const ids = rows.map((r) => r.id);
   const { data: depData } = await supabase
     .from('task_dependencies')
-    .select('predecessor_id, successor_id, lag_days')
+    .select('predecessor_id, successor_id, lag_days, type')
     .in('successor_id', ids);
-  const edges = (depData ?? []) as { predecessor_id: string; successor_id: string; lag_days: number }[];
+  const edges = (depData ?? []) as { predecessor_id: string; successor_id: string; lag_days: number; type: string | null }[];
   if (edges.length === 0) return 0;
 
   // Working window per task: only fully-planned tasks are movable.
@@ -98,9 +105,26 @@ async function cascadeProject(supabase: SupabaseClient, projectId: string): Prom
       const pred = win.get(e.predecessor_id);
       const succ = win.get(e.successor_id);
       if (!pred || !succ || !succ.scheduled) continue; // only move real windows
-      const minStart = shiftIso(pred.end, 1 + (e.lag_days || 0));
-      if (succ.start < minStart) {
-        const delta = diffDays(minStart, succ.start);
+      const lag = e.lag_days || 0;
+      const type = e.type ?? 'fs';
+      // Each type constrains a different successor anchor. fs/ss pin the start;
+      // ff/sf pin the finish. Shift the successor forward (preserving duration)
+      // only when its anchor sits earlier than the relationship allows.
+      let delta = 0;
+      if (type === 'ss') {
+        const minStart = shiftIso(pred.start, lag);
+        if (succ.start < minStart) delta = diffDays(minStart, succ.start);
+      } else if (type === 'ff') {
+        const minEnd = shiftIso(pred.end, lag);
+        if (succ.end < minEnd) delta = diffDays(minEnd, succ.end);
+      } else if (type === 'sf') {
+        const minEnd = shiftIso(pred.start, lag);
+        if (succ.end < minEnd) delta = diffDays(minEnd, succ.end);
+      } else {
+        const minStart = shiftIso(pred.end, 1 + lag);
+        if (succ.start < minStart) delta = diffDays(minStart, succ.start);
+      }
+      if (delta > 0) {
         succ.start = shiftIso(succ.start, delta);
         succ.end = shiftIso(succ.end, delta);
         shifted.add(e.successor_id);
@@ -156,6 +180,7 @@ export async function createDependency(formData: FormData): Promise<Result> {
   const predecessorId = String(formData.get('predecessorId') ?? '');
   const successorId = String(formData.get('successorId') ?? '');
   const lagRaw = Number(formData.get('lagDays') ?? 0);
+  const type = parseType(formData.get('type'));
   if (!projectId || !predecessorId || !successorId) return { ok: false, error: 'Missing task.' };
   if (predecessorId === successorId) return { ok: false, error: 'A task can’t depend on itself.' };
 
@@ -172,6 +197,7 @@ export async function createDependency(formData: FormData): Promise<Result> {
     predecessor_id: predecessorId,
     successor_id: successorId,
     lag_days: Number.isFinite(lagRaw) ? Math.trunc(lagRaw) : 0,
+    type,
   });
   if (error) {
     if (/circular/i.test(error.message)) return { ok: false, error: 'That would create a circular dependency.' };
@@ -199,6 +225,28 @@ export async function deleteDependency(formData: FormData): Promise<Result> {
     .eq('successor_id', successorId);
   if (error) return { ok: false, error: error.message };
 
+  revalidate(projectId);
+  return { ok: true };
+}
+
+/** Change a link's relationship type and/or lag. Cascades when auto-schedule is on. */
+export async function updateDependency(formData: FormData): Promise<Result> {
+  const { supabase } = await requireUser();
+  const projectId = String(formData.get('projectId') ?? '');
+  const predecessorId = String(formData.get('predecessorId') ?? '');
+  const successorId = String(formData.get('successorId') ?? '');
+  const type = parseType(formData.get('type'));
+  const lagRaw = Number(formData.get('lagDays') ?? 0);
+  if (!projectId || !predecessorId || !successorId) return { ok: false, error: 'Missing link.' };
+
+  const { error } = await supabase
+    .from('task_dependencies')
+    .update({ type, lag_days: Number.isFinite(lagRaw) ? Math.trunc(lagRaw) : 0 })
+    .eq('predecessor_id', predecessorId)
+    .eq('successor_id', successorId);
+  if (error) return { ok: false, error: error.message };
+
+  await cascadeProject(supabase, projectId);
   revalidate(projectId);
   return { ok: true };
 }
