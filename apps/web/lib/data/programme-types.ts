@@ -41,4 +41,6 @@ export interface ProgrammeData {
   projectedFinish: string | null;
   baselineFinish: string | null;
   hasCycle: boolean;
+  /** Per-project opt-in: moving a task cascades its dependents forward. */
+  autoSchedule: boolean;
 }

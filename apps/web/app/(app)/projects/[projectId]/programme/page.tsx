@@ -31,7 +31,12 @@ export default async function ProjectProgrammePage({
 
   return (
     <PageContainer width="6xl" className="space-y-6">
-      <LiveRefresh subscriptions={[{ table: 'tasks', filter: `project_id=eq.${projectId}` }]} />
+      <LiveRefresh
+        subscriptions={[
+          { table: 'tasks', filter: `project_id=eq.${projectId}` },
+          { table: 'task_dependencies', filter: `org_id=eq.${project.org_id}` },
+        ]}
+      />
       <PageHeader
         title="Programme"
         subtitle={<>{project.name} — the schedule by date, with the critical path and dependencies</>}

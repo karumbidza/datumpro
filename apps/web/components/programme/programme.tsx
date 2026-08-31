@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type FormEvent } from 'react';
+import { useMemo, useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { inputClass } from '@/components/ui/form';
@@ -8,7 +8,12 @@ import { AlertTriangle, GanttChart } from '@/components/icons';
 import { parseDate, startOfDay, addDays, differenceInDays, formatDayMonth } from '@/lib/date';
 import type { TaskStatus } from '@datumpro/shared/domain';
 import type { ProgrammeData, ProgrammeTask } from '@/lib/data/programme-types';
-import { rescheduleTask } from '@/app/(app)/projects/[projectId]/programme/actions';
+import {
+  rescheduleTask,
+  createDependency,
+  deleteDependency,
+  setAutoSchedule,
+} from '@/app/(app)/projects/[projectId]/programme/actions';
 
 const DAY_W = 26; // px per day
 const ROW_H = 34; // px per task row
@@ -38,6 +43,23 @@ function fmt(iso: string): string {
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
+// UTC-based arithmetic on YYYY-MM-DD, so day shifts don't drift across timezones.
+function shiftIso(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+function diffDaysIso(a: string, b: string): number {
+  return Math.round((Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`)) / 86_400_000);
+}
+
+type DragSession = {
+  mode: 'move' | 'resize-start' | 'resize-end' | 'link';
+  taskId: string;
+  origStart: string;
+  origEnd: string;
+  fromEdge?: 'start' | 'finish';
+};
 
 function RescheduleForm({
   task,
@@ -99,7 +121,8 @@ function RescheduleForm({
 
 /** The project programme: a Gantt timeline with a critical-path highlight, float,
  *  dependency arrows, a today marker and projected-vs-baseline finish. Managers can
- *  click a bar to reschedule it inline. */
+ *  drag a bar to move it, drag its edges to resize, and drag between bars to link
+ *  them (finish-to-start). With auto-schedule on, dependents cascade forward. */
 export function Programme({
   projectId,
   data,
@@ -111,6 +134,11 @@ export function Programme({
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ taskId: string; startIso: string; endIso: string } | null>(null);
+  const [link, setLink] = useState<{ fromId: string; fromEdge: 'start' | 'finish'; x: number; y: number } | null>(null);
+  const [linkMenu, setLinkMenu] = useState<{ predecessorId: string; successorId: string; x: number; y: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const rowsRef = useRef<HTMLDivElement>(null);
 
   const geom = useMemo(() => {
     if (!data.rangeStartIso || !data.rangeEndIso) return null;
@@ -123,7 +151,6 @@ export function Programme({
       const d = parseDate(iso);
       return d ? differenceInDays(startOfDay(d), start) : 0;
     };
-    // Week ticks (every 7 days from the padded start).
     const ticks: { x: number; label: string }[] = [];
     for (let i = 0; i <= totalDays; i += 7) {
       ticks.push({ x: i * DAY_W, label: formatDayMonth(addDays(start, i)) });
@@ -139,8 +166,137 @@ export function Programme({
     data.tasks.forEach((t, i) => m.set(t.id, i));
     return m;
   }, [data.tasks]);
+  const titleById = useMemo(() => {
+    const m = new Map<string, string>();
+    data.tasks.forEach((t) => m.set(t.id, t.title));
+    return m;
+  }, [data.tasks]);
 
   const selectedTask = data.tasks.find((t) => t.id === selected) ?? null;
+
+  // The window to draw for a task: its previewed window while it's being dragged.
+  const winOf = (t: ProgrammeTask): { startIso: string; endIso: string } =>
+    preview && preview.taskId === t.id ? { startIso: preview.startIso, endIso: preview.endIso } : { startIso: t.startIso, endIso: t.endIso };
+
+  function flash(message: string) {
+    setError(message);
+    window.setTimeout(() => setError((cur) => (cur === message ? null : cur)), 4000);
+  }
+
+  async function runReschedule(taskId: string, start: string, end: string) {
+    const fd = new FormData();
+    fd.set('taskId', taskId);
+    fd.set('projectId', projectId);
+    fd.set('plannedStartDate', start);
+    fd.set('plannedEndDate', end);
+    const res = await rescheduleTask(fd);
+    if (!res.ok) flash(res.error ?? 'Could not reschedule');
+    router.refresh();
+  }
+  async function runLink(predecessorId: string, successorId: string) {
+    const fd = new FormData();
+    fd.set('projectId', projectId);
+    fd.set('predecessorId', predecessorId);
+    fd.set('successorId', successorId);
+    const res = await createDependency(fd);
+    if (!res.ok) flash(res.error ?? 'Could not link the tasks');
+    router.refresh();
+  }
+  async function runUnlink(predecessorId: string, successorId: string) {
+    setLinkMenu(null);
+    const fd = new FormData();
+    fd.set('projectId', projectId);
+    fd.set('predecessorId', predecessorId);
+    fd.set('successorId', successorId);
+    const res = await deleteDependency(fd);
+    if (!res.ok) flash(res.error ?? 'Could not remove the link');
+    router.refresh();
+  }
+  async function toggleAuto() {
+    const fd = new FormData();
+    fd.set('projectId', projectId);
+    fd.set('enabled', String(!data.autoSchedule));
+    const res = await setAutoSchedule(fd);
+    if (!res.ok) flash(res.error ?? 'Could not change auto-schedule');
+    router.refresh();
+  }
+
+  function taskAtClientY(clientY: number): ProgrammeTask | null {
+    const rows = rowsRef.current;
+    if (!rows) return null;
+    const rect = rows.getBoundingClientRect();
+    const idx = Math.floor((clientY - rect.top) / ROW_H);
+    return idx >= 0 && idx < data.tasks.length ? data.tasks[idx]! : null;
+  }
+
+  function startDrag(e: ReactPointerEvent, session: DragSession) {
+    if (!canModerate) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    let moved = false;
+    let cur = { startIso: session.origStart, endIso: session.origEnd };
+
+    const onMove = (ev: globalThis.PointerEvent) => {
+      if (session.mode === 'link') {
+        const rows = rowsRef.current;
+        if (!rows) return;
+        const rect = rows.getBoundingClientRect();
+        moved = true;
+        setLink({ fromId: session.taskId, fromEdge: session.fromEdge!, x: ev.clientX - rect.left, y: ev.clientY - rect.top });
+        return;
+      }
+      const days = Math.round((ev.clientX - startX) / DAY_W);
+      if (days !== 0) moved = true;
+      const t = todayIso();
+      if (session.mode === 'move') {
+        let s = shiftIso(session.origStart, days);
+        let en = shiftIso(session.origEnd, days);
+        if (s < t) {
+          const back = diffDaysIso(t, s);
+          s = shiftIso(s, back);
+          en = shiftIso(en, back);
+        }
+        cur = { startIso: s, endIso: en };
+      } else if (session.mode === 'resize-start') {
+        let s = shiftIso(session.origStart, days);
+        if (s < t) s = t;
+        if (s > session.origEnd) s = session.origEnd;
+        cur = { startIso: s, endIso: session.origEnd };
+      } else {
+        let en = shiftIso(session.origEnd, days);
+        if (en < session.origStart) en = session.origStart;
+        cur = { startIso: session.origStart, endIso: en };
+      }
+      setPreview({ taskId: session.taskId, startIso: cur.startIso, endIso: cur.endIso });
+    };
+
+    const onUp = (ev: globalThis.PointerEvent) => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      if (session.mode === 'link') {
+        const target = taskAtClientY(ev.clientY);
+        setLink(null);
+        if (target && target.id !== session.taskId) {
+          const predecessorId = session.fromEdge === 'finish' ? session.taskId : target.id;
+          const successorId = session.fromEdge === 'finish' ? target.id : session.taskId;
+          void runLink(predecessorId, successorId);
+        }
+        return;
+      }
+      setPreview(null);
+      if (!moved) {
+        setSelected((prev) => (prev === session.taskId ? null : session.taskId));
+        return;
+      }
+      if (cur.startIso !== session.origStart || cur.endIso !== session.origEnd) {
+        void runReschedule(session.taskId, cur.startIso, cur.endIso);
+      }
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }
 
   if (data.tasks.length === 0) {
     return (
@@ -157,11 +313,20 @@ export function Programme({
   }
 
   const rowsH = data.tasks.length * ROW_H;
+  const linkSourcePoint = (() => {
+    if (!link || !geom) return null;
+    const i = rowIndexById.get(link.fromId);
+    const t = data.tasks.find((x) => x.id === link.fromId);
+    if (i == null || !t) return null;
+    const w = winOf(t);
+    const x = link.fromEdge === 'finish' ? (geom.offset(w.endIso) + 1) * DAY_W : geom.offset(w.startIso) * DAY_W;
+    return { x, y: i * ROW_H + ROW_H / 2 };
+  })();
 
   return (
     <div className="space-y-4">
-      {/* Finish summary */}
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+      {/* Finish summary + auto-schedule toggle */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
         {data.projectStart && (
           <span className="text-zinc-500 dark:text-zinc-400">
             Start <strong className="text-zinc-800 dark:text-zinc-100">{fmt(data.projectStart)}</strong>
@@ -183,12 +348,42 @@ export function Programme({
             )}
           </span>
         )}
+        {canModerate && (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={data.autoSchedule}
+            onClick={toggleAuto}
+            className="ml-auto inline-flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300"
+            title="When on, moving a task shifts its dependent tasks forward so a successor never starts before its predecessor finishes."
+          >
+            <span
+              className={`relative h-4 w-7 shrink-0 rounded-full transition ${
+                data.autoSchedule ? 'bg-brand-500' : 'bg-zinc-300 dark:bg-zinc-600'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${
+                  data.autoSchedule ? 'left-3.5' : 'left-0.5'
+                }`}
+              />
+            </span>
+            Auto-schedule dependents
+          </button>
+        )}
       </div>
 
       {data.hasCycle && (
         <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
           <AlertTriangle size={15} className="mt-0.5 shrink-0" />
           <span>A circular dependency was detected — the critical path can&apos;t be computed until it&apos;s resolved.</span>
+        </div>
+      )}
+
+      {error && (
+        <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+          <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+          <span>{error}</span>
         </div>
       )}
 
@@ -207,7 +402,7 @@ export function Programme({
       {/* The chart: fixed label column + horizontally-scrolling timeline. */}
       <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
         <div className="flex">
-          {/* Labels */}
+          {/* Labels — task name + assignee */}
           <div className="shrink-0 border-r border-zinc-200 dark:border-zinc-800" style={{ width: LABEL_W }}>
             <div style={{ height: AXIS_H }} className="border-b border-zinc-200 bg-zinc-50 px-3 text-[11px] font-medium uppercase tracking-wide leading-[34px] text-zinc-400 dark:border-zinc-800 dark:bg-zinc-900/40">
               Task
@@ -218,13 +413,18 @@ export function Programme({
                 type="button"
                 onClick={() => canModerate && setSelected(t.id === selected ? null : t.id)}
                 style={{ height: ROW_H }}
-                className={`flex w-full items-center gap-1.5 border-b border-zinc-100 px-3 text-left text-xs dark:border-zinc-800/70 ${
+                className={`flex w-full items-center gap-1.5 overflow-hidden border-b border-zinc-100 px-3 text-left dark:border-zinc-800/70 ${
                   canModerate ? 'hover:bg-zinc-50 dark:hover:bg-zinc-800/40' : 'cursor-default'
                 } ${t.id === selected ? 'bg-brand-50 dark:bg-brand-500/10' : ''}`}
-                title={t.title}
+                title={t.assigneeName ? `${t.title} · ${t.assigneeName}` : t.title}
               >
                 {t.critical && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" aria-label="Critical" />}
-                <span className="truncate text-zinc-700 dark:text-zinc-200">{t.title}</span>
+                <span className="min-w-0 flex-1 leading-tight">
+                  <span className="block truncate text-xs text-zinc-700 dark:text-zinc-200">{t.title}</span>
+                  <span className="block truncate text-[10px] text-zinc-400 dark:text-zinc-500">
+                    {t.assigneeName ?? 'Unassigned'}
+                  </span>
+                </span>
               </button>
             ))}
           </div>
@@ -243,7 +443,7 @@ export function Programme({
                 </div>
 
                 {/* Rows + bars */}
-                <div className="relative" style={{ height: rowsH }}>
+                <div ref={rowsRef} className="relative" style={{ height: rowsH }}>
                   {/* Week gridlines */}
                   {geom.ticks.map((tick, i) => (
                     <div key={i} className="absolute top-0 h-full border-l border-zinc-100 dark:border-zinc-800/60" style={{ left: tick.x }} />
@@ -255,7 +455,7 @@ export function Programme({
                     </div>
                   )}
 
-                  {/* Dependency arrows */}
+                  {/* Dependency arrows (+ invisible hit paths to remove them) */}
                   <svg className="pointer-events-none absolute inset-0" width={geom.width} height={rowsH}>
                     <defs>
                       <marker id="pm-arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
@@ -268,60 +468,154 @@ export function Programme({
                       if (pi == null || si == null) return null;
                       const pt = data.tasks[pi]!;
                       const st = data.tasks[si]!;
-                      const x1 = (geom.offset(pt.endIso) + 1) * DAY_W;
+                      const pw = winOf(pt);
+                      const sw = winOf(st);
+                      const x1 = (geom.offset(pw.endIso) + 1) * DAY_W;
                       const y1 = pi * ROW_H + ROW_H / 2;
-                      const x2 = geom.offset(st.startIso) * DAY_W;
+                      const x2 = geom.offset(sw.startIso) * DAY_W;
                       const y2 = si * ROW_H + ROW_H / 2;
                       const midX = Math.max(x1 + 8, x2 - 8);
                       const d = `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`;
                       const crit = pt.critical && st.critical;
                       return (
-                        <path
-                          key={i}
-                          d={d}
-                          fill="none"
-                          className={crit ? 'stroke-red-400/80' : 'stroke-zinc-300 dark:stroke-zinc-600'}
-                          strokeWidth={1.5}
-                          markerEnd="url(#pm-arrow)"
-                        />
+                        <g key={i}>
+                          <path
+                            d={d}
+                            fill="none"
+                            className={crit ? 'stroke-red-400/80' : 'stroke-zinc-300 dark:stroke-zinc-600'}
+                            strokeWidth={1.5}
+                            markerEnd="url(#pm-arrow)"
+                          />
+                          {canModerate && (
+                            <path
+                              d={d}
+                              fill="none"
+                              stroke="transparent"
+                              strokeWidth={11}
+                              className="pointer-events-auto cursor-pointer"
+                              onClick={() =>
+                                setLinkMenu({ predecessorId: e.predecessorId, successorId: e.successorId, x: midX, y: (y1 + y2) / 2 })
+                              }
+                            >
+                              <title>Remove dependency</title>
+                            </path>
+                          )}
+                        </g>
                       );
                     })}
+                    {/* In-progress link line */}
+                    {link && linkSourcePoint && (
+                      <line
+                        x1={linkSourcePoint.x}
+                        y1={linkSourcePoint.y}
+                        x2={link.x}
+                        y2={link.y}
+                        className="stroke-brand-500"
+                        strokeWidth={1.5}
+                        strokeDasharray="4 3"
+                      />
+                    )}
                   </svg>
 
                   {/* Bars */}
                   {data.tasks.map((t, i) => {
-                    const left = geom.offset(t.startIso) * DAY_W;
-                    const days = differenceInDays(startOfDay(parseDate(t.endIso)!), startOfDay(parseDate(t.startIso)!)) + 1;
-                    const w = Math.max(days * DAY_W - 3, 8);
-                    const floatW = !t.critical && t.floatDays > 0 ? t.floatDays * DAY_W : 0;
+                    const w = winOf(t);
+                    const left = geom.offset(w.startIso) * DAY_W;
+                    const days = diffDaysIso(w.endIso, w.startIso) + 1;
+                    const width = Math.max(days * DAY_W - 3, 8);
+                    const dragging = preview?.taskId === t.id;
+                    const floatW = !t.critical && t.floatDays > 0 && !dragging ? t.floatDays * DAY_W : 0;
                     return (
-                      <div key={t.id} className="absolute" style={{ top: i * ROW_H + 6, left, height: ROW_H - 12 }}>
+                      <div key={t.id} className="group absolute" style={{ top: i * ROW_H + 6, left, height: ROW_H - 12 }}>
                         {/* Float slack */}
                         {floatW > 0 && (
                           <div
                             className="absolute top-1/2 h-0.5 -translate-y-1/2 rounded bg-zinc-300 dark:bg-zinc-600"
-                            style={{ left: w, width: floatW }}
+                            style={{ left: width, width: floatW }}
                             title={`${t.floatDays} day${t.floatDays === 1 ? '' : 's'} float`}
                           />
                         )}
-                        <button
-                          type="button"
-                          onClick={() => canModerate && setSelected(t.id === selected ? null : t.id)}
-                          style={{ width: w }}
-                          className={`group relative flex h-full items-center overflow-hidden rounded px-1.5 text-[10px] font-medium text-white shadow-sm ${
+                        <div
+                          style={{ width }}
+                          className={`relative flex h-full items-center overflow-hidden rounded text-[10px] font-medium text-white shadow-sm ${
                             STATUS_BAR[t.status]
                           } ${t.critical ? 'ring-2 ring-red-500 ring-offset-1 ring-offset-white dark:ring-offset-zinc-950' : ''} ${
-                            canModerate ? 'cursor-pointer' : 'cursor-default'
-                          } ${t.scheduled ? '' : 'opacity-70'}`}
-                          title={`${t.title} · ${fmt(t.startIso)}–${fmt(t.endIso)} · ${STATUS_LABEL[t.status]}${
+                            t.scheduled ? '' : 'opacity-70'
+                          } ${dragging ? 'ring-2 ring-brand-400' : ''}`}
+                          title={`${t.title} · ${fmt(w.startIso)}–${fmt(w.endIso)} · ${STATUS_LABEL[t.status]}${
                             t.critical ? ' · critical' : t.floatDays > 0 ? ` · ${t.floatDays}d float` : ''
                           }${t.waitingOn.length ? ` · waiting on ${t.waitingOn.join(', ')}` : ''}`}
                         >
-                          <span className="truncate">{t.assigneeName ?? t.title}</span>
-                        </button>
+                          {canModerate && (
+                            <span
+                              onPointerDown={(e) => startDrag(e, { mode: 'resize-start', taskId: t.id, origStart: w.startIso, origEnd: w.endIso })}
+                              className="absolute left-0 top-0 z-10 h-full w-1.5 cursor-ew-resize opacity-0 group-hover:opacity-100"
+                              aria-hidden
+                            />
+                          )}
+                          <span
+                            onPointerDown={(e) => startDrag(e, { mode: 'move', taskId: t.id, origStart: w.startIso, origEnd: w.endIso })}
+                            className={`flex h-full min-w-0 flex-1 items-center px-1.5 ${canModerate ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
+                          >
+                            <span className="truncate">{t.title}</span>
+                          </span>
+                          {canModerate && (
+                            <span
+                              onPointerDown={(e) => startDrag(e, { mode: 'resize-end', taskId: t.id, origStart: w.startIso, origEnd: w.endIso })}
+                              className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-ew-resize opacity-0 group-hover:opacity-100"
+                              aria-hidden
+                            />
+                          )}
+                        </div>
+
+                        {/* Connector handles — drag to another bar to link (finish→start) */}
+                        {canModerate && (
+                          <>
+                            <span
+                              onPointerDown={(e) => startDrag(e, { mode: 'link', taskId: t.id, origStart: w.startIso, origEnd: w.endIso, fromEdge: 'start' })}
+                              className="absolute top-1/2 h-2.5 w-2.5 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-brand-500 bg-white opacity-0 group-hover:opacity-100 dark:bg-zinc-950"
+                              style={{ left: -9 }}
+                              title="Drag to a predecessor task"
+                              aria-label="Link predecessor"
+                            />
+                            <span
+                              onPointerDown={(e) => startDrag(e, { mode: 'link', taskId: t.id, origStart: w.startIso, origEnd: w.endIso, fromEdge: 'finish' })}
+                              className="absolute top-1/2 h-2.5 w-2.5 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-brand-500 bg-white opacity-0 group-hover:opacity-100 dark:bg-zinc-950"
+                              style={{ left: width + 3 }}
+                              title="Drag to a dependent task"
+                              aria-label="Link successor"
+                            />
+                          </>
+                        )}
                       </div>
                     );
                   })}
+
+                  {/* Remove-dependency popover */}
+                  {linkMenu && (
+                    <div
+                      className="absolute z-20 -translate-x-1/2 rounded-lg border border-zinc-200 bg-white p-2 text-xs shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+                      style={{ left: linkMenu.x, top: linkMenu.y + 6 }}
+                    >
+                      <p className="mb-1.5 max-w-[180px] text-zinc-500 dark:text-zinc-400">
+                        <span className="text-zinc-700 dark:text-zinc-200">{titleById.get(linkMenu.predecessorId) ?? 'Task'}</span>
+                        {' → '}
+                        <span className="text-zinc-700 dark:text-zinc-200">{titleById.get(linkMenu.successorId) ?? 'Task'}</span>
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => runUnlink(linkMenu.predecessorId, linkMenu.successorId)}
+                          className="rounded bg-red-500 px-2 py-1 font-medium text-white hover:bg-red-600"
+                        >
+                          Remove link
+                        </button>
+                        <button type="button" onClick={() => setLinkMenu(null)} className="text-zinc-500 hover:underline dark:text-zinc-400">
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -336,7 +630,7 @@ export function Programme({
         <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> Done</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-orange-500" /> Blocked</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-0.5 w-4 rounded bg-zinc-300 dark:bg-zinc-600" /> Float</span>
-        {canModerate && <span>· Click a task to reschedule it</span>}
+        {canModerate && <span>· Drag a bar to move it, its edges to resize, or the dots to link tasks</span>}
       </div>
 
       {data.unscheduled.length > 0 && (
