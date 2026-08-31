@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo, useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { inputClass } from '@/components/ui/form';
 import { AlertTriangle, GanttChart } from '@/components/icons';
@@ -43,6 +44,9 @@ const STATUS_BAR: Record<TaskStatus, string> = {
   blocked: 'bg-orange-500',
   done: 'bg-emerald-500',
 };
+// A task that has started keeps its real dates — its bar can be reordered but not
+// dragged to a new time or resized (matches the engine + the migration-044 trigger).
+const STARTED_STATUSES: ReadonlySet<TaskStatus> = new Set<TaskStatus>(['in_progress', 'submitted', 'done']);
 const STATUS_LABEL: Record<TaskStatus, string> = {
   todo: 'To do',
   in_progress: 'In progress',
@@ -159,8 +163,10 @@ function LinkEditor({
   const [type, setType] = useState<DependencyType>(initialType);
   const [lag, setLag] = useState(String(initialLag));
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function run(action: typeof updateDependency | typeof deleteDependency, withFields: boolean) {
+    setError(null);
     setBusy(true);
     try {
       const fd = new FormData();
@@ -171,8 +177,14 @@ function LinkEditor({
         fd.set('type', type);
         fd.set('lagDays', String(Number.parseInt(lag, 10) || 0));
       }
-      await action(fd);
+      const res = await action(fd);
+      if (!res.ok) {
+        setError(res.error ?? 'Could not update dependency');
+        return;
+      }
       onDone();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not update dependency');
     } finally {
       setBusy(false);
     }
@@ -211,6 +223,7 @@ function LinkEditor({
           Cancel
         </button>
       </div>
+      {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
     </div>
   );
 }
@@ -222,10 +235,12 @@ function LinkEditor({
  *  on, dependents cascade forward. */
 export function Programme({
   projectId,
+  orgId,
   data,
   canModerate,
 }: {
   projectId: string;
+  orgId: string;
   data: ProgrammeData;
   canModerate: boolean;
 }) {
@@ -238,6 +253,52 @@ export function Programme({
   const [error, setError] = useState<string | null>(null);
   const [showBaseline, setShowBaseline] = useState(true);
   const rowsRef = useRef<HTMLDivElement>(null);
+  // A drag is in flight: while true the live subscription must not re-render the
+  // bars out from under the active pointer handlers (they hold the drag's captured
+  // origin dates). A refresh that arrives mid-drag is deferred, then flushed on
+  // pointer-up. `writingRef` blocks a second drag while a commit is being saved.
+  const draggingRef = useRef(false);
+  const pendingRefresh = useRef(false);
+  const writingRef = useRef(false);
+
+  // Refresh the route now, unless a drag is in flight — then defer it to pointer-up.
+  const liveRefresh = () => {
+    if (draggingRef.current) {
+      pendingRefresh.current = true;
+      return;
+    }
+    router.refresh();
+  };
+  const liveRefreshRef = useRef(liveRefresh);
+  liveRefreshRef.current = liveRefresh;
+
+  // Live-refresh: re-fetch the RSC when tasks / dependencies for this project
+  // change (mirrors <LiveRefresh>), but drag-aware so an in-flight gesture is
+  // never corrupted by a teammate's change. Debounced; RLS applies on realtime.
+  useEffect(() => {
+    const supabase = createClient();
+    let active = true;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const refresh = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (active) liveRefreshRef.current();
+      }, 350);
+    };
+    const channel = supabase.channel(`live:programme:${projectId}`);
+    (async () => {
+      const { data: sess } = await supabase.auth.getSession();
+      if (sess.session?.access_token) supabase.realtime.setAuth(sess.session.access_token);
+      channel.on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: `project_id=eq.${projectId}` }, refresh);
+      channel.on('postgres_changes', { event: '*', schema: 'public', table: 'task_dependencies', filter: `org_id=eq.${orgId}` }, refresh);
+      channel.subscribe();
+    })();
+    return () => {
+      active = false;
+      if (timer) clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
+  }, [projectId, orgId]);
 
   const geom = useMemo(() => {
     if (!data.rangeStartIso || !data.rangeEndIso) return null;
@@ -282,15 +343,28 @@ export function Programme({
     window.setTimeout(() => setError((cur) => (cur === message ? null : cur)), 4000);
   }
 
+  // Commit a move/resize. The previewed window is kept rendered while the write is
+  // in flight (optimistic): on success the ensuing refresh brings the saved dates
+  // and we clear the preview; on failure we revert the bar to `data` and flash.
   async function runReschedule(taskId: string, start: string, end: string) {
-    const fd = new FormData();
-    fd.set('taskId', taskId);
-    fd.set('projectId', projectId);
-    fd.set('plannedStartDate', start);
-    fd.set('plannedEndDate', end);
-    const res = await rescheduleTask(fd);
-    if (!res.ok) flash(res.error ?? 'Could not reschedule');
-    router.refresh();
+    writingRef.current = true;
+    try {
+      const fd = new FormData();
+      fd.set('taskId', taskId);
+      fd.set('projectId', projectId);
+      fd.set('plannedStartDate', start);
+      fd.set('plannedEndDate', end);
+      const res = await rescheduleTask(fd);
+      if (!res.ok) {
+        setPreview((p) => (p && p.taskId === taskId ? null : p));
+        flash(res.error ?? 'Could not reschedule');
+        return;
+      }
+      setPreview((p) => (p && p.taskId === taskId ? null : p));
+      router.refresh();
+    } finally {
+      writingRef.current = false;
+    }
   }
   async function runLink(predecessorId: string, successorId: string) {
     const fd = new FormData();
@@ -352,10 +426,29 @@ export function Programme({
     router.refresh();
   }
 
+  // End the current drag session and flush a refresh that was deferred while dragging.
+  function endDrag() {
+    draggingRef.current = false;
+    if (pendingRefresh.current) {
+      pendingRefresh.current = false;
+      router.refresh();
+    }
+  }
+
   function startDrag(e: ReactPointerEvent, session: DragSession) {
     if (!canModerate) return;
+    // Ignore a new gesture while a previous commit is still saving, so we don't
+    // stack writes against a window that's about to change under us.
+    if (writingRef.current) return;
+    // A started task keeps its real dates: don't begin a horizontal reschedule or a
+    // resize. A body 'move' still starts, but stays reorder-only (no date change).
+    const dragTask = data.tasks.find((t) => t.id === session.taskId);
+    const started = dragTask != null && STARTED_STATUSES.has(dragTask.status);
+    if (started && (session.mode === 'resize-start' || session.mode === 'resize-end')) return;
     e.preventDefault();
     e.stopPropagation();
+    // Suspend live-refresh for the lifetime of this gesture.
+    draggingRef.current = true;
     const startX = e.clientX;
     const startY = e.clientY;
     let moved = false;
@@ -385,7 +478,8 @@ export function Programme({
         const dx = ev.clientX - startX;
         const dy = ev.clientY - startY;
         if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
-        axis = Math.abs(dy) > Math.abs(dx) ? 'y' : 'x';
+        // Started tasks can be reordered but never rescheduled — lock to the y axis.
+        axis = started || Math.abs(dy) > Math.abs(dx) ? 'y' : 'x';
       }
 
       if (session.mode === 'move' && axis === 'y') {
@@ -423,6 +517,8 @@ export function Programme({
     const onUp = (ev: globalThis.PointerEvent) => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
+      // The gesture has fully ended: resume live-refresh (and flush a deferred one).
+      endDrag();
       if (session.mode === 'link') {
         const target = taskAtClientY(ev.clientY);
         setLink(null);
@@ -439,13 +535,17 @@ export function Programme({
         if (target != null) void runReorder(session.taskId, target);
         return;
       }
-      setPreview(null);
       if (!moved) {
+        setPreview(null);
         setSelected((prev) => (prev === session.taskId ? null : session.taskId));
         return;
       }
       if (cur.startIso !== session.origStart || cur.endIso !== session.origEnd) {
+        // Keep the previewed window rendered; runReschedule clears it on success
+        // (after the refresh lands) or reverts to `data` on failure.
         void runReschedule(session.taskId, cur.startIso, cur.endIso);
+      } else {
+        setPreview(null);
       }
     };
 
@@ -768,6 +868,7 @@ export function Programme({
                     const width = Math.max(days * DAY_W - 3, 8);
                     const dragging = preview?.taskId === t.id;
                     const reordering = reorder?.taskId === t.id;
+                    const started = STARTED_STATUSES.has(t.status);
                     const floatW = !t.critical && t.floatDays > 0 && !dragging ? t.floatDays * DAY_W : 0;
                     const variance = t.baselineEndIso ? diffDaysIso(w.endIso, t.baselineEndIso) : 0;
                     const varianceText = variance > 0 ? ` · ${variance}d behind baseline` : variance < 0 ? ` · ${-variance}d ahead of baseline` : '';
@@ -800,7 +901,7 @@ export function Programme({
                             t.critical ? ' · critical' : t.floatDays > 0 ? ` · ${t.floatDays}d float` : ''
                           }${varianceText}${t.waitingOn.length ? ` · waiting on ${t.waitingOn.join(', ')}` : ''}`}
                         >
-                          {canModerate && (
+                          {canModerate && !started && (
                             <span
                               onPointerDown={(e) => startDrag(e, { mode: 'resize-start', taskId: t.id, origStart: w.startIso, origEnd: w.endIso })}
                               className="absolute left-0 top-0 z-10 h-full w-1.5 cursor-ew-resize opacity-0 group-hover:opacity-100"
@@ -809,11 +910,11 @@ export function Programme({
                           )}
                           <span
                             onPointerDown={(e) => startDrag(e, { mode: 'move', taskId: t.id, origStart: w.startIso, origEnd: w.endIso })}
-                            className={`flex h-full min-w-0 flex-1 items-center px-1.5 ${canModerate ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
+                            className={`flex h-full min-w-0 flex-1 items-center px-1.5 ${canModerate ? (started ? 'cursor-default' : 'cursor-grab active:cursor-grabbing') : 'cursor-default'}`}
                           >
                             <span className="truncate">{t.title}</span>
                           </span>
-                          {canModerate && (
+                          {canModerate && !started && (
                             <span
                               onPointerDown={(e) => startDrag(e, { mode: 'resize-end', taskId: t.id, origStart: w.startIso, origEnd: w.endIso })}
                               className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-ew-resize opacity-0 group-hover:opacity-100"

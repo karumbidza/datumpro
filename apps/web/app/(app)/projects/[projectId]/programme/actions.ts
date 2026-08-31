@@ -106,7 +106,19 @@ export async function rescheduleTask(formData: FormData): Promise<Result> {
   if (!start || Number.isNaN(Date.parse(start))) return { ok: false, error: 'Pick a start date.' };
   if (!end || Number.isNaN(Date.parse(end))) return { ok: false, error: 'Pick an end date.' };
   if (end < start) return { ok: false, error: 'The end date can’t be before the start.' };
-  if (isBackdated(start)) return { ok: false, error: 'The start date can’t be in the past.' };
+
+  const { data: cur } = await supabase
+    .from('tasks')
+    .select('status, planned_start_date')
+    .eq('id', taskId)
+    .maybeSingle();
+  const status = (cur as { status: string; planned_start_date: string | null } | null)?.status;
+  if (status === 'in_progress' || status === 'submitted' || status === 'done') {
+    return { ok: false, error: 'A task that has started keeps its dates — reschedule its successors instead.' };
+  }
+  if (start !== (cur as { planned_start_date: string | null } | null)?.planned_start_date && isBackdated(start)) {
+    return { ok: false, error: 'The start date can’t be in the past.' };
+  }
 
   const { error } = await supabase
     .from('tasks')
