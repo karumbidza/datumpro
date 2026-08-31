@@ -101,14 +101,41 @@ export async function getProgrammeData(projectId: string): Promise<ProgrammeData
   // Dependency edges among the tasks we can draw.
   let edges: ProgrammeEdge[] = [];
   if (scheduledIds.size > 0) {
-    const supabase = await createClient();
     const { data: depData } = await supabase
       .from('task_dependencies')
       .select('predecessor_id, successor_id, lag_days, type')
       .in('successor_id', [...scheduledIds]);
+    // A link is a driving critical link when both ends are critical AND it is the
+    // binding constraint on the successor (the relationship's implied anchor
+    // equals the successor's earliest start/finish in the CPM layout).
+    const sched = schedule?.schedule.tasks ?? {};
+    const isDriving = (predId: string, succId: string, type: ProgrammeEdge['type'], lag: number): boolean => {
+      const p = sched[predId];
+      const s = sched[succId];
+      if (!p || !s || !p.critical || !s.critical) return false;
+      switch (type) {
+        case 'ss':
+          return s.es === p.es + lag;
+        case 'ff':
+          return s.ef === p.ef + lag;
+        case 'sf':
+          return s.ef === p.es + lag;
+        default:
+          return s.es === p.ef + lag; // fs
+      }
+    };
     edges = ((depData ?? []) as { predecessor_id: string; successor_id: string; lag_days: number; type: ProgrammeEdge['type'] | null }[])
       .filter((d) => scheduledIds.has(d.predecessor_id))
-      .map((d) => ({ predecessorId: d.predecessor_id, successorId: d.successor_id, lagDays: d.lag_days, type: d.type ?? 'fs' }));
+      .map((d) => {
+        const type = d.type ?? 'fs';
+        return {
+          predecessorId: d.predecessor_id,
+          successorId: d.successor_id,
+          lagDays: d.lag_days,
+          type,
+          critical: isDriving(d.predecessor_id, d.successor_id, type, d.lag_days),
+        };
+      });
   }
 
   return {
