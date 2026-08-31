@@ -160,6 +160,16 @@ export async function getProgrammeData(projectId: string): Promise<ProgrammeData
     if (t.baselineEndIso && (!trueBaselineFinish || t.baselineEndIso > trueBaselineFinish)) trueBaselineFinish = t.baselineEndIso;
   }
 
+  // Projected finish = the latest written planned end across the tasks, so the
+  // header figure matches where the Gantt bars actually end (ISO YYYY-MM-DD
+  // compares lexically). Fall back to the CPM's raw-day estimate if no task has a
+  // planned end (e.g. an all-unscheduled project).
+  let projectedFinish: string | null = null;
+  for (const t of tasks) {
+    if (t.endIso && (!projectedFinish || t.endIso > projectedFinish)) projectedFinish = t.endIso;
+  }
+  projectedFinish = projectedFinish ?? schedule?.projectedFinish ?? null;
+
   return {
     tasks,
     unscheduled,
@@ -167,7 +177,7 @@ export async function getProgrammeData(projectId: string): Promise<ProgrammeData
     rangeStartIso,
     rangeEndIso,
     projectStart: schedule?.projectStart ?? null,
-    projectedFinish: schedule?.projectedFinish ?? null,
+    projectedFinish,
     baselineFinish: trueBaselineFinish ?? schedule?.baselineFinish ?? null,
     hasCycle: schedule?.schedule.hasCycle ?? false,
     autoSchedule,
