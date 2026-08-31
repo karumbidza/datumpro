@@ -30,6 +30,10 @@ function depTag(type: DependencyType, lag: number): string {
   const base = type.toUpperCase();
   return lag > 0 ? `${base}+${lag}` : lag < 0 ? `${base}${lag}` : base;
 }
+// Human relationship label ("Finish → Start") for the relationships panel.
+function typeLabel(type: DependencyType): string {
+  return DEP_OPTIONS.find((o) => o.value === type)?.label ?? type.toUpperCase();
+}
 
 const DAY_W = 26; // px per day
 const ROW_H = 34; // px per task row
@@ -515,6 +519,22 @@ export function Programme({
     router.refresh();
   }
 
+  // Remove a dependency from the relationships panel (mirrors the LinkEditor's
+  // remove path). Confirms, calls deleteDependency, flashes on failure.
+  async function runUnlink(predecessorId: string, successorId: string) {
+    if (!window.confirm('Unlink these tasks?')) return;
+    const fd = new FormData();
+    fd.set('projectId', projectId);
+    fd.set('predecessorId', predecessorId);
+    fd.set('successorId', successorId);
+    const res = await deleteDependency(fd);
+    if (!res.ok) {
+      flash(res.error ?? 'Could not unlink');
+      return;
+    }
+    router.refresh();
+  }
+
   // End the current drag session and flush a refresh that was deferred while dragging.
   function endDrag() {
     draggingRef.current = false;
@@ -798,6 +818,98 @@ export function Programme({
           onCancel={() => setSelected(null)}
         />
       )}
+
+      {/* Relationships panel — plain-English predecessors / successors for the
+          selected task, each with Edit (opens the link editor) and Unlink. */}
+      {selectedTask && (() => {
+        const waitsOn = data.edges.filter((e) => e.successorId === selected);
+        const feeds = data.edges.filter((e) => e.predecessorId === selected);
+        // Position the edit popover near the selected task's bar finish edge so it
+        // lands in view within the Gantt scroll area (x/y are rows-relative coords).
+        const openEdit = (e: (typeof data.edges)[number]) => {
+          const i = rowIndexById.get(selected!) ?? 0;
+          const t = data.tasks[i];
+          const x = t && geom ? (geom.offset(winOf(t).endIso) + 1) * DAY_W : 0;
+          const y = i * ROW_H + ROW_H / 2;
+          setLinkMenu({ predecessorId: e.predecessorId, successorId: e.successorId, type: e.type, lag: e.lagDays, x, y });
+        };
+        const Row = ({ e, otherId }: { e: (typeof data.edges)[number]; otherId: string }) => (
+          <li className="flex items-center gap-2 py-1">
+            <span className="min-w-0 flex-1 truncate text-xs text-zinc-700 dark:text-zinc-200">
+              {titleById.get(otherId) ?? 'Task'}
+              <span className="ml-1.5 text-[11px] text-zinc-400 dark:text-zinc-500">
+                {typeLabel(e.type)}{e.lagDays ? `, +${e.lagDays}d` : ''}
+              </span>
+            </span>
+            {canModerate && (
+              <span className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => openEdit(e)}
+                  className="text-[11px] text-zinc-500 hover:text-zinc-800 hover:underline dark:text-zinc-400 dark:hover:text-zinc-100"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void runUnlink(e.predecessorId, e.successorId)}
+                  className="text-[11px] text-red-600 hover:underline dark:text-red-400"
+                >
+                  Unlink
+                </button>
+              </span>
+            )}
+          </li>
+        );
+        return (
+          <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+            <div className="mb-2 flex items-center gap-2">
+              <span className="truncate text-sm font-medium text-zinc-800 dark:text-zinc-100">{selectedTask.title}</span>
+              <span className="text-[11px] uppercase tracking-[0.04em] text-zinc-400">Relationships</span>
+              <button
+                type="button"
+                onClick={() => setSelected(null)}
+                aria-label="Deselect task"
+                className="ml-auto shrink-0 rounded p-0.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+              >
+                ✕
+              </button>
+            </div>
+            {waitsOn.length === 0 && feeds.length === 0 ? (
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                No dependencies yet — drag from a bar&apos;s edge to link it.
+              </p>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-zinc-400">Waits on</p>
+                  {waitsOn.length === 0 ? (
+                    <p className="text-[11px] text-zinc-400 dark:text-zinc-500">Nothing</p>
+                  ) : (
+                    <ul className="divide-y divide-zinc-100 dark:divide-zinc-800/70">
+                      {waitsOn.map((e) => (
+                        <Row key={`${e.predecessorId}-${e.successorId}`} e={e} otherId={e.predecessorId} />
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div>
+                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-zinc-400">Feeds</p>
+                  {feeds.length === 0 ? (
+                    <p className="text-[11px] text-zinc-400 dark:text-zinc-500">Nothing</p>
+                  ) : (
+                    <ul className="divide-y divide-zinc-100 dark:divide-zinc-800/70">
+                      {feeds.map((e) => (
+                        <Row key={`${e.predecessorId}-${e.successorId}`} e={e} otherId={e.successorId} />
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* The chart: fixed label column + horizontally-scrolling timeline. */}
       <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
