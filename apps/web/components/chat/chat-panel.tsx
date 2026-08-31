@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import {
@@ -77,6 +77,38 @@ function fullTime(iso: string): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+// A gap longer than this between two messages from the same sender starts a fresh
+// group (a new header), so a burst reads as one block but a later reply doesn't.
+const GROUP_GAP_MS = 5 * 60 * 1000;
+
+function sameDay(a: string, b: string): boolean {
+  const da = new Date(a);
+  const db = new Date(b);
+  return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate();
+}
+
+/** Short HH:MM for a group header — the date lives in the day separator above. */
+function shortTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+}
+
+/** Day-separator label. `nowMs` is null until mount so SSR and the first client
+ *  paint render the same absolute date (no hydration mismatch); after mount it
+ *  resolves the friendlier Today / Yesterday. */
+function dayLabel(iso: string, nowMs: number | null): string {
+  const d = new Date(iso);
+  const abs = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  if (nowMs == null) return abs;
+  const sd = (x: Date, y: Date) =>
+    x.getFullYear() === y.getFullYear() && x.getMonth() === y.getMonth() && x.getDate() === y.getDate();
+  const today = new Date(nowMs);
+  const yst = new Date(nowMs);
+  yst.setDate(today.getDate() - 1);
+  if (sd(d, today)) return 'Today';
+  if (sd(d, yst)) return 'Yesterday';
+  return abs;
 }
 
 function kindFromMime(mime: string): AttachmentKind {
@@ -229,6 +261,10 @@ export function ChatPanel({
   const [searching, setSearching] = useState(false);
   const [loadingEarlier, setLoadingEarlier] = useState(false);
   const [hasMore, setHasMore] = useState(initialMessages.length >= 50);
+  // Resolved after mount so day separators can say Today/Yesterday without a
+  // server/client hydration mismatch.
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => setNow(Date.now()), []);
 
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const lastSeqRef = useRef(initialMessages.at(-1)?.seq ?? 0);
@@ -736,9 +772,9 @@ export function ChatPanel({
           )}
         </div>
       ) : (
-      <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-4">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4">
         {hasMore && messages.length > 0 && (
-          <div className="flex justify-center pb-1">
+          <div className="flex justify-center pb-2">
             <button
               type="button"
               onClick={onLoadEarlier}
@@ -752,122 +788,155 @@ export function ChatPanel({
         {messages.length === 0 ? (
           <p className="py-8 text-center text-sm text-zinc-400 dark:text-zinc-500">No messages yet — start the discussion.</p>
         ) : (
-          messages.map((m) => {
+          messages.map((m, i) => {
             const mine = m.senderId === currentUserId;
             const parent = m.parentMessageId ? msgById.get(m.parentMessageId) : null;
+            const prev = i > 0 ? messages[i - 1]! : null;
+            // A run of messages from the same sender, close in time, is one group:
+            // the header shows once and the follow-ups sit tight beneath it. A new
+            // day, a new sender, a >5-min gap, or a reply each starts a fresh group.
+            const showDate = !prev || !sameDay(prev.createdAt, m.createdAt);
+            const showHeader =
+              showDate ||
+              !prev ||
+              prev.senderId !== m.senderId ||
+              !!m.parentMessageId ||
+              new Date(m.createdAt).getTime() - new Date(prev.createdAt).getTime() > GROUP_GAP_MS;
+            const topGap = showDate ? '' : showHeader ? 'mt-3' : 'mt-0.5';
             return (
-              <div key={m.id} className={`group flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
-                <p className="mb-1 flex items-center gap-1.5 text-[11px] text-zinc-400 dark:text-zinc-500">
-                  <span className="font-medium text-zinc-600 dark:text-zinc-300">{m.senderName}</span>
-                  <span>· {fullTime(m.createdAt)}</span>
-                  {m.editedAt && !m.deletedAt && <span>· edited</span>}
-                </p>
-
-                {parent && (
-                  <p className={`mb-1 max-w-[80%] truncate border-l-2 border-zinc-300 pl-2 text-[11px] text-zinc-400 dark:text-zinc-500 ${mine ? 'text-right' : ''}`}>
-                    ↩ {parent.senderName}: {(parent.body ?? 'message').slice(0, 48)}
-                  </p>
-                )}
-
-                {(editingId === m.id || m.deletedAt || m.body) && (
-                  <div
-                    className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${
-                      mine
-                        ? 'bg-brand-50 text-zinc-900 dark:bg-brand-500/15 dark:text-zinc-100'
-                        : 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100'
-                    }`}
-                  >
-                    {editingId === m.id ? (
-                      <div className="flex items-center gap-1">
-                        <input
-                          value={editingBody}
-                          onChange={(e) => setEditingBody(e.target.value)}
-                          className="w-48 rounded bg-white/60 px-1 text-sm outline-none dark:bg-zinc-900"
-                          autoFocus
-                        />
-                        <button onClick={saveEdit} className="text-xs text-brand-600 underline">save</button>
-                        <button onClick={() => setEditingId(null)} className="text-xs opacity-60">cancel</button>
-                      </div>
-                    ) : m.deletedAt ? (
-                      <p className="italic opacity-60">message deleted</p>
-                    ) : (
-                      <p className="whitespace-pre-wrap break-words">{m.body}</p>
-                    )}
+              <Fragment key={m.id}>
+                {showDate && (
+                  <div className="my-3 flex justify-center">
+                    <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-[10px] font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                      {dayLabel(m.createdAt, now)}
+                    </span>
                   </div>
                 )}
+                <div className={`group relative flex flex-col ${mine ? 'items-end' : 'items-start'} ${topGap}`}>
+                  {showHeader && (
+                    <p className="mb-1 flex items-center gap-1.5 text-[11px] text-zinc-400 dark:text-zinc-500">
+                      <span className="font-medium text-zinc-600 dark:text-zinc-300">{m.senderName}</span>
+                      <span>· {shortTime(m.createdAt)}</span>
+                      {m.editedAt && !m.deletedAt && <span>· edited</span>}
+                    </p>
+                  )}
 
-                {!m.deletedAt && m.attachments.length > 0 && (
-                  <div className={`mt-1 flex max-w-[80%] flex-col gap-1 ${mine ? 'items-end' : 'items-start'}`}>
-                    {m.attachments.map((a) => (
-                      <AttachmentView key={a.id} a={a} />
-                    ))}
-                  </div>
-                )}
+                  {parent && (
+                    <p className={`mb-1 max-w-[80%] truncate border-l-2 border-zinc-300 pl-2 text-[11px] text-zinc-400 dark:text-zinc-500 ${mine ? 'text-right' : ''}`}>
+                      ↩ {parent.senderName}: {(parent.body ?? 'message').slice(0, 48)}
+                    </p>
+                  )}
 
-                {m.reactions.length > 0 && (
-                  <div className={`mt-1 flex flex-wrap gap-1 ${mine ? 'justify-end' : ''}`}>
-                    {m.reactions.map((r) => (
-                      <button
-                        key={r.emoji}
-                        onClick={() => onReact(m.id, r.emoji)}
-                        className={`rounded-full border px-1.5 py-0.5 text-[11px] ${
-                          r.mine ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-zinc-200 dark:border-zinc-700'
+                  {/* Content + floating hover toolbar. The toolbar is absolutely
+                      positioned so it never reserves height (that empty reserved
+                      row was the source of the ragged vertical gaps). */}
+                  <div className={`relative flex max-w-[80%] flex-col gap-1 ${mine ? 'items-end' : 'items-start'}`}>
+                    {(editingId === m.id || m.deletedAt || m.body) && (
+                      <div
+                        className={`rounded-xl px-3 py-2 text-sm ${
+                          mine
+                            ? 'bg-brand-50 text-zinc-900 dark:bg-brand-500/15 dark:text-zinc-100'
+                            : 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100'
                         }`}
                       >
-                        {r.emoji} {r.count}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                        {editingId === m.id ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              value={editingBody}
+                              onChange={(e) => setEditingBody(e.target.value)}
+                              className="w-48 rounded bg-white/60 px-1 text-sm outline-none dark:bg-zinc-900"
+                              autoFocus
+                            />
+                            <button onClick={saveEdit} className="text-xs text-brand-600 underline">save</button>
+                            <button onClick={() => setEditingId(null)} className="text-xs opacity-60">cancel</button>
+                          </div>
+                        ) : m.deletedAt ? (
+                          <p className="italic opacity-60">message deleted</p>
+                        ) : (
+                          <p className="whitespace-pre-wrap break-words">{m.body}</p>
+                        )}
+                      </div>
+                    )}
 
-                {!m.deletedAt && (
-                  <div className={`mt-0.5 flex gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 ${mine ? 'justify-end' : ''}`}>
-                    {EMOJIS.map((e) => (
-                      <button key={e} onClick={() => onReact(m.id, e)} className="text-sm hover:scale-110" title="React">
-                        {e}
-                      </button>
-                    ))}
-                    <button
-                      onClick={() => setReplyTo({ id: m.id, name: m.senderName, snippet: m.body ?? '' })}
-                      className="text-[11px] text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200"
-                    >
-                      Reply
-                    </button>
-                    <button
-                      onClick={() => togglePin(m.id)}
-                      className={`text-[11px] hover:text-zinc-700 dark:hover:text-zinc-200 ${
-                        pinnedSet.has(m.id) ? 'text-brand-600 dark:text-brand-400' : 'text-zinc-400 dark:text-zinc-500'
-                      }`}
-                    >
-                      {pinnedSet.has(m.id) ? 'Unpin' : 'Pin'}
-                    </button>
-                    {mine && (
-                      <button
-                        onClick={() => {
-                          setEditingId(m.id);
-                          setEditingBody(m.body ?? '');
-                        }}
-                        className="text-[11px] text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200"
-                      >
-                        Edit
-                      </button>
+                    {!m.deletedAt && m.attachments.length > 0 && (
+                      <div className={`flex flex-col gap-1 ${mine ? 'items-end' : 'items-start'}`}>
+                        {m.attachments.map((a) => (
+                          <AttachmentView key={a.id} a={a} />
+                        ))}
+                      </div>
                     )}
-                    {(mine || canModerate) && (
-                      <button
-                        onClick={() => deleteMessage(m.id).then(() => applyOne(m.id))}
-                        className="text-[11px] text-zinc-400 dark:text-zinc-500 hover:text-red-500"
+
+                    {!m.deletedAt && (
+                      <div
+                        className={`absolute -top-3.5 z-10 hidden items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2 py-1 shadow-sm group-hover:flex dark:border-zinc-700 dark:bg-zinc-900 ${
+                          mine ? 'right-1' : 'left-1'
+                        }`}
                       >
-                        Delete
-                      </button>
+                        {EMOJIS.map((e) => (
+                          <button key={e} onClick={() => onReact(m.id, e)} className="text-sm leading-none hover:scale-110" title="React">
+                            {e}
+                          </button>
+                        ))}
+                        <span className="mx-0.5 h-3.5 w-px bg-zinc-200 dark:bg-zinc-700" />
+                        <button
+                          onClick={() => setReplyTo({ id: m.id, name: m.senderName, snippet: m.body ?? '' })}
+                          className="text-[11px] text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-100"
+                        >
+                          Reply
+                        </button>
+                        <button
+                          onClick={() => togglePin(m.id)}
+                          className={`text-[11px] hover:text-zinc-800 dark:hover:text-zinc-100 ${
+                            pinnedSet.has(m.id) ? 'text-brand-600 dark:text-brand-400' : 'text-zinc-500 dark:text-zinc-400'
+                          }`}
+                        >
+                          {pinnedSet.has(m.id) ? 'Unpin' : 'Pin'}
+                        </button>
+                        {mine && (
+                          <button
+                            onClick={() => {
+                              setEditingId(m.id);
+                              setEditingBody(m.body ?? '');
+                            }}
+                            className="text-[11px] text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-100"
+                          >
+                            Edit
+                          </button>
+                        )}
+                        {(mine || canModerate) && (
+                          <button
+                            onClick={() => deleteMessage(m.id).then(() => applyOne(m.id))}
+                            className="text-[11px] text-zinc-500 dark:text-zinc-400 hover:text-red-500"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
-              </div>
+
+                  {m.reactions.length > 0 && (
+                    <div className={`mt-1 flex flex-wrap gap-1 ${mine ? 'justify-end' : ''}`}>
+                      {m.reactions.map((r) => (
+                        <button
+                          key={r.emoji}
+                          onClick={() => onReact(m.id, r.emoji)}
+                          className={`rounded-full border px-1.5 py-0.5 text-[11px] ${
+                            r.mine ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-zinc-200 dark:border-zinc-700'
+                          }`}
+                        >
+                          {r.emoji} {r.count}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </Fragment>
             );
           })
         )}
         {lastOwn && !lastOwn.deletedAt && (
-          <p className="pr-1 text-right text-[10px] text-zinc-400 dark:text-zinc-500">
+          <p className="mt-1 pr-1 text-right text-[10px] text-zinc-400 dark:text-zinc-500">
             {othersRead >= lastOwn.seq ? 'Seen' : 'Sent'}
           </p>
         )}
