@@ -178,11 +178,9 @@ export default async function TaskBoardPage({
     projEnd ? parseDate(projEnd) : null,
   );
 
-  // Closed (signed-off) tasks sink to the bottom so the active work stays in view.
-  // Stable sort keeps the existing order within each group.
-  const orderedTasks = [...tasks].sort(
-    (a, b) => Number(a.status === 'done') - Number(b.status === 'done'),
-  );
+  // Tasks keep their natural (sequence) order — completed tasks stay in place
+  // rather than sinking to the bottom, so the board reads in the real work order.
+  const orderedTasks = tasks;
 
   return (
     <PageContainer width="6xl" className="flex flex-col gap-8">
