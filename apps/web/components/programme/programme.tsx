@@ -697,13 +697,21 @@ export function Programme({
                     const floatW = !t.critical && t.floatDays > 0 && !dragging ? t.floatDays * DAY_W : 0;
                     return (
                       <div key={t.id} className={`group absolute ${reordering ? 'opacity-40' : ''}`} style={{ top: i * ROW_H + 6, left, height: ROW_H - 12 }}>
-                        {/* Float slack */}
+                        {/* Total float (slack) + its value */}
                         {floatW > 0 && (
-                          <div
-                            className="absolute top-1/2 h-0.5 -translate-y-1/2 rounded bg-zinc-300 dark:bg-zinc-600"
-                            style={{ left: width, width: floatW }}
-                            title={`${t.floatDays} day${t.floatDays === 1 ? '' : 's'} float`}
-                          />
+                          <>
+                            <div
+                              className="absolute top-1/2 h-0.5 -translate-y-1/2 rounded bg-zinc-300 dark:bg-zinc-600"
+                              style={{ left: width, width: floatW }}
+                              title={`${t.floatDays} day${t.floatDays === 1 ? '' : 's'} of total float — it can slip this long without delaying the finish`}
+                            />
+                            <span
+                              className="absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-[9px] tabular-nums text-zinc-400 dark:text-zinc-500"
+                              style={{ left: width + floatW + 4 }}
+                            >
+                              {t.floatDays}d
+                            </span>
+                          </>
                         )}
                         <div
                           style={{ width }}
@@ -808,7 +816,7 @@ export function Programme({
         <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-brand-500" /> In progress</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> Done</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-orange-500" /> Blocked</span>
-        <span className="inline-flex items-center gap-1.5"><span className="h-0.5 w-4 rounded bg-zinc-300 dark:bg-zinc-600" /> Float</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-0.5 w-4 rounded bg-zinc-300 dark:bg-zinc-600" /> Total float (slack days)</span>
         {canModerate && <span>· Drag a bar sideways to move it, up/down to reorder, its edges to resize, the dots to link tasks, or a link to set its type</span>}
       </div>
 
