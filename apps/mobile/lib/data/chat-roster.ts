@@ -7,6 +7,8 @@ export interface RosterMember {
   role: string;
   email: string | null;
   phone: string | null;
+  company: string | null;
+  avatarUrl: string | null;
   lastActiveAt: string | null;
 }
 
@@ -35,7 +37,7 @@ export async function getConversationRoster(conversationId: string): Promise<Ros
 
   const { data: profs } = await supabase
     .from('profiles')
-    .select('id, display_name, email, phone, last_active_at')
+    .select('id, display_name, email, phone, company, avatar_url, last_active_at')
     .in('id', ids);
   const pmap = new Map(
     ((profs ?? []) as {
@@ -43,6 +45,8 @@ export async function getConversationRoster(conversationId: string): Promise<Ros
       display_name: string | null;
       email: string | null;
       phone: string | null;
+      company: string | null;
+      avatar_url: string | null;
       last_active_at: string | null;
     }[]).map((p) => [p.id, p]),
   );
@@ -55,6 +59,8 @@ export async function getConversationRoster(conversationId: string): Promise<Ros
       role: r.role,
       email: p?.email ?? null,
       phone: p?.phone ?? null,
+      company: p?.company ?? null,
+      avatarUrl: p?.avatar_url ?? null,
       lastActiveAt: p?.last_active_at ?? null,
     };
   });

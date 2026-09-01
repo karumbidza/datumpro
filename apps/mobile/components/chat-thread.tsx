@@ -38,6 +38,7 @@ import {
 import { getConversationRoster, type RosterMember } from '../lib/data/chat-roster';
 import { ChatMembersSheet } from './chat-members-sheet';
 import { VoiceNote } from './voice-note';
+import { Avatar, senderTint, roleLabel } from '../lib/chat-identity';
 
 /** The chat surface — message list, realtime sync, text + photo composer. Shared
  *  by the task discussion and the project team channel; the parent resolves the
@@ -95,6 +96,8 @@ export function ChatThread({
   }, []);
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const onlineCount = members.filter((m) => onlineIds.has(m.userId)).length;
+  // Identity lookup for the message list — company / role / avatar per sender.
+  const rosterById = useMemo(() => new Map(members.map((m) => [m.userId, m])), [members]);
 
   const reload = useCallback(async (id: string) => {
     setMessages(await listMessages(id));
@@ -307,21 +310,63 @@ export function ChatThread({
         keyExtractor={(m) => m.id}
         contentContainerStyle={styles.listContent}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
-        renderItem={({ item }) => {
+        renderItem={({ item, index }) => {
           const mine = item.senderId === meId;
+          const prev = index > 0 ? messages[index - 1] : null;
+          // A run from the same sender, close in time, shows the header once;
+          // follow-ups sit tight beneath, aligned under it via the avatar gutter.
+          // A sender change or a >5-min gap starts a fresh header (with its time).
+          const showHeader =
+            !prev ||
+            prev.senderId !== item.senderId ||
+            new Date(item.createdAt).getTime() - new Date(prev.createdAt).getTime() > GROUP_GAP_MS;
+          const meta = rosterById.get(item.senderId);
+          const tint = senderTint(item.senderId);
+          const role = roleLabel(meta?.role);
+
+          const content = (
+            <>
+              {item.imageUrl && !item.deletedAt && (
+                <Image source={{ uri: item.imageUrl }} style={styles.image} resizeMode="cover" />
+              )}
+              {item.audioUrl && !item.deletedAt && <VoiceNote url={item.audioUrl} mine={mine} />}
+              {(item.body || item.deletedAt) && (
+                <Text style={[styles.body, mine && styles.bodyMine, item.imageUrl && styles.bodyWithImage]}>
+                  {item.deletedAt ? 'message deleted' : item.body}
+                </Text>
+              )}
+            </>
+          );
+
+          if (mine) {
+            return (
+              <View style={[styles.row, styles.rowMine]}>
+                <View style={styles.mineCol}>
+                  {showHeader && <Text style={styles.mineTime}>{shortTime(item.createdAt)}</Text>}
+                  <View style={[styles.bubble, styles.bubbleMine]}>{content}</View>
+                </View>
+              </View>
+            );
+          }
           return (
-            <View style={[styles.row, mine ? styles.rowMine : styles.rowOther]}>
-              <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleOther]}>
-                {!mine && <Text style={styles.sender}>{item.senderName}</Text>}
-                {item.imageUrl && !item.deletedAt && (
-                  <Image source={{ uri: item.imageUrl }} style={styles.image} resizeMode="cover" />
-                )}
-                {item.audioUrl && !item.deletedAt && <VoiceNote url={item.audioUrl} mine={mine} />}
-                {(item.body || item.deletedAt) && (
-                  <Text style={[styles.body, mine && styles.bodyMine, item.imageUrl && styles.bodyWithImage]}>
-                    {item.deletedAt ? 'message deleted' : item.body}
+            <View style={[styles.row, styles.rowOther]}>
+              <View style={styles.avatarGutter}>
+                {showHeader ? (
+                  <Avatar name={item.senderName} avatarUrl={meta?.avatarUrl} userId={item.senderId} size={30} />
+                ) : null}
+              </View>
+              <View style={styles.otherCol}>
+                {showHeader && (
+                  <Text style={styles.identity} numberOfLines={1}>
+                    <Text style={styles.identityName}>{item.senderName}</Text>
+                    {meta?.company ? <Text style={styles.identityMeta}> · {meta.company}</Text> : null}
+                    {role ? <Text style={styles.identityMeta}> · {role}</Text> : null}
+                    <Text style={styles.identityMeta}> · {shortTime(item.createdAt)}</Text>
                   </Text>
                 )}
+                <View style={[styles.bubble, styles.bubbleOther, { backgroundColor: tint.bg, borderColor: tint.border }]}>
+                  {content}
+                </View>
               </View>
             </View>
           );
@@ -394,13 +439,19 @@ const makeStyles = (c: Colors) =>
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg },
     muted: { color: c.muted },
     listContent: { padding: 12, gap: 8 },
-    row: { flexDirection: 'row' },
+    row: { flexDirection: 'row', gap: 8 },
     rowMine: { justifyContent: 'flex-end' },
-    rowOther: { justifyContent: 'flex-start' },
-    bubble: { maxWidth: '82%', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8 },
+    rowOther: { justifyContent: 'flex-start', alignItems: 'flex-start' },
+    avatarGutter: { width: 30 },
+    otherCol: { flexShrink: 1, maxWidth: '82%', alignItems: 'flex-start' },
+    mineCol: { flexShrink: 1, maxWidth: '82%', alignItems: 'flex-end' },
+    mineTime: { fontSize: 11, color: c.subtle, marginBottom: 3, marginRight: 2 },
+    identity: { fontSize: 11, color: c.subtle, marginBottom: 3, marginLeft: 2 },
+    identityName: { fontFamily: font.bodySemi, color: c.text },
+    identityMeta: { color: c.subtle },
+    bubble: { borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8 },
     bubbleMine: { backgroundColor: c.brand },
     bubbleOther: { backgroundColor: c.surface, borderWidth: 1, borderColor: c.border },
-    sender: { fontSize: 11, color: c.muted, marginBottom: 2, fontFamily: font.bodySemi },
     body: { fontSize: 14, color: c.text },
     bodyMine: { color: c.onBrand },
     bodyWithImage: { marginTop: 6 },
@@ -452,4 +503,15 @@ const makeStyles = (c: Colors) =>
 function fmtDuration(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+// A run of same-sender messages within this gap groups under one header.
+const GROUP_GAP_MS = 5 * 60 * 1000;
+
+/** Local "9:41am" — hand-rolled to avoid relying on RN's patchy Intl on Android. */
+function shortTime(iso: string): string {
+  const d = new Date(iso);
+  const h = d.getHours();
+  const hh = ((h + 11) % 12) + 1;
+  return `${hh}:${String(d.getMinutes()).padStart(2, '0')}${h < 12 ? 'am' : 'pm'}`;
 }
