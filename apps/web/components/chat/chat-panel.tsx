@@ -21,13 +21,46 @@ import {
 import type { ChatAttachment, ChatMessage, ChatSearchResult, ConversationFile, ChatAbout, PinnedMessage } from '@/lib/data/chat';
 import type { RosterMember } from '@/lib/data/chat-roster';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, Paperclip, Mic, Square, X, Download, FileText, Search, Users } from '@/components/icons';
+import { MessageCircle, Paperclip, Mic, Square, X, Download, FileText, Search, Users, ChevronDown, Reply, Pin, Pencil, Trash2 } from '@/components/icons';
 import { NotifyToggle } from '@/components/chat/notify-toggle';
 import { ChatRail } from '@/components/chat/chat-rail';
 import { Avatar, senderTint, rolePill } from '@/components/chat/identity';
 
 const EMOJIS = ['👍', '❤️', '😂', '🎉', '✅'];
 const MAX_FILE_BYTES = 50 * 1024 * 1024; // 50 MB per file
+
+/** One action row inside the message hover menu. */
+function MenuItem({
+  icon,
+  label,
+  onClick,
+  danger,
+  active,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+  active?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      className={`flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs transition hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
+        danger
+          ? 'text-red-600 dark:text-red-400'
+          : active
+            ? 'text-brand-600 dark:text-brand-400'
+            : 'text-zinc-700 dark:text-zinc-200'
+      }`}
+    >
+      <span className="shrink-0 opacity-80">{icon}</span>
+      {label}
+    </button>
+  );
+}
 
 interface Props {
   conversationId: string;
@@ -251,8 +284,26 @@ export function ChatPanel({
   const [sending, setSending] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingBody, setEditingBody] = useState('');
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<{ id: string; name: string; snippet: string } | null>(null);
   const [typing, setTyping] = useState<Record<string, string>>({});
+
+  // Close the message hover menu on an outside click or Escape.
+  useEffect(() => {
+    if (!openMenuId) return;
+    const onDown = (e: PointerEvent) => {
+      if (!(e.target as HTMLElement).closest('[data-msg-menu]')) setOpenMenuId(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpenMenuId(null);
+    };
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [openMenuId]);
   const [onlineIds, setOnlineIds] = useState<Set<string>>(() => new Set());
   const [railOpen, setRailOpen] = useState(false);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
@@ -890,49 +941,86 @@ export function ChatPanel({
                     )}
 
                     {!m.deletedAt && (
-                      <div
-                        className={`absolute -top-3.5 z-10 hidden items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2 py-1 shadow-sm group-hover:flex dark:border-zinc-700 dark:bg-zinc-900 ${
-                          mine ? 'right-1' : 'left-1'
-                        }`}
-                      >
-                        {EMOJIS.map((e) => (
-                          <button key={e} onClick={() => onReact(m.id, e)} className="text-sm leading-none hover:scale-110" title="React">
-                            {e}
-                          </button>
-                        ))}
-                        <span className="mx-0.5 h-3.5 w-px bg-zinc-200 dark:bg-zinc-700" />
+                      <div data-msg-menu className={`absolute -top-2 z-20 ${mine ? 'right-0' : 'left-0'}`}>
+                        {/* Subtle hover affordance — one chevron that opens the menu. */}
                         <button
-                          onClick={() => setReplyTo({ id: m.id, name: m.senderName, snippet: m.body ?? '' })}
-                          className="text-[11px] text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-100"
-                        >
-                          Reply
-                        </button>
-                        <button
-                          onClick={() => togglePin(m.id)}
-                          className={`text-[11px] hover:text-zinc-800 dark:hover:text-zinc-100 ${
-                            pinnedSet.has(m.id) ? 'text-brand-600 dark:text-brand-400' : 'text-zinc-500 dark:text-zinc-400'
+                          type="button"
+                          onClick={() => setOpenMenuId((cur) => (cur === m.id ? null : m.id))}
+                          aria-label="Message actions"
+                          aria-haspopup="menu"
+                          aria-expanded={openMenuId === m.id}
+                          className={`h-6 w-6 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-500 shadow-sm transition hover:text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 ${
+                            openMenuId === m.id ? 'flex' : 'hidden group-hover:flex'
                           }`}
                         >
-                          {pinnedSet.has(m.id) ? 'Unpin' : 'Pin'}
+                          <ChevronDown size={14} />
                         </button>
-                        {mine && (
-                          <button
-                            onClick={() => {
-                              setEditingId(m.id);
-                              setEditingBody(m.body ?? '');
-                            }}
-                            className="text-[11px] text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-100"
+
+                        {openMenuId === m.id && (
+                          <div
+                            role="menu"
+                            className={`absolute top-7 z-30 w-44 overflow-hidden rounded-xl border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 ${
+                              mine ? 'right-0' : 'left-0'
+                            }`}
                           >
-                            Edit
-                          </button>
-                        )}
-                        {(mine || canModerate) && (
-                          <button
-                            onClick={() => deleteMessage(m.id).then(() => applyOne(m.id))}
-                            className="text-[11px] text-zinc-500 dark:text-zinc-400 hover:text-red-500"
-                          >
-                            Delete
-                          </button>
+                            {/* Quick reactions */}
+                            <div className="flex items-center justify-between px-2 pb-1 pt-0.5">
+                              {EMOJIS.map((e) => (
+                                <button
+                                  key={e}
+                                  onClick={() => {
+                                    onReact(m.id, e);
+                                    setOpenMenuId(null);
+                                  }}
+                                  className="rounded-full p-1 text-base leading-none transition hover:scale-125 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                                  title="React"
+                                >
+                                  {e}
+                                </button>
+                              ))}
+                            </div>
+                            <div className="my-1 h-px bg-zinc-100 dark:bg-zinc-800" />
+                            {/* Actions */}
+                            <MenuItem
+                              icon={<Reply size={14} />}
+                              label="Reply"
+                              onClick={() => {
+                                setReplyTo({ id: m.id, name: m.senderName, snippet: m.body ?? '' });
+                                setOpenMenuId(null);
+                              }}
+                            />
+                            <MenuItem
+                              icon={<Pin size={14} />}
+                              label={pinnedSet.has(m.id) ? 'Unpin' : 'Pin'}
+                              active={pinnedSet.has(m.id)}
+                              onClick={() => {
+                                togglePin(m.id);
+                                setOpenMenuId(null);
+                              }}
+                            />
+                            {mine && (
+                              <MenuItem
+                                icon={<Pencil size={14} />}
+                                label="Edit"
+                                onClick={() => {
+                                  setEditingId(m.id);
+                                  setEditingBody(m.body ?? '');
+                                  setOpenMenuId(null);
+                                }}
+                              />
+                            )}
+                            {(mine || canModerate) && (
+                              <MenuItem
+                                icon={<Trash2 size={14} />}
+                                label="Delete"
+                                danger
+                                onClick={() => {
+                                  void deleteMessage(m.id).then(() => applyOne(m.id));
+                                  setOpenMenuId(null);
+                                }}
+                              />
+                            )}
+                          </div>
                         )}
                       </div>
                     )}
