@@ -251,7 +251,7 @@ function QuickActions({
       { href: `/projects/${projectId}/rfis`, icon: HelpCircle, label: 'RFIs' },
     ];
     return (
-      <div className="grid grid-cols-5 gap-0.5 border-b border-zinc-200 px-1.5 py-1.5 dark:border-zinc-800">
+      <div className="grid h-[52px] shrink-0 grid-cols-5 items-center gap-0.5 border-b border-zinc-200 px-1.5 dark:border-zinc-800">
         {links.map(({ href, icon: Icon, label }) => (
           <Link key={href} href={href} className={quickItem} title={label}>
             <Icon size={16} />
@@ -262,7 +262,7 @@ function QuickActions({
     );
   }
   return (
-    <div className="flex items-stretch gap-1 border-b border-zinc-200 px-2 py-1.5 dark:border-zinc-800">
+    <div className="flex h-[52px] shrink-0 items-stretch gap-1 border-b border-zinc-200 px-2 py-1.5 dark:border-zinc-800">
       {onFind && (
         <button type="button" onClick={onFind} className={`flex-1 ${quickItem}`}>
           <Search size={16} />

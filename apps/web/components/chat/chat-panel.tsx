@@ -677,7 +677,7 @@ export function ChatPanel({
     <div className={`flex min-h-0 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950 ${className}`}>
       <div className="flex min-w-0 flex-1 flex-col">
       {title && (
-        <header className="flex items-center gap-2 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+        <header className="flex h-[52px] shrink-0 items-center gap-2 border-b border-zinc-200 px-4 dark:border-zinc-800">
           <MessageCircle size={18} className="text-zinc-500 dark:text-zinc-400" />
           <h2 className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{title}</h2>
           <div className="ml-auto flex items-center gap-2">
