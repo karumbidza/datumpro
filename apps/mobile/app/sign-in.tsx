@@ -11,6 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import { radius, font, type Colors } from '../lib/theme';
@@ -22,6 +23,11 @@ export default function SignIn() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  // `?add=1`: an already-signed-in user is adding another account. On success we
+  // navigate ourselves (the AuthGate deliberately doesn't redirect in this mode).
+  const { add } = useLocalSearchParams<{ add?: string }>();
+  const adding = add === '1';
+  const router = useRouter();
 
   const [method, setMethod] = useState<Method>('password');
   const [email, setEmail] = useState('');
@@ -43,8 +49,10 @@ export default function SignIn() {
     reset();
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     setBusy(false);
-    if (error) setError(error.message);
-    // On success the AuthGate redirects into the app.
+    if (error) return setError(error.message);
+    // On success the AuthGate redirects into the app — unless we're adding an
+    // account, where the gate stays put, so navigate ourselves.
+    if (adding) router.replace('/(app)/(tabs)');
   }
 
   // Sends a one-time code to the member's email. Works for accounts created with
@@ -76,8 +84,8 @@ export default function SignIn() {
       type: 'email',
     });
     setBusy(false);
-    if (error) setError(error.message);
-    // On success the AuthGate redirects into the app.
+    if (error) return setError(error.message);
+    if (adding) router.replace('/(app)/(tabs)');
   }
 
   return (
@@ -120,7 +128,13 @@ export default function SignIn() {
 
         {/* ── Form ──────────────────────────────────────────────────────────── */}
         <View style={styles.form}>
-          <Text style={styles.formTitle}>Sign in to your site account</Text>
+          {adding ? (
+            <Pressable style={styles.cancelRow} onPress={() => router.back()} hitSlop={8}>
+              <Ionicons name="chevron-back" size={18} color={colors.brand} />
+              <Text style={styles.cancelText}>Cancel</Text>
+            </Pressable>
+          ) : null}
+          <Text style={styles.formTitle}>{adding ? 'Add another account' : 'Sign in to your site account'}</Text>
 
           <View style={styles.toggle}>
             <Pressable
@@ -299,6 +313,8 @@ const makeStyles = (c: Colors) =>
     // Form
     form: { paddingHorizontal: 24, paddingTop: 26, gap: 10 },
     formTitle: { fontSize: 15, fontFamily: font.bodySemi, color: c.muted, marginBottom: 2 },
+    cancelRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginBottom: 2 },
+    cancelText: { color: c.brand, fontFamily: font.bodySemi, fontSize: 14 },
     toggle: {
       flexDirection: 'row',
       backgroundColor: c.sunk,

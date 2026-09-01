@@ -1,11 +1,12 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BrandLoader } from '../../../components/brand-loader';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Modal, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { supabase, currentUser } from '../../../lib/supabase';
 import { useSession } from '../../../lib/auth';
+import { listAccounts, switchToAccount, removeAccount, type StoredAccount } from '../../../lib/accounts';
 import { Avatar } from '../../../components/ui';
 import { contentWidth, radius, font, type Colors } from '../../../lib/theme';
 import { useTheme } from '../../../lib/theme-context';
@@ -26,6 +27,10 @@ export default function More() {
   const { contentMaxWidth } = useResponsive();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [notifications, setNotifications] = useState(0);
+  const [accountsOpen, setAccountsOpen] = useState(false);
+  const [accounts, setAccounts] = useState<StoredAccount[]>([]);
+  const [acctBusy, setAcctBusy] = useState(false);
+  const meId = session?.user.id ?? null;
 
   const load = useCallback(async () => {
     const user = await currentUser();
@@ -56,6 +61,64 @@ export default function More() {
     }, [load]),
   );
 
+  // Re-load the profile whenever the active account changes (e.g. after a switch).
+  useEffect(() => {
+    void load();
+  }, [meId, load]);
+
+  async function openAccounts() {
+    setAccounts(await listAccounts());
+    setAccountsOpen(true);
+  }
+
+  async function doSwitch(userId: string) {
+    if (userId === meId || acctBusy) return;
+    setAcctBusy(true);
+    try {
+      await switchToAccount(userId);
+      setAccountsOpen(false); // the app re-renders as the new user
+    } catch (e) {
+      setAccounts(await listAccounts());
+      Alert.alert('Could not switch', e instanceof Error ? e.message : 'Please sign in to that account again.');
+    } finally {
+      setAcctBusy(false);
+    }
+  }
+
+  function addAccount() {
+    setAccountsOpen(false);
+    router.push('/sign-in?add=1');
+  }
+
+  /** Remove a stored, non-active account from this device (no session change). */
+  async function forgetAccount(userId: string) {
+    await removeAccount(userId);
+    setAccounts(await listAccounts());
+  }
+
+  /** Sign out of the active account: switch to another stored one if there is one
+   *  (no re-login needed), else fully sign out to the login screen. */
+  async function signOutActive() {
+    if (acctBusy) return;
+    setAcctBusy(true);
+    try {
+      const list = await listAccounts();
+      const others = list.filter((a) => a.userId !== meId);
+      if (others.length > 0) {
+        await switchToAccount(others[0]!.userId);
+        if (meId) await removeAccount(meId);
+      } else {
+        if (meId) await removeAccount(meId);
+        await supabase.auth.signOut();
+      }
+      setAccountsOpen(false);
+    } catch (e) {
+      Alert.alert('Could not sign out', e instanceof Error ? e.message : 'Please try again.');
+    } finally {
+      setAcctBusy(false);
+    }
+  }
+
   const cardShadow = scheme === 'light' && styles.shadow;
 
   return (
@@ -69,8 +132,11 @@ export default function More() {
           </View>
         ) : (
           <>
-            {/* Profile */}
-            <View style={[styles.card, cardShadow, styles.profileCard]}>
+            {/* Profile — tap to switch account */}
+            <Pressable
+              onPress={openAccounts}
+              style={({ pressed }) => [styles.card, cardShadow, styles.profileCard, pressed && styles.pressed]}
+            >
               <View style={styles.profileRow}>
                 <Avatar name={profile.name} size={52} />
                 <View style={{ flex: 1, minWidth: 0 }}>
@@ -88,8 +154,9 @@ export default function More() {
                     </View>
                   )}
                 </View>
+                <Ionicons name="swap-horizontal-outline" size={20} color={colors.subtle} />
               </View>
-            </View>
+            </Pressable>
 
             {/* Organisations */}
             {profile.orgs.length > 0 && (
@@ -154,7 +221,8 @@ export default function More() {
 
             {/* Sign out */}
             <Pressable
-              onPress={() => supabase.auth.signOut()}
+              onPress={signOutActive}
+              disabled={acctBusy}
               style={({ pressed }) => [styles.card, styles.signOut, pressed && styles.pressed]}
             >
               <View style={styles.signOutIcon}>
@@ -170,6 +238,63 @@ export default function More() {
           </>
         )}
       </ScrollView>
+
+      <Modal visible={accountsOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setAccountsOpen(false)}>
+        <View style={styles.sheet}>
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>Accounts</Text>
+            {acctBusy ? <ActivityIndicator color={colors.brand} /> : (
+              <Pressable onPress={() => setAccountsOpen(false)} hitSlop={10}>
+                <Text style={styles.sheetDone}>Done</Text>
+              </Pressable>
+            )}
+          </View>
+          <ScrollView contentContainerStyle={styles.sheetContent}>
+            {accounts.map((a) => {
+              const isMe = a.userId === meId;
+              const label = a.displayName || a.email || 'Account';
+              return (
+                <View key={a.userId} style={styles.acctRow}>
+                  <Pressable style={styles.acctMain} onPress={() => doSwitch(a.userId)} disabled={isMe || acctBusy}>
+                    <Avatar name={label} size={40} />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={styles.acctName} numberOfLines={1}>
+                        {label}
+                        {isMe ? <Text style={styles.acctYou}>  · current</Text> : null}
+                      </Text>
+                      {a.email ? (
+                        <Text style={styles.acctEmail} numberOfLines={1}>
+                          {a.email}
+                        </Text>
+                      ) : null}
+                    </View>
+                    {isMe ? (
+                      <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+                    ) : (
+                      <Ionicons name="chevron-forward" size={18} color={colors.subtle} />
+                    )}
+                  </Pressable>
+                  {isMe ? (
+                    <Pressable onPress={signOutActive} disabled={acctBusy} hitSlop={6}>
+                      <Text style={styles.acctSignOut}>Sign out</Text>
+                    </Pressable>
+                  ) : (
+                    <Pressable onPress={() => void forgetAccount(a.userId)} disabled={acctBusy} hitSlop={6}>
+                      <Text style={styles.acctRemove}>Remove</Text>
+                    </Pressable>
+                  )}
+                </View>
+              );
+            })}
+
+            <Pressable style={styles.addAccount} onPress={addAccount} disabled={acctBusy}>
+              <Ionicons name="add" size={20} color={colors.brand} />
+              <Text style={styles.addAccountText}>Add account</Text>
+            </Pressable>
+            <Text style={styles.sheetHint}>Switching keeps you signed in to each account on this device.</Text>
+          </ScrollView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -267,4 +392,27 @@ const makeStyles = (c: Colors) =>
     signOutText: { fontSize: 15, fontFamily: font.bodyBold, color: c.danger },
     foot: { fontSize: 12, fontFamily: font.body, color: c.muted, textAlign: 'center', marginTop: 20 },
     footSub: { fontSize: 11, fontFamily: font.body, color: c.subtle, textAlign: 'center', marginTop: 4 },
+    // Accounts sheet
+    sheet: { flex: 1, backgroundColor: c.bg },
+    sheetHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+    },
+    sheetTitle: { fontSize: 17, fontFamily: font.displayBold, color: c.text },
+    sheetDone: { fontSize: 15, fontFamily: font.bodySemi, color: c.brand },
+    sheetContent: { padding: 16, gap: 4 },
+    acctRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.border },
+    acctMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+    acctName: { fontSize: 15, fontFamily: font.bodySemi, color: c.text },
+    acctYou: { fontSize: 12, fontFamily: font.body, color: c.subtle },
+    acctEmail: { fontSize: 12, fontFamily: font.body, color: c.muted, marginTop: 1 },
+    acctSignOut: { fontSize: 13, fontFamily: font.bodySemi, color: c.danger, paddingHorizontal: 4 },
+    acctRemove: { fontSize: 13, fontFamily: font.bodySemi, color: c.subtle, paddingHorizontal: 4 },
+    addAccount: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14, marginTop: 4 },
+    addAccountText: { fontSize: 15, fontFamily: font.bodyBold, color: c.brand },
+    sheetHint: { fontSize: 12, fontFamily: font.body, color: c.subtle, textAlign: 'center', marginTop: 8 },
   });

@@ -1,7 +1,7 @@
 import 'react-native-url-polyfill/auto';
 import { BrandLoader } from '../components/brand-loader';
 import { useEffect } from 'react';
-import { Slot, useRouter, useSegments } from 'expo-router';
+import { Slot, useRouter, useSegments, useGlobalSearchParams } from 'expo-router';
 import { StatusBar, setStatusBarHidden } from 'expo-status-bar';
 import { AppState, Platform, View } from 'react-native';
 import * as NavigationBar from 'expo-navigation-bar';
@@ -51,6 +51,7 @@ function useImmersiveAndroid() {
 function AuthGate() {
   const { session, loading } = useSession();
   const segments = useSegments();
+  const params = useGlobalSearchParams<{ add?: string }>();
   const router = useRouter();
 
   useEffect(() => {
@@ -58,12 +59,15 @@ function AuthGate() {
     const first = (segments as string[])[0]; // undefined on the index route
     const inAuthScreen = first === 'sign-in';
     const inApp = first === '(app)';
+    // `?add=1` on the sign-in screen means an already-signed-in user is adding
+    // another account — don't bounce them back into the app before they sign in.
+    const addingAccount = inAuthScreen && params.add === '1';
     if (!session) {
       if (!inAuthScreen) router.replace('/sign-in');
-    } else if (!inApp) {
+    } else if (!inApp && !addingAccount) {
       router.replace('/(app)/(tabs)');
     }
-  }, [session, loading, segments, router]);
+  }, [session, loading, segments, params.add, router]);
 
   if (loading) {
     return (
