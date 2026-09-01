@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+import { rememberSession } from './accounts';
 
 interface SessionState {
   session: Session | null;
@@ -25,9 +26,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (!active) return;
       setSession(data.session);
       setLoading(false);
+      if (data.session) void rememberSession(data.session);
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
       setSession(next);
+      // Keep the multi-account registry's refresh token current for the active
+      // account on sign-in and every silent refresh.
+      if (next && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) void rememberSession(next);
     });
     return () => {
       active = false;
