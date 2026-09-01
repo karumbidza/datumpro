@@ -33,6 +33,7 @@ import {
   sendPhotoMessage,
   sendVoiceMessage,
   markConversationRead,
+  pinMessage,
   type ChatMessage,
 } from '../lib/data/chat';
 import { getConversationRoster, type RosterMember } from '../lib/data/chat-roster';
@@ -161,6 +162,24 @@ export function ChatThread({
       if (channel) supabase.removeChannel(channel);
     };
   }, [conversationId, reload, meId, session?.user.email]);
+
+  function pinPrompt(item: ChatMessage) {
+    if (item.deletedAt) return;
+    Alert.alert('Message', undefined, [
+      {
+        text: 'Pin message',
+        onPress: async () => {
+          try {
+            await pinMessage(item.id);
+            Alert.alert('Pinned', 'Find it under People → Pinned.');
+          } catch (e) {
+            Alert.alert('Could not pin', e instanceof Error ? e.message : 'Please try again.');
+          }
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
 
   async function submit() {
     if (!conversationId || sending) return;
@@ -298,6 +317,7 @@ export function ChatThread({
       <ChatMembersSheet
         visible={sheetOpen}
         onClose={() => setSheetOpen(false)}
+        conversationId={conversationId}
         members={members}
         onlineIds={onlineIds}
         meId={meId ?? ''}
@@ -340,16 +360,16 @@ export function ChatThread({
 
           if (mine) {
             return (
-              <View style={[styles.row, styles.rowMine]}>
+              <Pressable onLongPress={() => pinPrompt(item)} delayLongPress={300} style={[styles.row, styles.rowMine]}>
                 <View style={styles.mineCol}>
                   {showHeader && <Text style={styles.mineTime}>{shortTime(item.createdAt)}</Text>}
                   <View style={[styles.bubble, styles.bubbleMine]}>{content}</View>
                 </View>
-              </View>
+              </Pressable>
             );
           }
           return (
-            <View style={[styles.row, styles.rowOther]}>
+            <Pressable onLongPress={() => pinPrompt(item)} delayLongPress={300} style={[styles.row, styles.rowOther]}>
               <View style={styles.avatarGutter}>
                 {showHeader ? (
                   <Avatar name={item.senderName} avatarUrl={meta?.avatarUrl} userId={item.senderId} size={30} />
@@ -368,7 +388,7 @@ export function ChatThread({
                   {content}
                 </View>
               </View>
-            </View>
+            </Pressable>
           );
         }}
       />
