@@ -16,8 +16,16 @@ export interface CalendarItem {
   taskId: string | null;
 }
 
+/** Local calendar day (YYYY-MM-DD) — NOT UTC, so day bucketing tracks the device
+ *  timezone (matters for timed events and the today/overdue boundary). */
+export function localDay(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localDay(new Date());
 }
 
 /** Every dated item on a project, aggregated for the agenda. RLS scopes each read.
@@ -36,8 +44,9 @@ export async function listProjectCalendar(projectId: string): Promise<CalendarIt
       .not('due_date', 'is', null),
     supabase
       .from('project_events')
-      .select('id, title, kind, location, starts_at')
-      .eq('project_id', projectId),
+      .select('id, title, kind, location, starts_at, status')
+      .eq('project_id', projectId)
+      .eq('status', 'scheduled'),
     supabase
       .from('rfis')
       .select('id, number, subject, due_date, status')
@@ -68,7 +77,8 @@ export async function listProjectCalendar(projectId: string): Promise<CalendarIt
     items.push({ id: `todo-${a.id}`, date: a.due_date, kind: 'todo', title: a.title, subtitle: 'To-do', deadline: true, done: a.status === 'done', taskId: null });
   }
   for (const e of (eventRes.data ?? []) as { id: string; title: string; kind: string | null; location: string | null; starts_at: string }[]) {
-    items.push({ id: `event-${e.id}`, date: e.starts_at.slice(0, 10), kind: 'event', title: e.title, subtitle: e.location || e.kind || null, deadline: false, done: false, taskId: null });
+    // starts_at is a timestamptz — bucket by the LOCAL day it falls on.
+    items.push({ id: `event-${e.id}`, date: localDay(new Date(e.starts_at)), kind: 'event', title: e.title, subtitle: e.location || e.kind || null, deadline: false, done: false, taskId: null });
   }
   for (const r of (rfiRes.data ?? []) as { id: string; number: number; subject: string; due_date: string }[]) {
     items.push({ id: `rfi-${r.id}`, date: r.due_date, kind: 'rfi', title: `RFI #${r.number} due`, subtitle: r.subject, deadline: true, done: false, taskId: null });

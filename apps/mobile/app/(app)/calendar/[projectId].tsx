@@ -3,14 +3,14 @@ import { View, Text, Pressable, ScrollView, StyleSheet, RefreshControl } from 'r
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { BrandLoader } from '../../../components/brand-loader';
-import { listProjectCalendar, type CalendarItem, type CalendarKind } from '../../../lib/data/calendar';
+import { listProjectCalendar, localDay, type CalendarItem, type CalendarKind } from '../../../lib/data/calendar';
 import { contentWidth, radius, font, type Colors } from '../../../lib/theme';
 import { useTheme } from '../../../lib/theme-context';
 
 function isoOffset(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return localDay(d);
 }
 function dateHeader(iso: string, today: string, tomorrow: string): string {
   if (iso === today) return 'Today';
