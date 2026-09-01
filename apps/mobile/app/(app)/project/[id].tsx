@@ -222,6 +222,19 @@ export default function ProjectScreen() {
                 <Text style={styles.teamChatText}>Calendar</Text>
                 <Ionicons name="chevron-forward" size={16} color={colors.subtle} style={{ marginLeft: 'auto' }} />
               </Pressable>
+              <Pressable
+                style={styles.teamChat}
+                onPress={() =>
+                  router.push({
+                    pathname: '/(app)/reports/[projectId]',
+                    params: { projectId: String(id), name: name ?? '' },
+                  })
+                }
+              >
+                <Ionicons name="document-text-outline" size={18} color={colors.brand} />
+                <Text style={styles.teamChatText}>Site reports</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.subtle} style={{ marginLeft: 'auto' }} />
+              </Pressable>
               {tasks.length > 0 && <Text style={styles.count}>{tasks.length} tasks</Text>}
             </View>
           }
