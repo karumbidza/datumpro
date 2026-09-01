@@ -904,7 +904,7 @@ export function ChatPanel({
                   {/* Content + floating hover toolbar. The toolbar is absolutely
                       positioned so it never reserves height (that empty reserved
                       row was the source of the ragged vertical gaps). */}
-                  <div className={`relative flex w-full flex-col gap-1 ${mine ? 'items-end' : 'items-start'}`}>
+                  <div className={`group/bubble relative flex w-fit flex-col gap-1 ${mine ? 'items-end' : 'items-start'}`}>
                     {(editingId === m.id || m.deletedAt || m.body) && (
                       <div
                         className={`rounded-xl px-3 py-2 text-sm ${
@@ -950,7 +950,7 @@ export function ChatPanel({
                           aria-haspopup="menu"
                           aria-expanded={openMenuId === m.id}
                           className={`h-6 w-6 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-500 shadow-sm transition hover:text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 ${
-                            openMenuId === m.id ? 'flex' : 'hidden group-hover:flex'
+                            openMenuId === m.id ? 'flex' : 'hidden group-hover/bubble:flex'
                           }`}
                         >
                           <ChevronDown size={14} />
