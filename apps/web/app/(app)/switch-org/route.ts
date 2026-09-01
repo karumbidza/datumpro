@@ -9,8 +9,10 @@ import { getActiveContext, ACTIVE_ORG_COOKIE } from '@/lib/data/org';
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const org = req.nextUrl.searchParams.get('org');
   const nextParam = req.nextUrl.searchParams.get('next') || '/dashboard';
-  // Only same-origin relative paths are valid redirect targets (no open redirect).
-  const safeNext = nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/dashboard';
+  // Only same-origin relative paths are valid redirect targets: must start with a
+  // single '/' NOT followed by '/' or '\' (blocks //evil.com and /\evil.com, which
+  // some parsers treat as protocol-relative). No open redirect.
+  const safeNext = /^\/(?![/\\])/.test(nextParam) ? nextParam : '/dashboard';
 
   const ctx = await getActiveContext();
   if (!ctx) return NextResponse.redirect(new URL('/sign-in', req.url));
