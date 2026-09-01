@@ -2,51 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import type { RosterMember, ActivityItem } from '@/lib/data/chat-roster';
-import type { MemberType, ProjectRole } from '@datumpro/shared/access';
 import { ChevronLeft, ChevronRight, Phone, Mail, MessageCircle, X } from '@/components/icons';
-
-const ONLINE = '#22c55e';
-const OFFLINE = '#d4d4d8';
-
-/** Role → pill label + tone classes (theme-aware; mirrors ui/badge tones).
- *  Owner/Admin come from member_type; everything else from the project role. */
-function rolePill(role: ProjectRole, memberType: MemberType): { label: string; cls: string } {
-  if (memberType === 'owner' || memberType === 'admin') {
-    return {
-      label: memberType === 'owner' ? 'Owner' : 'Admin',
-      cls: 'bg-purple-50 text-purple-700 dark:bg-purple-500/15 dark:text-purple-400',
-    };
-  }
-  switch (role) {
-    case 'pm':
-      return { label: 'Project manager', cls: 'bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400' };
-    case 'contractor':
-      return { label: 'Contractor', cls: 'bg-orange-50 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400' };
-    case 'client':
-      return { label: 'Client', cls: 'bg-green-50 text-green-700 dark:bg-green-500/15 dark:text-green-400' };
-    case 'contributor':
-      return { label: 'Contributor', cls: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300' };
-    default:
-      return { label: 'Viewer', cls: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400' };
-  }
-}
-
-const AVATAR_COLORS = ['#2563eb', '#7e22ce', '#c2410c', '#15803d', '#b45309', '#db2777', '#0891b2', '#4f46e5'];
-
-function avatarColor(id: string): string {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return AVATAR_COLORS[h % AVATAR_COLORS.length]!;
-}
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  const first = parts[0];
-  if (!first) return '?';
-  if (parts.length === 1) return first.slice(0, 2).toUpperCase();
-  const last = parts[parts.length - 1]!;
-  return (first[0]! + last[0]!).toUpperCase();
-}
+import { Avatar, rolePill } from '@/components/chat/identity';
 
 /** "Active 40m ago" from a last_active_at timestamp (or "Offline" if unknown). */
 function activeAgo(iso: string | null): string {
@@ -59,46 +16,6 @@ function activeAgo(iso: string | null): string {
   if (hrs < 24) return `Active ${hrs}h ago`;
   const days = Math.floor(hrs / 24);
   return `Active ${days}d ago`;
-}
-
-function Avatar({ member, size, online }: { member: RosterMember; size: number; online: boolean }) {
-  const dot = size >= 64 ? 16 : 10;
-  const border = size >= 64 ? 3 : 2;
-  return (
-    <span className="relative flex-shrink-0" style={{ width: size, height: size }}>
-      {member.avatarUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={member.avatarUrl}
-          alt={member.name}
-          className="rounded-full object-cover"
-          style={{ width: size, height: size, opacity: online ? 1 : 0.55 }}
-        />
-      ) : (
-        <span
-          className="flex items-center justify-center rounded-full font-semibold text-white"
-          style={{
-            width: size,
-            height: size,
-            background: avatarColor(member.userId),
-            fontSize: size * 0.4,
-            opacity: online ? 1 : 0.55,
-          }}
-        >
-          {initials(member.name)}
-        </span>
-      )}
-      <span
-        className="absolute bottom-0 right-0 rounded-full"
-        style={{
-          width: dot,
-          height: dot,
-          background: online ? ONLINE : OFFLINE,
-          border: `${border}px solid var(--rail-avatar-ring, #fff)`,
-        }}
-      />
-    </span>
-  );
 }
 
 interface RailCommon {
@@ -209,7 +126,7 @@ function PersonRow({
       className="flex min-h-11 w-full items-center gap-2.5 rounded-lg p-2 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800"
     >
       <span className="[--rail-avatar-ring:#ffffff] dark:[--rail-avatar-ring:#09090b]">
-        <Avatar member={member} size={32} online={online} />
+        <Avatar name={member.name} avatarUrl={member.avatarUrl} userId={member.userId} size={32} online={online} />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
@@ -275,7 +192,7 @@ function MemberDetail({
         {/* Identity */}
         <div className="flex flex-col items-center gap-2 border-b border-zinc-100 px-5 py-6 dark:border-zinc-800">
           <span className="[--rail-avatar-ring:#ffffff] dark:[--rail-avatar-ring:#09090b]">
-            <Avatar member={member} size={72} online={online} />
+            <Avatar name={member.name} avatarUrl={member.avatarUrl} userId={member.userId} size={72} online={online} />
           </span>
           <p className="text-base font-semibold text-zinc-900 dark:text-white">
             {member.name}
