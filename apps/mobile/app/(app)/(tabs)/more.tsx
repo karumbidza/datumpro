@@ -7,6 +7,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { supabase, currentUser } from '../../../lib/supabase';
 import { useSession } from '../../../lib/auth';
 import { listAccounts, switchToAccount, removeAccount, type StoredAccount } from '../../../lib/accounts';
+import { useActiveOrg, ALL_WORKSPACES } from '../../../lib/active-org';
 import { Avatar } from '../../../components/ui';
 import { contentWidth, radius, font, type Colors } from '../../../lib/theme';
 import { useTheme } from '../../../lib/theme-context';
@@ -31,6 +32,7 @@ export default function More() {
   const [accounts, setAccounts] = useState<StoredAccount[]>([]);
   const [acctBusy, setAcctBusy] = useState(false);
   const meId = session?.user.id ?? null;
+  const { activeOrgId, orgs, setActiveOrg } = useActiveOrg();
 
   const load = useCallback(async () => {
     const user = await currentUser();
@@ -158,10 +160,35 @@ export default function More() {
               </View>
             </Pressable>
 
-            {/* Organisations */}
-            {profile.orgs.length > 0 && (
+            {/* Workspace — switch which org the app is scoped to (only when the
+                user belongs to more than one). */}
+            {orgs.length > 1 ? (
               <View style={[styles.card, cardShadow, styles.orgCard]}>
-                <Text style={styles.cardLabel}>Organisations</Text>
+                <Text style={styles.cardLabel}>Workspace</Text>
+                <Pressable style={styles.wsRow} onPress={() => setActiveOrg(ALL_WORKSPACES)}>
+                  <Text style={styles.wsName}>All workspaces</Text>
+                  {activeOrgId === ALL_WORKSPACES ? (
+                    <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+                  ) : (
+                    <View style={styles.wsDot} />
+                  )}
+                </Pressable>
+                {orgs.map((o) => (
+                  <Pressable key={o.id} style={styles.wsRow} onPress={() => setActiveOrg(o.id)}>
+                    <Text style={styles.wsName} numberOfLines={1}>
+                      {o.name}
+                    </Text>
+                    {activeOrgId === o.id ? (
+                      <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+                    ) : (
+                      <View style={styles.wsDot} />
+                    )}
+                  </Pressable>
+                ))}
+              </View>
+            ) : profile.orgs.length > 0 ? (
+              <View style={[styles.card, cardShadow, styles.orgCard]}>
+                <Text style={styles.cardLabel}>Organisation</Text>
                 {profile.orgs.map((o, i) => (
                   <View key={i} style={styles.orgRow}>
                     <Text style={styles.orgName} numberOfLines={1}>
@@ -171,7 +198,7 @@ export default function More() {
                   </View>
                 ))}
               </View>
-            )}
+            ) : null}
 
             {/* Notifications */}
             <Pressable
@@ -343,6 +370,9 @@ const makeStyles = (c: Colors) =>
     orgRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6, gap: 12 },
     orgName: { fontSize: 14, fontFamily: font.bodySemi, color: c.text, flex: 1 },
     orgRole: { fontSize: 12, fontFamily: font.body, color: c.subtle, textTransform: 'capitalize' },
+    wsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 9, gap: 12 },
+    wsName: { fontSize: 15, fontFamily: font.bodySemi, color: c.text, flex: 1 },
+    wsDot: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: c.border },
     linkRow: {
       flexDirection: 'row',
       alignItems: 'center',
