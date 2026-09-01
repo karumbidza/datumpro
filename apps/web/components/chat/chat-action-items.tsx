@@ -4,7 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { inputCompactClass as inputClass } from '@/components/ui/form';
-import type { ActionItem } from '@/lib/data/action-items';
+import type { ActionItem, Urgency } from '@/lib/data/action-items';
 import {
   createActionItem,
   setActionItemDone,
@@ -13,6 +13,15 @@ import {
 } from '@/app/(app)/projects/[projectId]/chat/action-item-actions';
 
 export type ActionMember = { userId: string; name: string };
+
+/** Urgency → picker label + chip tone. 'normal' shows no chip (the quiet default). */
+const URGENCY_META: Record<Urgency, { label: string; chip: string | null }> = {
+  urgent: { label: 'Urgent', chip: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400' },
+  high: { label: 'High', chip: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400' },
+  normal: { label: 'Normal', chip: null },
+  low: { label: 'Low', chip: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400' },
+};
+const URGENCY_ORDER: Urgency[] = ['low', 'normal', 'high', 'urgent'];
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -42,6 +51,7 @@ function Composer({
   const [title, setTitle] = useState(item?.title ?? '');
   const [assignee, setAssignee] = useState(item?.assigneeId ?? '');
   const [due, setDue] = useState(item?.dueDate ?? '');
+  const [urgency, setUrgency] = useState<Urgency>(item?.urgency ?? 'normal');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,6 +66,7 @@ function Composer({
       fd.set('title', title.trim());
       if (assignee) fd.set('assigneeId', assignee);
       if (due) fd.set('dueDate', due);
+      fd.set('urgency', urgency);
       let res;
       if (item) {
         fd.set('id', item.id);
@@ -92,6 +103,18 @@ function Composer({
           ))}
         </select>
         <input type="date" value={due} min={todayIso()} onChange={(e) => setDue(e.target.value)} className={`${inputClass} flex-1`} />
+        <select
+          value={urgency}
+          onChange={(e) => setUrgency(e.target.value as Urgency)}
+          aria-label="Urgency"
+          className={`${inputClass} flex-1`}
+        >
+          {URGENCY_ORDER.map((u) => (
+            <option key={u} value={u}>
+              {URGENCY_META[u].label}
+            </option>
+          ))}
+        </select>
       </div>
       {error && <p className="text-xs text-red-500">{error}</p>}
       <div className="flex items-center gap-2">
@@ -125,8 +148,18 @@ function Row({
   const done = item.status === 'done';
   const overdue = !done && item.dueDate != null && item.dueDate < todayIso();
   const canEdit = canManage || item.createdBy === currentUserId;
+  const isAssignee = item.assigneeId === currentUserId;
+  // Only the assignee (or a manager) may TICK OFF an assigned to-do; anyone with
+  // edit rights, plus the assignee, may reopen it. Mirrors the DB completion guard.
+  const canComplete = !item.assigneeId || isAssignee || canManage;
+  const canReopen = canEdit || isAssignee;
+  const checkboxEnabled = done ? canReopen : canComplete;
+  const blockedReason =
+    !done && !canComplete ? `Only ${item.assigneeName ?? 'the assignee'} can complete this` : undefined;
+  const urgency = URGENCY_META[item.urgency];
 
   async function toggle() {
+    if (!checkboxEnabled) return;
     setBusy(true);
     const fd = new FormData();
     fd.set('id', item.id);
@@ -169,13 +202,14 @@ function Row({
       <button
         type="button"
         onClick={toggle}
-        disabled={busy}
+        disabled={busy || !checkboxEnabled}
         aria-label={done ? 'Reopen' : 'Mark done'}
+        title={blockedReason}
         className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full border ${
           done
             ? 'border-green-600 bg-green-600 text-white dark:border-green-500 dark:bg-green-500'
             : 'border-zinc-300 hover:border-green-500 dark:border-zinc-600'
-        }`}
+        } ${!checkboxEnabled ? 'cursor-not-allowed opacity-50 hover:border-zinc-300 dark:hover:border-zinc-600' : ''}`}
       >
         {done ? (
           <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -188,6 +222,9 @@ function Row({
           {item.title}
         </p>
         <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-zinc-400 dark:text-zinc-500">
+          {!done && urgency.chip && (
+            <span className={`rounded-full px-1.5 py-0.5 font-medium ${urgency.chip}`}>{urgency.label}</span>
+          )}
           <span>{item.assigneeName ? `For ${item.assigneeName}` : 'Unassigned'}</span>
           {item.dueDate && (
             <span className={overdue ? 'font-medium text-red-500' : ''}>Due {fmtDue(item.dueDate)}</span>

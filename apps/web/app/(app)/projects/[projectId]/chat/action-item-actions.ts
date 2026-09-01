@@ -6,6 +6,13 @@ import { notifyUser } from '@/lib/data/notifications';
 
 type Result = { ok: boolean; error?: string };
 
+const URGENCIES = ['low', 'normal', 'high', 'urgent'] as const;
+/** Clamp arbitrary form input to a valid urgency (defaults to 'normal'). */
+function readUrgency(formData: FormData): (typeof URGENCIES)[number] {
+  const raw = String(formData.get('urgency') ?? '');
+  return (URGENCIES as readonly string[]).includes(raw) ? (raw as (typeof URGENCIES)[number]) : 'normal';
+}
+
 function revalidate(projectId: string) {
   revalidatePath(`/projects/${projectId}/chat`);
   revalidatePath(`/projects/${projectId}/calendar`);
@@ -31,6 +38,7 @@ export async function createActionItem(formData: FormData): Promise<Result> {
   const detail = (formData.get('detail') as string)?.trim() || null;
   const assigneeId = (formData.get('assigneeId') as string) || null;
   const dueDate = (formData.get('dueDate') as string) || null;
+  const urgency = readUrgency(formData);
   const conversationId = (formData.get('conversationId') as string) || null;
   const messageId = (formData.get('messageId') as string) || null;
   if (!projectId) return { ok: false, error: 'Missing project.' };
@@ -53,6 +61,7 @@ export async function createActionItem(formData: FormData): Promise<Result> {
       assignee_id: assigneeId,
       created_by: user.id,
       due_date: dueDate,
+      urgency,
     })
     .select('id')
     .single();
@@ -138,6 +147,7 @@ export async function updateActionItem(formData: FormData): Promise<Result> {
   const detail = (formData.get('detail') as string)?.trim() || null;
   const assigneeId = (formData.get('assigneeId') as string) || null;
   const dueDate = (formData.get('dueDate') as string) || null;
+  const urgency = readUrgency(formData);
   if (!id || !projectId) return { ok: false, error: 'Missing item.' };
   if (title.length < 2) return { ok: false, error: 'Give the to-do a title.' };
 
@@ -150,7 +160,7 @@ export async function updateActionItem(formData: FormData): Promise<Result> {
 
   const { error } = await supabase
     .from('action_items')
-    .update({ title, detail, assignee_id: assigneeId, due_date: dueDate, updated_at: new Date().toISOString() })
+    .update({ title, detail, assignee_id: assigneeId, due_date: dueDate, urgency, updated_at: new Date().toISOString() })
     .eq('id', id);
   if (error) return { ok: false, error: error.message };
 

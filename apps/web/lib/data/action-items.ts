@@ -1,6 +1,8 @@
 import 'server-only';
 import { createClient } from '@/lib/supabase/server';
 
+export type Urgency = 'low' | 'normal' | 'high' | 'urgent';
+
 /** A lightweight to-do raised from the project chat — not a formal task. */
 export interface ActionItem {
   id: string;
@@ -12,6 +14,7 @@ export interface ActionItem {
   createdBy: string | null;
   createdByName: string | null;
   dueDate: string | null;
+  urgency: Urgency;
   status: 'open' | 'done';
   doneAt: string | null;
   createdAt: string;
@@ -25,12 +28,16 @@ type Row = {
   assignee_id: string | null;
   created_by: string | null;
   due_date: string | null;
+  urgency: Urgency;
   status: 'open' | 'done';
   done_at: string | null;
   created_at: string;
 };
 
-const SELECT = 'id, project_id, title, detail, assignee_id, created_by, due_date, status, done_at, created_at';
+const SELECT = 'id, project_id, title, detail, assignee_id, created_by, due_date, urgency, status, done_at, created_at';
+
+/** Sort weight for urgent-first ordering of open to-dos. */
+const URGENCY_RANK: Record<Urgency, number> = { urgent: 0, high: 1, normal: 2, low: 3 };
 
 async function resolveNames(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -57,6 +64,7 @@ function toItem(r: Row, names: Map<string, string>): ActionItem {
     createdBy: r.created_by,
     createdByName: r.created_by ? (names.get(r.created_by) ?? null) : null,
     dueDate: r.due_date,
+    urgency: r.urgency ?? 'normal',
     status: r.status,
     doneAt: r.done_at,
     createdAt: r.created_at,
@@ -78,6 +86,12 @@ export async function listProjectActionItems(projectId: string): Promise<ActionI
   const dueRank = (d: string | null) => (d ? d : '9999-12-31');
   return items.sort((a, b) => {
     if (a.status !== b.status) return a.status === 'open' ? -1 : 1;
+    // Within open to-dos, most urgent first; then by due date. Done items just
+    // fall to the bottom by due date.
+    if (a.status === 'open') {
+      const u = URGENCY_RANK[a.urgency] - URGENCY_RANK[b.urgency];
+      if (u !== 0) return u;
+    }
     return dueRank(a.dueDate).localeCompare(dueRank(b.dueDate));
   });
 }
