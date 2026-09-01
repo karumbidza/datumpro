@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { MessageCircle, Paperclip, Mic, Square, X, Download, FileText, Search, Users } from '@/components/icons';
 import { NotifyToggle } from '@/components/chat/notify-toggle';
 import { ChatRail } from '@/components/chat/chat-rail';
+import { Avatar, senderTint, rolePill } from '@/components/chat/identity';
 
 const EMOJIS = ['👍', '❤️', '😂', '🎉', '✅'];
 const MAX_FILE_BYTES = 50 * 1024 * 1024; // 50 MB per file
@@ -287,6 +288,8 @@ export function ChatPanel({
   const recStart = useRef(0);
   const pendingRef = useRef<PendingAttachment[]>([]);
   const msgById = useMemo(() => new Map(messages.map((m) => [m.id, m])), [messages]);
+  // Identity lookup for the message list: company, role and avatar per sender.
+  const rosterById = useMemo(() => new Map((members ?? []).map((m) => [m.userId, m])), [members]);
 
   // Keep a ref of pending so the unmount cleanup can revoke object URLs.
   useEffect(() => {
@@ -676,9 +679,7 @@ export function ChatPanel({
       {title && (
         <header className="flex items-center gap-2 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
           <MessageCircle size={18} className="text-zinc-500 dark:text-zinc-400" />
-          <h2 className="text-sm font-semibold text-zinc-900 dark:text-white">
-            {title} <span className="text-zinc-400 dark:text-zinc-500">({messages.length})</span>
-          </h2>
+          <h2 className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{title}</h2>
           <div className="ml-auto flex items-center gap-2">
             {roster ? (
               <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
@@ -807,6 +808,12 @@ export function ChatPanel({
               !!m.parentMessageId ||
               new Date(m.createdAt).getTime() - new Date(prev.createdAt).getTime() > GROUP_GAP_MS;
             const topGap = showDate ? '' : showHeader ? 'mt-3' : 'mt-0.5';
+            // Identity for the header line + per-person colour. Company/role come
+            // from the roster; a sender who has left the project falls back to name.
+            const meta = rosterById.get(m.senderId);
+            const tint = senderTint(m.senderId);
+            const company = meta?.company ?? null;
+            const role = meta ? rolePill(meta.role, meta.memberType).label : null;
             return (
               <Fragment key={m.id}>
                 {showDate && (
@@ -816,17 +823,29 @@ export function ChatPanel({
                     </span>
                   </div>
                 )}
-                <div className={`group relative flex flex-col ${mine ? 'items-end' : 'items-start'} ${topGap}`}>
+                <div className={`group relative flex gap-2 ${mine ? 'flex-row-reverse' : 'flex-row'} ${topGap}`}>
+                  {/* Avatar gutter — shown once per group beside the identity line;
+                      a matching spacer keeps grouped follow-ups aligned under it. */}
+                  {!mine && (
+                    <div className="w-7 flex-shrink-0 pt-0.5">
+                      {showHeader && (
+                        <Avatar name={m.senderName} avatarUrl={meta?.avatarUrl} userId={m.senderId} size={28} />
+                      )}
+                    </div>
+                  )}
+                  <div className={`flex min-w-0 max-w-[80%] flex-col ${mine ? 'items-end' : 'items-start'}`}>
                   {showHeader && (
-                    <p className="mb-1 flex items-center gap-1.5 text-[11px] text-zinc-400 dark:text-zinc-500">
-                      <span className="font-medium text-zinc-600 dark:text-zinc-300">{m.senderName}</span>
+                    <p className="mb-1 flex flex-wrap items-center gap-x-1.5 text-[11px] text-zinc-400 dark:text-zinc-500">
+                      <span className={`font-semibold ${mine ? 'text-brand-700 dark:text-brand-300' : tint.name}`}>{m.senderName}</span>
+                      {company && <span>· {company}</span>}
+                      {role && <span>· {role}</span>}
                       <span>· {shortTime(m.createdAt)}</span>
                       {m.editedAt && !m.deletedAt && <span>· edited</span>}
                     </p>
                   )}
 
                   {parent && (
-                    <p className={`mb-1 max-w-[80%] truncate border-l-2 border-zinc-300 pl-2 text-[11px] text-zinc-400 dark:text-zinc-500 ${mine ? 'text-right' : ''}`}>
+                    <p className={`mb-1 max-w-full truncate border-l-2 border-zinc-300 pl-2 text-[11px] text-zinc-400 dark:text-zinc-500 ${mine ? 'text-right' : ''}`}>
                       ↩ {parent.senderName}: {(parent.body ?? 'message').slice(0, 48)}
                     </p>
                   )}
@@ -834,13 +853,13 @@ export function ChatPanel({
                   {/* Content + floating hover toolbar. The toolbar is absolutely
                       positioned so it never reserves height (that empty reserved
                       row was the source of the ragged vertical gaps). */}
-                  <div className={`relative flex max-w-[80%] flex-col gap-1 ${mine ? 'items-end' : 'items-start'}`}>
+                  <div className={`relative flex w-full flex-col gap-1 ${mine ? 'items-end' : 'items-start'}`}>
                     {(editingId === m.id || m.deletedAt || m.body) && (
                       <div
                         className={`rounded-xl px-3 py-2 text-sm ${
                           mine
                             ? 'bg-brand-50 text-zinc-900 dark:bg-brand-500/15 dark:text-zinc-100'
-                            : 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100'
+                            : `${tint.bubble} text-zinc-900 dark:text-zinc-100`
                         }`}
                       >
                         {editingId === m.id ? (
@@ -934,6 +953,7 @@ export function ChatPanel({
                       ))}
                     </div>
                   )}
+                  </div>
                 </div>
               </Fragment>
             );

@@ -12,6 +12,7 @@ export interface RosterMember {
   memberType: MemberType;
   email: string | null;
   phone: string | null;
+  company: string | null;
   avatarUrl: string | null;
   lastActiveAt: string | null;
   openTasks: number;
@@ -21,6 +22,7 @@ export interface RosterMember {
 interface ProfileBits {
   email: string | null;
   phone: string | null;
+  company: string | null;
   avatarUrl: string | null;
   lastActiveAt: string | null;
 }
@@ -42,7 +44,7 @@ export async function listChatRoster(
   const [{ data: profileRows }, { data: taskRows }] = await Promise.all([
     supabase
       .from('profiles')
-      .select('id, email, phone, avatar_url, last_active_at')
+      .select('id, email, phone, company, avatar_url, last_active_at')
       .in('id', ids),
     supabase
       .from('tasks')
@@ -56,11 +58,12 @@ export async function listChatRoster(
       id: string;
       email: string | null;
       phone: string | null;
+      company: string | null;
       avatar_url: string | null;
       last_active_at: string | null;
     }[]).map((p) => [
       p.id,
-      { email: p.email, phone: p.phone, avatarUrl: p.avatar_url, lastActiveAt: p.last_active_at },
+      { email: p.email, phone: p.phone, company: p.company, avatarUrl: p.avatar_url, lastActiveAt: p.last_active_at },
     ]),
   );
 
@@ -83,6 +86,7 @@ export async function listChatRoster(
       memberType: m.memberType,
       email: p?.email ?? m.email,
       phone: p?.phone ?? null,
+      company: p?.company ?? null,
       avatarUrl: p?.avatarUrl ?? null,
       lastActiveAt: p?.lastActiveAt ?? null,
       openTasks: c?.open ?? 0,

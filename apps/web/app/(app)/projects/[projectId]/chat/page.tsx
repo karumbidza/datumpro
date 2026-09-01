@@ -72,7 +72,7 @@ export default async function ProjectChatPage({
               {/* Messaging leads; the to-dos + events strip sits below it. */}
               <ChatPanel
                 className="mt-3 min-h-0 flex-1"
-                title="Project Chat"
+                title={project.name}
                 conversationId={conversationId}
                 orgId={project.org_id}
                 projectId={projectId}
