@@ -58,8 +58,9 @@ async function resolveNames(ids: (string | null)[]): Promise<Map<string, string>
   return map;
 }
 
-/** Site reports on a project (newest date first). RLS: a member sees their own;
- *  managers (owner/admin/pm) see all. Photos signed for an hour. */
+/** Site reports on a project (newest date first). RLS: every project member sees
+ *  the project's reports (SELECT is org-scoped); only the author or a manager may
+ *  write, and only a manager may delete. Photos signed for an hour. */
 export async function listProjectSiteReports(projectId: string): Promise<SiteReport[]> {
   const { data } = await supabase
     .from('site_reports')

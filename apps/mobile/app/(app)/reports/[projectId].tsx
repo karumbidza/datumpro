@@ -163,12 +163,14 @@ export default function ProjectReports() {
             ) : null}
           </View>
 
-          {canAct ? (
+          {(detail.status === 'draft' && canAct) || canManage ? (
             <View style={styles.actionsCol}>
-              {detail.status === 'draft' ? (
+              {detail.status === 'draft' && canAct ? (
                 <ActionButton label="Submit report" icon="send-outline" onPress={() => void runAction(() => submitSiteReport(detail.id))} styles={styles} colors={colors} disabled={busy} />
               ) : null}
-              <ActionButton label="Remove" icon="trash-outline" tone="danger" onPress={() => confirmDelete(detail)} styles={styles} colors={colors} disabled={busy} />
+              {canManage ? (
+                <ActionButton label="Remove" icon="trash-outline" tone="danger" onPress={() => confirmDelete(detail)} styles={styles} colors={colors} disabled={busy} />
+              ) : null}
             </View>
           ) : null}
         </ScrollView>
