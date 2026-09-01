@@ -131,6 +131,19 @@ export default function ProjectScreen() {
                 <Text style={styles.teamChatText}>Change orders</Text>
                 <Ionicons name="chevron-forward" size={16} color={colors.subtle} style={{ marginLeft: 'auto' }} />
               </Pressable>
+              <Pressable
+                style={styles.teamChat}
+                onPress={() =>
+                  router.push({
+                    pathname: '/(app)/project-todos/[projectId]',
+                    params: { projectId: String(id), name: name ?? '' },
+                  })
+                }
+              >
+                <Ionicons name="checkbox-outline" size={18} color={colors.brand} />
+                <Text style={styles.teamChatText}>To-dos</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.subtle} style={{ marginLeft: 'auto' }} />
+              </Pressable>
               {tasks.length > 0 && <Text style={styles.count}>{tasks.length} tasks</Text>}
             </View>
           }
