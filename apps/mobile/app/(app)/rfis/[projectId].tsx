@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -95,6 +95,10 @@ export default function ProjectRfis() {
     }, [load]),
   );
 
+  // Clear the draft answer whenever the open RFI changes, so a half-typed answer
+  // for one RFI never carries into another.
+  useEffect(() => setAnswerText(''), [detailId]);
+
   const detail = detailId ? rfis.find((r) => r.id === detailId) ?? null : null;
 
   async function runAction(fn: () => Promise<unknown>) {
@@ -163,7 +167,8 @@ export default function ProjectRfis() {
     const isAssignee = detail.assigneeId === meId;
     const isRaiser = detail.raisedById === meId;
     const canAnswer = (isAssignee || canManage) && ['open', 'reopened'].includes(detail.status);
-    const canSettle = (isRaiser || canManage) && detail.status === 'answered';
+    const canClose = (isRaiser || canManage) && detail.status === 'answered';
+    const canReopen = (isRaiser || canManage) && ['answered', 'closed'].includes(detail.status);
     const canEdit = canManage || isRaiser;
     const pri = priorityTone(detail.priority, colors);
     const st = statusTone(detail.status, colors);
@@ -224,11 +229,11 @@ export default function ProjectRfis() {
             ) : null}
 
             <View style={styles.actionsCol}>
-              {canSettle ? (
-                <>
-                  <ActionButton label="Close RFI" icon="checkmark-circle-outline" onPress={() => void runAction(() => closeRfi(detail.id))} styles={styles} colors={colors} disabled={busy} />
-                  <ActionButton label="Reopen" icon="refresh-outline" tone="danger" onPress={() => void runAction(() => reopenRfi(detail.id, String(projectId)))} styles={styles} colors={colors} disabled={busy} />
-                </>
+              {canClose ? (
+                <ActionButton label="Close RFI" icon="checkmark-circle-outline" onPress={() => void runAction(() => closeRfi(detail.id))} styles={styles} colors={colors} disabled={busy} />
+              ) : null}
+              {canReopen ? (
+                <ActionButton label="Reopen" icon="refresh-outline" tone="danger" onPress={() => void runAction(() => reopenRfi(detail.id, String(projectId)))} styles={styles} colors={colors} disabled={busy} />
               ) : null}
               {canEdit ? (
                 <>
