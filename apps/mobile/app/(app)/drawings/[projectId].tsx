@@ -47,11 +47,14 @@ function statusTone(s: RevisionStatus, c: Colors): { bg: string; fg: string } {
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
+const MAX_PDF_BYTES = 25 * 1024 * 1024; // 25 MB — read wholly into memory, so cap it.
+
 async function pickPdf(): Promise<PickedPdf | null> {
   const res = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', copyToCacheDirectory: true });
   if (res.canceled) return null;
   const asset = res.assets[0];
   if (!asset) return null;
+  if (asset.size && asset.size > MAX_PDF_BYTES) throw new Error('That PDF is over 25 MB. Please attach a smaller file.');
   const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
   const ext = (asset.name.split('.').pop() || 'pdf').toLowerCase();
   return { base64, ext, filename: asset.name };
@@ -327,8 +330,8 @@ function PdfPicker({ pdf, onPick, styles, colors }: { pdf: PickedPdf | null; onP
         try {
           const picked = await pickPdf();
           if (picked) onPick(picked);
-        } catch {
-          Alert.alert('Could not read the file', 'Please try another PDF.');
+        } catch (e) {
+          Alert.alert('Could not add PDF', e instanceof Error ? e.message : 'Please try another PDF.');
         }
       }}
     >

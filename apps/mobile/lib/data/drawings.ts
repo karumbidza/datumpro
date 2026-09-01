@@ -163,6 +163,40 @@ export interface PickedPdf {
   filename: string;
 }
 
+/** When a sheet is issued for construction, notify every active project member
+ *  (except the issuer). Best-effort — never blocks the write. Mirrors web. */
+async function notifyForConstruction(
+  orgId: string,
+  projectId: string,
+  actorId: string,
+  number: string,
+  revision: string,
+  title: string,
+): Promise<void> {
+  try {
+    const [{ data: proj }, { data: mems }] = await Promise.all([
+      supabase.from('projects').select('name').eq('id', projectId).maybeSingle(),
+      supabase.from('project_members').select('user_id').eq('project_id', projectId).eq('status', 'active'),
+    ]);
+    const pname = (proj as { name: string } | null)?.name ?? 'a project';
+    for (const m of (mems ?? []) as { user_id: string }[]) {
+      if (m.user_id === actorId) continue;
+      await supabase.rpc('notify', {
+        p_org: orgId,
+        p_user: m.user_id,
+        p_type: 'drawing_issued',
+        p_title: `${number} Rev ${revision} issued for construction — ${pname}`,
+        p_body: title,
+        p_link: `/projects/${projectId}/drawings`,
+        p_entity_type: 'task',
+        p_entity_id: null,
+      });
+    }
+  } catch {
+    /* best-effort */
+  }
+}
+
 export async function createDrawing(args: {
   projectId: string;
   number: string;
@@ -206,6 +240,10 @@ export async function createDrawing(args: {
     uploaded_by: user.id,
   });
   if (revErr) throw new Error(revErr.message);
+
+  if (args.status === 'for_construction') {
+    await notifyForConstruction(orgId, args.projectId, user.id, args.number.trim(), args.revision.trim() || 'A', args.title.trim());
+  }
 }
 
 /** Issue a new revision — supersedes every prior revision of the drawing. */
@@ -220,9 +258,10 @@ export async function addRevision(args: {
   const user = await currentUser();
   if (!user) throw new Error('Not signed in.');
   if (!args.revision.trim()) throw new Error('Give the revision a label (e.g. B).');
-  const { data: draw } = await supabase.from('drawings').select('org_id').eq('id', args.drawingId).maybeSingle();
-  const orgId = (draw as { org_id: string } | null)?.org_id;
-  if (!orgId) throw new Error('Drawing not found.');
+  const { data: draw } = await supabase.from('drawings').select('org_id, number, title').eq('id', args.drawingId).maybeSingle();
+  const d = draw as { org_id: string; number: string; title: string } | null;
+  if (!d) throw new Error('Drawing not found.');
+  const orgId = d.org_id;
 
   await supabase.from('drawing_revisions').update({ status: 'superseded' }).eq('drawing_id', args.drawingId);
 
@@ -247,6 +286,10 @@ export async function addRevision(args: {
   });
   if (error) throw new Error(error.message.includes('duplicate') ? `Revision ${args.revision} already exists.` : error.message);
   await supabase.from('drawings').update({ updated_at: new Date().toISOString() }).eq('id', args.drawingId);
+
+  if (args.status === 'for_construction') {
+    await notifyForConstruction(orgId, args.projectId, user.id, d.number, args.revision.trim(), d.title);
+  }
 }
 
 export async function updateRevisionStatus(revisionId: string, status: RevisionStatus): Promise<void> {
