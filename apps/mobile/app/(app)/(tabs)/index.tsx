@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { View, Text, ScrollView, StyleSheet, RefreshControl, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -91,8 +91,14 @@ export default function Home() {
     }, [load]),
   );
 
-  // Re-scope the portfolio when the active workspace changes.
+  // Re-scope the portfolio when the active workspace changes (the initial fetch
+  // is handled by useFocusEffect, so skip the mount run to avoid a double fetch).
+  const firstRun = useRef(true);
   useEffect(() => {
+    if (firstRun.current) {
+      firstRun.current = false;
+      return;
+    }
     void load();
   }, [load]);
 
