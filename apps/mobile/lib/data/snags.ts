@@ -140,7 +140,7 @@ export async function canManageProject(projectId: string): Promise<boolean> {
   const proj = await projectOrg(projectId);
   if (!proj) return false;
   const [{ data: orgRow }, { data: projRow }] = await Promise.all([
-    supabase.from('org_members').select('role').eq('org_id', proj.orgId).eq('user_id', me).maybeSingle(),
+    supabase.from('org_members').select('role').eq('org_id', proj.orgId).eq('user_id', me).eq('status', 'active').maybeSingle(),
     supabase.from('project_members').select('role').eq('project_id', projectId).eq('user_id', me).maybeSingle(),
   ]);
   const orgRole = (orgRow as { role: string } | null)?.role ?? null;
