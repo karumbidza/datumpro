@@ -141,7 +141,10 @@ export function ChatMembersSheet({
     if (!visible) return;
     if (tab === 'pinned' && pinned === null) listPinnedMessages(conversationId).then(setPinned).catch(() => setPinned([]));
     if (tab === 'files' && files === null) listConversationFiles(conversationId).then(setFiles).catch(() => setFiles([]));
-    if (tab === 'about' && about === null) getConversationAbout(conversationId).then(setAbout).catch(() => {});
+    if (tab === 'about' && about === null)
+      getConversationAbout(conversationId)
+        .then(setAbout)
+        .catch(() => setAbout({ topic: null, description: null, note: null, createdByName: null, createdAt: null }));
   }, [visible, tab, conversationId, pinned, files, about]);
 
   function close() {
