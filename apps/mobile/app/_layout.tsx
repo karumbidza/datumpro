@@ -20,6 +20,7 @@ import {
   Manrope_800ExtraBold,
 } from '@expo-google-fonts/manrope';
 import { SessionProvider, useSession } from '../lib/auth';
+import { ActiveOrgProvider } from '../lib/active-org';
 import { ThemeProvider } from '../lib/theme-context';
 
 /** Android immersive mode: hide the status + navigation bars for a true
@@ -97,14 +98,16 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ThemeProvider>
         <SessionProvider>
-          <StatusBar style="auto" hidden />
-          {fontsReady ? (
-            <AuthGate />
-          ) : (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-              <BrandLoader />
-            </View>
-          )}
+          <ActiveOrgProvider>
+            <StatusBar style="auto" hidden />
+            {fontsReady ? (
+              <AuthGate />
+            ) : (
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                <BrandLoader />
+              </View>
+            )}
+          </ActiveOrgProvider>
         </SessionProvider>
       </ThemeProvider>
     </SafeAreaProvider>

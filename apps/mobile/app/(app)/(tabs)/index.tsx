@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { View, Text, ScrollView, StyleSheet, RefreshControl, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,6 +12,7 @@ import {
   type PendingApproval,
 } from '../../../lib/data/home';
 import { listMyTenderInvites, type MyTenderInvite } from '../../../lib/data/tenders';
+import { useActiveOrg, orgFilter, ALL_WORKSPACES } from '../../../lib/active-org';
 import { Card, ProgressBar, StatTile, Avatar } from '../../../components/ui';
 import { contentWidth, radius, font, type Colors } from '../../../lib/theme';
 import { useTheme } from '../../../lib/theme-context';
@@ -67,20 +68,39 @@ export default function Home() {
   const [signoffs, setSignoffs] = useState<PendingApproval[]>([]);
   const [tenders, setTenders] = useState<MyTenderInvite[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const { activeOrgId, orgs } = useActiveOrg();
+  const workspaceName =
+    activeOrgId === ALL_WORKSPACES ? 'All workspaces' : orgs.find((o) => o.id === activeOrgId)?.name ?? 'Workspace';
 
   const load = useCallback(async () => {
-    const [home, pending, invites] = await Promise.all([getHomeData(), listPendingApprovals(), listMyTenderInvites()]);
+    const scope = orgFilter(activeOrgId);
+    const [home, pending, invites] = await Promise.all([
+      getHomeData(scope),
+      listPendingApprovals(scope),
+      listMyTenderInvites(),
+    ]);
     setData(home);
     setSignoffs(pending);
     setTenders(invites);
     setRefreshing(false);
-  }, []);
+  }, [activeOrgId]);
 
   useFocusEffect(
     useCallback(() => {
       void load();
     }, [load]),
   );
+
+  // Re-scope the portfolio when the active workspace changes (the initial fetch
+  // is handled by useFocusEffect, so skip the mount run to avoid a double fetch).
+  const firstRun = useRef(true);
+  useEffect(() => {
+    if (firstRun.current) {
+      firstRun.current = false;
+      return;
+    }
+    void load();
+  }, [load]);
 
   const onTrack = data ? data.myOverdue === 0 : true;
 
@@ -127,6 +147,17 @@ export default function Home() {
           {data ? firstName(data.displayName) : '…'}.
         </Text>
         <Text style={styles.subGreeting}>{subline(data, signoffs.length)}</Text>
+
+        {/* Workspace scope — tap to switch (only when the user has more than one) */}
+        {orgs.length > 1 && (
+          <Pressable style={styles.workspacePill} onPress={() => router.navigate('/(app)/(tabs)/more')}>
+            <Ionicons name="business-outline" size={14} color={colors.brandDeep} />
+            <Text style={styles.workspaceText} numberOfLines={1}>
+              {workspaceName}
+            </Text>
+            <Ionicons name="swap-horizontal-outline" size={15} color={colors.subtle} />
+          </Pressable>
+        )}
 
         {/* Hero portfolio card */}
         <LinearGradient
@@ -339,6 +370,22 @@ const makeStyles = (c: Colors) =>
     },
     greeting: { marginTop: 18, fontSize: 27, lineHeight: 32, fontFamily: font.displayBold, color: c.text },
     subGreeting: { fontSize: 13, fontFamily: font.body, color: c.muted, marginTop: 8 },
+    workspacePill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      alignSelf: 'flex-start',
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: radius.pill,
+      paddingLeft: 10,
+      paddingRight: 8,
+      paddingVertical: 6,
+      marginTop: 12,
+      maxWidth: '100%',
+    },
+    workspaceText: { fontSize: 12.5, fontFamily: font.bodySemi, color: c.text, flexShrink: 1 },
     hero: { borderRadius: radius.lg, padding: 20, marginTop: 18, overflow: 'hidden' },
     heroTop: { flexDirection: 'row', alignItems: 'center', gap: 16 },
     heroLabel: { fontSize: 11, fontFamily: font.bodyBold, letterSpacing: 0.6, color: 'rgba(255,255,255,0.8)' },

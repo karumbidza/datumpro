@@ -44,7 +44,7 @@ function impactLabel(cents: number, days: number): string {
 /** Every decision waiting on the current user — task sign-offs, extension
  *  requests and submitted variations — on the projects they manage (project PM,
  *  or every project in orgs where they're owner/admin). Empty for field users. */
-export async function listPendingApprovals(): Promise<PendingApproval[]> {
+export async function listPendingApprovals(orgId: string | null = null): Promise<PendingApproval[]> {
   const user = await currentUser();
   const me = user?.id;
   if (!me) return [];
@@ -62,19 +62,23 @@ export async function listPendingApprovals(): Promise<PendingApproval[]> {
   if (adminOrgs.length) ors.push(`org_id.in.(${adminOrgs.join(',')})`);
   const or = ors.join(',');
 
-  const [tasksRes, extRes, varRes] = await Promise.all([
-    supabase.from('tasks').select('id, title, project_id, assignee_id, submitted_at').eq('status', 'submitted').or(or),
-    supabase
-      .from('task_extension_requests')
-      .select('id, task_id, project_id, proposed_due_date, requested_by, created_at')
-      .eq('status', 'pending')
-      .or(or),
-    supabase
-      .from('variation_orders')
-      .select('id, project_id, description, cost_impact_cents, time_impact_days, created_by, created_at')
-      .eq('status', 'submitted')
-      .or(or),
-  ]);
+  let tasksQ = supabase.from('tasks').select('id, title, project_id, assignee_id, submitted_at').eq('status', 'submitted').or(or);
+  let extQ = supabase
+    .from('task_extension_requests')
+    .select('id, task_id, project_id, proposed_due_date, requested_by, created_at')
+    .eq('status', 'pending')
+    .or(or);
+  let varQ = supabase
+    .from('variation_orders')
+    .select('id, project_id, description, cost_impact_cents, time_impact_days, created_by, created_at')
+    .eq('status', 'submitted')
+    .or(or);
+  if (orgId) {
+    tasksQ = tasksQ.eq('org_id', orgId);
+    extQ = extQ.eq('org_id', orgId);
+    varQ = varQ.eq('org_id', orgId);
+  }
+  const [tasksRes, extRes, varRes] = await Promise.all([tasksQ, extQ, varQ]);
   const tasks = (tasksRes.data ?? []) as { id: string; title: string; project_id: string; assignee_id: string | null; submitted_at: string | null }[];
   const exts = (extRes.data ?? []) as { id: string; task_id: string; project_id: string; proposed_due_date: string; requested_by: string | null; created_at: string }[];
   const vars = (varRes.data ?? []) as { id: string; project_id: string; description: string; cost_impact_cents: number; time_impact_days: number; created_by: string | null; created_at: string }[];
@@ -130,16 +134,24 @@ export async function listPendingApprovals(): Promise<PendingApproval[]> {
 /** One round-trip of everything the Home dashboard needs. RLS scopes the rows to
  *  what this user may see, so the same query naturally adapts to their role:
  *  a manager sees every project's tasks, a foreman only their own. */
-export async function getHomeData(): Promise<HomeData> {
+/** `orgId` scopes the portfolio to one workspace; null = all workspaces (aggregate). */
+export async function getHomeData(orgId: string | null = null): Promise<HomeData> {
   const user = await currentUser();
   const me = user?.id ?? '';
   const today = new Date().toISOString().slice(0, 10);
 
+  let projectQ = supabase.from('projects').select('id, name').order('created_at', { ascending: false });
+  let taskQ = supabase.from('tasks').select('id, status, sla_status, due_date, project_id, assignee_id');
+  if (orgId) {
+    projectQ = projectQ.eq('org_id', orgId);
+    taskQ = taskQ.eq('org_id', orgId);
+  }
+
   const [{ data: profile }, { data: projectRows }, { data: taskRows }, { data: orgRoles }, { data: pmSeats }] =
     await Promise.all([
       supabase.from('profiles').select('display_name, email').eq('id', me).maybeSingle(),
-      supabase.from('projects').select('id, name').order('created_at', { ascending: false }),
-      supabase.from('tasks').select('id, status, sla_status, due_date, project_id, assignee_id'),
+      projectQ,
+      taskQ,
       supabase.from('org_members').select('role').eq('user_id', me).eq('status', 'active'),
       supabase.from('project_members').select('project_id').eq('user_id', me).eq('role', 'pm').limit(1),
     ]);
