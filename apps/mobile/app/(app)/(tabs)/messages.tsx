@@ -41,26 +41,20 @@ export default function Messages() {
     }, [load]),
   );
 
+  // Messages shows PROJECT team channels only — task discussions now live inside
+  // each task (its "Open discussion"), surfaced as an unread badge on the task.
   const sections = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const filtered = q ? items.filter((i) => i.title.toLowerCase().includes(q)) : items;
-    const project = filtered.filter((i) => i.type === 'project');
-    const tasks = filtered.filter((i) => i.type === 'task_dm');
-    return [
-      { title: 'Project chats', data: project },
-      { title: 'Task discussions', data: tasks },
-    ].filter((s) => s.data.length > 0);
+    const project = items.filter((i) => i.type === 'project');
+    const filtered = q ? project.filter((i) => i.title.toLowerCase().includes(q)) : project;
+    return filtered.length > 0 ? [{ title: 'Project channels', data: filtered }] : [];
   }, [items, query]);
 
   function open(item: InboxItem) {
-    if (item.type === 'task_dm' && item.taskId) {
-      router.push(`/(app)/chat/${item.taskId}`);
-    } else {
-      router.push({
-        pathname: '/(app)/project-chat/[projectId]',
-        params: { projectId: item.projectId, name: item.title },
-      });
-    }
+    router.push({
+      pathname: '/(app)/project-chat/[projectId]',
+      params: { projectId: item.projectId, name: item.title },
+    });
   }
 
   return (

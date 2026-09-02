@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { listMyTasks, type MyTask } from '../../../lib/data/tasks';
 import { subtaskProgressForTasks } from '../../../lib/data/subtasks';
+import { taskUnreadCounts } from '../../../lib/data/chat';
 import { TaskCard } from '../../../components/task-card';
 import { contentWidth, radius, font, type Colors } from '../../../lib/theme';
 import { useTheme } from '../../../lib/theme-context';
@@ -26,6 +27,7 @@ export default function Tasks() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [tasks, setTasks] = useState<MyTask[]>([]);
   const [progressMap, setProgressMap] = useState<Map<string, { done: number; total: number }>>(new Map());
+  const [unreadMap, setUnreadMap] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<Filter>('all');
@@ -34,7 +36,10 @@ export default function Tasks() {
   const load = useCallback(async () => {
     const rows = await listMyTasks();
     setTasks(rows);
-    setProgressMap(await subtaskProgressForTasks(rows.map((t) => t.id)));
+    const ids = rows.map((t) => t.id);
+    const [progress, unread] = await Promise.all([subtaskProgressForTasks(ids), taskUnreadCounts(ids)]);
+    setProgressMap(progress);
+    setUnreadMap(unread);
     setLoading(false);
     setRefreshing(false);
   }, []);
@@ -55,7 +60,8 @@ export default function Tasks() {
     };
   }, [tasks]);
 
-  const { columns, contentMaxWidth } = useResponsive();
+  // Tasks always read as a single-column list (even on tablet/landscape).
+  const { contentMaxWidth } = useResponsive();
 
   const visible = useMemo(() => {
     const t = today();
@@ -130,9 +136,6 @@ export default function Tasks() {
       ) : (
         <FlatList
           data={visible}
-          key={`cols-${columns}`}
-          numColumns={columns}
-          columnWrapperStyle={columns > 1 ? styles.row : undefined}
           keyExtractor={(t) => t.id}
           contentContainerStyle={
             visible.length === 0 ? styles.emptyWrap : [styles.listContent, { maxWidth: contentMaxWidth }]
@@ -149,9 +152,7 @@ export default function Tasks() {
           }
           ListEmptyComponent={<Text style={styles.empty}>Nothing here.</Text>}
           renderItem={({ item }) => (
-            <View style={columns > 1 ? styles.col : undefined}>
-              <TaskCard task={item} progress={progressMap.get(item.id)} />
-            </View>
+            <TaskCard task={item} progress={progressMap.get(item.id)} unread={unreadMap.get(item.id)} />
           )}
         />
       )}
@@ -190,8 +191,6 @@ const makeStyles = (c: Colors) =>
     chipTextActive: { color: c.bg },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     listContent: { padding: 16, gap: 10, ...contentWidth },
-    row: { gap: 10 },
-    col: { flex: 1 },
     emptyWrap: { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
     empty: { color: c.subtle, fontSize: 14, fontFamily: font.body },
   });

@@ -48,10 +48,13 @@ export function TaskCard({
   task,
   subtitle,
   progress,
+  unread,
 }: {
   task: MyTask;
   subtitle?: string;
   progress?: { done: number; total: number };
+  /** Unread task-discussion messages — shows a small chat badge when > 0. */
+  unread?: number;
 }) {
   const router = useRouter();
   const { colors, scheme } = useTheme();
@@ -84,6 +87,12 @@ export function TaskCard({
             {subtitle ?? task.projectName}
           </Text>
         </View>
+        {unread && unread > 0 ? (
+          <View style={styles.chatBadge}>
+            <Ionicons name="chatbubble" size={11} color={colors.onAccent} />
+            <Text style={styles.chatBadgeText}>{unread > 99 ? '99+' : unread}</Text>
+          </View>
+        ) : null}
         <Pill label={slaLabel(task.slaStatus)} tone={tone} />
       </View>
 
@@ -140,4 +149,14 @@ const makeStyles = (c: Colors) =>
     metaDot: { color: c.subtle },
     progress: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     pct: { fontSize: 13, fontFamily: font.display, color: c.text, width: 40, textAlign: 'right' },
+    chatBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+      backgroundColor: c.accent,
+      borderRadius: 999,
+      paddingHorizontal: 7,
+      paddingVertical: 3,
+    },
+    chatBadgeText: { fontSize: 11, fontFamily: font.bodyBold, color: c.onAccent },
   });

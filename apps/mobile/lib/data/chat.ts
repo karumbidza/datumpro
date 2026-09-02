@@ -363,6 +363,45 @@ export async function unpinMessage(messageId: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+/** Unread task-discussion counts, keyed by task id — for a badge on task rows.
+ *  Only tasks with unread messages are included. */
+export async function taskUnreadCounts(taskIds: string[]): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  const user = await currentUser();
+  const me = user?.id;
+  if (!me || taskIds.length === 0) return map;
+
+  const { data: convRows } = await supabase
+    .from('conversations')
+    .select('id, task_id')
+    .eq('type', 'task_dm')
+    .in('task_id', taskIds);
+  const convs = (convRows ?? []) as { id: string; task_id: string }[];
+  if (convs.length === 0) return map;
+  const convIds = convs.map((c) => c.id);
+
+  const [{ data: reads }, { data: msgs }] = await Promise.all([
+    supabase.from('chat_read_state').select('conversation_id, last_read_seq').eq('user_id', me).in('conversation_id', convIds),
+    supabase.from('messages').select('conversation_id, seq, sender_id').in('conversation_id', convIds),
+  ]);
+  const lastRead = new Map<string, number>();
+  for (const r of (reads ?? []) as { conversation_id: string; last_read_seq: number }[]) {
+    lastRead.set(r.conversation_id, r.last_read_seq);
+  }
+  const byConv = new Map<string, number>();
+  for (const m of (msgs ?? []) as { conversation_id: string; seq: number; sender_id: string }[]) {
+    if (m.sender_id === me) continue;
+    if (m.seq > (lastRead.get(m.conversation_id) ?? 0)) {
+      byConv.set(m.conversation_id, (byConv.get(m.conversation_id) ?? 0) + 1);
+    }
+  }
+  for (const c of convs) {
+    const u = byConv.get(c.id) ?? 0;
+    if (u > 0) map.set(c.task_id, u);
+  }
+  return map;
+}
+
 export interface InboxItem {
   conversationId: string;
   type: 'project' | 'task_dm';
