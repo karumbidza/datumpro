@@ -333,6 +333,7 @@ export function ChatPanel({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const lastTypingSent = useRef(0);
+  const reactPending = useRef<Set<string>>(new Set());
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recChunks = useRef<Blob[]>([]);
   const recTimer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -681,9 +682,18 @@ export function ChatPanel({
   }
 
   async function onReact(id: string, emoji: string) {
-    await toggleReaction(id, emoji);
-    broadcast('reaction', { messageId: id });
-    await applyOne(id);
+    // Ignore repeat clicks while a toggle for this emoji is in flight, so a fast
+    // double-click can't race into the unique-constraint path and mis-toggle.
+    const key = `${id}:${emoji}`;
+    if (reactPending.current.has(key)) return;
+    reactPending.current.add(key);
+    try {
+      await toggleReaction(id, emoji);
+      broadcast('reaction', { messageId: id });
+      await applyOne(id);
+    } finally {
+      reactPending.current.delete(key);
+    }
   }
 
   async function saveEdit() {
@@ -1037,18 +1047,24 @@ export function ChatPanel({
                   </div>
 
                   {m.reactions.length > 0 && (
-                    <div className={`mt-1 flex flex-wrap gap-1 ${mine ? 'justify-end' : ''}`}>
-                      {m.reactions.map((r) => (
-                        <button
-                          key={r.emoji}
-                          onClick={() => onReact(m.id, r.emoji)}
-                          className={`rounded-full border px-1.5 py-0.5 text-[11px] ${
-                            r.mine ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-zinc-200 dark:border-zinc-700'
-                          }`}
-                        >
-                          {r.emoji} {r.count}
-                        </button>
-                      ))}
+                    <div className={`mt-0.5 flex ${mine ? 'justify-end' : ''}`}>
+                      <div className="flex -space-x-0.5 items-center rounded-full bg-zinc-100/80 px-1 py-0.5 shadow-sm dark:bg-zinc-800/70">
+                        {m.reactions.map((r) => (
+                          <button
+                            key={r.emoji}
+                            onClick={() => onReact(m.id, r.emoji)}
+                            title={`${r.count} reaction${r.count === 1 ? '' : 's'}`}
+                            className={`flex items-center rounded-full px-0.5 text-[13px] leading-none transition hover:z-10 hover:scale-110 ${
+                              r.mine ? 'bg-brand-100 dark:bg-brand-500/25' : ''
+                            }`}
+                          >
+                            <span>{r.emoji}</span>
+                            {r.count > 1 && (
+                              <span className="ml-0.5 text-[10px] font-medium text-zinc-500 dark:text-zinc-400">{r.count}</span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
                   </div>
@@ -1062,9 +1078,16 @@ export function ChatPanel({
       )}
 
       {typingNames.length > 0 && (
-        <p className="px-4 pb-1 text-[11px] italic text-zinc-400 dark:text-zinc-500">
-          {typingNames.join(', ')} {typingNames.length === 1 ? 'is' : 'are'} typing…
-        </p>
+        <div className="flex items-center gap-2 px-4 pb-1">
+          <div className="flex items-center gap-1 rounded-2xl rounded-bl-sm bg-zinc-100 px-3 py-2 dark:bg-zinc-800">
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400 [animation-delay:-0.3s] dark:bg-zinc-500" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400 [animation-delay:-0.15s] dark:bg-zinc-500" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400 dark:bg-zinc-500" />
+          </div>
+          <span className="text-[11px] text-zinc-400 dark:text-zinc-500">
+            {typingNames.join(', ')} {typingNames.length === 1 ? 'is' : 'are'} typing…
+          </span>
+        </div>
       )}
 
       {canPost && (

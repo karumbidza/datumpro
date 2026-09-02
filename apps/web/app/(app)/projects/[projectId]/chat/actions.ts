@@ -157,7 +157,9 @@ export async function toggleReaction(messageId: string, emoji: string) {
     const { error } = await supabase
       .from('message_reactions')
       .insert({ message_id: messageId, user_id: user.id, emoji });
-    if (error) throw new Error(error.message);
+    // A racing double-click can try to insert the same reaction twice; the unique
+    // constraint rejects the second — treat that as already-reacted, not an error.
+    if (error && !/duplicate|unique/i.test(error.message)) throw new Error(error.message);
   }
 }
 
