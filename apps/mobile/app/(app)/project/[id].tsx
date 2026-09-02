@@ -110,130 +110,16 @@ export default function ProjectScreen() {
                 }
               >
                 <Ionicons name="chatbubbles-outline" size={18} color={colors.brand} />
-                <Text style={styles.teamChatText}>Team channel</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.teamChatText}>Team channel</Text>
+                  <Text style={styles.teamChatSub}>Chat · registers · calendar · reports</Text>
+                </View>
                 {teamUnread > 0 && (
                   <View style={styles.unread}>
                     <Text style={styles.unreadText}>{teamUnread > 99 ? '99+' : teamUnread}</Text>
                   </View>
                 )}
-                <Ionicons name="chevron-forward" size={16} color={colors.subtle} style={{ marginLeft: 'auto' }} />
-              </Pressable>
-              <Pressable
-                style={styles.teamChat}
-                onPress={() =>
-                  router.push({
-                    pathname: '/(app)/variations/[projectId]',
-                    params: { projectId: String(id), name: name ?? '' },
-                  })
-                }
-              >
-                <Ionicons name="git-compare-outline" size={18} color={colors.brand} />
-                <Text style={styles.teamChatText}>Change orders</Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.subtle} style={{ marginLeft: 'auto' }} />
-              </Pressable>
-              <Pressable
-                style={styles.teamChat}
-                onPress={() =>
-                  router.push({
-                    pathname: '/(app)/project-todos/[projectId]',
-                    params: { projectId: String(id), name: name ?? '' },
-                  })
-                }
-              >
-                <Ionicons name="checkbox-outline" size={18} color={colors.brand} />
-                <Text style={styles.teamChatText}>To-dos</Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.subtle} style={{ marginLeft: 'auto' }} />
-              </Pressable>
-              <Pressable
-                style={styles.teamChat}
-                onPress={() =>
-                  router.push({
-                    pathname: '/(app)/snags/[projectId]',
-                    params: { projectId: String(id), name: name ?? '' },
-                  })
-                }
-              >
-                <Ionicons name="construct-outline" size={18} color={colors.brand} />
-                <Text style={styles.teamChatText}>Snags</Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.subtle} style={{ marginLeft: 'auto' }} />
-              </Pressable>
-              <Pressable
-                style={styles.teamChat}
-                onPress={() =>
-                  router.push({
-                    pathname: '/(app)/diary/[projectId]',
-                    params: { projectId: String(id), name: name ?? '' },
-                  })
-                }
-              >
-                <Ionicons name="book-outline" size={18} color={colors.brand} />
-                <Text style={styles.teamChatText}>Site diary</Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.subtle} style={{ marginLeft: 'auto' }} />
-              </Pressable>
-              <Pressable
-                style={styles.teamChat}
-                onPress={() =>
-                  router.push({
-                    pathname: '/(app)/rfis/[projectId]',
-                    params: { projectId: String(id), name: name ?? '' },
-                  })
-                }
-              >
-                <Ionicons name="help-circle-outline" size={18} color={colors.brand} />
-                <Text style={styles.teamChatText}>RFIs</Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.subtle} style={{ marginLeft: 'auto' }} />
-              </Pressable>
-              <Pressable
-                style={styles.teamChat}
-                onPress={() =>
-                  router.push({
-                    pathname: '/(app)/drawings/[projectId]',
-                    params: { projectId: String(id), name: name ?? '' },
-                  })
-                }
-              >
-                <Ionicons name="layers-outline" size={18} color={colors.brand} />
-                <Text style={styles.teamChatText}>Drawings</Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.subtle} style={{ marginLeft: 'auto' }} />
-              </Pressable>
-              <Pressable
-                style={styles.teamChat}
-                onPress={() =>
-                  router.push({
-                    pathname: '/(app)/transmittals/[projectId]',
-                    params: { projectId: String(id), name: name ?? '' },
-                  })
-                }
-              >
-                <Ionicons name="send-outline" size={18} color={colors.brand} />
-                <Text style={styles.teamChatText}>Transmittals</Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.subtle} style={{ marginLeft: 'auto' }} />
-              </Pressable>
-              <Pressable
-                style={styles.teamChat}
-                onPress={() =>
-                  router.push({
-                    pathname: '/(app)/calendar/[projectId]',
-                    params: { projectId: String(id), name: name ?? '' },
-                  })
-                }
-              >
-                <Ionicons name="calendar-outline" size={18} color={colors.brand} />
-                <Text style={styles.teamChatText}>Calendar</Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.subtle} style={{ marginLeft: 'auto' }} />
-              </Pressable>
-              <Pressable
-                style={styles.teamChat}
-                onPress={() =>
-                  router.push({
-                    pathname: '/(app)/reports/[projectId]',
-                    params: { projectId: String(id), name: name ?? '' },
-                  })
-                }
-              >
-                <Ionicons name="document-text-outline" size={18} color={colors.brand} />
-                <Text style={styles.teamChatText}>Site reports</Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.subtle} style={{ marginLeft: 'auto' }} />
+                <Ionicons name="chevron-forward" size={16} color={colors.subtle} />
               </Pressable>
               {tasks.length > 0 && <Text style={styles.count}>{tasks.length} tasks</Text>}
             </View>
@@ -270,6 +156,7 @@ const makeStyles = (c: Colors) =>
       paddingVertical: 12,
     },
     teamChatText: { fontSize: 15, fontFamily: font.bodySemi, color: c.text },
+    teamChatSub: { fontSize: 12, fontFamily: font.body, color: c.subtle, marginTop: 2 },
     unread: {
       minWidth: 20,
       height: 20,

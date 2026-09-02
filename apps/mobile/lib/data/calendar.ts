@@ -24,13 +24,11 @@ export function localDay(d: Date): string {
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
-function todayIso(): string {
-  return localDay(new Date());
-}
-
-/** Every dated item on a project, aggregated for the agenda. RLS scopes each read.
+/** Every dated item on a project, aggregated for the calendar. RLS scopes each read.
  *  Tasks/to-dos use their due date; RFIs & snags their open response deadline;
- *  transmittals their issue date; events their start. */
+ *  transmittals their issue date; events their start. Returns the full set sorted
+ *  by date so the month grid can dot every day; the screen derives the upcoming
+ *  agenda and per-day views from it. */
 export async function listProjectCalendar(projectId: string): Promise<CalendarItem[]> {
   const [taskRes, todoRes, eventRes, rfiRes, snagRes, trRes] = await Promise.all([
     supabase
@@ -90,9 +88,5 @@ export async function listProjectCalendar(projectId: string): Promise<CalendarIt
     items.push({ id: `tr-${t.id}`, date: t.issued_date, kind: 'transmittal', title: `TR-${String(t.number).padStart(3, '0')} issued`, subtitle: `to ${t.recipient}`, deadline: false, done: false, taskId: null });
   }
 
-  const today = todayIso();
-  // A forward-looking agenda: keep everything from today on, plus still-open
-  // deadlines that are already overdue (so nothing important is hidden).
-  const kept = items.filter((i) => i.date >= today || (i.deadline && !i.done && i.date < today));
-  return kept.sort((a, b) => a.date.localeCompare(b.date));
+  return items.sort((a, b) => a.date.localeCompare(b.date));
 }
