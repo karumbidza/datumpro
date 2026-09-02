@@ -3,6 +3,12 @@ import { supabase, currentUser} from '../supabase';
 
 const CHAT_BUCKET = 'chat-media';
 
+export interface ReactionSummary {
+  emoji: string;
+  count: number;
+  mine: boolean;
+}
+
 export interface ChatMessage {
   id: string;
   body: string | null;
@@ -12,6 +18,7 @@ export interface ChatMessage {
   deletedAt: string | null;
   imageUrl: string | null; // first image attachment, signed
   audioUrl: string | null; // first audio (voice note) attachment, signed
+  reactions: ReactionSummary[]; // aggregated emoji reactions
 }
 
 /** The active task-DM conversation id for a task — null if none or no access. */
@@ -55,9 +62,10 @@ export async function listMessages(conversationId: string, limit = 50): Promise<
     deleted_at: string | null;
   }[]).reverse();
 
-  const [names, media] = await Promise.all([
+  const [names, media, reactions] = await Promise.all([
     resolveNames(rows.map((r) => r.sender_id)),
     resolveAttachments(rows.map((r) => r.id)),
+    resolveReactions(rows.map((r) => r.id)),
   ]);
   return rows.map((r) => ({
     id: r.id,
@@ -68,7 +76,63 @@ export async function listMessages(conversationId: string, limit = 50): Promise<
     deletedAt: r.deleted_at,
     imageUrl: r.deleted_at ? null : media.images.get(r.id) ?? null,
     audioUrl: r.deleted_at ? null : media.audios.get(r.id) ?? null,
+    reactions: r.deleted_at ? [] : reactions.get(r.id) ?? [],
   }));
+}
+
+/** message_id → aggregated emoji reactions (count + whether the current user
+ *  reacted). One query covers all listed messages. */
+async function resolveReactions(messageIds: string[]): Promise<Map<string, ReactionSummary[]>> {
+  const out = new Map<string, ReactionSummary[]>();
+  const ids = [...new Set(messageIds)];
+  if (ids.length === 0) return out;
+  const user = await currentUser();
+  const me = user?.id;
+  const { data } = await supabase
+    .from('message_reactions')
+    .select('message_id, emoji, user_id')
+    .in('message_id', ids);
+  const rows = (data ?? []) as { message_id: string; emoji: string; user_id: string }[];
+  const byMsg = new Map<string, Map<string, { count: number; mine: boolean }>>();
+  for (const r of rows) {
+    let emap = byMsg.get(r.message_id);
+    if (!emap) {
+      emap = new Map();
+      byMsg.set(r.message_id, emap);
+    }
+    const e = emap.get(r.emoji) ?? { count: 0, mine: false };
+    e.count += 1;
+    if (me && r.user_id === me) e.mine = true;
+    emap.set(r.emoji, e);
+  }
+  for (const [mid, emap] of byMsg) {
+    out.set(
+      mid,
+      [...emap.entries()].map(([emoji, v]) => ({ emoji, count: v.count, mine: v.mine })),
+    );
+  }
+  return out;
+}
+
+/** Toggle one emoji reaction for the current user (insert, or delete if it exists).
+ *  Scope columns are filled by a trigger; a duplicate insert on a race is a no-op. */
+export async function toggleReaction(messageId: string, emoji: string): Promise<void> {
+  const user = await currentUser();
+  if (!user) throw new Error('Not signed in.');
+  const { data: existing } = await supabase
+    .from('message_reactions')
+    .select('id')
+    .eq('message_id', messageId)
+    .eq('user_id', user.id)
+    .eq('emoji', emoji)
+    .maybeSingle();
+  if (existing) {
+    const { error } = await supabase.from('message_reactions').delete().eq('id', (existing as { id: string }).id);
+    if (error) throw new Error(error.message);
+  } else {
+    const { error } = await supabase.from('message_reactions').insert({ message_id: messageId, user_id: user.id, emoji });
+    if (error && error.code !== '23505') throw new Error(error.message);
+  }
 }
 
 /** Post a text message. RLS (can_access_chat) governs who may send. */

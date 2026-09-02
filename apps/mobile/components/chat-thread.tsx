@@ -11,6 +11,8 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  Modal,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -34,8 +36,11 @@ import {
   sendVoiceMessage,
   markConversationRead,
   pinMessage,
+  toggleReaction,
   type ChatMessage,
 } from '../lib/data/chat';
+
+const EMOJIS = ['👍', '❤️', '😂', '🎉', '✅'];
 import { getConversationRoster, type RosterMember } from '../lib/data/chat-roster';
 import { ChatMembersSheet } from './chat-members-sheet';
 import { VoiceNote } from './voice-note';
@@ -100,6 +105,46 @@ export function ChatThread({
   // Identity lookup for the message list — company / role / avatar per sender.
   const rosterById = useMemo(() => new Map(members.map((m) => [m.userId, m])), [members]);
 
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const lastTypingSent = useRef(0);
+  const typingTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
+  const [actionTarget, setActionTarget] = useState<ChatMessage | null>(null);
+  const [myName, setMyName] = useState('Someone');
+
+  // My display name for the typing broadcast (so peers see who's typing).
+  useEffect(() => {
+    if (!meId) return;
+    void supabase
+      .from('profiles')
+      .select('display_name, email')
+      .eq('id', meId)
+      .maybeSingle()
+      .then(({ data }) => {
+        const p = data as { display_name: string | null; email: string | null } | null;
+        if (p) setMyName(p.display_name || p.email?.split('@')[0] || 'Someone');
+      });
+  }, [meId]);
+
+  // Register a peer's typing signal; auto-clear after 3s of silence.
+  const showTyping = useCallback(
+    (payload: { userId?: string; name?: string }) => {
+      const uid = payload?.userId;
+      if (!uid || uid === meId) return;
+      setTypingUsers((cur) => ({ ...cur, [uid]: payload.name || 'Someone' }));
+      const existing = typingTimers.current[uid];
+      if (existing) clearTimeout(existing);
+      typingTimers.current[uid] = setTimeout(() => {
+        setTypingUsers((cur) => {
+          const next = { ...cur };
+          delete next[uid];
+          return next;
+        });
+      }, 3000);
+    },
+    [meId],
+  );
+
   const reload = useCallback(async (id: string) => {
     setMessages(await listMessages(id));
     // Opening / viewing the thread clears its unread state.
@@ -142,8 +187,11 @@ export function ChatThread({
       channel = supabase.channel(`chat:${conversationId}`, {
         config: { private: true, broadcast: { self: false }, presence: { key: meId ?? '' } },
       });
+      channelRef.current = channel;
       channel
         .on('broadcast', { event: 'message' }, () => active && void reload(conversationId))
+        .on('broadcast', { event: 'reaction' }, () => active && void reload(conversationId))
+        .on('broadcast', { event: 'typing' }, ({ payload }) => showTyping(payload as { userId?: string; name?: string }))
         .on('presence', { event: 'sync' }, () => {
           const state = channel!.presenceState() as Record<string, { user_id?: string }[]>;
           const ids = new Set<string>();
@@ -159,26 +207,40 @@ export function ChatThread({
 
     return () => {
       active = false;
+      channelRef.current = null;
       if (channel) supabase.removeChannel(channel);
     };
-  }, [conversationId, reload, meId, session?.user.email]);
+  }, [conversationId, reload, meId, session?.user.email, showTyping]);
 
-  function pinPrompt(item: ChatMessage) {
-    if (item.deletedAt) return;
-    Alert.alert('Message', undefined, [
-      {
-        text: 'Pin message',
-        onPress: async () => {
-          try {
-            await pinMessage(item.id);
-            Alert.alert('Pinned', 'Find it under People → Pinned.');
-          } catch (e) {
-            Alert.alert('Could not pin', e instanceof Error ? e.message : 'Please try again.');
-          }
-        },
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+  async function doPin(item: ChatMessage) {
+    try {
+      await pinMessage(item.id);
+      Alert.alert('Pinned', 'Find it under People → Pinned.');
+    } catch (e) {
+      Alert.alert('Could not pin', e instanceof Error ? e.message : 'Please try again.');
+    }
+  }
+
+  async function onReact(messageId: string, emoji: string) {
+    if (!conversationId) return;
+    try {
+      await toggleReaction(messageId, emoji);
+      await reload(conversationId);
+      // Peers don't get self-broadcasts, so tell them a reaction changed.
+      channelRef.current?.send({ type: 'broadcast', event: 'reaction', payload: { messageId } });
+    } catch (e) {
+      Alert.alert('Could not react', e instanceof Error ? e.message : 'Please try again.');
+    }
+  }
+
+  // Broadcast a typing signal on keystroke, throttled — same event the web listens for.
+  function onChangeInput(text: string) {
+    setInput(text);
+    const now = Date.now();
+    if (meId && channelRef.current && now - lastTypingSent.current > 1500) {
+      lastTypingSent.current = now;
+      channelRef.current.send({ type: 'broadcast', event: 'typing', payload: { userId: meId, name: myName } });
+    }
   }
 
   async function submit() {
@@ -358,18 +420,34 @@ export function ChatThread({
             </>
           );
 
+          const reactionRow = item.reactions.length > 0 && (
+            <View style={[styles.reactions, mine ? { justifyContent: 'flex-end' } : null]}>
+              {item.reactions.map((r) => (
+                <Pressable
+                  key={r.emoji}
+                  onPress={() => void onReact(item.id, r.emoji)}
+                  style={[styles.reactionChip, r.mine && styles.reactionChipMine]}
+                >
+                  <Text style={styles.reactionEmoji}>{r.emoji}</Text>
+                  {r.count > 1 && <Text style={styles.reactionCount}>{r.count}</Text>}
+                </Pressable>
+              ))}
+            </View>
+          );
+
           if (mine) {
             return (
-              <Pressable onLongPress={() => pinPrompt(item)} delayLongPress={300} style={[styles.row, styles.rowMine]}>
+              <Pressable onLongPress={() => !item.deletedAt && setActionTarget(item)} delayLongPress={300} style={[styles.row, styles.rowMine]}>
                 <View style={styles.mineCol}>
                   {showHeader && <Text style={styles.mineTime}>{shortTime(item.createdAt)}</Text>}
                   <View style={[styles.bubble, styles.bubbleMine]}>{content}</View>
+                  {reactionRow}
                 </View>
               </Pressable>
             );
           }
           return (
-            <Pressable onLongPress={() => pinPrompt(item)} delayLongPress={300} style={[styles.row, styles.rowOther]}>
+            <Pressable onLongPress={() => !item.deletedAt && setActionTarget(item)} delayLongPress={300} style={[styles.row, styles.rowOther]}>
               <View style={styles.avatarGutter}>
                 {showHeader ? (
                   <Avatar name={item.senderName} avatarUrl={meta?.avatarUrl} userId={item.senderId} size={30} />
@@ -387,11 +465,56 @@ export function ChatThread({
                 <View style={[styles.bubble, styles.bubbleOther, { backgroundColor: tint.bg, borderColor: tint.border }]}>
                   {content}
                 </View>
+                {reactionRow}
               </View>
             </Pressable>
           );
         }}
       />
+      {Object.keys(typingUsers).length > 0 && (
+        <View style={styles.typingRow}>
+          <View style={styles.typingBubble}>
+            <TypingDots color={colors.subtle} />
+          </View>
+          <Text style={styles.typingText} numberOfLines={1}>
+            {Object.values(typingUsers).join(', ')} {Object.keys(typingUsers).length === 1 ? 'is' : 'are'} typing…
+          </Text>
+        </View>
+      )}
+
+      <Modal visible={!!actionTarget} transparent animationType="fade" onRequestClose={() => setActionTarget(null)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setActionTarget(null)}>
+          <Pressable style={styles.actionCard} onPress={() => {}}>
+            <View style={styles.emojiRow}>
+              {EMOJIS.map((e) => (
+                <Pressable
+                  key={e}
+                  style={styles.emojiBtn}
+                  onPress={() => {
+                    const t = actionTarget;
+                    setActionTarget(null);
+                    if (t) void onReact(t.id, e);
+                  }}
+                >
+                  <Text style={styles.emojiBig}>{e}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Pressable
+              style={styles.actionSheetRow}
+              onPress={() => {
+                const t = actionTarget;
+                setActionTarget(null);
+                if (t) void doPin(t);
+              }}
+            >
+              <Ionicons name="bookmark-outline" size={18} color={colors.text} />
+              <Text style={styles.actionSheetText}>Pin message</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {recorderState.isRecording ? (
         <View style={styles.composer}>
           <Pressable style={styles.attach} onPress={() => void cancelRecording()}>
@@ -416,7 +539,7 @@ export function ChatThread({
             placeholder="Write a message…"
             placeholderTextColor={colors.subtle}
             value={input}
-            onChangeText={setInput}
+            onChangeText={onChangeInput}
             multiline
           />
           {input.trim() ? (
@@ -436,6 +559,32 @@ export function ChatThread({
       )}
       {/* Lifts the composer above the keyboard (open) or the gesture bar (closed). */}
       <View style={{ height: bottomSpace }} />
+    </View>
+  );
+}
+
+/** Three bouncing dots — the WhatsApp-style "typing…" animation. */
+function TypingDots({ color }: { color: string }) {
+  const dots = useRef([new Animated.Value(0.3), new Animated.Value(0.3), new Animated.Value(0.3)]).current;
+  useEffect(() => {
+    const anims = dots.map((v, i) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * 160),
+          Animated.timing(v, { toValue: 1, duration: 320, useNativeDriver: true }),
+          Animated.timing(v, { toValue: 0.3, duration: 320, useNativeDriver: true }),
+          Animated.delay((2 - i) * 160),
+        ]),
+      ),
+    );
+    anims.forEach((a) => a.start());
+    return () => anims.forEach((a) => a.stop());
+  }, [dots]);
+  return (
+    <View style={{ flexDirection: 'row', gap: 4 }}>
+      {dots.map((v, i) => (
+        <Animated.View key={i} style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color, opacity: v }} />
+      ))}
     </View>
   );
 }
@@ -476,6 +625,46 @@ const makeStyles = (c: Colors) =>
     bodyMine: { color: c.onBrand },
     bodyWithImage: { marginTop: 6 },
     image: { width: 200, height: 200, borderRadius: 10, backgroundColor: c.sunk },
+    reactions: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
+    reactionChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 11,
+      backgroundColor: c.sunk,
+    },
+    reactionChipMine: { backgroundColor: c.brandSoft },
+    reactionEmoji: { fontSize: 13 },
+    reactionCount: { fontSize: 11, color: c.subtle, fontFamily: font.bodySemi },
+    typingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingBottom: 4 },
+    typingBubble: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: c.surface,
+      borderRadius: 14,
+      borderBottomLeftRadius: 4,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    typingText: { flex: 1, fontSize: 11, color: c.subtle },
+    modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+    actionCard: { backgroundColor: c.surface, borderRadius: 16, padding: 10, minWidth: 260 },
+    emojiRow: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 4 },
+    emojiBtn: { paddingHorizontal: 8, paddingVertical: 6 },
+    emojiBig: { fontSize: 28 },
+    actionSheetRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingVertical: 12,
+      paddingHorizontal: 8,
+      marginTop: 4,
+      borderTopWidth: 1,
+      borderTopColor: c.border,
+    },
+    actionSheetText: { fontSize: 15, color: c.text, fontFamily: font.bodySemi },
     composer: {
       flexDirection: 'row',
       alignItems: 'flex-end',
