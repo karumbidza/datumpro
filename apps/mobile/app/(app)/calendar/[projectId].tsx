@@ -154,6 +154,11 @@ export default function ProjectCalendar() {
       router.push(`/(app)/task/${item.taskId}`);
       return;
     }
+    if (item.kind === 'event') {
+      // Calendar event items are keyed `event-<uuid>`; strip the prefix to the row id.
+      router.push(`/(app)/event/${item.id.replace('event-', '')}`);
+      return;
+    }
     const route =
       item.kind === 'todo'
         ? '/(app)/project-todos/[projectId]'
