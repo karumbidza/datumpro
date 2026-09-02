@@ -171,6 +171,9 @@ export default async function DashboardPage() {
   const tStats = {
     assigned: myTimeline.length,
     inProgress: myTimeline.filter((t) => t.status === 'in_progress').length,
+    notStarted: myTimeline.filter(
+      (t) => t.status === 'todo' && t.planned_start_date && new Date(t.planned_start_date).getTime() < nowMs,
+    ).length,
     overdue: myTimeline.filter(
       (t) => t.status !== 'done' && ((t.due_date && new Date(t.due_date).getTime() < nowMs) || t.sla_status === 'breached'),
     ).length,
@@ -186,6 +189,7 @@ export default async function DashboardPage() {
         cells={[
           { label: 'Assigned', value: String(tStats.assigned) },
           { label: 'In progress', value: String(tStats.inProgress) },
+          { label: 'Not started', value: String(tStats.notStarted), tone: tStats.notStarted > 0 ? 'amber' : undefined },
           { label: 'Overdue', value: String(tStats.overdue), tone: 'amber' },
           { label: 'Done', value: String(tStats.done), tone: 'green' },
         ]}

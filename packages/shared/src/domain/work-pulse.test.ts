@@ -5,6 +5,7 @@ const base: WorkPulseData = {
   firstName: 'Allen',
   pendingApprovals: 0,
   overdueTasks: 0,
+  notStartedTasks: 0,
   dueTodayTasks: 0,
   dueSoonTasks: 0,
   upcomingTasks: 0,

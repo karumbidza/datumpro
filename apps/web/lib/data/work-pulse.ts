@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server';
  *  combines these with the approvals count it already has and the user's name. */
 export interface WorkPulseSignals {
   overdueTasks: number;
+  notStartedTasks: number;
   dueTodayTasks: number;
   dueSoonTasks: number;
   upcomingTasks: number;
@@ -19,6 +20,7 @@ export interface WorkPulseSignals {
 
 const EMPTY: WorkPulseSignals = {
   overdueTasks: 0,
+  notStartedTasks: 0,
   dueTodayTasks: 0,
   dueSoonTasks: 0,
   upcomingTasks: 0,
@@ -53,7 +55,7 @@ export async function getWorkPulseSignals(orgId: string, userId: string): Promis
   const [tasksRes, recentRes, mineRes] = await Promise.all([
     supabase
       .from('tasks')
-      .select('id, status, due_date, sla_status, assignee_id, actual_end_date, project_id, projects(name)')
+      .select('id, status, due_date, planned_start_date, sla_status, assignee_id, actual_end_date, project_id, projects(name)')
       .eq('org_id', orgId),
     supabase
       .from('task_activity')
@@ -72,6 +74,7 @@ export async function getWorkPulseSignals(orgId: string, userId: string): Promis
     id: string;
     status: string;
     due_date: string | null;
+    planned_start_date: string | null;
     sla_status: string | null;
     assignee_id: string | null;
     actual_end_date: string | null;
@@ -91,6 +94,9 @@ export async function getWorkPulseSignals(orgId: string, userId: string): Promis
       if (t.assignee_id === userId && t.actual_end_date && t.actual_end_date >= weekAgo) s.completedThisWeek++;
       continue;
     }
+
+    // Should have started — planned start is past but the task is still to-do.
+    if (t.status === 'todo' && t.planned_start_date && t.planned_start_date < today) s.notStartedTasks++;
 
     if (t.due_date) {
       if (t.due_date < today) s.overdueTasks++;

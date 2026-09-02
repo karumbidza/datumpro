@@ -102,7 +102,11 @@ export default function Home() {
     void load();
   }, [load]);
 
-  const onTrack = data ? data.myOverdue === 0 : true;
+  // Behind = tasks that should have started but haven't (portfolio for managers,
+  // else my own). On track means nothing overdue AND nothing behind on start.
+  const overdue = data?.myOverdue ?? 0;
+  const behind = data ? (data.isManager ? data.behindStart : data.myNotStarted) : 0;
+  const onTrack = overdue === 0 && behind === 0;
 
   const kindConfig: Record<PendingApproval['kind'], { abbr: string; label: string; soft: string; deep: string }> = {
     signoff: { abbr: 'SGN', label: 'Sign-off', soft: colors.brandSoft, deep: colors.brandDeep },
@@ -183,7 +187,9 @@ export default function Home() {
             <Text style={styles.heroPillText}>
               {onTrack
                 ? 'On track · finishing on time'
-                : `${data?.myOverdue} task${data?.myOverdue === 1 ? '' : 's'} overdue`}
+                : overdue > 0
+                  ? `${overdue} task${overdue === 1 ? '' : 's'} overdue`
+                  : `${behind} task${behind === 1 ? '' : 's'} behind — not started`}
             </Text>
           </View>
         </LinearGradient>
@@ -337,6 +343,8 @@ function subline(data: HomeData | null, approvals: number): string {
   const day = new Date().toLocaleDateString(undefined, { weekday: 'long' });
   if (!data) return day;
   const bits = [day, `${data.myOpen} open task${data.myOpen === 1 ? '' : 's'}`];
+  const behind = data.isManager ? data.behindStart : data.myNotStarted;
+  if (behind > 0) bits.push(`${behind} should have started`);
   if (approvals > 0) bits.push(`${approvals} to sign off`);
   return bits.join(' · ');
 }
