@@ -206,6 +206,18 @@ export async function getHomeData(orgId: string | null = null): Promise<HomeData
     }
   }
 
+  // Progress mirrors the web project overview: the effort-weighted project_progress
+  // RPC (each task weighted by its awarded contract value), NOT a naive done/total
+  // count — so the same project reads the same % on mobile and web. The RPC is
+  // SECURITY DEFINER because it aggregates quote costs the client can't see.
+  const pctByProject = new Map<string, number>();
+  await Promise.all(
+    projects.map(async (p) => {
+      const { data } = await supabase.rpc('project_progress', { p_project_id: p.id });
+      pctByProject.set(p.id, typeof data === 'number' ? data : 0);
+    }),
+  );
+
   const projectProgress: ProjectProgress[] = projects.map((p) => {
     const agg = byProject.get(p.id) ?? { total: 0, done: 0 };
     return {
@@ -213,9 +225,21 @@ export async function getHomeData(orgId: string | null = null): Promise<HomeData
       name: p.name,
       total: agg.total,
       done: agg.done,
-      pct: agg.total === 0 ? 0 : Math.round((agg.done / agg.total) * 100),
+      pct: pctByProject.get(p.id) ?? 0,
     };
   });
+
+  // Portfolio % blends each project's effort-weighted % by its task count, so a big
+  // project sways it more than a one-task one (a portfolio-level proxy for value,
+  // where per-project costs aren't exposed to the client).
+  let pctWeighted = 0;
+  let pctWeight = 0;
+  for (const proj of projects) {
+    const agg = byProject.get(proj.id) ?? { total: 0, done: 0 };
+    pctWeighted += (pctByProject.get(proj.id) ?? 0) * agg.total;
+    pctWeight += agg.total;
+  }
+  const portfolioPct = pctWeight === 0 ? 0 : Math.round(pctWeighted / pctWeight);
 
   const p = profile as { display_name: string | null; email: string | null } | null;
   const displayName = p?.display_name || p?.email?.split('@')[0] || 'there';
@@ -224,7 +248,7 @@ export async function getHomeData(orgId: string | null = null): Promise<HomeData
     displayName,
     isManager,
     projects: projectProgress,
-    portfolioPct: totalTasks === 0 ? 0 : Math.round((doneTasks / totalTasks) * 100),
+    portfolioPct,
     totalTasks,
     doneTasks,
     myOpen,
