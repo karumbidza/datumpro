@@ -164,6 +164,13 @@ export const Check: IconComponent = (p) => (
   </Icon>
 );
 
+export const CheckCheck: IconComponent = (p) => (
+  <Icon {...p}>
+    <path d="M18 6 7 17l-5-5" />
+    <path d="m22 10-7.5 7.5L13 16" />
+  </Icon>
+);
+
 export const Clock: IconComponent = (p) => (
   <Icon {...p}>
     <circle cx="12" cy="12" r="10" />

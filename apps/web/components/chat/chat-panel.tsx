@@ -21,7 +21,7 @@ import {
 import type { ChatAttachment, ChatMessage, ChatSearchResult, ConversationFile, ChatAbout, PinnedMessage } from '@/lib/data/chat';
 import type { RosterMember } from '@/lib/data/chat-roster';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, Paperclip, Mic, Square, X, Download, FileText, Search, Users, ChevronDown, Reply, Pin, Pencil, Trash2 } from '@/components/icons';
+import { MessageCircle, Paperclip, Mic, Square, X, Download, FileText, Search, Users, ChevronDown, Reply, Pin, Pencil, Trash2, CheckCheck } from '@/components/icons';
 import { NotifyToggle } from '@/components/chat/notify-toggle';
 import { ChatRail } from '@/components/chat/chat-rail';
 import { Avatar, senderTint, rolePill } from '@/components/chat/identity';
@@ -694,7 +694,6 @@ export function ChatPanel({
     await applyOne(id);
   }
 
-  const lastOwn = [...messages].reverse().find((m) => m.senderId === currentUserId);
   const typingNames = Object.values(typing);
 
   // Presence-derived counts. `onlineOthers` (excludes self) drives the legacy
@@ -940,6 +939,17 @@ export function ChatPanel({
                       </div>
                     )}
 
+                    {/* Read receipt — WhatsApp-style double tick, blue once read. */}
+                    {mine && !m.deletedAt && editingId !== m.id && (
+                      <span
+                        className="-mt-0.5 flex items-center self-end pr-0.5"
+                        title={othersRead >= m.seq ? 'Read' : 'Sent'}
+                        aria-label={othersRead >= m.seq ? 'Read' : 'Sent'}
+                      >
+                        <CheckCheck size={14} className={othersRead >= m.seq ? 'text-sky-500' : 'text-zinc-400 dark:text-zinc-500'} />
+                      </span>
+                    )}
+
                     {!m.deletedAt && (
                       <div data-msg-menu className={`absolute -top-2 z-20 ${mine ? 'right-0' : 'left-0'}`}>
                         {/* Subtle hover affordance — one chevron that opens the menu. */}
@@ -1046,11 +1056,6 @@ export function ChatPanel({
               </Fragment>
             );
           })
-        )}
-        {lastOwn && !lastOwn.deletedAt && (
-          <p className="mt-1 pr-1 text-right text-[10px] text-zinc-400 dark:text-zinc-500">
-            {othersRead >= lastOwn.seq ? 'Seen' : 'Sent'}
-          </p>
         )}
         <div ref={bottomRef} />
       </div>
