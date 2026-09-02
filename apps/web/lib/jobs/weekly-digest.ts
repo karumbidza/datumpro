@@ -13,6 +13,7 @@ type TaskRow = {
   title: string;
   status: string;
   due_date: string | null;
+  planned_start_date: string | null;
   sla_status: string | null;
   assignee_id: string | null;
   actual_end_date: string | null;
@@ -44,6 +45,7 @@ function signalsFor(
   const weekAgo = new Date(now.getTime() - 7 * 86_400_000).toISOString();
 
   let overdue = 0,
+    notStarted = 0,
     dueToday = 0,
     dueSoon = 0,
     upcoming = 0,
@@ -60,6 +62,7 @@ function signalsFor(
       if (t.actual_end_date && t.actual_end_date >= weekAgo) completed++;
       continue;
     }
+    if (t.status === 'todo' && t.planned_start_date && t.planned_start_date < today) notStarted++;
     if (t.due_date) {
       if (t.due_date < today) overdue++;
       else if (t.due_date === today) dueToday++;
@@ -90,6 +93,7 @@ function signalsFor(
   return {
     pendingApprovals,
     overdueTasks: overdue,
+    notStartedTasks: notStarted,
     dueTodayTasks: dueToday,
     dueSoonTasks: dueSoon,
     upcomingTasks: upcoming,
@@ -152,7 +156,7 @@ export async function runWeeklyDigest(now: Date = new Date()): Promise<{ recipie
     const [tasksRes, pmRes, extRes, varRes, rfiRes, snagRes, aiRes] = await Promise.all([
       admin
         .from('tasks')
-        .select('id, title, status, due_date, sla_status, assignee_id, actual_end_date, project_id, projects(name)')
+        .select('id, title, status, due_date, planned_start_date, sla_status, assignee_id, actual_end_date, project_id, projects(name)')
         .eq('org_id', orgId),
       admin.from('project_members').select('user_id, project_id').eq('org_id', orgId).eq('role', 'pm'),
       admin.from('task_extension_requests').select('project_id').eq('org_id', orgId).eq('status', 'pending'),

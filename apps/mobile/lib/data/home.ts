@@ -20,6 +20,10 @@ export interface HomeData {
   myOpen: number;
   myOverdue: number;
   myAtRisk: number;
+  /** My tasks that should have started (planned start is past) but are still to-do. */
+  myNotStarted: number;
+  /** Portfolio tasks that should have started but are still to-do (manager view). */
+  behindStart: number;
 }
 
 export type ApprovalKind = 'signoff' | 'extension' | 'variation';
@@ -141,7 +145,7 @@ export async function getHomeData(orgId: string | null = null): Promise<HomeData
   const today = new Date().toISOString().slice(0, 10);
 
   let projectQ = supabase.from('projects').select('id, name').order('created_at', { ascending: false });
-  let taskQ = supabase.from('tasks').select('id, status, sla_status, due_date, project_id, assignee_id');
+  let taskQ = supabase.from('tasks').select('id, status, sla_status, due_date, planned_start_date, project_id, assignee_id');
   if (orgId) {
     projectQ = projectQ.eq('org_id', orgId);
     taskQ = taskQ.eq('org_id', orgId);
@@ -166,6 +170,7 @@ export async function getHomeData(orgId: string | null = null): Promise<HomeData
     status: string;
     sla_status: string;
     due_date: string | null;
+    planned_start_date: string | null;
     project_id: string;
     assignee_id: string | null;
   }[];
@@ -177,6 +182,8 @@ export async function getHomeData(orgId: string | null = null): Promise<HomeData
   let myOpen = 0;
   let myOverdue = 0;
   let myAtRisk = 0;
+  let myNotStarted = 0;
+  let behindStart = 0;
 
   for (const t of tasks) {
     const agg = byProject.get(t.project_id);
@@ -187,8 +194,13 @@ export async function getHomeData(orgId: string | null = null): Promise<HomeData
     totalTasks += 1;
     if (t.status === 'done') doneTasks += 1;
 
+    // "Should have started" — planned start is in the past but the task is still to-do.
+    const shouldHaveStarted = t.status === 'todo' && !!t.planned_start_date && t.planned_start_date < today;
+    if (shouldHaveStarted) behindStart += 1;
+
     if (t.assignee_id === me && t.status !== 'done') {
       myOpen += 1;
+      if (shouldHaveStarted) myNotStarted += 1;
       if (t.due_date && t.due_date < today) myOverdue += 1;
       if (t.sla_status === 'at_risk' || t.sla_status === 'breached') myAtRisk += 1;
     }
@@ -218,5 +230,7 @@ export async function getHomeData(orgId: string | null = null): Promise<HomeData
     myOpen,
     myOverdue,
     myAtRisk,
+    myNotStarted,
+    behindStart,
   };
 }

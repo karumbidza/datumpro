@@ -22,6 +22,9 @@ export interface DashboardCounts {
   pendingSignoff: number;
   blockers: number;
   breaches: number;
+  /** Tasks whose planned start is in the past but are still to-do (behind schedule
+   *  on starting) — the reason a low-% project isn't actually "on track". */
+  notStarted: number;
 }
 
 export interface DashboardData {
@@ -35,6 +38,13 @@ function isOverdue(task: { due_date: string | null; status: TaskStatus }): boole
   if (TERMINAL_STATUSES.includes(task.status) || !task.due_date) return false;
   const due = new Date(task.due_date);
   return !Number.isNaN(due.getTime()) && due.getTime() < Date.now();
+}
+
+/** Should have started — planned start is past but the task is still to-do. */
+function shouldHaveStarted(task: { planned_start_date: string | null; status: TaskStatus }): boolean {
+  if (task.status !== 'todo' || !task.planned_start_date) return false;
+  const s = new Date(task.planned_start_date);
+  return !Number.isNaN(s.getTime()) && s.getTime() < Date.now();
 }
 
 /** Aggregate everything a dashboard renders in a few scoped queries. RLS keeps the
@@ -114,6 +124,7 @@ export async function getDashboardData(orgId: string, projectId?: string): Promi
       .length,
     blockers: tasks.filter((t) => t.status === 'blocked' || t.sla_status === 'blocked').length,
     breaches: tasks.filter((t) => t.sla_status === 'breached' || isOverdue(t)).length,
+    notStarted: tasks.filter(shouldHaveStarted).length,
   };
 
   return { counts, tasks };

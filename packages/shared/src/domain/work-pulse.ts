@@ -14,6 +14,7 @@ export interface WorkPulseData {
   firstName: string;
   pendingApprovals: number; // approvals waiting on this user
   overdueTasks: number; // not done, past their due date
+  notStartedTasks: number; // planned start is past but still to-do (behind on starting)
   dueTodayTasks: number; // due today, not done
   dueSoonTasks: number; // due within the next 2 days (excludes today), not done
   upcomingTasks: number; // not done, due within the next 7 days
@@ -71,6 +72,16 @@ function attentionClauses(data: WorkPulseData): { priority: number; clause: stri
         data.overdueTasks,
         '1 task has slipped past its planned date',
         `${data.overdueTasks} tasks have slipped past their planned dates`,
+      ),
+    });
+  }
+  if (data.notStartedTasks > 0) {
+    out.push({
+      priority: 90,
+      clause: plural(
+        data.notStartedTasks,
+        '1 task should have started but hasn’t',
+        `${data.notStartedTasks} tasks should have started but haven’t`,
       ),
     });
   }
