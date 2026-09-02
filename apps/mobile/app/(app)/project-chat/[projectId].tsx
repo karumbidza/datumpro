@@ -28,13 +28,11 @@ export default function ProjectChat() {
     };
   }, [projectId]);
 
-  const chat = (
-    <ChatThread
-      conversationId={conversationId}
-      resolving={resolving}
-      emptyText="You don't have access to this project's team channel."
-    />
-  );
+  // The rail replaces the burger when wide — make sure a drawer left open in
+  // portrait doesn't spring back when the device is rotated to landscape.
+  useEffect(() => {
+    if (isWide) setDrawerOpen(false);
+  }, [isWide]);
 
   return (
     <>
@@ -45,27 +43,29 @@ export default function ProjectChat() {
           headerRight: isWide ? undefined : () => <ProjectNavBurger onPress={() => setDrawerOpen(true)} />,
         }}
       />
-      {isWide ? (
-        <View style={[styles.wide, { backgroundColor: colors.bg }]}>
-          <ProjectNavRail projectId={String(projectId)} name={name ?? ''} />
-          <View style={styles.flex}>{chat}</View>
-        </View>
-      ) : (
-        <>
-          {chat}
-          <ProjectNavDrawer
-            visible={drawerOpen}
-            onClose={() => setDrawerOpen(false)}
-            projectId={String(projectId)}
-            name={name ?? ''}
+      {/* Keep ChatThread at a stable tree position across rotation so it isn't
+          remounted (which would drop the unsent draft + re-fetch messages). */}
+      <View style={[styles.row, { backgroundColor: colors.bg }]}>
+        {isWide && <ProjectNavRail projectId={String(projectId)} name={name ?? ''} />}
+        <View style={styles.flex}>
+          <ChatThread
+            conversationId={conversationId}
+            resolving={resolving}
+            emptyText="You don't have access to this project's team channel."
           />
-        </>
-      )}
+        </View>
+      </View>
+      <ProjectNavDrawer
+        visible={!isWide && drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        projectId={String(projectId)}
+        name={name ?? ''}
+      />
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  wide: { flex: 1, flexDirection: 'row' },
+  row: { flex: 1, flexDirection: 'row' },
   flex: { flex: 1 },
 });
