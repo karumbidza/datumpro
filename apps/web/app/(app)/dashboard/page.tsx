@@ -135,13 +135,16 @@ export default async function DashboardPage() {
 
   // ── Delivery cockpit — PM ─────────────────────────────────────────────────
   if (persona === 'delivery') {
-    const [managed, dash] = await Promise.all([
+    const [managed, dash, projectTimeline] = await Promise.all([
       listManagedProjects(active.orgId, ctx.userId, active.role),
       getDashboardData(active.orgId),
+      getPortfolioTimeline(active.orgId),
     ]);
-    // Task-level timeline + action counts, scoped to the projects this PM runs.
+    // Action counts come from the tasks; the timeline shows one bar per project
+    // this PM runs (task-level detail lives on each project's Overview).
     const managedIds = new Set(managed.map((m) => m.id));
     const timelineTasks = dash.tasks.filter((t) => managedIds.has(t.project_id));
+    const projectRows = projectTimeline.filter((p) => managedIds.has(p.project_id));
     const now = Date.now();
     const blockers = timelineTasks.filter((t) => t.status === 'blocked' || t.sla_status === 'blocked').length;
     const overdue = timelineTasks.filter(
@@ -155,16 +158,17 @@ export default async function DashboardPage() {
         <WorkPulseGreeting data={pulse(null)} context={`${active.name} · Delivery overview`} action={newProject} />
         <DeliveryFocus approvals={approvals} blockers={blockers} overdue={overdue} />
         <WhatNeedsMe inbox={inbox} />
-        <TimelineOverview tasks={timelineTasks} unit="task" />
+        <TimelineOverview tasks={projectRows} unit="project" />
       </PageContainer>
     );
   }
 
   // ── Personal home — member / contractor / viewer ──────────────────────────
-  const [myUpcoming, myPay, myTimeline] = await Promise.all([
+  const [myUpcoming, myPay, myTimeline, projectTimeline] = await Promise.all([
     listMyUpcomingTasks(ctx.userId),
     listMyOwed(ctx.userId),
     listMyTimelineTasks(ctx.userId),
+    getPortfolioTimeline(active.orgId),
   ]);
   const hasPay = myPay.summary.earnedCents > 0;
   const nowMs = Date.now();
@@ -194,7 +198,7 @@ export default async function DashboardPage() {
           { label: 'Done', value: String(tStats.done), tone: 'green' },
         ]}
       />
-      <TimelineOverview tasks={myTimeline} unit="task" />
+      <TimelineOverview tasks={projectTimeline} unit="project" />
       <UpcomingTasksTable tasks={myUpcoming} />
       {hasPay && (
         <Card>
