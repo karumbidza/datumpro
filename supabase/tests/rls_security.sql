@@ -1935,7 +1935,7 @@ reset request.jwt.claims;
 insert into public.tasks (id, org_id, project_id, title, assignee_id, planned_start_date, planned_end_date, programme_order) values
   ('a5000000-0000-0000-0000-0000000000c1','a1110000-0000-0000-0000-000000000000',
    'a2220000-0000-0000-0000-000000000000','Prog guard task',
-   'a0000000-0000-0000-0000-0000000000a9','2026-09-01','2026-09-05',1);
+   'a0000000-0000-0000-0000-0000000000a9', current_date + 10, current_date + 14, 1);
 
 -- (1a) Contractor a9 CANNOT move their own task's planned_start_date (guard fires).
 set role authenticated;
@@ -1944,7 +1944,7 @@ do $$
 declare blocked boolean := false;
 begin
   begin
-    update public.tasks set planned_start_date = '2026-10-01'
+    update public.tasks set planned_start_date = current_date + 20
       where id = 'a5000000-0000-0000-0000-0000000000c1';
   exception when others then blocked := true;
   end;
@@ -1956,16 +1956,16 @@ reset request.jwt.claims;
 
 -- Confirm the write did not land.
 select pg_temp.ok(
-  (select planned_start_date from public.tasks where id = 'a5000000-0000-0000-0000-0000000000c1') = '2026-09-01',
+  (select planned_start_date from public.tasks where id = 'a5000000-0000-0000-0000-0000000000c1') = current_date + 10,
   'programme: contractor date change was blocked (value unchanged)');
 
 -- (1b) Owner a1 (org-staff) CAN update the task's planned dates.
 set role authenticated;
 set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
-update public.tasks set planned_start_date = '2026-09-02', planned_end_date = '2026-09-06'
+update public.tasks set planned_start_date = current_date + 11, planned_end_date = current_date + 15
   where id = 'a5000000-0000-0000-0000-0000000000c1';
 select pg_temp.ok(
-  (select planned_start_date from public.tasks where id = 'a5000000-0000-0000-0000-0000000000c1') = '2026-09-02',
+  (select planned_start_date from public.tasks where id = 'a5000000-0000-0000-0000-0000000000c1') = current_date + 11,
   'programme: org-staff can change a task planned date');
 reset role;
 reset request.jwt.claims;
