@@ -35,12 +35,13 @@ export async function myMemberType(orgId: string): Promise<MemberType> {
 }
 
 /** Redact contact details (email) per the viewer's standing:
- *   · internal (owner/admin/pm/staff) → see everyone's contact
+ *   · internal management (owner/admin/pm) → see everyone's contact
+ *   · staff → project-scoped like a contractor: sees the project PM only
  *   · contractor → sees the project PM + fellow contractors; owner/admin hidden
  *   · client / viewer → sees the project PM only
  *  Names + roles stay visible; only the way-to-reach-them is hidden. */
 export function redactContacts(viewerType: MemberType, members: ProjectMemberRow[]): ProjectMemberRow[] {
-  const internal = viewerType === 'owner' || viewerType === 'admin' || viewerType === 'pm' || viewerType === 'staff';
+  const internal = viewerType === 'owner' || viewerType === 'admin' || viewerType === 'pm';
   if (internal) return members;
   return members.map((m) => {
     const visible = m.role === 'pm' || (viewerType === 'contractor' && m.memberType === 'contractor');

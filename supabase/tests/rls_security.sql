@@ -56,10 +56,13 @@ insert into public.organizations (id, name, require_mfa) values
   ('b1110000-0000-0000-0000-000000000000','Org B', false),
   ('c1110000-0000-0000-0000-000000000000','Org M', true);
 
-insert into public.org_members (org_id, user_id, role, status) values
-  ('a1110000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000a1','owner','active'),
-  ('b1110000-0000-0000-0000-000000000000','b0000000-0000-0000-0000-0000000000b1','owner','active'),
-  ('c1110000-0000-0000-0000-000000000000','c0000000-0000-0000-0000-0000000000c1','owner','active');
+-- Owners carry member_type='owner' (as handle_new_org grants in production). The
+-- column defaults to 'staff', so it MUST be set explicitly here: since staff are
+-- now project-scoped (not org-wide), a defaulted owner would lose is_org_staff.
+insert into public.org_members (org_id, user_id, role, member_type, status) values
+  ('a1110000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000a1','owner','owner','active'),
+  ('b1110000-0000-0000-0000-000000000000','b0000000-0000-0000-0000-0000000000b1','owner','owner','active'),
+  ('c1110000-0000-0000-0000-000000000000','c0000000-0000-0000-0000-0000000000c1','owner','owner','active');
 
 insert into public.projects (id, org_id, name) values
   ('a2220000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','Project A'),
@@ -188,20 +191,21 @@ end $$;
 reset role;
 reset request.jwt.claims;
 
--- ── Piece 2: BOQ role split — staff read the library, contractors do not ──────
--- is_org_staff() keys on member_type (staff vs contractor both hold org_role
--- 'member'). Staff read the whole BOQ library incl. PRIVATE budget rates and every
--- org tender; a contractor org-member is blocked from the library and sees only
--- tenders they were invited to bid on, still able to price via tender_bill_lines
--- (which never returns budget_rate_cents).
+-- ── Piece 2: BOQ role split — org-staff read the library, contractors do not ──
+-- is_org_staff() = member_type in (owner,admin,pm). Org-staff read the whole BOQ
+-- library incl. PRIVATE budget rates and every org tender; a contractor org-member
+-- is blocked from the library and sees only tenders they were invited to bid on,
+-- still able to price via tender_bill_lines (which never returns
+-- budget_rate_cents). (Staff are project-scoped and blocked from the library too —
+-- asserted with user a7 further below.)
 set role authenticated;
 
--- Staff (user A, member_type defaults to 'staff'): full library + both tenders.
+-- Owner (user A): full library + both tenders.
 set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
 select pg_temp.ok((select count(*) from public.boq_items where id = 'a3350000-0000-0000-0000-000000000000') = 1,
-  'role-split: staff can read BOQ library items');
+  'role-split: org-staff (owner) can read BOQ library items');
 select pg_temp.ok((select count(*) from public.boq_tenders where org_id = 'a1110000-0000-0000-0000-000000000000') = 2,
-  'role-split: staff can read all org tenders');
+  'role-split: org-staff (owner) can read all org tenders');
 
 -- Contractor (user A2, member_type contractor): no library, only their tender.
 set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a2","role":"authenticated","aal":"aal1"}';
@@ -902,6 +906,19 @@ insert into public.project_members (org_id, project_id, user_id, role, status) v
   ('a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000a7','contributor','active');
 insert into public.tasks (id, org_id, project_id, title) values
   ('a7770000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','Staff checklist task');
+
+-- Staff are project-scoped (20260903140000): a7 (staff, a project contributor on
+-- Project A) is cut off from the org-wide BOQ library and org tenders — the same
+-- as a contractor. Their own project data stays visible via is_project_member.
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a7","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok((select count(*) from public.boq_items where id = 'a3350000-0000-0000-0000-000000000000') = 0,
+  'role-split: staff is project-scoped — CANNOT read the BOQ library');
+select pg_temp.ok((select count(*) from public.boq_tenders where org_id = 'a1110000-0000-0000-0000-000000000000') = 0,
+  'role-split: staff CANNOT read org-wide tenders');
+reset role;
+reset request.jwt.claims;
+
 set role authenticated;
 set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
 do $$
