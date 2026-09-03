@@ -42,6 +42,10 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const canManageMembers = can(role, 'member:manage');
   const canCreateProject = can(role, 'project:create');
   const canViewFinance = can(role, 'finance:view');
+  // Salaried staff carry no per-task money, so they never see the personal
+  // Payments statement even when assigned to tasks (which otherwise trips the
+  // contractor signal). Money surfaces are for contractors and finance roles.
+  const showMyPayments = isContractor && ctx.active.memberType !== 'staff';
 
   return (
     <div className="flex h-screen overflow-hidden bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
@@ -62,7 +66,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         canManageMembers={canManageMembers}
         canCreateProject={canCreateProject}
         canViewFinance={canViewFinance}
-        showMyPayments={isContractor}
+        showMyPayments={showMyPayments}
         managedProjectIds={managedProjectIds}
         myTaskCount={myTaskCount}
         memberType={ctx.active.memberType}
@@ -76,7 +80,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           canManageMembers={canManageMembers}
           canCreateProject={canCreateProject}
           canViewFinance={canViewFinance}
-          showMyPayments={isContractor}
+          showMyPayments={showMyPayments}
           managedProjectIds={managedProjectIds}
           memberType={ctx.active.memberType}
         />

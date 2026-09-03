@@ -890,6 +890,35 @@ end $$;
 reset role;
 reset request.jwt.claims;
 
+-- ── Staff-assigned tasks carry NO money (20260903120000) ─────────────────────
+-- A task assigned to a member_type='staff' user must stay on the plain
+-- checklist — acceptance_status null, no awarded value or price lock — whereas a
+-- contractor assignee still goes 'pending' (asserted just above).
+insert into auth.users (id, email) values
+  ('a0000000-0000-0000-0000-0000000000a7','staff-a@test.dev');
+insert into public.org_members (org_id, user_id, role, member_type, status) values
+  ('a1110000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000a7','member','staff','active');
+insert into public.project_members (org_id, project_id, user_id, role, status) values
+  ('a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000a7','contributor','active');
+insert into public.tasks (id, org_id, project_id, title) values
+  ('a7770000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','Staff checklist task');
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a1","role":"authenticated","aal":"aal1"}';
+do $$
+begin
+  update public.tasks set assignee_id = 'a0000000-0000-0000-0000-0000000000a7'
+    where id = 'a7770000-0000-0000-0000-000000000000';
+  perform pg_temp.ok(
+    (select acceptance_status is null from public.tasks where id = 'a7770000-0000-0000-0000-000000000000'),
+    'staff-money: task assigned to staff stays off the accept/price flow (acceptance_status null)');
+  perform pg_temp.ok(
+    (select awarded_cost_cents is null and plan_approved_at is null
+       from public.tasks where id = 'a7770000-0000-0000-0000-000000000000'),
+    'staff-money: staff task has no awarded value or price lock');
+end $$;
+reset role;
+reset request.jwt.claims;
+
 -- ── Project↔BOQ: award repricing of pre-generated tasks ───────────────────────
 -- Reuses the a4… fixtures: BOQ Gen is linked to Gen Project and holds generated
 -- unassigned tasks. A tender awarded to contractor a2 must take REPRICE mode:
