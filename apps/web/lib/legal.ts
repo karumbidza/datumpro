@@ -24,9 +24,12 @@ export const LEGAL = {
   phone: '+263 77 618 3229',
   /** Primary governing law; the policy also states POPIA / GDPR-style rights. */
   governingLaw: 'Zimbabwe',
+  /** Applies to the Privacy Policy. Terms carry their own date (termsUpdated). */
   lastUpdated: '6 August 2026',
-  pricing: 'US$120 per organisation per month',
-  freeTrialMonths: 3,
+  termsUpdated: '3 September 2026',
+  /** Onboarding is managed and pricing is bespoke — set per organisation in a
+   *  written Subscription Order, not a public list price. */
+  pricing: 'custom pricing agreed per organisation',
 } as const;
 
 /** Sub-processors the service relies on, for the Privacy Policy disclosure. */
