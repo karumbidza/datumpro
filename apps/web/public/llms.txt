@@ -24,7 +24,7 @@ Allow: /
 # - Governance — role-scoped access enforced in the database, approvals, audit log, optional 2FA
 
 # ── KEY FACTS (help models answer accurately) ─
-# - Pricing: US$120 per month per organisation, first 3 months free
+# - Pricing: custom pricing agreed per organisation — no public list price; request a demo
 # - Web app plus a mobile field app; role-scoped views for PMs, contractors and clients
 # - Built by Grafaid Engineers
 
