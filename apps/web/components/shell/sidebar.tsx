@@ -90,7 +90,7 @@ export function Sidebar({ projects, orgs, activeOrgId, email, canManageMembers, 
 
       <div className="p-2">
         <div className="rounded-lg bg-zinc-50 p-2 dark:bg-zinc-800/40">
-        <OrgSwitcher orgs={orgs} activeOrgId={activeOrgId} />
+        <OrgSwitcher orgs={orgs} activeOrgId={activeOrgId} memberType={memberType} />
         <div className="mt-1 flex items-center justify-between gap-2">
           <Link
             href="/account"
@@ -148,7 +148,7 @@ function OrgAvatar({ org, size = 16 }: { org: OrgMembershipSummary; size?: numbe
   );
 }
 
-function OrgSwitcher({ orgs, activeOrgId }: { orgs: OrgMembershipSummary[]; activeOrgId: string }) {
+function OrgSwitcher({ orgs, activeOrgId, memberType }: { orgs: OrgMembershipSummary[]; activeOrgId: string; memberType: MemberType }) {
   const [open, setOpen] = useState(false);
   const active = orgs.find((o) => o.orgId === activeOrgId);
   const activeName = active?.name ?? 'Organisation';
@@ -191,7 +191,8 @@ function OrgSwitcher({ orgs, activeOrgId }: { orgs: OrgMembershipSummary[]; acti
                 </button>
               </form>
             ))}
-            {ownsOrg ? (
+            {/* Staff are pinned to one organisation — no join/create-another affordance. */}
+            {memberType !== 'staff' && (ownsOrg ? (
               // Already owns an org — a second needs a new account/email. Open sign-up
               // in a new tab so this session (and org) stays put in the original tab.
               <a
@@ -214,7 +215,7 @@ function OrgSwitcher({ orgs, activeOrgId }: { orgs: OrgMembershipSummary[]; acti
               >
                 <Plus size={14} /> New organisation
               </Link>
-            )}
+            ))}
           </div>
         </>
       )}

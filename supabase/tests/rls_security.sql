@@ -919,6 +919,35 @@ end $$;
 reset role;
 reset request.jwt.claims;
 
+-- ── Staff are pinned to one org (20260903130000) ─────────────────────────────
+-- a7 is staff in Org A. Joining Org B by invitation AND creating a new org must
+-- both be rejected — a staff membership is exclusive. (Contractor a2 is multi-org
+-- and unaffected: they hold memberships across orgs elsewhere in this suite.)
+insert into public.org_invitations (org_id, email, role, member_type, token, status, invited_by, expires_at) values
+  ('b1110000-0000-0000-0000-000000000000','staff-a@test.dev','member','staff','tok-staff-b','pending',
+   'b0000000-0000-0000-0000-0000000000b1', now() + interval '7 days');
+set role authenticated;
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a7","role":"authenticated","aal":"aal1"}';
+do $$
+begin
+  begin
+    perform public.accept_org_invitation('tok-staff-b');
+    perform pg_temp.ok(false, 'staff-single-org: staff in Org A must not join Org B');
+  exception when others then
+    perform pg_temp.ok(position('single organisation' in SQLERRM) > 0,
+      'staff-single-org: a staff invite into a second org is rejected');
+  end;
+  begin
+    insert into public.organizations (name) values ('a7 side hustle');
+    perform pg_temp.ok(false, 'staff-single-org: staff must not create a second org');
+  exception when others then
+    perform pg_temp.ok(position('single organisation' in SQLERRM) > 0,
+      'staff-single-org: a staff account creating an org is rejected');
+  end;
+end $$;
+reset role;
+reset request.jwt.claims;
+
 -- ── Project↔BOQ: award repricing of pre-generated tasks ───────────────────────
 -- Reuses the a4… fixtures: BOQ Gen is linked to Gen Project and holds generated
 -- unassigned tasks. A tender awarded to contractor a2 must take REPRICE mode:
