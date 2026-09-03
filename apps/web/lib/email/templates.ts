@@ -268,4 +268,29 @@ export function enterpriseRequestEmail(opts: {
   };
 }
 
+export function demoRequestEmail(opts: {
+  orgName: string;
+  contactName?: string | null;
+  contactEmail: string;
+  teamSize?: string | null;
+  needs?: string | null;
+}) {
+  const row = (label: string, value?: string | null) =>
+    value ? `<p style="margin:0 0 4px"><strong>${label}:</strong> ${value}</p>` : '';
+  return {
+    subject: `Demo request: ${opts.orgName}`,
+    html: layout({
+      heading: 'New demo request',
+      intro: `<strong>${opts.orgName}</strong> requested a demo of DatumPro.`,
+      bodyHtml: `<div style="font-size:13px;color:#3f3f46;line-height:1.6;background:#f4f4f5;border-radius:8px;padding:12px">
+        ${row('Contact', opts.contactName)}
+        ${row('Email', opts.contactEmail)}
+        ${row('Team size', opts.teamSize)}
+        ${row('What they want to see', opts.needs)}
+      </div>`,
+      footnote: 'DatumPro demo request — a specialist should follow up within 8 hours.',
+    }),
+  };
+}
+
 export { appUrl };

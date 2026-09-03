@@ -4,41 +4,43 @@ import { redirect } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { Button } from '@/components/ui/button';
 import { ManageCookiesLink } from '@/components/consent/manage-cookies-link';
+import { Input, Textarea, Select, Label, Req, hintClass } from '@/components/ui/form';
+import { SubmitButton } from '@/components/ui/submit-button';
+import { requestDemo } from './request-demo-action';
 
 const BASE = process.env.NEXT_PUBLIC_APP_URL || 'https://datumpro.app';
 
 /* ── SEO ─────────────────────────────────────────────────────────────────── */
 
 export const metadata: Metadata = {
-  title: { absolute: 'DatumPro — Project Management Software for Real-World Work' },
+  title: { absolute: 'DatumPro — Construction Project Management Software' },
   description:
-    'Project management for real-world work — construction, healthcare, agriculture and more. Tasks & timelines, sealed tenders, payments and approvals with a full audit trail. $120/mo, first 3 months free.',
+    'Construction project management software that runs delivery, tendering and payments on a full audit trail — tasks & timelines, sealed tenders, contractor payments and approvals. Also used across healthcare, agriculture, infrastructure and public programmes. Request a demo.',
   keywords: [
+    'construction project management software',
     'project management software',
     'field project management',
-    'construction project management',
-    'healthcare project management',
-    'agriculture project management',
-    'tender management',
-    'contractor payments',
+    'tender management software',
+    'contractor payment software',
+    'construction scheduling software',
     'project management Zimbabwe',
   ],
   alternates: { canonical: '/' },
   openGraph: {
-    title: 'DatumPro — Project Management Software for Real-World Work',
+    title: 'DatumPro — Construction Project Management Software',
     description:
-      'Construction, healthcare, agriculture and more — tasks & timelines, sealed tenders, payments, full audit trail. $120/month, first 3 months free.',
+      'Run delivery, sealed tendering and contractor payments on one system with a full audit trail. Built for the field, from site to boardroom. Request a demo.',
     url: '/',
     siteName: 'DatumPro',
     type: 'website',
     locale: 'en_US',
-    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'DatumPro — project management for real-world work, field to boardroom' }],
+    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'DatumPro — construction project management, field to boardroom' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'DatumPro — Project Management Software for Real-World Work',
+    title: 'DatumPro — Construction Project Management Software',
     description:
-      'Construction, healthcare, agriculture and more — tasks & timelines, sealed tenders, payments, full audit trail. $120/month, first 3 months free.',
+      'Run delivery, sealed tendering and contractor payments on one system with a full audit trail. Request a demo.',
     images: ['/og.png'],
   },
   robots: {
@@ -52,12 +54,8 @@ export const metadata: Metadata = {
  *  same source so they can never disagree. */
 const FAQS: { q: string; a: string }[] = [
   {
-    q: 'How much does DatumPro cost?',
-    a: 'One flat price: US$120 per month per organisation, with every feature included — projects, tendering, payments, site reports and the audit trail. Your first 3 months are free.',
-  },
-  {
-    q: 'Is there a free trial?',
-    a: 'Better — the first 3 months are completely free. Create your organisation, run real projects, and only pay from month four.',
+    q: 'How do I get started?',
+    a: 'Onboarding is managed by our team, not a self-serve signup. Request a demo and a specialist will be in touch within 8 hours to understand your projects, set up your organisation, and walk your team through it.',
   },
   {
     q: 'Who is DatumPro for?',
@@ -65,11 +63,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'Is DatumPro only for construction?',
-    a: 'No. DatumPro manages projects across industries — construction, healthcare, agriculture, infrastructure, energy and public programmes. Anywhere work happens in the field and money needs a paper trail, it fits.',
-  },
-  {
-    q: 'Does it work for site teams on phones?',
-    a: 'Yes. Contractors join from a single phone-friendly invite screen, sign in with a 6-digit email code instead of a password, and progress rolls up from photo-evidenced site reports.',
+    a: 'It is built for construction first, but the same system runs projects across industries — healthcare, agriculture, infrastructure, energy and public programmes. Anywhere work happens in the field and money needs a paper trail, it fits.',
   },
   {
     q: 'How is my data protected?',
@@ -86,7 +80,7 @@ function JsonLd() {
       url: BASE,
       logo: `${BASE}/icon-512.png`,
       description:
-        'DatumPro is a product of Quillstone Capital Private Limited, built by its Quillstone Digital division — project management for real-world work across construction, healthcare, agriculture and more, with delivery, tendering and payments on a full audit trail.',
+        'DatumPro is a product of Quillstone Capital Private Limited, built by its Quillstone Digital division — construction project management software that runs delivery, tendering and payments on a full audit trail, also used across healthcare, agriculture and public programmes.',
       parentOrganization: { '@type': 'Organization', name: 'Quillstone Capital Private Limited' },
     },
     {
@@ -98,13 +92,7 @@ function JsonLd() {
       url: BASE,
       image: `${BASE}/og.png`,
       description:
-        'Project management for real-world work: tasks with dependencies, planned-vs-actual timelines, sealed tendering, contractor payments and approvals with an audit trail. Used across construction, healthcare, agriculture and more.',
-      offers: {
-        '@type': 'Offer',
-        price: '120.00',
-        priceCurrency: 'USD',
-        description: 'US$120 per month per organisation. First 3 months free.',
-      },
+        'Construction project management software: tasks with dependencies, planned-vs-actual timelines, sealed tendering, contractor payments and approvals with an audit trail. Used across construction, healthcare, agriculture and more.',
     },
     {
       '@context': 'https://schema.org',
@@ -126,11 +114,15 @@ function JsonLd() {
 }
 
 /** Public landing. Signed-in users skip straight to their dashboard.
- *  Everything shown is drawn with the app's own recipes (no screenshots), so
- *  the marketing page and the product can't drift apart visually. */
-export default async function HomePage() {
+ *  Onboarding is admin-managed — there is no self-serve signup — so every
+ *  primary call to action opens the "Request a demo" form. Everything shown is
+ *  drawn with the app's own recipes (no screenshots), so the marketing page and
+ *  the product can't drift apart visually. */
+export default async function HomePage({ searchParams }: { searchParams?: Promise<{ demo?: string }> }) {
   const user = await getAuthUser();
   if (user) redirect('/dashboard');
+
+  const demo = (await searchParams)?.demo;
 
   return (
     <main className="bg-white text-zinc-900 dark:bg-zinc-950 dark:text-white">
@@ -138,13 +130,11 @@ export default async function HomePage() {
       <TopNav />
       <Hero />
       <CapabilityStrip />
-      <Industries />
       <FeatureTrio />
       <FieldBand />
       <TrustRow />
-      <Pricing />
+      <DemoRequest status={demo} />
       <Faq />
-      <FinalCta />
       <Footer />
     </main>
   );
@@ -162,8 +152,7 @@ function TopNav() {
           <span className="font-display text-[15px] font-semibold tracking-tight">DatumPro</span>
         </Link>
         <nav className="hidden items-center gap-6 text-sm text-zinc-600 dark:text-zinc-300 sm:flex">
-          <a href="#delivery" className="hover:text-zinc-900 dark:hover:text-white">Product</a>
-          <a href="#pricing" className="hover:text-zinc-900 dark:hover:text-white">Pricing</a>
+          <a href="#product" className="hover:text-zinc-900 dark:hover:text-white">Product</a>
           <a href="#faq" className="hover:text-zinc-900 dark:hover:text-white">FAQ</a>
           <Link href="/enterprise" className="hover:text-zinc-900 dark:hover:text-white">Enterprise</Link>
         </nav>
@@ -171,9 +160,9 @@ function TopNav() {
           <Link href="/sign-in" className="hidden text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white sm:block">
             Sign in
           </Link>
-          <Link href="/sign-in">
-            <Button size="sm">Get started</Button>
-          </Link>
+          <a href="#demo">
+            <Button size="sm">Request a demo</Button>
+          </a>
         </div>
       </div>
     </header>
@@ -200,7 +189,7 @@ function Hero() {
         <div className="mx-auto max-w-3xl text-center">
           <p className="mx-auto inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-brand-500" />
-            For real-world projects — field to boardroom
+            Construction project management — field to boardroom
           </p>
           <h1 className="font-display mt-5 text-4xl font-semibold leading-[1.08] tracking-[-0.02em] sm:text-5xl">
             Project management that runs the work,
@@ -212,15 +201,15 @@ function Hero() {
             a group chat, or someone&rsquo;s head.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link href="/sign-in">
-              <Button size="lg" className="px-6">Start free — 3 months on us</Button>
-            </Link>
-            <a href="#pricing">
-              <Button size="lg" variant="secondary" className="px-6">See pricing</Button>
+            <a href="#demo">
+              <Button size="lg" className="px-6">Request a demo</Button>
             </a>
+            <Link href="/sign-in">
+              <Button size="lg" variant="secondary" className="px-6">Sign in</Button>
+            </Link>
           </div>
           <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
-            Then $120/month per organisation · every feature included
+            A specialist will be in touch within 8 hours · onboarding managed by our team
           </p>
         </div>
 
@@ -380,49 +369,11 @@ function CapabilityStrip() {
   );
 }
 
-/* ── Industries ──────────────────────────────────────────────────────────── */
-
-function Industries() {
-  const industries: [string, string][] = [
-    ['🏗️', 'Construction'],
-    ['🏥', 'Healthcare'],
-    ['🌾', 'Agriculture'],
-    ['⚡', 'Infrastructure & energy'],
-    ['🏭', 'Manufacturing'],
-    ['🏛️', 'Public programmes & NGOs'],
-  ];
-  return (
-    <section className="mx-auto max-w-6xl px-4 pt-16 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-2xl text-center">
-        <h2 className="font-display text-2xl font-semibold tracking-[-0.02em] sm:text-3xl">
-          One system, any industry
-        </h2>
-        <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400 sm:text-base">
-          Wherever work happens in the field and money needs a paper trail — DatumPro runs the
-          project. Building a clinic, a road, an irrigation scheme or a plant: same plan, same
-          discipline.
-        </p>
-      </div>
-      <ul className="mx-auto mt-8 flex max-w-3xl flex-wrap items-center justify-center gap-2.5">
-        {industries.map(([icon, name]) => (
-          <li
-            key={name}
-            className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200"
-          >
-            <span aria-hidden>{icon}</span>
-            {name}
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
 /* ── Feature trio ────────────────────────────────────────────────────────── */
 
 function FeatureTrio() {
   return (
-    <section id="delivery" className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+    <section id="product" className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
       <div className="mx-auto max-w-2xl text-center">
         <p className="text-xs font-semibold uppercase tracking-wide text-brand-600 dark:text-brand-400">The whole job, one system</p>
         <h2 className="font-display mt-2 text-3xl font-semibold tracking-[-0.02em]">
@@ -572,57 +523,7 @@ function FieldBand() {
           </div>
         </div>
       </div>
-
-      <ProjectGallery />
     </section>
-  );
-}
-
-/** Auto-scrolling gallery inside the dark band — projects and industries in
- *  motion. Images live in /public/gallery; drop real site photos in with the
- *  same filenames to replace the branded placeholder scenes (no code change).
- *  The list is duplicated once so the -50% marquee loops seamlessly; hover
- *  pauses it, and reduced-motion users get a plain scrollable strip. */
-function ProjectGallery() {
-  const cards: { img: string; title: string; tag: string }[] = [
-    { img: 'office-block', title: 'Office block build', tag: 'Construction' },
-    { img: 'clinic', title: 'District clinic', tag: 'Healthcare' },
-    { img: 'irrigation', title: 'Irrigation scheme', tag: 'Agriculture' },
-    { img: 'solar', title: 'Solar plant', tag: 'Energy' },
-    { img: 'factory', title: 'Processing line', tag: 'Manufacturing' },
-    { img: 'road', title: 'Road programme', tag: 'Public works' },
-    { img: 'site-team', title: 'Site teams on the app', tag: 'In the field' },
-    { img: 'handover', title: 'Client handover day', tag: 'Delivered' },
-  ];
-  const strip = [...cards, ...cards]; // duplicate for the seamless loop
-  return (
-    <div className="marquee overflow-hidden border-t border-zinc-800/80 py-8" aria-label="Projects across industries">
-      <div className="marquee-track flex w-max gap-4 px-4">
-        {strip.map((c, i) => (
-          <figure
-            key={`${c.img}-${i}`}
-            className="w-60 shrink-0 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 sm:w-72"
-            aria-hidden={i >= cards.length || undefined}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`/gallery/${c.img}.jpg`}
-              alt={i < cards.length ? `${c.title} — ${c.tag}` : ''}
-              width={640}
-              height={420}
-              loading="lazy"
-              className="aspect-[3/2] w-full object-cover"
-            />
-            <figcaption className="flex items-center justify-between gap-2 px-3.5 py-2.5">
-              <span className="truncate text-xs font-medium text-white">{c.title}</span>
-              <span className="shrink-0 rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] font-medium text-zinc-300">
-                {c.tag}
-              </span>
-            </figcaption>
-          </figure>
-        ))}
-      </div>
-    </div>
   );
 }
 
@@ -653,66 +554,115 @@ function TrustRow() {
   );
 }
 
-/* ── Pricing ─────────────────────────────────────────────────────────────── */
+/* ── Request a demo ──────────────────────────────────────────────────────── */
 
-function Pricing() {
-  const included = [
-    'Unlimited projects and tasks',
-    'Planned-vs-actual timelines & SLA tracking',
-    'Sealed tendering and awards',
-    'Contractor payments & proof of payment',
-    'Site reports with photos',
-    'Role-scoped access for PMs, contractors & clients',
-    'Approvals, audit log & optional 2FA',
-    'Web + mobile field app',
-  ];
-  return (
-    <section id="pricing" className="border-t border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/40">
-      <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="text-xs font-semibold uppercase tracking-wide text-brand-600 dark:text-brand-400">Pricing</p>
-          <h2 className="font-display mt-2 text-3xl font-semibold tracking-[-0.02em]">
-            One flat price. First 3 months free.
+/** Onboarding is admin-managed: instead of a self-serve signup, prospects
+ *  request a demo and a specialist follows up within 8 hours. The form posts to
+ *  the `requestDemo` server action, which records the intent (shared RPC) and
+ *  fires a best-effort internal notification. On return, ?demo=sent|error drives
+ *  the banner; the honeypot `website` field drops bots silently. */
+function DemoRequest({ status }: { status?: string }) {
+  if (status === 'sent') {
+    return (
+      <section id="demo" className="border-t border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/40">
+        <div className="mx-auto max-w-2xl px-4 py-20 text-center sm:px-6 lg:px-8">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-xl text-green-700 dark:bg-green-500/15 dark:text-green-400">
+            ✓
+          </div>
+          <h2 className="font-display mt-5 text-2xl font-semibold tracking-[-0.02em] sm:text-3xl">
+            Request received
           </h2>
-          <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400 sm:text-base">
-            No per-seat maths, no feature tiers. Every role — PM, contractor, client — is included.
+          <p className="mx-auto mt-3 max-w-md text-sm text-zinc-500 dark:text-zinc-400 sm:text-base">
+            Thanks — a specialist will be in touch within 8 hours to arrange your demo and set up
+            your organisation. Keep an eye on your inbox.
           </p>
         </div>
+      </section>
+    );
+  }
 
-        <div className="mx-auto mt-10 max-w-md">
-          <div className="relative overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xl shadow-zinc-900/5 dark:border-zinc-800 dark:bg-zinc-950 dark:shadow-black/30">
-            <div className="bg-brand-500 px-6 py-2.5 text-center text-sm font-semibold text-white">
-              Your first 3 months are free
+  return (
+    <section id="demo" className="border-t border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/40">
+      <div className="mx-auto grid max-w-6xl items-start gap-10 px-4 py-16 sm:px-6 sm:py-20 md:grid-cols-2 lg:px-8">
+        <div className="md:pt-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-brand-600 dark:text-brand-400">Get started</p>
+          <h2 className="font-display mt-2 text-3xl font-semibold tracking-[-0.02em]">
+            Request a demo
+          </h2>
+          <p className="mt-3 max-w-md text-sm text-zinc-500 dark:text-zinc-400 sm:text-base">
+            We manage onboarding for every organisation, so you start on a system that already fits
+            your projects. Tell us a little about your work and a specialist will be in touch within
+            8 hours.
+          </p>
+          <ul className="mt-6 space-y-3 text-sm text-zinc-600 dark:text-zinc-300">
+            {[
+              'A walkthrough tailored to how you deliver',
+              'Your organisation set up with you — not left to figure out',
+              'No obligation, no card',
+            ].map((t) => (
+              <li key={t} className="flex items-start gap-2.5">
+                <span className="mt-0.5 flex h-4 w-4 flex-none items-center justify-center rounded-full bg-brand-500/15 text-[10px] text-brand-600 dark:text-brand-400">
+                  ✓
+                </span>
+                {t}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 sm:p-6">
+          {status === 'error' && (
+            <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
+              Something went wrong — please check your organisation and email and try again.
+            </p>
+          )}
+          <form action={requestDemo} className="space-y-4">
+            {/* Honeypot — hidden from humans, catches bots. */}
+            <div aria-hidden className="hidden">
+              <label>
+                Leave this field empty
+                <input type="text" name="website" tabIndex={-1} autoComplete="off" />
+              </label>
             </div>
-            <div className="p-6 sm:p-8">
-              <div className="flex items-end justify-center gap-2">
-                <span className="font-display text-5xl font-semibold tracking-tight">$120</span>
-                <span className="pb-1.5 text-sm text-zinc-500 dark:text-zinc-400">/ month · per organisation</span>
-              </div>
-              <p className="mt-2 text-center text-xs text-zinc-500 dark:text-zinc-400">
-                Pay nothing until month four. Cancel any time.
-              </p>
-              <ul className="mt-6 space-y-2.5 text-sm">
-                {included.map((item) => (
-                  <li key={item} className="flex items-start gap-2.5 text-zinc-600 dark:text-zinc-300">
-                    <span className="mt-0.5 flex h-4 w-4 flex-none items-center justify-center rounded-full bg-green-100 text-[10px] text-green-700 dark:bg-green-500/15 dark:text-green-400">
-                      ✓
-                    </span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <Link href="/sign-in" className="mt-7 block">
-                <Button size="lg" className="w-full">Start free — 3 months on us</Button>
+
+            <div>
+              <Label htmlFor="contactName">Your name <Req /></Label>
+              <Input id="contactName" name="contactName" required autoComplete="name" placeholder="Tendai Moyo" />
+            </div>
+            <div>
+              <Label htmlFor="contactEmail">Work email <Req /></Label>
+              <Input id="contactEmail" name="contactEmail" type="email" required autoComplete="email" placeholder="you@company.com" />
+            </div>
+            <div>
+              <Label htmlFor="orgName">Organisation <Req /></Label>
+              <Input id="orgName" name="orgName" required autoComplete="organization" placeholder="Company or project name" />
+            </div>
+            <div>
+              <Label htmlFor="teamSize">Team size</Label>
+              <Select id="teamSize" name="teamSize" defaultValue="">
+                <option value="" disabled>Select a range</option>
+                <option value="1–10">1–10</option>
+                <option value="11–50">11–50</option>
+                <option value="51–200">51–200</option>
+                <option value="200+">200+</option>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="needs">What would you like to see?</Label>
+              <Textarea id="needs" name="needs" rows={3} placeholder="Tell us about your projects or what you're hoping to solve (optional)." />
+            </div>
+
+            <SubmitButton size="lg" className="w-full" pendingText="Sending…">
+              Request a demo
+            </SubmitButton>
+            <p className={hintClass}>
+              Already have an account?{' '}
+              <Link href="/sign-in" className="font-medium text-brand-600 hover:underline dark:text-brand-400">
+                Sign in
               </Link>
-              <p className="mt-3 text-center text-xs text-zinc-500 dark:text-zinc-400">
-                Larger organisation?{' '}
-                <Link href="/enterprise" className="font-medium text-brand-600 dark:text-brand-400 hover:underline dark:text-brand-400">
-                  Talk to us about enterprise →
-                </Link>
-              </p>
-            </div>
-          </div>
+              .
+            </p>
+          </form>
         </div>
       </div>
     </section>
@@ -745,28 +695,7 @@ function Faq() {
   );
 }
 
-/* ── CTA + footer ────────────────────────────────────────────────────────── */
-
-function FinalCta() {
-  return (
-    <section className="border-t border-zinc-200 dark:border-zinc-800">
-      <div className="mx-auto max-w-6xl px-4 py-16 text-center sm:px-6 lg:px-8">
-        <h2 className="font-display text-3xl font-semibold tracking-[-0.02em]">
-          Put your next project on DatumPro
-        </h2>
-        <p className="mx-auto mt-3 max-w-md text-sm text-zinc-500 dark:text-zinc-400">
-          Create the project, invite the team, and see the whole job on one timeline this week —
-          free for your first 3 months.
-        </p>
-        <div className="mt-7 flex justify-center">
-          <Link href="/sign-in">
-            <Button size="lg" className="px-8">Get started — free</Button>
-          </Link>
-        </div>
-      </div>
-    </section>
-  );
-}
+/* ── Footer ──────────────────────────────────────────────────────────────── */
 
 function Footer() {
   return (
