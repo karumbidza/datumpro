@@ -6,6 +6,7 @@ import { StatusBar, setStatusBarHidden } from 'expo-status-bar';
 import { AppState, Platform, View } from 'react-native';
 import * as NavigationBar from 'expo-navigation-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { useFonts } from 'expo-font';
 import {
   SpaceGrotesk_500Medium,
@@ -96,20 +97,26 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
-        <SessionProvider>
-          <ActiveOrgProvider>
-            <StatusBar style="auto" hidden />
-            {fontsReady ? (
-              <AuthGate />
-            ) : (
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                <BrandLoader />
-              </View>
-            )}
-          </ActiveOrgProvider>
-        </SessionProvider>
-      </ThemeProvider>
+      {/* KeyboardProvider drives all react-native-keyboard-controller components
+          (KeyboardAvoidingView / KeyboardAwareScrollView). Required at the root,
+          and it works in Android edge-to-edge/immersive mode where the stock RN
+          KeyboardAvoidingView is a no-op. */}
+      <KeyboardProvider>
+        <ThemeProvider>
+          <SessionProvider>
+            <ActiveOrgProvider>
+              <StatusBar style="auto" hidden />
+              {fontsReady ? (
+                <AuthGate />
+              ) : (
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                  <BrandLoader />
+                </View>
+              )}
+            </ActiveOrgProvider>
+          </SessionProvider>
+        </ThemeProvider>
+      </KeyboardProvider>
     </SafeAreaProvider>
   );
 }

@@ -7,11 +7,10 @@ import {
   StyleSheet,
   ScrollView,
   Linking,
-  KeyboardAvoidingView,
-  Platform,
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -406,7 +405,7 @@ function DrawingComposer({
   }
 
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={styles.screen} behavior="padding">
       <Stack.Screen options={headerOpts(colors, drawing ? 'Edit drawing' : 'Add a drawing')} />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <TextInput style={styles.input} placeholder="Drawing number (e.g. A-101)" placeholderTextColor={colors.subtle} value={number} onChangeText={setNumber} autoFocus autoCapitalize="characters" />
@@ -486,7 +485,7 @@ function RevisionForm({
   }
 
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={styles.screen} behavior="padding">
       <Stack.Screen options={headerOpts(colors, `${drawing.number} · new revision`)} />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.hint}>Issuing a new revision supersedes the current sheet.</Text>

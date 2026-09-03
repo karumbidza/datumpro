@@ -7,11 +7,10 @@ import {
   StyleSheet,
   ScrollView,
   Image,
-  KeyboardAvoidingView,
-  Platform,
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -175,7 +174,7 @@ export default function ProjectRfis() {
     return (
       <View style={styles.screen}>
         <Stack.Screen options={headerOpts(colors, `RFI #${detail.number}`)} />
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
             <Pressable onPress={() => setDetailId(null)} style={styles.back} hitSlop={8}>
               <Ionicons name="chevron-back" size={18} color={colors.brand} />
@@ -412,7 +411,7 @@ function RfiComposer({
   }
 
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={styles.screen} behavior="padding">
       <Stack.Screen options={headerOpts(colors, rfi ? 'Edit RFI' : 'Raise an RFI')} />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <TextInput style={styles.input} placeholder="Subject" placeholderTextColor={colors.subtle} value={subject} onChangeText={setSubject} autoFocus />

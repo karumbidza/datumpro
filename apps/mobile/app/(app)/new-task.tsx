@@ -6,11 +6,10 @@ import {
   Pressable,
   StyleSheet,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { TASK_PRIORITIES } from '@datumpro/shared/domain';
 import { listProjectMembers, type Member } from '../../lib/data/members';
@@ -70,7 +69,7 @@ export default function NewTask() {
   }
 
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={styles.screen} behavior="padding">
       <Stack.Screen
         options={{
           title: 'New task',
