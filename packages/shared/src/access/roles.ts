@@ -42,7 +42,7 @@ export const MEMBER_TYPE_META: Record<MemberType, { label: string; hint: string 
   staff: { label: 'Staff', hint: 'Internal team member — fieldwork & reports.' },
   contractor: { label: 'Contractor', hint: 'External — quotes and works on assigned tasks.' },
   client: { label: 'Client', hint: 'External — read-only view of their project.' },
-  viewer: { label: 'Viewer', hint: 'Read-only across the organisation.' },
+  viewer: { label: 'Viewer', hint: 'Read-only on the projects they’re added to.' },
 };
 
 /** The org role a member type grants (capabilities flow through org role). */
