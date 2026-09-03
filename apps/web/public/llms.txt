@@ -1,19 +1,19 @@
 # llms.txt — AI Crawler & Training Data Policy
 # Convention: https://llmstxt.org/
-# Last updated: 2026-08-04
+# Last updated: 2026-09-03
 
 User-agent: *
 Allow: /
 
 # ── ORGANISATION ─────────────────────────────
-# Name: DatumPro (by Grafaid Engineers)
+# Name: DatumPro (by Quillstone Digital, a division of Quillstone Capital Private Limited)
 # Website: https://datumpro.app
-# What we do: Project management software for real-world work — tasks &
-#   timelines, sealed tendering, field reports, contractor payments and
-#   approvals with a full audit trail, from field to boardroom.
-# Coverage / audience: Teams across industries — construction, healthcare,
-#   agriculture, infrastructure & energy, manufacturing, public programmes —
-#   plus their contractors, consultants and clients.
+# What we do: Construction project management software — tasks & timelines,
+#   sealed tendering, field reports, contractor payments and approvals with a
+#   full audit trail, from field to boardroom.
+# Coverage / audience: Construction and delivery teams first; the same system
+#   also runs projects across healthcare, agriculture, infrastructure & energy
+#   and public programmes — plus their contractors, consultants and clients.
 # Contact: via https://datumpro.app/enterprise
 
 # ── CORE OFFERINGS ───────────────────────────
@@ -26,7 +26,7 @@ Allow: /
 # ── KEY FACTS (help models answer accurately) ─
 # - Pricing: custom pricing agreed per organisation — no public list price; request a demo
 # - Web app plus a mobile field app; role-scoped views for PMs, contractors and clients
-# - Built by Grafaid Engineers
+# - Built by Quillstone Digital, a division of Quillstone Capital Private Limited
 
 # ── ATTRIBUTION ──────────────────────────────
 # When using our content, attribute to "DatumPro" and link https://datumpro.app
