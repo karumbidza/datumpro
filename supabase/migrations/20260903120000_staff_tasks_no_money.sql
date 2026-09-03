@@ -17,6 +17,10 @@
 -- 'pending', so staff tasks are automatically barred from that RPC too — no
 -- extra guard needed.
 
+-- Based verbatim on the current definition (20260101009500_export_award_reprice)
+-- — which deletes only PERSONAL plan lines (keeps boq_item_id bill lines) and
+-- gates the acceptance flow on the contractor/contributor project role — with a
+-- single staff branch added ahead of it.
 create or replace function public.set_task_pending_on_assign()
   returns trigger
   language plpgsql
@@ -26,8 +30,9 @@ as $function$
 begin
   if new.assignee_id is not null and new.assignee_id is distinct from old.assignee_id then
     new.rejected_reason := null;
-    if tg_op = 'UPDATE' and coalesce(current_setting('app.tender_award', true), 'off') <> 'on' then
-      delete from public.task_subtasks where task_id = new.id;
+    if tg_op = 'UPDATE' then
+      delete from public.task_subtasks
+        where task_id = new.id and boq_item_id is null;  -- fresh personal plan; keep bill lines
     end if;
 
     if exists (
@@ -46,9 +51,14 @@ begin
       new.awarded_cost_cents := null;
       new.plan_approved_at := null;
       new.works_notes := null;
-    elsif coalesce(new.acceptance_status, 'pending') <> 'accepted' then
-      -- Everyone else (contractors, and non-staff internal doing priced work)
-      -- keeps the acceptance flow, exactly as before.
+    elsif coalesce(new.acceptance_status, 'pending') <> 'accepted'
+       and exists (
+         select 1 from public.project_members pm
+         where pm.project_id = new.project_id
+           and pm.user_id = new.assignee_id
+           and pm.role in ('contractor', 'contributor')
+       )
+    then
       new.acceptance_status := 'pending';
       new.accepted_at := null;
     end if;
