@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { BrandLoader } from '../../../components/brand-loader';
-import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getTask, getTaskPermissions, listUnfinishedPredecessors, type TaskDetail, type TaskPermissions, type PredecessorHint } from '../../../lib/data/tasks';
@@ -147,7 +148,7 @@ export default function TaskDetailScreen() {
   })();
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <KeyboardAwareScrollView style={styles.screen} contentContainerStyle={styles.content} bottomOffset={24}>
       <Stack.Screen
         options={{
           title: task.projectName,
@@ -288,7 +289,7 @@ export default function TaskDetailScreen() {
           <Text style={styles.body}>{task.description}</Text>
         </Card>
       ) : null}
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 
