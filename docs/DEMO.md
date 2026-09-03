@@ -97,6 +97,7 @@ mobile. Each project also has a **burn-up trend** (last 30 days of snapshots) on
 | Variations / calendar events / to-dos | 5 / 7 / 12 |
 | Site-diary entries / site reports / milestones | 17 / 14 / 13 |
 | Payment claims / approval-inbox items | 11 / 22 |
+| Task site photos (evidence) | 17 across 13 tasks |
 
 Payment claims: **$440k paid**, **$156k approved**, **$100k awaiting review** (the awaiting
 ones — Hillside "Plastering & screeds" and Central "Earthworks" — are the approve-during-demo items).
@@ -106,5 +107,7 @@ All six accounts were sign-in tested and work.
 ## 5. Re-running / resetting
 
 - Accounts are (re)created by `scripts/seed/reset-users.mjs` (Auth Admin API).
+- Task site photos are generated + uploaded by `scripts/seed/task-photos.mjs`
+  (renders site-photo PNGs via `sharp` → `project-media` bucket → `task_media` rows).
 - The data reset + core seed is SQL run against the project. Ask Claude Code to "reset the
   demo data" to regenerate.
