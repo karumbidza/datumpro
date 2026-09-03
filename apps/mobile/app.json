@@ -36,7 +36,8 @@
           "microphonePermission": "DatumPro uses the microphone to record voice notes in chat."
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-asset"
     ],
     "ios": {
       "supportsTablet": true,
