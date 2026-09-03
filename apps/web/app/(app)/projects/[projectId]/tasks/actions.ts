@@ -244,13 +244,23 @@ export async function updateTask(formData: FormData) {
   const title = String(formData.get('title') ?? '').trim();
   if (title.length < 2) throw new Error('Title is required');
 
+  const assigneeId = (formData.get('assigneeId') as string) || null;
+  // Reassigning to someone not yet on this project? Enrol them at their
+  // type-correct role first — mirrors createTask, since the assignee-member
+  // trigger requires project membership. Without this, reassigning to any org
+  // member who isn't already on the project would be rejected by the DB.
+  if (assigneeId) {
+    const enrolErr = await ensureProjectMember(supabase, task.org_id, task.project_id, assigneeId);
+    if (enrolErr) throw new Error(enrolErr);
+  }
+
   const { error } = await supabase
     .from('tasks')
     .update({
       title,
       description: (formData.get('description') as string)?.trim() || null,
       priority: (formData.get('priority') as string) || 'medium',
-      assignee_id: (formData.get('assigneeId') as string) || null,
+      assignee_id: assigneeId,
       planned_start_date: (formData.get('plannedStartDate') as string) || null,
       planned_end_date: (formData.get('plannedEndDate') as string) || null,
       // The end date IS the due date — keep them in sync.

@@ -4,11 +4,12 @@ import { PageHeader } from '@/components/ui/page-header';
 import { redirect, notFound } from 'next/navigation';
 import { getAuthUser } from '@/lib/data/org';
 import { getTask } from '@/lib/data/tasks';
-import { listProjectMembers } from '@/lib/data/members';
+import { listOrgMembers } from '@/lib/data/org-members';
 import { updateTask } from '../../actions';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { TASK_PRIORITIES, TASK_PRIORITY_LABELS } from '@datumpro/shared/domain';
+import { MEMBER_TYPE_META } from '@datumpro/shared/access';
 
 import { inputClass, Req } from '@/components/ui/form';
 
@@ -23,7 +24,10 @@ export default async function EditTaskPage({
 
   const task = await getTask(taskId);
   if (!task) notFound();
-  const members = await listProjectMembers(projectId);
+  // Any active org member can be assigned — updateTask enrols them on the
+  // project at their type-correct role, so reassignment isn't limited to people
+  // already on this project (matches the New task screen).
+  const members = (await listOrgMembers(task.org_id)).filter((m) => m.status === 'active');
 
   return (
     <PageContainer width="xl">
@@ -61,7 +65,7 @@ export default async function EditTaskPage({
                 <option value="">Unassigned</option>
                 {members.map((m) => (
                   <option key={m.userId} value={m.userId}>
-                    {m.name} ({m.role})
+                    {m.name} ({MEMBER_TYPE_META[m.memberType].label})
                   </option>
                 ))}
               </select>
