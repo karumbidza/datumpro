@@ -20,6 +20,7 @@ All accounts use the password **`DatumproDemo!2026`**.
 | **Contractor (Civils)** | Brian — BuildRight Civils | `buildright@datumpro.demo` | Field view: their assigned tasks, submit work for sign-off, raise blockers/RFIs, request payment. |
 | **Contractor (Electrical)** | Sipho — Spark Electrical | `sparkelec@datumpro.demo` | Same field view, electrical scope. |
 | **Contractor (Plumbing)** | Tendai — AquaPlumb Services | `aquaplumb@datumpro.demo` | Same field view, plumbing scope. |
+| **Staff (site)** | Simba Gumbo — Site Staff | `staff@datumpro.demo` | Project-scoped internal staff: sees **only Central Clinic Extension** (their enrolled project) — tasks, registers, chat there, but no other projects, no BOQ/rate library, no tender or contractor-document access. Shows off the staff-as-contractor scoping. |
 | **Client / Viewer** | Grace — Client Rep | `client@datumpro.demo` | Read-only client visibility of progress on their projects. |
 
 > **Tip:** run the demo with two windows/devices — sign in as **Patience (PM)** on the
@@ -78,8 +79,10 @@ mobile. Each project also has a **burn-up trend** (last 30 days of snapshots) on
     registers; open the **month-grid calendar** and tap a day; tap an **event** for details.
 16. Submit a task for sign-off from the field, then flip to the PM window to approve it.
 
-**F. Roles (sign in as Grace — client)**
-17. Read-only client visibility: progress and high-level status, no edit controls.
+**F. Roles (sign in as Grace — client, then Simba — staff)**
+17. Grace: read-only client visibility — progress and high-level status, no edit controls.
+18. Simba: staff scoping — only Central Clinic Extension appears; no BOQ library, tenders,
+    or other projects, but full working access (tasks, registers, chat) on their own site.
 
 ---
 
@@ -87,7 +90,7 @@ mobile. Each project also has a **burn-up trend** (last 30 days of snapshots) on
 
 | Area | Count |
 |------|-------|
-| Company / users / clients | 1 / 6 / 2 |
+| Company / users / clients | 1 / 7 / 2 |
 | Projects | 3 |
 | Tasks / subtasks / dependencies | 28 / 134 / 25 |
 | Progress snapshots (30-day burn-up) | 33 |
@@ -102,11 +105,17 @@ mobile. Each project also has a **burn-up trend** (last 30 days of snapshots) on
 Payment claims: **$440k paid**, **$156k approved**, **$100k awaiting review** (the awaiting
 ones — Hillside "Plastering & screeds" and Central "Earthworks" — are the approve-during-demo items).
 
-All six accounts were sign-in tested and work.
+All seven accounts were sign-in tested and work (the staff account via the API smoke
+test of the staff project-scoping RLS on 2026-09-03).
 
 ## 5. Re-running / resetting
 
 - Accounts are (re)created by `scripts/seed/reset-users.mjs` (Auth Admin API).
+  ⚠️ `staff@datumpro.demo` was added **after** the seed (2026-09-03) and is **not** in that
+  script's user list — a reseed will drop it unless the script is updated. To recreate by
+  hand: create the auth user, then an `org_members` row (`role='member'`,
+  `member_type='staff'`) and a `project_members` row (`role='contributor'`) on
+  Central Clinic Extension.
 - Task site photos are generated + uploaded by `scripts/seed/task-photos.mjs`
   (renders site-photo PNGs via `sharp` → `project-media` bucket → `task_media` rows).
 - The data reset + core seed is SQL run against the project. Ask Claude Code to "reset the
