@@ -52,6 +52,10 @@ export async function saveSiteDiaryEntry(formData: FormData): Promise<Result> {
     plant: text(formData.get('plant')),
     deliveries: text(formData.get('deliveries')),
     notes: text(formData.get('notes')),
+    hse_incidents: intOrNull(formData.get('hseIncidents')),
+    hse_near_misses: intOrNull(formData.get('hseNearMisses')),
+    hse_toolbox_talk: text(formData.get('hseToolboxTalk')),
+    hse_notes: text(formData.get('hseNotes')),
   };
   // Don't create an empty shell — require at least one filled field.
   if (Object.values(fields).every((v) => v === null)) {

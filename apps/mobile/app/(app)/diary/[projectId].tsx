@@ -45,6 +45,15 @@ function summary(e: SiteDiaryEntry): string {
   if (e.plant) bits.push(e.plant);
   return bits.join(' · ') || e.notes || 'Logged';
 }
+/** Compact one-line HSE snapshot, or null when nothing was recorded. */
+function hseSummary(e: SiteDiaryEntry): string | null {
+  const bits: string[] = [];
+  if (e.hseIncidents != null) bits.push(`incidents ${e.hseIncidents}`);
+  if (e.hseNearMisses != null) bits.push(`near-misses ${e.hseNearMisses}`);
+  if (e.hseToolboxTalk) bits.push(`toolbox talk: ${e.hseToolboxTalk}`);
+  if (bits.length === 0 && e.hseNotes) bits.push('safety notes');
+  return bits.length ? `HSE — ${bits.join(' · ')}` : null;
+}
 
 export default function ProjectDiary() {
   const { projectId, name } = useLocalSearchParams<{ projectId: string; name?: string }>();
@@ -149,6 +158,10 @@ export default function ProjectDiary() {
           {detail.plant ? <DetailRow label="Plant / equipment" value={detail.plant} styles={styles} /> : null}
           {detail.deliveries ? <DetailRow label="Deliveries" value={detail.deliveries} styles={styles} /> : null}
           {detail.notes ? <DetailRow label="Notes" value={detail.notes} styles={styles} /> : null}
+          {detail.hseIncidents != null ? <DetailRow label="HSE incidents" value={String(detail.hseIncidents)} styles={styles} /> : null}
+          {detail.hseNearMisses != null ? <DetailRow label="HSE near-misses" value={String(detail.hseNearMisses)} styles={styles} /> : null}
+          {detail.hseToolboxTalk ? <DetailRow label="Toolbox talk" value={detail.hseToolboxTalk} styles={styles} /> : null}
+          {detail.hseNotes ? <DetailRow label="Safety notes" value={detail.hseNotes} styles={styles} /> : null}
           {detail.createdByName ? <DetailRow label="Logged by" value={detail.createdByName} styles={styles} /> : null}
 
           <Text style={styles.sectionLabel}>Photos</Text>
@@ -214,6 +227,11 @@ export default function ProjectDiary() {
                     {summary(e)}
                     {e.photos.length ? `  ·  ${e.photos.length} photo${e.photos.length === 1 ? '' : 's'}` : ''}
                   </Text>
+                  {hseSummary(e) ? (
+                    <Text style={styles.metaText} numberOfLines={1}>
+                      {hseSummary(e)}
+                    </Text>
+                  ) : null}
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.subtle} />
               </Pressable>
@@ -291,6 +309,10 @@ function DiaryComposer({
   const [plant, setPlant] = useState(entry?.plant ?? '');
   const [deliveries, setDeliveries] = useState(entry?.deliveries ?? '');
   const [notes, setNotes] = useState(entry?.notes ?? '');
+  const [hseIncidents, setHseIncidents] = useState(entry?.hseIncidents != null ? String(entry.hseIncidents) : '');
+  const [hseNearMisses, setHseNearMisses] = useState(entry?.hseNearMisses != null ? String(entry.hseNearMisses) : '');
+  const [hseToolboxTalk, setHseToolboxTalk] = useState(entry?.hseToolboxTalk ?? '');
+  const [hseNotes, setHseNotes] = useState(entry?.hseNotes ?? '');
   const [busy, setBusy] = useState(false);
 
   function intOrNull(s: string): number | null {
@@ -313,6 +335,10 @@ function DiaryComposer({
         plant,
         deliveries,
         notes,
+        hseIncidents: intOrNull(hseIncidents),
+        hseNearMisses: intOrNull(hseNearMisses),
+        hseToolboxTalk,
+        hseNotes,
       });
       onDone();
     } catch (e) {
@@ -339,6 +365,14 @@ function DiaryComposer({
         <TextInput style={styles.input} placeholder="Plant / equipment" placeholderTextColor={colors.subtle} value={plant} onChangeText={setPlant} />
         <TextInput style={styles.input} placeholder="Deliveries" placeholderTextColor={colors.subtle} value={deliveries} onChangeText={setDeliveries} />
         <TextInput style={[styles.input, styles.multiline]} placeholder="Notes" placeholderTextColor={colors.subtle} value={notes} onChangeText={setNotes} multiline />
+
+        <Text style={styles.fieldLabel}>HSE snapshot (optional)</Text>
+        <View style={styles.dualRow}>
+          <TextInput style={[styles.input, styles.half]} placeholder="Incidents" placeholderTextColor={colors.subtle} value={hseIncidents} onChangeText={setHseIncidents} keyboardType="number-pad" />
+          <TextInput style={[styles.input, styles.half]} placeholder="Near-misses" placeholderTextColor={colors.subtle} value={hseNearMisses} onChangeText={setHseNearMisses} keyboardType="number-pad" />
+        </View>
+        <TextInput style={styles.input} placeholder="Toolbox talk topic" placeholderTextColor={colors.subtle} value={hseToolboxTalk} onChangeText={setHseToolboxTalk} />
+        <TextInput style={[styles.input, styles.multiline]} placeholder="Safety notes (hazards, PPE…)" placeholderTextColor={colors.subtle} value={hseNotes} onChangeText={setHseNotes} multiline />
 
         <View style={styles.composerActions}>
           <Pressable style={[styles.submit, busy && styles.disabled]} onPress={submit} disabled={busy}>

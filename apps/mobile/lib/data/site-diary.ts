@@ -19,6 +19,10 @@ export interface SiteDiaryEntry {
   plant: string | null;
   deliveries: string | null;
   notes: string | null;
+  hseIncidents: number | null;
+  hseNearMisses: number | null;
+  hseToolboxTalk: string | null;
+  hseNotes: string | null;
   createdById: string | null;
   createdByName: string | null;
   photos: DiaryPhoto[];
@@ -34,11 +38,15 @@ type EntryRow = {
   plant: string | null;
   deliveries: string | null;
   notes: string | null;
+  hse_incidents: number | null;
+  hse_near_misses: number | null;
+  hse_toolbox_talk: string | null;
+  hse_notes: string | null;
   created_by: string | null;
 };
 
 const SELECT =
-  'id, project_id, entry_date, weather, temperature, labour_count, plant, deliveries, notes, created_by';
+  'id, project_id, entry_date, weather, temperature, labour_count, plant, deliveries, notes, hse_incidents, hse_near_misses, hse_toolbox_talk, hse_notes, created_by';
 
 async function resolveNames(ids: (string | null)[]): Promise<Map<string, string>> {
   const unique = [...new Set(ids.filter(Boolean))] as string[];
@@ -99,6 +107,10 @@ export async function listSiteDiaryEntries(projectId: string): Promise<SiteDiary
     plant: r.plant,
     deliveries: r.deliveries,
     notes: r.notes,
+    hseIncidents: r.hse_incidents,
+    hseNearMisses: r.hse_near_misses,
+    hseToolboxTalk: r.hse_toolbox_talk,
+    hseNotes: r.hse_notes,
     createdById: r.created_by,
     createdByName: r.created_by ? names.get(r.created_by) ?? null : null,
     photos: byEntry.get(r.id) ?? [],
@@ -133,6 +145,10 @@ export interface DiaryFields {
   plant: string | null;
   deliveries: string | null;
   notes: string | null;
+  hseIncidents: number | null;
+  hseNearMisses: number | null;
+  hseToolboxTalk: string | null;
+  hseNotes: string | null;
 }
 
 /** Upsert one entry per (project, date). Requires at least one filled field.
@@ -148,6 +164,10 @@ export async function saveSiteDiaryEntry(projectId: string, entryDate: string, f
     plant: fields.plant?.trim() || null,
     deliveries: fields.deliveries?.trim() || null,
     notes: fields.notes?.trim() || null,
+    hse_incidents: fields.hseIncidents,
+    hse_near_misses: fields.hseNearMisses,
+    hse_toolbox_talk: fields.hseToolboxTalk?.trim() || null,
+    hse_notes: fields.hseNotes?.trim() || null,
   };
   if (Object.values(row).every((v) => v === null)) throw new Error('Add at least one detail before saving.');
 

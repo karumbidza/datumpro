@@ -14,6 +14,10 @@ type EntryRow = {
   plant: string | null;
   deliveries: string | null;
   notes: string | null;
+  hse_incidents: number | null;
+  hse_near_misses: number | null;
+  hse_toolbox_talk: string | null;
+  hse_notes: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -28,7 +32,7 @@ type PhotoRow = {
 };
 
 const ENTRY_SELECT =
-  'id, project_id, entry_date, weather, temperature, labour_count, plant, deliveries, notes, created_by, created_at, updated_at';
+  'id, project_id, entry_date, weather, temperature, labour_count, plant, deliveries, notes, hse_incidents, hse_near_misses, hse_toolbox_talk, hse_notes, created_by, created_at, updated_at';
 
 async function resolveNames(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -92,6 +96,10 @@ export async function listSiteDiaryEntries(projectId: string): Promise<SiteDiary
     plant: r.plant,
     deliveries: r.deliveries,
     notes: r.notes,
+    hseIncidents: r.hse_incidents,
+    hseNearMisses: r.hse_near_misses,
+    hseToolboxTalk: r.hse_toolbox_talk,
+    hseNotes: r.hse_notes,
     createdBy: r.created_by,
     createdByName: r.created_by ? (names.get(r.created_by) ?? null) : null,
     createdAt: r.created_at,
