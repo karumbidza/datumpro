@@ -8,6 +8,7 @@ import { notifyUser } from '@/lib/data/notifications';
 import { createTenderSchema, inviteBidderSchema } from '@datumpro/shared/validation';
 import type { FormState } from '@/components/ui/form-error';
 import { sendEmail } from '@/lib/email/resend';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { appUrl } from '@/lib/email/templates';
 import { tenderInviteEmail } from '@/lib/email/tender-invite';
 import { logAudit } from '@/lib/audit';
@@ -114,12 +115,50 @@ export async function inviteBidder(_prev: FormState, formData: FormData): Promis
       ]);
       const orgName = (org as { name?: string } | null)?.name ?? 'DatumPro';
       const tenderTitle = (tender as { title?: string } | null)?.title ?? 'Tender';
-      const acceptUrl = `${appUrl()}/tender/${token}`;
+      const plainUrl = `${appUrl()}/tender/${token}`;
+
+      // One-click access: sign the bidder in from the email itself. An external
+      // bidder usually has NO account, and the project sends auth emails through
+      // Supabase's mailer (no SMTP) — so the sign-up-then-confirm path dead-ends.
+      // Pre-provision the account (email pre-confirmed; the invite email is the
+      // trust anchor) and put a magic action link in OUR Resend email instead.
+      // Falls back to the plain tender URL if the admin API hiccups; the link
+      // also expires (~1h), so the email carries the plain URL as a second path.
+      let acceptUrl = plainUrl;
+      try {
+        const admin = createAdminClient();
+        const redirectTo = `${appUrl()}/auth/callback?next=${encodeURIComponent(`/tender/${token}`)}`;
+        let link = await admin.auth.admin.generateLink({
+          type: 'magiclink',
+          email: d.email,
+          options: { redirectTo },
+        });
+        if (link.error) {
+          const created = await admin.auth.admin.createUser({
+            email: d.email,
+            email_confirm: true,
+            user_metadata: { display_name: d.companyName },
+          });
+          if (created.error) throw created.error;
+          link = await admin.auth.admin.generateLink({
+            type: 'magiclink',
+            email: d.email,
+            options: { redirectTo },
+          });
+        }
+        if (!link.error && link.data.properties?.action_link) {
+          acceptUrl = link.data.properties.action_link;
+        }
+      } catch (adminErr) {
+        console.error('[tender] bidder one-click link failed, using plain URL:', adminErr);
+      }
+
       const { subject, html } = tenderInviteEmail({
         orgName,
         tenderTitle,
         companyName: d.companyName,
         acceptUrl,
+        fallbackUrl: acceptUrl === plainUrl ? undefined : plainUrl,
       });
       await sendEmail({ to: d.email, subject, html });
       // In-app notification for an invited EXISTING member (a by-email invite of a
