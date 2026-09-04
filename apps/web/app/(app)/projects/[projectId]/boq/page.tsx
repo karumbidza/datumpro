@@ -42,9 +42,13 @@ export default async function ProjectBoqPage({
   const [orgRole, projectRole] = await Promise.all([myOrgRole(project.org_id), myProjectRole(projectId)]);
   const manages = orgRole === 'owner' || orgRole === 'admin' || projectRole === 'pm';
   if (!manages) notFound();
+  // Bill authoring (draft/link/clone/generate/schedule) is org owner/admin only —
+  // a project PM reads their bill and assigns sections, but the library and its
+  // RPCs sit behind admin-only RLS (20260904120000).
+  const canEditBoq = orgRole === 'owner' || orgRole === 'admin';
 
   const boq = await getProjectBoq(project.org_id, projectId);
-  const [unlinked, cloneable] = boq
+  const [unlinked, cloneable] = boq || !canEditBoq
     ? [[], []]
     : await Promise.all([listUnlinkedBoqs(project.org_id), listCloneableBoqs(project.org_id, projectId)]);
 
@@ -101,20 +105,27 @@ export default async function ProjectBoqPage({
       {boq === null ? (
         <Card className="mt-6">
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            No bill for this project yet. Draft a new one, or clone another project&apos;s bill as a starting
-            point — its line items become this project&apos;s tasks.
+            {canEditBoq
+              ? 'No bill for this project yet. Draft a new one, or clone another project’s bill as a starting point — its line items become this project’s tasks.'
+              : 'No bill for this project yet. An org owner or admin drafts or links the bill; it will appear here once attached.'}
           </p>
-          <BoqTabControls projectId={projectId} boq={null} unlinked={unlinked} cloneable={cloneable} />
+          {canEditBoq && (
+            <BoqTabControls projectId={projectId} boq={null} unlinked={unlinked} cloneable={cloneable} />
+          )}
         </Card>
       ) : (
         <>
           <div className="mt-6 flex flex-wrap items-center gap-3">
-            <Link
-              href={`/boq/${boq.id}`}
-              className="text-lg font-medium text-brand-600 hover:underline dark:text-brand-500"
-            >
-              {boq.name} →
-            </Link>
+            {canEditBoq ? (
+              <Link
+                href={`/boq/${boq.id}`}
+                className="text-lg font-medium text-brand-600 hover:underline dark:text-brand-500"
+              >
+                {boq.name} →
+              </Link>
+            ) : (
+              <span className="text-lg font-medium">{boq.name}</span>
+            )}
             <Badge tone={boq.status === 'approved' ? 'green' : 'faint'}>{boq.status}</Badge>
             {boq.tenderStatus && <Badge tone="blue">tender: {boq.tenderStatus}</Badge>}
           </div>
@@ -137,12 +148,15 @@ export default async function ProjectBoqPage({
                   view tasks →
                 </Link>
               </p>
-              <SchedulePanel projectId={projectId} boqId={boq.id} defaultStartDate={project.start_date} />
+              {canEditBoq && (
+                <SchedulePanel projectId={projectId} boqId={boq.id} defaultStartDate={project.start_date} />
+              )}
             </>
           ) : (
             <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-300">
-              No tasks generated yet. Generating creates one task per section with budget-priced subtasks
-              per line — then you assign each section to a contractor below.
+              {canEditBoq
+                ? 'No tasks generated yet. Generating creates one task per section with budget-priced subtasks per line — then you assign each section to a contractor below.'
+                : 'No tasks generated yet — an org owner or admin generates them from the bill; you then assign each section to a contractor below.'}
             </p>
           )}
 
@@ -158,7 +172,7 @@ export default async function ProjectBoqPage({
             />
           )}
 
-          <BoqTabControls projectId={projectId} boq={boq} unlinked={[]} cloneable={[]} />
+          {canEditBoq && <BoqTabControls projectId={projectId} boq={boq} unlinked={[]} cloneable={[]} />}
         </>
       )}
     </PageContainer>

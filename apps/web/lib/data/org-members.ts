@@ -9,6 +9,8 @@ export interface OrgMemberRow {
   role: OrgRole;
   memberType: MemberType;
   status: 'active' | 'disabled';
+  /** Active project assignments within this org (project + project role). */
+  projects: { projectId: string; projectName: string; role: string }[];
 }
 
 export interface OrgInvitationRow {
@@ -64,6 +66,29 @@ export async function listOrgMembers(orgId: string): Promise<OrgMemberRow[]> {
     }[]).map((p) => [p.id, p]),
   );
 
+  // Project assignments for the whole roster in ONE query (projects embeds via
+  // the composite FK), grouped by user.
+  const { data: assignmentData } = await supabase
+    .from('project_members')
+    .select('user_id, project_id, role, projects(name)')
+    .eq('org_id', orgId)
+    .eq('status', 'active')
+    .in(
+      'user_id',
+      members.map((m) => m.user_id),
+    );
+  const assignments = new Map<string, OrgMemberRow['projects']>();
+  for (const a of (assignmentData ?? []) as unknown as {
+    user_id: string;
+    project_id: string;
+    role: string;
+    projects: { name: string } | null;
+  }[]) {
+    const list = assignments.get(a.user_id) ?? [];
+    list.push({ projectId: a.project_id, projectName: a.projects?.name ?? 'Project', role: a.role });
+    assignments.set(a.user_id, list);
+  }
+
   const rows = members.map((m) => {
     const p = profiles.get(m.user_id);
     return {
@@ -74,6 +99,9 @@ export async function listOrgMembers(orgId: string): Promise<OrgMemberRow[]> {
       role: (m.role ?? 'member') as OrgRole,
       memberType: (m.member_type ?? 'staff') as MemberType,
       status: (m.status === 'disabled' ? 'disabled' : 'active') as 'active' | 'disabled',
+      projects: (assignments.get(m.user_id) ?? []).sort((a, b) =>
+        a.projectName.localeCompare(b.projectName),
+      ),
     };
   });
   // Active first, then disabled.

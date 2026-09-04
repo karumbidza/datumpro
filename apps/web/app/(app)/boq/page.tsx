@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { getActiveContext, getAuthUser } from '@/lib/data/org';
-import { createClient } from '@/lib/supabase/server';
 import { listBoqs } from '@/lib/data/boq';
 import { listMyTenderInvites } from '@/lib/data/tender';
 import { ContractorTenderPortal } from './contractor-portal';
@@ -35,21 +34,9 @@ export default async function BoqIndexPage() {
     const invites = await listMyTenderInvites(ctx.userId);
     return <ContractorTenderPortal invites={invites} orgName={ctx.active.name} />;
   }
-  // Managers only — estimating and tendering is an owner/admin/PM activity.
-  // Org owner/admin/pm qualify outright; otherwise allow anyone who is a PM on at
-  // least one project (mirrors the nav gate so the shortcut and the page agree).
-  let canAccess = ['owner', 'admin', 'pm'].includes(ctx.active.role);
-  if (!canAccess) {
-    const supabase = await createClient();
-    const { count } = await supabase
-      .from('project_members')
-      .select('project_id', { count: 'exact', head: true })
-      .eq('user_id', ctx.userId)
-      .eq('role', 'pm')
-      .eq('status', 'active');
-    canAccess = (count ?? 0) > 0;
-  }
-  if (!canAccess) notFound();
+  // Owner/admin only — PMs are project-scoped and reach their project's BOQ
+  // from the project itself (mirrors the nav gate and the RLS policies).
+  if (!['owner', 'admin'].includes(ctx.active.role)) notFound();
 
   const boqs = await listBoqs(ctx.active.orgId);
 
