@@ -19,6 +19,10 @@ export interface SiteDiaryEntry {
   plant: string | null;
   deliveries: string | null;
   notes: string | null;
+  hseIncidents: number | null;
+  hseNearMisses: number | null;
+  hseToolboxTalk: string | null;
+  hseNotes: string | null;
   createdBy: string | null;
   createdByName: string | null;
   createdAt: string; // ISO

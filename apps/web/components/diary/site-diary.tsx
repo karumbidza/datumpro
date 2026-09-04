@@ -50,6 +50,10 @@ function Composer({
   const [plant, setPlant] = useState(entry?.plant ?? '');
   const [deliveries, setDeliveries] = useState(entry?.deliveries ?? '');
   const [notes, setNotes] = useState(entry?.notes ?? '');
+  const [hseIncidents, setHseIncidents] = useState(entry?.hseIncidents != null ? String(entry.hseIncidents) : '');
+  const [hseNearMisses, setHseNearMisses] = useState(entry?.hseNearMisses != null ? String(entry.hseNearMisses) : '');
+  const [hseToolboxTalk, setHseToolboxTalk] = useState(entry?.hseToolboxTalk ?? '');
+  const [hseNotes, setHseNotes] = useState(entry?.hseNotes ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,6 +71,10 @@ function Composer({
       fd.set('plant', plant.trim());
       fd.set('deliveries', deliveries.trim());
       fd.set('notes', notes.trim());
+      fd.set('hseIncidents', hseIncidents.trim());
+      fd.set('hseNearMisses', hseNearMisses.trim());
+      fd.set('hseToolboxTalk', hseToolboxTalk.trim());
+      fd.set('hseNotes', hseNotes.trim());
       const res = await saveSiteDiaryEntry(fd);
       if (!res.ok) throw new Error(res.error ?? 'Could not save');
       onDone();
@@ -156,6 +164,56 @@ function Composer({
           className={`${inputClass} resize-y`}
         />
       </label>
+      <div className="space-y-3 border-t border-zinc-200 pt-3 dark:border-zinc-800">
+        <p className="text-[11px] font-medium uppercase tracking-[0.04em] text-zinc-400 dark:text-zinc-500">
+          HSE snapshot (optional)
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className={fieldLabel}>Reportable incidents</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              value={hseIncidents}
+              onChange={(e) => setHseIncidents(e.target.value)}
+              placeholder="0"
+              className={inputClass}
+            />
+          </label>
+          <label className="block">
+            <span className={fieldLabel}>Near-misses</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              value={hseNearMisses}
+              onChange={(e) => setHseNearMisses(e.target.value)}
+              placeholder="0"
+              className={inputClass}
+            />
+          </label>
+        </div>
+        <label className="block">
+          <span className={fieldLabel}>Toolbox talk topic</span>
+          <input
+            value={hseToolboxTalk}
+            onChange={(e) => setHseToolboxTalk(e.target.value)}
+            placeholder="e.g. Working at height"
+            className={inputClass}
+          />
+        </label>
+        <label className="block">
+          <span className={fieldLabel}>Safety notes</span>
+          <textarea
+            value={hseNotes}
+            onChange={(e) => setHseNotes(e.target.value)}
+            rows={2}
+            placeholder="Safety observations, hazards, PPE issues…"
+            className={`${inputClass} resize-y`}
+          />
+        </label>
+      </div>
       {error && <p className="text-xs text-red-500">{error}</p>}
       <div className="flex items-center gap-2">
         <Button type="submit" size="sm" disabled={busy}>
@@ -379,6 +437,28 @@ function EntryCard({
           <div>
             <dt className={fieldLabel}>Work done / notes</dt>
             <dd className="whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-200">{entry.notes}</dd>
+          </div>
+        )}
+        {(entry.hseIncidents != null ||
+          entry.hseNearMisses != null ||
+          entry.hseToolboxTalk ||
+          entry.hseNotes) && (
+          <div>
+            <dt className={fieldLabel}>HSE snapshot</dt>
+            {(entry.hseIncidents != null || entry.hseNearMisses != null || entry.hseToolboxTalk) && (
+              <dd className="text-sm text-zinc-700 dark:text-zinc-200">
+                {[
+                  entry.hseIncidents != null ? `incidents ${entry.hseIncidents}` : null,
+                  entry.hseNearMisses != null ? `near-misses ${entry.hseNearMisses}` : null,
+                  entry.hseToolboxTalk ? `toolbox talk: ${entry.hseToolboxTalk}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </dd>
+            )}
+            {entry.hseNotes && (
+              <dd className="mt-1 whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-200">{entry.hseNotes}</dd>
+            )}
           </div>
         )}
       </dl>
