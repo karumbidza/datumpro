@@ -12,8 +12,11 @@ export function tenderInviteEmail(input: {
   tenderTitle: string;
   companyName: string;
   acceptUrl: string;
+  /** Plain tender URL shown as a second path when acceptUrl is a signed
+   *  (expiring) one-click link. */
+  fallbackUrl?: string;
 }): { subject: string; html: string } {
-  const { orgName, tenderTitle, companyName, acceptUrl } = input;
+  const { orgName, tenderTitle, companyName, acceptUrl, fallbackUrl } = input;
 
   const subject = `You're invited to bid: ${tenderTitle}`;
 
@@ -32,6 +35,15 @@ export function tenderInviteEmail(input: {
             <tr><td style="padding:8px 0 4px">
               <a href="${acceptUrl}" style="display:inline-block;background:${BRAND};color:#fff;text-decoration:none;font-weight:600;font-size:14px;padding:10px 18px;border-radius:8px">View &amp; submit bid</a>
             </td></tr>
+            ${
+              fallbackUrl
+                ? `<tr><td style="font-size:12px;color:#71717a;padding-top:14px;line-height:1.5">
+              The button signs you in automatically and opens your bid — no password needed. If it has
+              expired, open <a href="${fallbackUrl}" style="color:${BRAND}">${fallbackUrl}</a> and sign in
+              with this email address (use &ldquo;Forgot password&rdquo; to set a password first).
+            </td></tr>`
+                : ''
+            }
             <tr><td style="font-size:12px;color:#71717a;padding-top:14px">
               This link is unique to ${companyName} — please do not forward it to others. If you weren't expecting this invitation you can safely ignore this email.
             </td></tr>
