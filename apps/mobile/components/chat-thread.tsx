@@ -7,13 +7,12 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
-  Keyboard,
-  Platform,
   ActivityIndicator,
   Alert,
   Modal,
   Animated,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -69,37 +68,10 @@ export function ChatThread({
   const [members, setMembers] = useState<RosterMember[]>([]);
   const [onlineIds, setOnlineIds] = useState<Set<string>>(() => new Set());
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [kbHeight, setKbHeight] = useState(0);
   const insets = useSafeAreaInsets();
-  // Single source of truth for how far the composer sits off the bottom: above
-  // the keyboard when it's open, above the gesture nav bar when it's closed. This
-  // is why the composer both stops overlapping the keyboard AND stops hiding
-  // behind the Android gesture bar.
-  const bottomSpace = kbHeight > 0 ? kbHeight : insets.bottom;
 
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder);
-
-  // Read the keyboard height directly from the IME event and lift the composer
-  // by exactly that much. Works in Android edge-to-edge/immersive where the
-  // window doesn't resize and KeyboardAvoidingView fails.
-  useEffect(() => {
-    const ios = Platform.OS === 'ios';
-    const subs = [
-      Keyboard.addListener(ios ? 'keyboardWillShow' : 'keyboardDidShow', (e) =>
-        setKbHeight(e.endCoordinates?.height ?? 0),
-      ),
-      Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', () => setKbHeight(0)),
-      // Re-focusing the input while the keyboard is already up doesn't re-fire
-      // didShow on Android — the frame change does. Only ever raise the composer
-      // here (never zero it), so this can't flicker mid-animation.
-      Keyboard.addListener(ios ? 'keyboardWillChangeFrame' : 'keyboardDidChangeFrame', (e) => {
-        const h = e.endCoordinates?.height ?? 0;
-        if (h > 0) setKbHeight(h);
-      }),
-    ];
-    return () => subs.forEach((s) => s.remove());
-  }, []);
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const onlineCount = members.filter((m) => onlineIds.has(m.userId)).length;
   // Identity lookup for the message list — company / role / avatar per sender.
@@ -364,7 +336,10 @@ export function ChatThread({
   }
 
   return (
-    <View style={styles.screen}>
+    // KeyboardProvider (root) + this padding-behavior view lift the whole thread
+    // so the composer stays above the on-screen keyboard, including in Android
+    // edge-to-edge/immersive mode where the window doesn't resize.
+    <KeyboardAvoidingView behavior="padding" style={styles.screen}>
       {members.length > 0 && (
         <Pressable style={styles.peopleBar} onPress={() => setSheetOpen(true)}>
           <Ionicons name="people-outline" size={16} color={colors.brand} />
@@ -557,9 +532,10 @@ export function ChatThread({
           )}
         </View>
       )}
-      {/* Lifts the composer above the keyboard (open) or the gesture bar (closed). */}
-      <View style={{ height: bottomSpace }} />
-    </View>
+      {/* Keeps the composer above the Android gesture bar when the keyboard is
+          closed; the keyboard lift itself is handled by KeyboardAvoidingView. */}
+      <View style={{ height: insets.bottom }} />
+    </KeyboardAvoidingView>
   );
 }
 
