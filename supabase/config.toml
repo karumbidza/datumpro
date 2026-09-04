@@ -77,3 +77,10 @@ content_path = "./supabase/templates/recovery.html"
 # itself with the CHAT_PUSH_SECRET shared-secret header, so skip JWT verification.
 [functions.chat-push]
 verify_jwt = false
+
+# notification-push is invoked by the notification_push_notify pg_net trigger,
+# which authorizes with the NOTIFICATION_PUSH_SECRET shared-secret header instead
+# of a JWT (same pattern as chat-push). Without this the gateway 401s the
+# trigger's calls before they reach the function.
+[functions.notification-push]
+verify_jwt = false
