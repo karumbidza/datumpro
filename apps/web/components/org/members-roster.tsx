@@ -8,6 +8,7 @@ import {
   updateOrgMemberRole,
   removeOrgMember,
   assignMemberToProject,
+  unassignMemberFromProject,
   deactivateOrgMember,
   reactivateOrgMember,
   sendMemberPasswordReset,
@@ -21,6 +22,8 @@ const inputClass =
 const typeTone = (t: MemberType): 'amber' | 'blue' | 'neutral' =>
   t === 'owner' ? 'amber' : t === 'admin' || t === 'pm' ? 'blue' : 'neutral';
 
+const projectRoleLabel = (r: string) => (r === 'pm' ? 'PM' : r);
+
 interface Member {
   userId: string;
   name: string;
@@ -29,6 +32,7 @@ interface Member {
   role: string;
   memberType: MemberType;
   status: 'active' | 'disabled';
+  projects: { projectId: string; projectName: string; role: string }[];
 }
 
 export function MembersRoster({
@@ -147,6 +151,35 @@ export function MembersRoster({
                   </form>
                 )}
               </div>
+            </div>
+
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {m.projects.length === 0 ? (
+                <p className="text-xs text-zinc-400 dark:text-zinc-500">No project assignments</p>
+              ) : (
+                m.projects.map((a) => (
+                  <span
+                    key={a.projectId}
+                    className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+                  >
+                    {a.projectName} · {projectRoleLabel(a.role)}
+                    {isAdmin && (
+                      <form action={unassignMemberFromProject} className="inline-flex">
+                        <input type="hidden" name="projectId" value={a.projectId} />
+                        <input type="hidden" name="userId" value={m.userId} />
+                        <button
+                          type="submit"
+                          aria-label={`Remove from ${a.projectName}`}
+                          title={`Remove from ${a.projectName}`}
+                          className="rounded-full px-0.5 leading-none text-zinc-400 hover:text-red-600 dark:text-zinc-500 dark:hover:text-red-400"
+                        >
+                          ×
+                        </button>
+                      </form>
+                    )}
+                  </span>
+                ))
+              )}
             </div>
 
             {isAdmin && !disabled && projects.length > 0 && (

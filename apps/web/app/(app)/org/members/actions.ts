@@ -253,6 +253,29 @@ export async function assignMemberToProject(formData: FormData) {
   done('assigned');
 }
 
+/** Remove a member's assignment from a project. RLS (can_manage_project) rejects
+ *  anyone who isn't an org admin or the project PM — an unauthorized delete
+ *  simply matches no rows. */
+export async function unassignMemberFromProject(formData: FormData) {
+  const projectId = String(formData.get('projectId') ?? '');
+  const userId = String(formData.get('userId') ?? '');
+  if (!projectId || !userId) fail('Missing project or member.');
+
+  const { supabase, user } = await requireUser();
+  const { data: project } = await supabase.from('projects').select('org_id').eq('id', projectId).maybeSingle();
+  if (!project) fail('Project not found.');
+  const orgId = (project as { org_id: string }).org_id;
+
+  const { error } = await supabase
+    .from('project_members')
+    .delete()
+    .eq('project_id', projectId)
+    .eq('user_id', userId);
+  if (error) fail(error.message);
+  await logAudit({ orgId, actorId: user.id, entityType: 'project_member', entityId: userId, action: 'member.unassigned', after: { projectId } });
+  done();
+}
+
 /** Cancel a pending invitation. RLS (is_org_admin) enforces authority. */
 export async function revokeInvitation(formData: FormData) {
   const invitationId = String(formData.get('invitationId') ?? '');
