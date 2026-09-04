@@ -1,13 +1,14 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendEmail } from '@/lib/email/resend';
-import { sendExpoPushToUsers } from '@/lib/notify/push';
 import { appUrl } from '@/lib/email/templates';
 
 type Admin = ReturnType<typeof createAdminClient>;
 
-/** Deliver a reminder across all channels from the cron (service) context —
- *  direct insert (RLS-bypassing), email, and mobile push. Best-effort. */
+/** Deliver a reminder from the cron (service) context — a direct notifications
+ *  insert (RLS-bypassing) plus email. The insert itself fans out to the phone via
+ *  the notifications-INSERT trigger → notification-push Edge Function, so there is
+ *  no separate push call here. Best-effort. */
 async function deliver(
   admin: Admin,
   args: { orgId: string; userId: string; type: string; title: string; body: string; link: string; entityId: string },
@@ -46,7 +47,6 @@ async function deliver(
       html: `<div style="font-family:system-ui,sans-serif"><h2 style="margin:0 0 8px">${args.title}</h2><p style="color:#3f3f46">${args.body}</p><a href="${url}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 16px;border-radius:6px">Open in DatumPro</a></div>`,
     }).catch(() => {});
   }
-  await sendExpoPushToUsers([args.userId], { title: args.title, body: args.body, url: args.link });
 }
 
 /** Daily reminder scan: subtask steps due-soon/overdue and tasks still waiting

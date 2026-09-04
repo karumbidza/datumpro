@@ -84,7 +84,10 @@ export async function createActionItem(formData: FormData): Promise<Result> {
   return { ok: true };
 }
 
-/** Mark an action item done (or reopen it). The assignee, raiser, or a manager may. */
+/** Mark an action item done (or reopen it). Completing an *assigned* to-do is
+ *  restricted to its assignee (with a PM / org-staff override) — enforced by the
+ *  action_item_completion_guard trigger; we surface a clean message if it trips.
+ *  Reopening and completing an unassigned item stay open to the raiser/managers. */
 export async function setActionItemDone(formData: FormData): Promise<Result> {
   const supabase = await createClient();
   const {
@@ -113,7 +116,15 @@ export async function setActionItemDone(formData: FormData): Promise<Result> {
       updated_at: new Date().toISOString(),
     })
     .eq('id', id);
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    const assigneeOnly = /only the assignee/i.test(error.message);
+    return {
+      ok: false,
+      error: assigneeOnly
+        ? 'Only the person this to-do is assigned to can mark it done.'
+        : error.message,
+    };
+  }
 
   // Tell the raiser when someone else completes their ask.
   if (done && b && b.created_by && b.created_by !== user.id) {
