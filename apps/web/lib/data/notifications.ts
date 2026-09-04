@@ -1,7 +1,6 @@
 import { after } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { emailUser } from '@/lib/email/notify';
-import { sendExpoPushToUsers } from '@/lib/notify/push';
 import { appUrl } from '@/lib/email/templates';
 
 export interface AppNotification {
@@ -61,7 +60,10 @@ function notifHtml(title: string, body: string | undefined, link: string | undef
 }
 
 /** Emit a notification to one user across all channels: in-app (bell), email,
- *  and mobile push. Best-effort — never lets a delivery failure break the
+ *  and — via the notifications-INSERT trigger → notification-push Edge Function —
+ *  mobile/web push. We only write the row + send the email here; the phone push
+ *  is fanned out at the database so every origin (web, mobile, cron) reaches the
+ *  device through one path. Best-effort — never lets a delivery failure break the
  *  workflow that triggered it. */
 export async function notifyUser(
   supabase: SupabaseClient,
@@ -83,11 +85,11 @@ export async function notifyUser(
   } catch {
     /* swallow */
   }
-  // Email + mobile push are external HTTP — run them AFTER the response is sent
-  // so they never add latency to the click. (Vercel keeps the function alive.)
+  // Email is external HTTP — run it AFTER the response is sent so it never adds
+  // latency to the click. (Vercel keeps the function alive.) The phone push is
+  // handled by the notifications-INSERT trigger, not from here.
   after(async () => {
     await emailUser(args.userId, { subject: args.title, html: notifHtml(args.title, args.body, args.link) });
-    await sendExpoPushToUsers([args.userId], { title: args.title, body: args.body ?? '', url: args.link });
   });
 }
 
