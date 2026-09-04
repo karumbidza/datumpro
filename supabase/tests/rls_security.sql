@@ -197,7 +197,7 @@ reset request.jwt.claims;
 -- is blocked from the library and sees only tenders they were invited to bid on,
 -- still able to price via tender_bill_lines (which never returns
 -- budget_rate_cents). (Staff and PMs are project-scoped and blocked from the
--- library too — asserted with users a7 and a8 further below.)
+-- library too — asserted with users a7 and d8 further below.)
 set role authenticated;
 
 -- Owner (user A): full library + both tenders.
@@ -966,30 +966,30 @@ reset role;
 reset request.jwt.claims;
 
 -- ── PMs are project-scoped (20260904120000) ──────────────────────────────────
--- a8 (member_type='pm', project-PM of Project A only) must behave like a
+-- d8 (member_type='pm', project-PM of Project A only) must behave like a
 -- contractor outside their own projects: no other org projects, no org BOQ
 -- library, no org tenders, no tender RPCs, no granting the PM role. On their
 -- OWN project they keep full management (update it, manage non-PM teammates)
 -- and can read the BOQ *linked* to it (is_project_pm_for_boq).
 insert into auth.users (id, email) values
-  ('a0000000-0000-0000-0000-0000000000a8','pm-a@test.dev'),
-  ('a0000000-0000-0000-0000-0000000000a9','pm-b@test.dev');
+  ('a0000000-0000-0000-0000-0000000000d8','pm-a@test.dev'),
+  ('a0000000-0000-0000-0000-0000000000d9','pm-b@test.dev');
 insert into public.org_members (org_id, user_id, role, member_type, status) values
-  ('a1110000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000a8','pm','pm','active'),
-  ('a1110000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000a9','pm','pm','active');
+  ('a1110000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000d8','pm','pm','active'),
+  ('a1110000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000d9','pm','pm','active');
 insert into public.project_members (org_id, project_id, user_id, role, status) values
-  ('a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000a8','pm','active');
--- A second org-A project a8 is NOT a member of, and a BOQ linked to Project A.
+  ('a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000d8','pm','active');
+-- A second org-A project d8 is NOT a member of, and a BOQ linked to Project A.
 insert into public.projects (id, org_id, name) values
   ('a8880000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','Project A2');
 insert into public.boqs (id, org_id, name, project_id) values
   ('a8330000-0000-0000-0000-000000000000','a1110000-0000-0000-0000-000000000000','BOQ linked to Project A','a2220000-0000-0000-0000-000000000000');
 
 set role authenticated;
-set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000a8","role":"authenticated","aal":"aal1"}';
+set request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-0000000000d8","role":"authenticated","aal":"aal1"}';
 select pg_temp.ok(
   (select count(*) from public.projects where org_id = 'a1110000-0000-0000-0000-000000000000'
-     and id not in (select project_id from public.project_members where user_id = 'a0000000-0000-0000-0000-0000000000a8')) = 0,
+     and id not in (select project_id from public.project_members where user_id = 'a0000000-0000-0000-0000-0000000000d8')) = 0,
   'pm-scope: a PM sees no org projects beyond their own memberships');
 select pg_temp.ok((select count(*) from public.projects where id = 'a2220000-0000-0000-0000-000000000000') = 1,
   'pm-scope: a PM still sees the project they manage');
@@ -1022,17 +1022,17 @@ begin
   -- Granting the project-PM role is owner/admin only; other roles still work.
   begin
     insert into public.project_members (org_id, project_id, user_id, role, status) values
-      ('a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000a9','pm','active');
+      ('a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000d9','pm','active');
     perform pg_temp.ok(false, 'pm-scope: a project PM must not grant the PM role');
   exception when insufficient_privilege then
     perform pg_temp.ok(true, 'pm-scope: PM-role grant by a project PM is rejected');
   end;
   insert into public.project_members (org_id, project_id, user_id, role, status) values
-    ('a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000a9','contributor','active');
+    ('a1110000-0000-0000-0000-000000000000','a2220000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000d9','contributor','active');
   perform pg_temp.ok(
     (select count(*) from public.project_members
       where project_id = 'a2220000-0000-0000-0000-000000000000'
-        and user_id = 'a0000000-0000-0000-0000-0000000000a9' and role = 'contributor') = 1,
+        and user_id = 'a0000000-0000-0000-0000-0000000000d9' and role = 'contributor') = 1,
     'pm-scope: a project PM still enrols non-PM teammates on their project');
 end $$;
 reset role;
