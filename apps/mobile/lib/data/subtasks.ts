@@ -87,11 +87,20 @@ export async function subtaskProgressForTasks(
   return map;
 }
 
-export async function acceptTask(taskId: string): Promise<void> {
-  const { error } = await supabase
-    .from('tasks')
-    .update({ acceptance_status: 'accepted', accepted_at: new Date().toISOString() })
-    .eq('id', taskId);
+/** Whole-task pricing (mirrors web): the assigned contractor accepts by naming
+ *  ONE price for the whole task and describing the works. The definer RPC
+ *  re-checks the caller is the pending assignee, sets the awarded value and LOCKS
+ *  the plan (plan_approved_at) — there is no contractor-built step breakdown. */
+export async function acceptAndPriceTask(
+  taskId: string,
+  priceCents: number,
+  worksNotes: string,
+): Promise<void> {
+  const { error } = await supabase.rpc('accept_and_price_task', {
+    p_task_id: taskId,
+    p_price_cents: Math.max(0, Math.round(priceCents)),
+    p_works_notes: worksNotes,
+  });
   if (error) throw new Error(error.message);
 }
 

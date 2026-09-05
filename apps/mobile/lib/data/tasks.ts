@@ -24,6 +24,8 @@ export interface TaskDetail extends MyTask {
   planSubmittedAt: string | null;
   planApprovedAt: string | null;
   awardedCostCents: number | null;
+  /** The contractor's description of the works, captured at accept time. */
+  worksNotes: string | null;
 }
 
 /** The current user's role relative to a task's project — drives which actions
@@ -149,7 +151,7 @@ export async function getTask(id: string): Promise<TaskDetail | null> {
   const { data } = await supabase
     .from('tasks')
     .select(
-      'id, org_id, title, description, status, sla_status, due_date, priority, project_id, assignee_id, requires_photo_on_complete, planned_start_date, planned_end_date, actual_end_date, acceptance_status, plan_submitted_at, plan_approved_at, awarded_cost_cents, projects(name)',
+      'id, org_id, title, description, status, sla_status, due_date, priority, project_id, assignee_id, requires_photo_on_complete, planned_start_date, planned_end_date, actual_end_date, acceptance_status, plan_submitted_at, plan_approved_at, awarded_cost_cents, works_notes, projects(name)',
     )
     .eq('id', id)
     .maybeSingle();
@@ -173,6 +175,7 @@ export async function getTask(id: string): Promise<TaskDetail | null> {
     plan_submitted_at: string | null;
     plan_approved_at: string | null;
     awarded_cost_cents: number | null;
+    works_notes: string | null;
     projects: ProjectJoin;
   };
   return {
@@ -195,6 +198,7 @@ export async function getTask(id: string): Promise<TaskDetail | null> {
     planSubmittedAt: t.plan_submitted_at,
     planApprovedAt: t.plan_approved_at,
     awardedCostCents: t.awarded_cost_cents,
+    worksNotes: t.works_notes,
   };
 }
 

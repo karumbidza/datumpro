@@ -233,6 +233,7 @@ export default function TaskDetailScreen() {
           planSubmittedAt={task.planSubmittedAt}
           planApprovedAt={task.planApprovedAt}
           awardedCostCents={task.awardedCostCents}
+          worksNotes={task.worksNotes}
           planSteps={planSteps}
           variationSteps={variationSteps}
           viewerRole={viewerRole}
