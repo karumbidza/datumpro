@@ -2,7 +2,11 @@
 -- DatumPro — RLS / tenancy regression tests (security assessment F9)
 --
 -- Runnable defence-in-depth check for the invariants the security assessment
--- relied on. Run against a database that has all migrations applied:
+-- relied on. Run against a CLEAN database that has all migrations applied and
+-- no application data — the suite seeds fixed UUIDs and asserts exact counts,
+-- so an existing local stack with data WILL fail spuriously. Reset first
+-- (`supabase db reset`) or rely on CI, which replays migrations onto a fresh
+-- stack on every PR:
 --
 --     psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/rls_security.sql
 --

@@ -25,9 +25,9 @@ import { MessageCircle, Paperclip, Mic, Square, X, Download, FileText, Search, U
 import { NotifyToggle } from '@/components/chat/notify-toggle';
 import { ChatRail } from '@/components/chat/chat-rail';
 import { Avatar, senderTint, rolePill } from '@/components/chat/identity';
+import { MAX_CHAT_MEDIA_BYTES, uploadSizeError } from '@/lib/upload-limits';
 
 const EMOJIS = ['👍', '❤️', '😂', '🎉', '✅'];
-const MAX_FILE_BYTES = 50 * 1024 * 1024; // 50 MB per file
 
 /** One action row inside the message hover menu. */
 function MenuItem({
@@ -592,8 +592,9 @@ export function ChatPanel({
     setUploadError(null);
     const next: PendingAttachment[] = [];
     for (const file of Array.from(files)) {
-      if (file.size > MAX_FILE_BYTES) {
-        setUploadError(`"${file.name}" exceeds the 50 MB limit.`);
+      const sizeErr = uploadSizeError(file, MAX_CHAT_MEDIA_BYTES);
+      if (sizeErr) {
+        setUploadError(sizeErr);
         continue;
       }
       const mime = file.type || 'application/octet-stream';

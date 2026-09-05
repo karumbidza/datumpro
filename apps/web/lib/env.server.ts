@@ -54,10 +54,23 @@ export function validateServerEnv(): void {
   const warnings: string[] = [];
 
   // ── Hard requirements (production only; dev/test/CI may omit them) ──────────
-  if (isProd() && !val('SUPABASE_SERVICE_ROLE_KEY')) {
-    errors.push(
-      'SUPABASE_SERVICE_ROLE_KEY is required in production — server jobs (cron scans, fan-outs, the admin adapter) use the RLS-bypassing service-role client.',
-    );
+  // These three are the minimum production control set (2026-09 audit): without
+  // them, auth flows silently break (no invite/reset email), scheduled jobs
+  // silently never run, or privileged server paths throw at call time. All
+  // three are confirmed present in the live Vercel project, so requiring them
+  // cannot regress an existing deploy — it only stops a misconfigured new one.
+  if (isProd()) {
+    const required: Array<[keyof ServerEnv, string]> = [
+      [
+        'SUPABASE_SERVICE_ROLE_KEY',
+        'server jobs (cron scans, fan-outs, the admin adapter) use the RLS-bypassing service-role client',
+      ],
+      ['CRON_SECRET', 'scheduled jobs (SLA scans, reminders, digests) refuse to run without it'],
+      ['RESEND_API_KEY', 'invites and password resets cannot send email without it'],
+    ];
+    for (const [k, why] of required) {
+      if (!val(k)) errors.push(`${k} is required in production — ${why}.`);
+    }
   }
 
   // ── Shape checks — warn (never crash) when a present value looks wrong ──────
@@ -89,9 +102,7 @@ export function validateServerEnv(): void {
   // ── Recommended in production — warn when unset so operators notice ─────────
   if (isProd()) {
     const recommended: Array<[keyof ServerEnv, string]> = [
-      ['CRON_SECRET', 'scheduled jobs (SLA scans, fan-outs) will refuse to run'],
       ['SENTRY_DSN', 'server errors are logged locally only, not reported'],
-      ['RESEND_API_KEY', 'transactional email (invites, password resets) is disabled'],
     ];
     for (const [k, effect] of recommended) {
       if (!val(k)) warnings.push(`${k} is not set — ${effect}.`);

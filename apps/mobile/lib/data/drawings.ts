@@ -1,5 +1,6 @@
 import { decode } from 'base64-arraybuffer';
 import { supabase, currentUser } from '../supabase';
+import { assertUploadSize, MAX_PROJECT_MEDIA_BYTES } from '../upload-limits';
 
 const BUCKET = 'project-media';
 
@@ -151,6 +152,7 @@ export async function listProjectDrawings(projectId: string): Promise<Drawing[]>
 async function uploadPdf(projectId: string, base64: string, ext: string): Promise<{ orgId: string; path: string }> {
   const orgId = await resolveOrg(projectId);
   if (!orgId) throw new Error('Project not found.');
+  assertUploadSize(base64, MAX_PROJECT_MEDIA_BYTES, 'This PDF');
   const path = `${orgId}/${projectId}/drawings/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
   const { error } = await supabase.storage.from(BUCKET).upload(path, decode(base64), { contentType: 'application/pdf', upsert: false });
   if (error) throw new Error(error.message);

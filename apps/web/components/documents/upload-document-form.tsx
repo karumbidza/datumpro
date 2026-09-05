@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { uploadContractorDocument } from '@/app/(app)/documents/actions';
+import { MAX_PROJECT_MEDIA_BYTES, uploadSizeError } from '@/lib/upload-limits';
 import { CONTRACTOR_DOC_TYPES, CONTRACTOR_DOC_TYPE_LABEL } from '@datumpro/shared/domain';
 import { Button } from '@/components/ui/button';
 
@@ -28,6 +29,11 @@ export function UploadDocumentForm({ orgs }: { orgs: { id: string; name: string 
     setError(null);
     if (!orgId || !file) {
       setError('Choose an organization and a file.');
+      return;
+    }
+    const sizeErr = uploadSizeError(file, MAX_PROJECT_MEDIA_BYTES);
+    if (sizeErr) {
+      setError(sizeErr);
       return;
     }
     setBusy(true);

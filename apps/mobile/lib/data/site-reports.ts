@@ -1,5 +1,6 @@
 import { decode } from 'base64-arraybuffer';
 import { supabase, currentUser } from '../supabase';
+import { assertUploadSize, MAX_PROJECT_MEDIA_BYTES } from '../upload-limits';
 
 const BUCKET = 'project-media';
 
@@ -187,6 +188,7 @@ export async function addReportPhoto(params: {
 }): Promise<void> {
   const orgId = await projectOrg(params.projectId);
   if (!orgId) throw new Error('Project not found.');
+  assertUploadSize(params.base64, MAX_PROJECT_MEDIA_BYTES, 'This photo');
   const name = `${Date.now()}-${Math.random().toString(36).slice(2)}.${params.ext}`;
   const path = `${orgId}/${params.projectId}/${params.reportId}/${name}`;
   const { error: upErr } = await supabase.storage

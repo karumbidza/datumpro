@@ -7,8 +7,12 @@ import globals from 'globals';
 // Flat-config ESLint for the Next.js app (replaces the deprecated `next lint`).
 // Tuned to be a real safety net that passes clean: correctness rules error,
 // stylistic/opinion rules warn or off, so `pnpm lint` fails only on genuine bugs.
+// NOTE: eslint.config.mjs itself must NOT be in `ignores` — Next's build-time
+// plugin detection runs calculateConfigForFile() on this very file, and a
+// globally-ignored config file yields no plugins, triggering the bogus
+// "Next.js plugin was not detected" warning.
 export default tseslint.config(
-  { ignores: ['.next/**', 'node_modules/**', 'next-env.d.ts', 'eslint.config.mjs'] },
+  { ignores: ['.next/**', 'node_modules/**', 'next-env.d.ts'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

@@ -64,6 +64,14 @@ function snippet(body: string | null, hasNoBody: boolean): string {
   return t.length > 140 ? `${t.slice(0, 139)}…` : t || 'New message';
 }
 
+/** Run fn over items with bounded concurrency (sequential batches) so a large
+ *  recipient list can't blow the function duration or burst the push services. */
+async function inBatches<T>(items: T[], size: number, fn: (item: T) => Promise<void>) {
+  for (let i = 0; i < items.length; i += size) {
+    await Promise.all(items.slice(i, i + size).map(fn));
+  }
+}
+
 async function pruneSubscription(id: string) {
   await admin.from('push_subscriptions').delete().eq('id', id);
 }
@@ -129,8 +137,7 @@ Deno.serve(async (req) => {
   let delivered = 0;
   let pruned = 0;
 
-  await Promise.all(
-    list.map(async (t) => {
+  await inBatches(list, 8, async (t) => {
       try {
         if (t.platform === 'web') {
           if (!VAPID_PUBLIC || !VAPID_PRIVATE || !t.p256dh || !t.auth) return;
@@ -178,8 +185,7 @@ Deno.serve(async (req) => {
           pruned++;
         }
       }
-    }),
-  );
+  });
 
   return json({ delivered, pruned, targets: list.length });
 });
