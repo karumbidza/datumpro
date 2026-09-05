@@ -7,14 +7,11 @@ import { Card, ProgressBar } from './ui';
 import { radius, font, type Colors } from '../lib/theme';
 import { useTheme } from '../lib/theme-context';
 import {
-  acceptTask,
+  acceptAndPriceTask,
   declineTask,
   returnTask,
   addSubtask,
-  updateSubtask,
   toggleSubtask,
-  removeSubtask,
-  submitPlan,
   subtaskPct,
   isCounted,
   type Subtask,
@@ -26,8 +23,6 @@ import { DocAttach } from './doc-attach';
 import type { TaskDoc } from '../lib/data/tenders';
 import { uploadTaskPhoto, type TaskPhoto } from '../lib/data/media';
 import { DateField } from './date-field';
-
-const dollars = (cents: number) => (cents / 100).toFixed(2);
 
 export function SubtaskPanel({
   taskId,
@@ -43,6 +38,7 @@ export function SubtaskPanel({
   planSubmittedAt,
   planApprovedAt,
   awardedCostCents,
+  worksNotes,
   planSteps,
   variationSteps,
   viewerRole,
@@ -64,6 +60,8 @@ export function SubtaskPanel({
   planSubmittedAt: string | null;
   planApprovedAt: string | null;
   awardedCostCents: number | null;
+  /** The contractor's description of the works to be done, captured at accept time. */
+  worksNotes: string | null;
   planSteps: ApprovalStep[];
   /** task_variation approval chains, keyed by the variation subtask's id. */
   variationSteps: Record<string, ApprovalStep[]>;
@@ -77,16 +75,18 @@ export function SubtaskPanel({
   const [declineOpen, setDeclineOpen] = useState(false);
   const [handBackOpen, setHandBackOpen] = useState(false);
   const [reason, setReason] = useState('');
-  // Add-a-step draft inputs (priced plan).
+  // Accept-&-price inputs: one whole-task price + a works-to-be-done note.
+  const [price, setPrice] = useState('');
+  const [works, setWorks] = useState('');
+  // Draft inputs for the variation form + the legacy (non-plan) add-step row.
+  // The priced plan itself no longer lets a contractor author steps — the
+  // assigner sets them out and the contractor only prices & dates them.
   const [newTitle, setNewTitle] = useState('');
   const [newQty, setNewQty] = useState('');
   const [newUnit, setNewUnit] = useState<'hours' | 'days'>('days');
   const [newStart, setNewStart] = useState<string | null>(null);
   const [newEnd, setNewEnd] = useState<string | null>(null);
   const [newCost, setNewCost] = useState('');
-  // Editing an existing plan step — one local buffer, saved on Done (no
-  // save-on-every-keystroke churn).
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [openSteps, setOpenSteps] = useState<Set<string>>(new Set()); // expanded checklist rows
   const toggleOpen = (id: string) =>
     setOpenSteps((cur) => {
@@ -95,21 +95,6 @@ export function SubtaskPanel({
       else n.add(id);
       return n;
     });
-  const [eTitle, setETitle] = useState('');
-  const [eQty, setEQty] = useState('');
-  const [eUnit, setEUnit] = useState<'hours' | 'days'>('days');
-  const [eStart, setEStart] = useState<string | null>(null);
-  const [eCost, setECost] = useState('');
-
-  function openEdit(s: Subtask) {
-    setEditingId(s.id);
-    setETitle(s.title);
-    setEQty(s.estQty != null ? String(s.estQty) : '');
-    setEUnit(s.estUnit ?? 'days');
-    setEStart(s.plannedStartDate);
-    setECost(s.costCents ? dollars(s.costCents) : '');
-  }
-  const stepIncomplete = (s: Subtask) => !s.estQty || !s.estUnit || !s.plannedStartDate || s.costCents <= 0;
 
   const baseline = subtasks.filter((s) => !s.isVariation);
   const counted = subtasks.filter(isCounted);
@@ -121,7 +106,6 @@ export function SubtaskPanel({
   const planDraft = usesPlanFlow && acceptanceStatus === 'accepted' && !planSubmittedAt && !planApprovedAt;
   const planPending = usesPlanFlow && !!planSubmittedAt && !planApprovedAt;
   const planLocked = usesPlanFlow && !!planApprovedAt;
-  const wasSentBack = planSteps.some((s) => s.decision === 'rejected');
 
   const openVariations = subtasks.filter((s) => s.isVariation && s.variationStatus !== 'approved');
   const canAddVariation = isAssignee && planLocked && taskStatus !== 'submitted' && taskStatus !== 'done';
@@ -131,8 +115,11 @@ export function SubtaskPanel({
   // (mirrors web — press "Start task" in Actions to move todo → in_progress).
   const canTick = isAssignee && taskStatus === 'in_progress' && (planLocked || !usesPlanFlow);
   // Start the task from the plan panel (top, under the progress bar). Available
-  // once the plan is approved (or non-plan) and there's at least one step.
-  const canStart = isAssignee && taskStatus === 'todo' && (planLocked || !usesPlanFlow) && subtasks.length > 0;
+  // once the plan is approved (or non-plan). A locked whole-task price may have
+  // NO step checklist (non-BOQ task) — it can still start; legacy non-plan tasks
+  // need at least one step to work (mirrors web).
+  const canStart =
+    isAssignee && taskStatus === 'todo' && (planLocked || (!usesPlanFlow && subtasks.length > 0));
   const canHandBack =
     isAssignee && acceptanceStatus === 'accepted' && taskStatus !== 'submitted' && taskStatus !== 'done';
 
@@ -198,20 +185,59 @@ export function SubtaskPanel({
     ]);
   }
 
-  // ── Acceptance decision for the assigned contractor ──
+  // ── Acceptance + pricing for the assigned contractor ──
+  // Whole-task pricing (mirrors web): the contractor names ONE price for the
+  // whole task and describes the works. Accepting LOCKS the price — there is no
+  // contractor-built step breakdown. The steps are the project manager's, set
+  // out in the bill; the contractor only dates and ticks them off afterwards.
   if (acceptanceStatus === 'pending' && isAssignee) {
+    const priceNum = Number(price);
+    const canAcceptPrice = !!price.trim() && Number.isFinite(priceNum) && priceNum >= 0 && works.trim().length >= 3;
     return (
       <Card>
-        <Text style={styles.title}>Accept this task?</Text>
-        <Text style={styles.hint}>Accept to plan and price your work, or decline to send it back to the PM.</Text>
+        <Text style={styles.title}>Accept &amp; price this task</Text>
+        <Text style={styles.hint}>
+          Name your price for the whole task and describe the works you&apos;ll do. Accepting locks the price — or
+          decline to send it back to the PM.
+        </Text>
         {!declineOpen ? (
-          <View style={styles.row}>
-            <Pressable style={[styles.btn, styles.btnPrimary]} disabled={busy} onPress={() => run(() => acceptTask(taskId))}>
-              <Text style={styles.btnPrimaryText}>Accept task</Text>
-            </Pressable>
-            <Pressable style={[styles.btn, styles.btnOutline]} disabled={busy} onPress={() => setDeclineOpen(true)}>
-              <Text style={styles.btnOutlineText}>Decline</Text>
-            </Pressable>
+          <View style={{ gap: 12, marginTop: 10 }}>
+            <View style={{ gap: 6 }}>
+              <Text style={styles.addLabel}>Task price ($)</Text>
+              <TextInput
+                value={price}
+                onChangeText={setPrice}
+                keyboardType="numeric"
+                placeholder="0.00"
+                placeholderTextColor={colors.subtle}
+                style={[styles.input, styles.cost]}
+              />
+            </View>
+            <View style={{ gap: 6 }}>
+              <Text style={styles.addLabel}>Works to be done</Text>
+              <TextInput
+                value={works}
+                onChangeText={setWorks}
+                placeholder="Describe the works you'll carry out"
+                placeholderTextColor={colors.subtle}
+                style={[styles.input, { minHeight: 92, textAlignVertical: 'top' }]}
+                multiline
+              />
+            </View>
+            <View style={styles.row}>
+              <Pressable
+                style={[styles.btn, styles.btnPrimary, (!canAcceptPrice || busy) && { opacity: 0.5 }]}
+                disabled={!canAcceptPrice || busy}
+                onPress={() =>
+                  run(() => acceptAndPriceTask(taskId, Math.round(priceNum * 100), works.trim()))
+                }
+              >
+                {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.btnPrimaryText}>Accept &amp; lock price</Text>}
+              </Pressable>
+              <Pressable style={[styles.btn, styles.btnOutline]} disabled={busy} onPress={() => setDeclineOpen(true)}>
+                <Text style={styles.btnOutlineText}>Decline</Text>
+              </Pressable>
+            </View>
           </View>
         ) : (
           <View style={{ gap: 8 }}>
@@ -291,151 +317,13 @@ export function SubtaskPanel({
         </View>
       )}
 
-      {/* Plan draft — priced editor (assignee) */}
-      {planDraft && isAssignee && (
-        <View style={{ marginTop: 10, gap: 10 }}>
-          {wasSentBack && (
-            <Text style={styles.sentBack}>Your plan was sent back. Revise the steps or costs and resubmit.</Text>
-          )}
-          <Text style={styles.hint}>
-            Break the task into the steps needed to complete it — each with a duration, start date and cost. This is
-            your quote; it goes to the PM &amp; admin for approval.
-          </Text>
-
-          {/* Add a step — a labeled sub-card, first (matches the web layout) */}
-          <View style={styles.addBlock}>
-            <Text style={styles.addLabel}>Add a step</Text>
-            <TextInput value={newTitle} onChangeText={setNewTitle} placeholder="e.g. Excavate footing" placeholderTextColor={colors.subtle} style={styles.input} />
-            <View style={styles.editGrid}>
-              <TextInput value={newQty} onChangeText={setNewQty} keyboardType="numeric" placeholder="Duration" placeholderTextColor={colors.subtle} style={[styles.input, styles.qty]} />
-              <View style={styles.unitToggle}>
-                {(['hours', 'days'] as const).map((u) => (
-                  <Pressable key={u} style={[styles.unitBtn, newUnit === u && styles.unitBtnOn]} onPress={() => setNewUnit(u)}>
-                    <Text style={[styles.unitText, newUnit === u && styles.unitTextOn]}>{u === 'hours' ? 'hrs' : 'days'}</Text>
-                  </Pressable>
-                ))}
-              </View>
-              <TextInput value={newCost} onChangeText={setNewCost} keyboardType="numeric" placeholder="Cost $" placeholderTextColor={colors.subtle} style={[styles.input, styles.cost]} />
-            </View>
-            <DateField label="Start" value={newStart} onChange={setNewStart} min={taskStart} max={taskEnd} />
-            <Pressable
-              style={[styles.btn, styles.btnPrimary, (!newTitle.trim() || busy) && { opacity: 0.5 }]}
-              disabled={!newTitle.trim() || busy}
-              onPress={() =>
-                run(async () => {
-                  await addSubtask({
-                    taskId,
-                    orgId,
-                    title: newTitle.trim(),
-                    costCents: Math.round((Number(newCost) || 0) * 100),
-                    estQty: Number(newQty) || null,
-                    estUnit: newUnit,
-                    plannedStartDate: newStart,
-                  });
-                  setNewTitle('');
-                  setNewQty('');
-                  setNewCost('');
-                  setNewStart(null);
-                })
-              }
-            >
-              {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.btnPrimaryText}>Add step</Text>}
-            </Pressable>
-          </View>
-
-          {baseline.map((s) =>
-            editingId === s.id ? (
-              <View key={s.id} style={styles.editRow}>
-                <TextInput
-                  value={eTitle}
-                  onChangeText={setETitle}
-                  placeholder="What's the step?"
-                  placeholderTextColor={colors.subtle}
-                  style={styles.input}
-                />
-                <View style={styles.editGrid}>
-                  <TextInput value={eQty} onChangeText={setEQty} keyboardType="numeric" placeholder="Duration" placeholderTextColor={colors.subtle} style={[styles.input, styles.qty]} />
-                  <View style={styles.unitToggle}>
-                    {(['hours', 'days'] as const).map((u) => (
-                      <Pressable key={u} style={[styles.unitBtn, eUnit === u && styles.unitBtnOn]} onPress={() => setEUnit(u)}>
-                        <Text style={[styles.unitText, eUnit === u && styles.unitTextOn]}>{u === 'hours' ? 'hrs' : 'days'}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                  <TextInput value={eCost} onChangeText={setECost} keyboardType="numeric" placeholder="Cost $" placeholderTextColor={colors.subtle} style={[styles.input, styles.cost]} />
-                </View>
-                <DateField label="Start" value={eStart} onChange={setEStart} min={taskStart} max={taskEnd} />
-                <View style={styles.row}>
-                  <Pressable
-                    style={[styles.btn, styles.btnPrimary, (!eTitle.trim() || busy) && { opacity: 0.5 }]}
-                    disabled={!eTitle.trim() || busy}
-                    onPress={() =>
-                      run(async () => {
-                        await updateSubtask(s.id, {
-                          title: eTitle.trim(),
-                          estQty: Number(eQty) || null,
-                          estUnit: eUnit,
-                          plannedStartDate: eStart,
-                          costCents: Math.round((Number(eCost) || 0) * 100),
-                        });
-                        setEditingId(null);
-                      })
-                    }
-                  >
-                    {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.btnPrimaryText}>Done</Text>}
-                  </Pressable>
-                  <Pressable style={[styles.btn, styles.btnOutline]} onPress={() => setEditingId(null)}>
-                    <Text style={styles.btnOutlineText}>Cancel</Text>
-                  </Pressable>
-                </View>
-              </View>
-            ) : (
-              <View key={s.id} style={styles.stepCard}>
-                <Pressable style={{ flex: 1 }} onPress={() => openEdit(s)}>
-                  <Text style={styles.stepTitle}>{s.title}</Text>
-                  <Text style={[styles.stepMeta, stepIncomplete(s) && styles.stepWarn]}>
-                    {stepIncomplete(s)
-                      ? '⚠ Tap to add duration, start date & cost'
-                      : `${s.estQty} ${s.estUnit} · ${s.plannedStartDate} · ${formatUsd(s.costCents)}`}
-                  </Text>
-                </Pressable>
-                <Pressable onPress={() => openEdit(s)} hitSlop={8}>
-                  <Ionicons name="create-outline" size={18} color={colors.subtle} />
-                </Pressable>
-                <Pressable disabled={busy} onPress={() => run(() => removeSubtask(s.id))} hitSlop={8}>
-                  <Ionicons name="close" size={18} color={colors.subtle} />
-                </Pressable>
-              </View>
-            ),
-          )}
-
-          {/* Total + submit */}
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>
-              Total quote: <Text style={styles.totalValue}>{formatUsd(draftTotal)}</Text>
-            </Text>
-          </View>
-          {(() => {
-            const need = baseline.filter(stepIncomplete).length;
-            if (baseline.length === 0) return <Text style={styles.gateHint}>Add at least one step to build your plan.</Text>;
-            if (need > 0)
-              return (
-                <Text style={styles.gateHint}>
-                  {need} step{need === 1 ? '' : 's'} still need a duration, start date &amp; cost.
-                </Text>
-              );
-            return null;
-          })()}
-          <Pressable
-            style={[styles.btn, styles.btnPrimary, (baseline.length === 0 || baseline.some(stepIncomplete) || busy) && { opacity: 0.5 }]}
-            disabled={baseline.length === 0 || baseline.some(stepIncomplete) || busy}
-            onPress={() => run(() => submitPlan(taskId))}
-          >
-            {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.btnPrimaryText}>Submit plan for approval</Text>}
-          </Pressable>
+      {/* Works to be done — the contractor's scope, captured at accept time. */}
+      {planLocked && worksNotes && worksNotes.trim().length > 0 && (
+        <View style={styles.worksBox}>
+          <Text style={styles.worksLabel}>Works to be done</Text>
+          <Text style={styles.worksText}>{worksNotes.trim()}</Text>
         </View>
       )}
-      {planDraft && !isAssignee && <Text style={styles.hint}>The contractor is preparing a priced plan.</Text>}
 
       {/* Locked plan / legacy — checklist */}
       {(planLocked || !usesPlanFlow) && (
@@ -735,6 +623,17 @@ const makeStyles = (c: Colors) =>
     },
     awardLabel: { fontSize: 13, fontFamily: font.body, color: c.muted },
     awardValue: { fontSize: 15, fontFamily: font.bodyBold, color: c.brandDeep },
+    worksBox: {
+      marginTop: 12,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: radius.md,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      gap: 4,
+    },
+    worksLabel: { fontSize: 10.5, fontFamily: font.bodyBold, color: c.subtle, textTransform: 'uppercase', letterSpacing: 0.5 },
+    worksText: { fontSize: 13.5, fontFamily: font.body, color: c.text, lineHeight: 20 },
     pendingBox: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -810,6 +709,7 @@ const makeStyles = (c: Colors) =>
       color: c.text,
     },
     editRow: { gap: 8, borderWidth: 1, borderColor: c.brand, borderRadius: radius.md, padding: 10 },
+    editTitle: { fontSize: 14, fontFamily: font.bodySemi, color: c.text },
     stepCard: {
       flexDirection: 'row',
       alignItems: 'center',
