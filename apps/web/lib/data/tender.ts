@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import type { BidderStatus, TenderStatus } from '@datumpro/shared/domain';
 
 // PostgREST returns numeric as string; coerce everything through Number at the
@@ -50,6 +51,8 @@ export interface BidWorkspace {
   bidderId: string;
   bidderStatus: BidderStatus;
   companyName: string;
+  /** ISO currency code of the underlying BOQ (e.g. "USD"). */
+  currency: string;
   sections: BidSection[];
   myRates: Record<string, { rateCents: number; noBid: boolean; note: string | null; durationDays: number | null }>;
 }
@@ -151,7 +154,7 @@ export async function getBidWorkspace(token: string): Promise<BidWorkspace | nul
   // 2. Load the tender header.
   const { data: tender } = await supabase
     .from('boq_tenders')
-    .select('id, title, status, close_at')
+    .select('id, title, status, close_at, boq_id')
     .eq('id', b.tender_id)
     .maybeSingle();
 
@@ -162,9 +165,27 @@ export async function getBidWorkspace(token: string): Promise<BidWorkspace | nul
     title: string;
     status: TenderStatus;
     close_at: string | null;
+    boq_id: string;
   };
 
   const t = tender as unknown as TenderHeader;
+
+  // 2b. The bill's currency lives on the BOQ header, which boqs_select hides
+  // from external bidders (staff/PM-only). Authority was already established
+  // above — the invite token resolved to a bidder row under RLS — so a scoped
+  // service-role read of this single non-sensitive field is safe.
+  let currency = 'USD';
+  try {
+    const admin = createAdminClient();
+    const { data: boqRow } = await admin
+      .from('boqs')
+      .select('currency')
+      .eq('id', t.boq_id)
+      .maybeSingle();
+    currency = (boqRow as { currency: string | null } | null)?.currency ?? 'USD';
+  } catch {
+    // Missing service credentials (e.g. local preview) — keep the USD default.
+  }
 
   // 3. Load bill lines via SECURITY DEFINER function (no budget rate exposed).
   const { data: lines } = await supabase.rpc('tender_bill_lines', {
@@ -243,6 +264,7 @@ export async function getBidWorkspace(token: string): Promise<BidWorkspace | nul
     bidderId: b.id,
     bidderStatus: b.status,
     companyName: b.company_name,
+    currency,
     sections,
     myRates,
   };

@@ -1,5 +1,6 @@
 import { decode } from 'base64-arraybuffer';
 import { supabase, currentUser } from '../supabase';
+import { assertUploadSize, MAX_PROJECT_MEDIA_BYTES } from '../upload-limits';
 
 const BUCKET = 'project-media';
 
@@ -39,6 +40,7 @@ export async function uploadTaskDocument(params: {
 }): Promise<void> {
   const user = await currentUser();
   if (!user) throw new Error('Not signed in');
+  assertUploadSize(params.base64, MAX_PROJECT_MEDIA_BYTES, 'This document');
   const ext = (params.filename.includes('.') ? params.filename.split('.').pop() : 'bin')!.toLowerCase().slice(0, 8);
   const path = `${params.orgId}/${params.projectId}/tasks/${params.taskId}/docs/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
   const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, decode(params.base64), {

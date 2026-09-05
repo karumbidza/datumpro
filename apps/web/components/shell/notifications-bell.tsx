@@ -1,35 +1,64 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Bell } from '@/components/icons';
 
-/** Sidebar bell — polls the caller's unread notification count (RLS-scoped) and
- *  links to the notifications feed. */
+/** Sidebar bell — shows the caller's unread notification count (RLS-scoped) and
+ *  links to the notifications feed. Event-driven: reloads on realtime INSERTs,
+ *  navigation and window focus, with a slow safety poll as backstop. */
 export function NotificationsBell() {
   const [count, setCount] = useState(0);
   const pathname = usePathname();
 
+  const load = useCallback(async () => {
+    const supabase = createClient();
+    const { count: c } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .is('read_at', null);
+    setCount(c ?? 0);
+  }, []);
+
+  // Re-check when navigating (e.g. after visiting /notifications marks them read).
+  useEffect(() => {
+    void load();
+  }, [pathname, load]);
+
+  // Live refresh: subscribe to notification INSERTs for the signed-in user
+  // (same pattern as ToastHost) instead of hammering a 30s poll. A 5-minute
+  // safety poll + focus refresh cover missed events (sleep, dropped socket).
   useEffect(() => {
     const supabase = createClient();
     let active = true;
-    const load = async () => {
-      const { count: c } = await supabase
-        .from('notifications')
-        .select('id', { count: 'exact', head: true })
-        .is('read_at', null);
-      if (active) setCount(c ?? 0);
-    };
-    void load();
-    const iv = setInterval(load, 30_000);
+    const channel = supabase.channel('notif-bell');
+
+    (async () => {
+      const { data: sess } = await supabase.auth.getSession();
+      const userId = sess.session?.user.id;
+      if (!active || !userId) return;
+      if (sess.session?.access_token) supabase.realtime.setAuth(sess.session.access_token);
+      channel
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
+          () => void load(),
+        )
+        .subscribe();
+    })();
+
+    const iv = setInterval(() => void load(), 300_000);
+    const onFocus = () => void load();
+    window.addEventListener('focus', onFocus);
     return () => {
       active = false;
       clearInterval(iv);
+      window.removeEventListener('focus', onFocus);
+      supabase.removeChannel(channel);
     };
-    // Re-check when navigating (e.g. after visiting /notifications marks them read).
-  }, [pathname]);
+  }, [load]);
 
   return (
     <Link

@@ -44,9 +44,17 @@ reads a claim with zero DB round-trip. Deferred — optimized membership-table R
 handles thousands of orgs comfortably.
 
 ## 2. Two clients, one backend — and the offline boundary
-Construction sites have poor connectivity, so **field capture is offline-first** (Expo + PowerSync ↔ on-device SQLite). But **finance must never act on stale local data**, so invoices/payments/approvals are **online, server-authoritative**.
+> **Current contract (2026-09): BOTH clients are online-only.** The mobile app
+> calls Supabase directly (`apps/mobile/lib/data`); there is no PowerSync,
+> no on-device SQLite, and no offline queue. A field user without signal can
+> read nothing and submit nothing — plan site workflows accordingly.
+>
+> Offline-first field capture (originally scoped as Expo + PowerSync ↔ SQLite)
+> remains a roadmap item, not an implemented guarantee. When it lands, the
+> boundary below is the intended split; **finance must never act on stale local
+> data**, so invoices/payments/approvals stay online, server-authoritative.
 
-| Offline-synced | Online-only |
+| Offline-synced (roadmap) | Online-only (always) |
 |---|---|
 | site reports, photos/video, progress, GPS check-ins, draft requests | invoices, payments, POP verification, approval decisions, budget edits, Paynow, member/role admin |
 
@@ -66,7 +74,7 @@ Construction / marketing / IT share one project engine; an industry "pack" is pr
 
 ## Build slices (sequencing)
 1. **Foundation** (this scaffold) — monorepo, tenancy + projects schema + RLS, shared domain/access, web shell, auth.
-2. **Monitoring** — site reports + media, milestones; mobile offline capture + PowerSync.
+2. **Monitoring** — site reports + media, milestones ✅ (shipped online-only; offline capture + PowerSync still open).
 3. **Requests & approvals** — schema ✅. Requests (RFI/purchase/variation/access),
    per-org approval policies, and an approval chain materialised by a SECURITY
    DEFINER `submit_request()` (clients can't forge steps). DB triggers enforce

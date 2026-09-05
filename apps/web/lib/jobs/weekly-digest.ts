@@ -7,6 +7,14 @@ import { composeWorkPulse, type WorkPulseData } from '@datumpro/shared/domain';
 
 type Admin = ReturnType<typeof createAdminClient>;
 
+// Cap on unbounded job selects so a runaway tenant can't blow the cron budget.
+const JOB_ROW_CAP = 2000;
+const warnIfCapped = (label: string, rows: readonly unknown[] | null | undefined) => {
+  if ((rows?.length ?? 0) >= JOB_ROW_CAP) {
+    console.warn(`[weekly-digest] ${label} hit the ${JOB_ROW_CAP}-row cap — results truncated`);
+  }
+};
+
 type MemberRow = { org_id: string; user_id: string; role: string };
 type TaskRow = {
   id: string;
@@ -137,8 +145,10 @@ export async function runWeeklyDigest(now: Date = new Date()): Promise<{ recipie
     .from('org_members')
     .select('org_id, user_id, role')
     .eq('status', 'active')
-    .eq('weekly_digest_opt_in', true);
+    .eq('weekly_digest_opt_in', true)
+    .limit(JOB_ROW_CAP);
   const members = (memberData ?? []) as MemberRow[];
+  warnIfCapped('org_members', members);
   if (members.length === 0) return { recipients: 0, emailed: 0 };
 
   const byOrg = new Map<string, MemberRow[]>();
@@ -157,16 +167,24 @@ export async function runWeeklyDigest(now: Date = new Date()): Promise<{ recipie
       admin
         .from('tasks')
         .select('id, title, status, due_date, planned_start_date, sla_status, assignee_id, actual_end_date, project_id, projects(name)')
-        .eq('org_id', orgId),
-      admin.from('project_members').select('user_id, project_id').eq('org_id', orgId).eq('role', 'pm'),
-      admin.from('task_extension_requests').select('project_id').eq('org_id', orgId).eq('status', 'pending'),
-      admin.from('variation_orders').select('project_id').eq('org_id', orgId).eq('status', 'submitted'),
-      admin.from('rfis').select('assignee_id, raised_by, status').eq('org_id', orgId),
-      admin.from('snags').select('assignee_id, raised_by, status').eq('org_id', orgId),
-      admin.from('action_items').select('assignee_id, status').eq('org_id', orgId).eq('status', 'open'),
+        .eq('org_id', orgId)
+        .limit(JOB_ROW_CAP),
+      admin.from('project_members').select('user_id, project_id').eq('org_id', orgId).eq('role', 'pm').limit(JOB_ROW_CAP),
+      admin.from('task_extension_requests').select('project_id').eq('org_id', orgId).eq('status', 'pending').limit(JOB_ROW_CAP),
+      admin.from('variation_orders').select('project_id').eq('org_id', orgId).eq('status', 'submitted').limit(JOB_ROW_CAP),
+      admin.from('rfis').select('assignee_id, raised_by, status').eq('org_id', orgId).limit(JOB_ROW_CAP),
+      admin.from('snags').select('assignee_id, raised_by, status').eq('org_id', orgId).limit(JOB_ROW_CAP),
+      admin.from('action_items').select('assignee_id, status').eq('org_id', orgId).eq('status', 'open').limit(JOB_ROW_CAP),
     ]);
 
     const tasks = (tasksRes.data ?? []) as TaskRow[];
+    warnIfCapped(`tasks (org ${orgId})`, tasks);
+    warnIfCapped(`project_members (org ${orgId})`, pmRes.data);
+    warnIfCapped(`task_extension_requests (org ${orgId})`, extRes.data);
+    warnIfCapped(`variation_orders (org ${orgId})`, varRes.data);
+    warnIfCapped(`rfis (org ${orgId})`, rfiRes.data);
+    warnIfCapped(`snags (org ${orgId})`, snagRes.data);
+    warnIfCapped(`action_items (org ${orgId})`, aiRes.data);
 
     // Approvals per project = submitted tasks + pending extensions + submitted variations.
     const approvalsByProject = new Map<string, number>();

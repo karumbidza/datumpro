@@ -14,8 +14,6 @@ export function TaskActions({
   onChanged,
   planComplete = true,
   acceptancePending = false,
-  hasPlan = true,
-  planApproved = true,
 }: {
   task: TaskDetail;
   perms: TaskPermissions;
@@ -24,10 +22,6 @@ export function TaskActions({
   planComplete?: boolean;
   /** Task awaiting the contractor's accept/decline — hide start/submit. */
   acceptancePending?: boolean;
-  /** At least one planned step exists — required before "Start". */
-  hasPlan?: boolean;
-  /** The priced plan has been approved (or this task doesn't use the plan flow). */
-  planApproved?: boolean;
 }) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);

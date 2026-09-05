@@ -11,12 +11,16 @@ export async function runProgressSnapshot(now: Date = new Date()): Promise<{ cap
   const day = now.toISOString().slice(0, 10);
 
   // Only projects that are actually running — no point trending archived/draft work.
+  // Capped so a runaway tenant can't blow the cron budget.
+  const JOB_ROW_CAP = 2000;
   const { data: projects } = await admin
     .from('projects')
     .select('id, org_id')
-    .in('status', ['planning', 'active', 'on_hold']);
+    .in('status', ['planning', 'active', 'on_hold'])
+    .limit(JOB_ROW_CAP);
 
   const rows = projects ?? [];
+  if (rows.length >= JOB_ROW_CAP) console.warn(`[snapshots] projects scan hit the ${JOB_ROW_CAP}-row cap — results truncated`);
   const snapshots: { org_id: string; project_id: string; day: string; pct: number }[] = [];
   for (const p of rows as { id: string; org_id: string }[]) {
     const { data } = await admin.rpc('project_progress', { p_project_id: p.id });

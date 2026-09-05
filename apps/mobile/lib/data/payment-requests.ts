@@ -1,5 +1,6 @@
 import { decode } from 'base64-arraybuffer';
 import { supabase, currentUser} from '../supabase';
+import { assertUploadSize, MAX_PROJECT_MEDIA_BYTES } from '../upload-limits';
 import type { PaymentRequestStatus } from '@datumpro/shared/domain';
 
 const BUCKET = 'project-media';
@@ -91,6 +92,7 @@ export async function uploadPaymentDoc(params: {
   ext: string;
   mime: string;
 }): Promise<{ path: string; name: string }> {
+  assertUploadSize(params.base64, MAX_PROJECT_MEDIA_BYTES, 'This document');
   const unique = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const path = `${params.orgId}/${params.projectId}/payment-requests/${unique}.${params.ext}`;
   const { error } = await supabase.storage

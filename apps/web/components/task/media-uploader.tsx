@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { recordTaskMedia } from '@/app/(app)/projects/[projectId]/tasks/actions';
+import { MAX_PROJECT_MEDIA_BYTES, uploadSizeError } from '@/lib/upload-limits';
 
 const BUCKET = 'project-media';
 
@@ -40,6 +41,12 @@ export function MediaUploader({
   async function onChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    const sizeErr = uploadSizeError(file, MAX_PROJECT_MEDIA_BYTES);
+    if (sizeErr) {
+      setError(sizeErr);
+      e.target.value = '';
+      return;
+    }
     setBusy(true);
     setError(null);
     try {

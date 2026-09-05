@@ -1,5 +1,6 @@
 import { decode } from 'base64-arraybuffer';
 import { supabase, currentUser} from '../supabase';
+import { assertUploadSize, MAX_PROJECT_MEDIA_BYTES } from '../upload-limits';
 
 const BUCKET = 'project-media';
 
@@ -61,6 +62,7 @@ export async function uploadTaskPhoto(params: {
   purpose?: string;
 }): Promise<void> {
   const { orgId, projectId, taskId, base64, ext, mime, gpsLat, gpsLng, subtaskId, purpose } = params;
+  assertUploadSize(base64, MAX_PROJECT_MEDIA_BYTES, 'This photo');
   const name = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
   const path = `${orgId}/${projectId}/tasks/${taskId}/${name}`;
 

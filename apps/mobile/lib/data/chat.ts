@@ -1,5 +1,6 @@
 import { decode } from 'base64-arraybuffer';
 import { supabase, currentUser} from '../supabase';
+import { assertUploadSize, MAX_CHAT_MEDIA_BYTES } from '../upload-limits';
 
 const CHAT_BUCKET = 'chat-media';
 
@@ -169,6 +170,7 @@ export async function sendPhotoMessage(params: {
     .maybeSingle();
   const c = conv as { org_id: string; project_id: string } | null;
   if (!c) throw new Error('Conversation not found');
+  assertUploadSize(params.base64, MAX_CHAT_MEDIA_BYTES, 'This photo');
 
   const name = `${Date.now()}-${Math.random().toString(36).slice(2)}.${params.ext}`;
   const path = `${c.org_id}/${c.project_id}/chat/${params.conversationId}/${name}`;
@@ -216,6 +218,7 @@ export async function sendVoiceMessage(params: {
     .maybeSingle();
   const c = conv as { org_id: string; project_id: string } | null;
   if (!c) throw new Error('Conversation not found');
+  assertUploadSize(params.base64, MAX_CHAT_MEDIA_BYTES, 'This voice note');
 
   const name = `${Date.now()}-${Math.random().toString(36).slice(2)}.${params.ext}`;
   const path = `${c.org_id}/${c.project_id}/chat/${params.conversationId}/${name}`;

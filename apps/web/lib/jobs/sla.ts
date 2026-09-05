@@ -14,6 +14,9 @@ interface TaskRow {
 
 const ACTIVE = ['todo', 'in_progress']; // work in flight; not submitted/blocked/done
 
+// Cap on unbounded job selects so a runaway tenant can't blow the cron budget.
+const JOB_ROW_CAP = 2000;
+
 /** Today's date (UTC) as YYYY-MM-DD — due_date is a DATE column. */
 function todayISO(now: Date): string {
   return now.toISOString().slice(0, 10);
@@ -45,7 +48,8 @@ export async function runSlaScan(now: Date = new Date()): Promise<{
       .not('due_date', 'is', null)
       .lt('due_date', today)
       .in('status', ACTIVE)
-      .in('sla_status', ['on_track', 'at_risk']),
+      .in('sla_status', ['on_track', 'at_risk'])
+      .limit(JOB_ROW_CAP),
     admin
       .from('tasks')
       .select('id, title, due_date, project_id, assignee_id, sla_status')
@@ -53,11 +57,14 @@ export async function runSlaScan(now: Date = new Date()): Promise<{
       .gte('due_date', today)
       .lte('due_date', tomorrow)
       .in('status', ACTIVE)
-      .eq('sla_status', 'on_track'),
+      .eq('sla_status', 'on_track')
+      .limit(JOB_ROW_CAP),
   ]);
 
   const breachedTasks = (overdueData ?? []) as TaskRow[];
   const atRiskTasks = (soonData ?? []) as TaskRow[];
+  if (breachedTasks.length >= JOB_ROW_CAP) console.warn(`[sla] overdue scan hit the ${JOB_ROW_CAP}-row cap — results truncated`);
+  if (atRiskTasks.length >= JOB_ROW_CAP) console.warn(`[sla] due-soon scan hit the ${JOB_ROW_CAP}-row cap — results truncated`);
 
   // Flip the states in two bulk updates.
   if (breachedTasks.length) {

@@ -320,8 +320,7 @@ export function BidWorkspaceView({
                 index={si}
                 section={s}
                 closed={closed}
-                // TODO: carry tender currency — currently defaults to USD
-                currency="USD"
+                currency={ws.currency}
                 itemTotal={itemTotal}
                 sectionTotal={sectionTotal(s)}
                 onRateBlur={onRateBlur}
@@ -350,8 +349,7 @@ export function BidWorkspaceView({
                 </span>
               </td>
               <td className="border-l border-zinc-300 px-2.5 py-3 text-right tabular-nums text-brand-600 dark:border-zinc-700 dark:text-brand-500">
-                {/* TODO: carry tender currency */}
-                {fmtMoney(grand, 'USD')}
+                {fmtMoney(grand, ws.currency)}
               </td>
             </tr>
           </tfoot>

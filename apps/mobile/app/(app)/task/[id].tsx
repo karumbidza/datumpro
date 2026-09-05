@@ -120,9 +120,6 @@ export default function TaskDetailScreen() {
   // Only the agreed scope (baseline + approved variations) gates completion.
   const countedSubtasks = subtasks.filter((s) => !s.isVariation || s.variationStatus === 'approved');
   const planComplete = countedSubtasks.length === 0 || countedSubtasks.every((s) => s.isDone);
-  // Contractor tasks can't start until the priced plan is approved.
-  const usesPlanFlow = task.acceptanceStatus !== null;
-  const planApproved = !usesPlanFlow || !!task.planApprovedAt;
   // An open tender invitee builds their sealed bid instead of the normal panels.
   const isBidder = bid?.status === 'invited' || bid?.status === 'submitted';
   // Plan docs (bid_contractor_id null) vs my own bid docs (RLS only returns mine).
@@ -251,8 +248,6 @@ export default function TaskDetailScreen() {
           onChanged={load}
           planComplete={planComplete}
           acceptancePending={acceptancePending}
-          hasPlan={subtasks.length > 0}
-          planApproved={planApproved}
         />
       )}
 

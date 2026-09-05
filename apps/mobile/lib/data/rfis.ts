@@ -1,5 +1,6 @@
 import { decode } from 'base64-arraybuffer';
 import { supabase, currentUser } from '../supabase';
+import { assertUploadSize, MAX_PROJECT_MEDIA_BYTES } from '../upload-limits';
 
 const BUCKET = 'project-media';
 
@@ -320,6 +321,7 @@ export async function addRfiAttachment(params: {
   if (!user) throw new Error('Not signed in.');
   const proj = await projectOrg(params.projectId);
   if (!proj) throw new Error('Project not found.');
+  assertUploadSize(params.base64, MAX_PROJECT_MEDIA_BYTES, 'This photo');
 
   const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${params.ext}`;
   const path = `${proj.orgId}/${params.projectId}/rfis/${params.rfiId}/${filename}`;

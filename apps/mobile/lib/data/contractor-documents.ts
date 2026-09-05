@@ -1,5 +1,6 @@
 import { decode } from 'base64-arraybuffer';
 import { supabase, currentUser} from '../supabase';
+import { assertUploadSize, MAX_PROJECT_MEDIA_BYTES } from '../upload-limits';
 import type { ContractorDocType, ContractorDocStatus } from '@datumpro/shared/domain';
 
 const BUCKET = 'project-media';
@@ -76,6 +77,7 @@ export async function uploadDocument(params: {
 }): Promise<void> {
   const user = await currentUser();
   if (!user) throw new Error('Not signed in');
+  assertUploadSize(params.base64, MAX_PROJECT_MEDIA_BYTES, 'This document');
   const unique = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const path = `${params.orgId}/compliance/${unique}.${params.ext}`;
   const { error: upErr } = await supabase.storage
