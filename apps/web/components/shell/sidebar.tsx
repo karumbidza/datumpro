@@ -51,7 +51,7 @@ export function Sidebar({ projects, orgs, activeOrgId, email, canManageMembers, 
 
       <nav className="flex-1 overflow-y-auto p-2">
         {activeProject && (
-          <p className="px-3 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+          <p className="px-3 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
             {activeProject.name}
           </p>
         )}
@@ -168,7 +168,7 @@ function OrgSwitcher({ orgs, activeOrgId, memberType }: { orgs: OrgMembershipSum
             onClick={() => setOpen(false)}
           />
           <div className="absolute bottom-full left-0 right-0 z-20 mb-1 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
-            <p className="px-3 py-1.5 text-[10px] uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+            <p className="px-3 py-1.5 text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
               Organisations
             </p>
             {orgs.map((o) => (
@@ -290,7 +290,7 @@ function ProjectSwitcher({
 
             {projects.length > 0 && (
               <>
-                <p className="px-3 pt-1 text-[10px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                <p className="px-3 pt-1 text-[10px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                   Projects
                 </p>
                 <div className="p-1.5">

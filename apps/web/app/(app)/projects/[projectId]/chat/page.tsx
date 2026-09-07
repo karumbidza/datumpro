@@ -9,13 +9,17 @@ import {
   getProjectConversationId,
   listMessages,
   othersMaxReadSeq,
+  myReadSeq,
   listConversationAttachments,
   getConversationAbout,
   listPinnedMessages,
 } from '@/lib/data/chat';
 import { listProjectActionItems } from '@/lib/data/action-items';
 import { listProjectEvents } from '@/lib/data/events';
+import { chatV2Enabled } from '@/lib/chat-flag';
 import { ChatPanel } from '@/components/chat/chat-panel';
+import { ChatPanelV2 } from '@/components/chat/v2/chat-panel-v2';
+import { TodayOnSite } from '@/components/chat/v2/today-on-site';
 import { ChatActionItems } from '@/components/chat/chat-action-items';
 import { ChatEvents } from '@/components/chat/chat-events';
 import { Card } from '@/components/ui/card';
@@ -33,9 +37,11 @@ export default async function ProjectChatPage({
   if (!project) notFound();
 
   const conversationId = await getProjectConversationId(projectId);
+  const v2 = chatV2Enabled();
 
   return (
     <div className="flex h-full flex-col px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      <h1 className="sr-only">{project.name} — project chat</h1>
       <Link href={`/projects/${projectId}`} className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
         ← {project.name}
       </Link>
@@ -51,13 +57,14 @@ export default async function ProjectChatPage({
         </div>
       ) : (
         await (async () => {
-          const [messages, roster, orgRole, projectRole, othersRead, actionItems, events, sharedFiles, about, pinned] =
+          const [messages, roster, orgRole, projectRole, othersRead, ownRead, actionItems, events, sharedFiles, about, pinned] =
             await Promise.all([
               listMessages(conversationId, user.id),
               listChatRoster(projectId),
               myOrgRole(project.org_id),
               myProjectRole(projectId),
               othersMaxReadSeq(conversationId, user.id),
+              myReadSeq(conversationId, user.id),
               listProjectActionItems(projectId),
               listProjectEvents(projectId),
               listConversationAttachments(conversationId),
@@ -67,6 +74,44 @@ export default async function ProjectChatPage({
           const names = Object.fromEntries(roster.map((m) => [m.userId, m.name]));
           const meName = names[user.id] ?? user.email?.split('@')[0] ?? 'You';
           const canModerate = orgRole === 'owner' || orgRole === 'admin' || projectRole === 'pm';
+          const stripMembers = roster.map((m) => ({ userId: m.userId, name: m.name }));
+
+          if (v2) {
+            return (
+              <ChatPanelV2
+                className="mt-3 min-h-0 flex-1"
+                title={project.name}
+                conversationId={conversationId}
+                orgId={project.org_id}
+                projectId={projectId}
+                currentUserId={user.id}
+                meName={meName}
+                initialMessages={messages}
+                othersReadSeq={othersRead}
+                myReadSeq={ownRead}
+                canPost
+                canModerate={canModerate}
+                members={roster}
+                sharedFiles={sharedFiles}
+                about={about}
+                pinnedMessages={pinned}
+                pinnedMessageIds={pinned.map((p) => p.messageId)}
+                showRegisterLinks
+                todayStrip={
+                  <TodayOnSite
+                    projectId={projectId}
+                    conversationId={conversationId}
+                    actionItems={actionItems}
+                    events={events}
+                    members={stripMembers}
+                    canManage={canModerate}
+                    currentUserId={user.id}
+                  />
+                }
+              />
+            );
+          }
+
           return (
             <>
               {/* Messaging leads; the to-dos + events strip sits below it. */}
@@ -94,7 +139,7 @@ export default async function ProjectChatPage({
                   projectId={projectId}
                   conversationId={conversationId}
                   items={actionItems}
-                  members={roster.map((m) => ({ userId: m.userId, name: m.name }))}
+                  members={stripMembers}
                   canManage={canModerate}
                   currentUserId={user.id}
                 />
@@ -102,7 +147,7 @@ export default async function ProjectChatPage({
                   projectId={projectId}
                   conversationId={conversationId}
                   events={events}
-                  members={roster.map((m) => ({ userId: m.userId, name: m.name }))}
+                  members={stripMembers}
                   canManage={canModerate}
                   currentUserId={user.id}
                 />

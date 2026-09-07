@@ -33,7 +33,7 @@ export function ToastCard({
         }`}
       >
         {toast.orgName && (
-          <span className="mb-0.5 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+          <span className="mb-0.5 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-brand-500" aria-hidden />
             {toast.orgName}
           </span>

@@ -433,3 +433,51 @@ export function BrandMark({ size = 32 }: { size?: number }) {
     />
   );
 }
+
+export const Play: IconComponent = (p) => (
+  <Icon {...p}>
+    <polygon points="6 3 20 12 6 21 6 3" />
+  </Icon>
+);
+
+export const Pause: IconComponent = (p) => (
+  <Icon {...p}>
+    <rect x="14" y="4" width="4" height="16" rx="1" />
+    <rect x="6" y="4" width="4" height="16" rx="1" />
+  </Icon>
+);
+
+export const Hash: IconComponent = (p) => (
+  <Icon {...p}>
+    <line x1="4" x2="20" y1="9" y2="9" />
+    <line x1="4" x2="20" y1="15" y2="15" />
+    <line x1="10" x2="8" y1="3" y2="21" />
+    <line x1="16" x2="14" y1="3" y2="21" />
+  </Icon>
+);
+
+export const AtSign: IconComponent = (p) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="4" />
+    <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" />
+  </Icon>
+);
+
+export const PanelRight: IconComponent = (p) => (
+  <Icon {...p}>
+    <rect width="18" height="18" x="3" y="3" rx="2" />
+    <path d="M15 3v18" />
+  </Icon>
+);
+
+export const WifiOff: IconComponent = (p) => (
+  <Icon {...p}>
+    <path d="M12 20h.01" />
+    <path d="M8.5 16.429a5 5 0 0 1 7 0" />
+    <path d="M5 12.859a10 10 0 0 1 5.17-2.69" />
+    <path d="M19 12.859a10 10 0 0 0-2.007-1.523" />
+    <path d="M2 8.82a15 15 0 0 1 4.177-2.643" />
+    <path d="M22 8.82a15 15 0 0 0-11.288-3.764" />
+    <path d="m2 2 20 20" />
+  </Icon>
+);

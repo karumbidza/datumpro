@@ -18,6 +18,22 @@ export interface ChatAttachment {
   durationSeconds: number | null;
   width: number | null;
   height: number | null;
+  /** Site-photo evidence metadata, when the sender's device provided it. */
+  lat: number | null;
+  lng: number | null;
+  takenAt: string | null;
+}
+
+export type LinkTargetType = 'task' | 'snag' | 'rfi' | 'payment' | 'drawing';
+
+/** A work-item reference chip on a message. Label and status are resolved live
+ *  from the target row at read time — never snapshotted. */
+export interface MessageLink {
+  id: string;
+  targetType: LinkTargetType;
+  targetId: string;
+  label: string;
+  status: string | null;
 }
 
 export interface ChatMessage {
@@ -32,6 +48,11 @@ export interface ChatMessage {
   parentMessageId: string | null;
   reactions: MessageReaction[];
   attachments: ChatAttachment[];
+  links: MessageLink[];
+  /** User ids @-mentioned in this message (drives the mentioned-row tint). */
+  mentionedUserIds: string[];
+  /** Replies threaded under this message (0 for thread replies themselves). */
+  replyCount: number;
 }
 
 /** The project's group-chat conversation id — or null if the caller can't access
@@ -79,10 +100,13 @@ interface MessageRow {
 async function hydrate(rows: MessageRow[], meId: string): Promise<ChatMessage[]> {
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
-  const [names, reactions, attachments] = await Promise.all([
+  const [names, reactions, attachments, links, mentions, replyCounts] = await Promise.all([
     resolveNames(rows.map((r) => r.sender_id)),
     aggregateReactions(ids, meId),
     loadAttachments(ids),
+    loadLinks(ids),
+    loadMentions(ids),
+    loadReplyCounts(ids),
   ]);
   return rows.map((r) => ({
     id: r.id,
@@ -96,7 +120,175 @@ async function hydrate(rows: MessageRow[], meId: string): Promise<ChatMessage[]>
     parentMessageId: r.parent_message_id,
     reactions: reactions.get(r.id) ?? [],
     attachments: r.deleted_at ? [] : attachments.get(r.id) ?? [],
+    links: r.deleted_at ? [] : links.get(r.id) ?? [],
+    mentionedUserIds: mentions.get(r.id) ?? [],
+    replyCount: replyCounts.get(r.id) ?? 0,
   }));
+}
+
+/** Replies-per-parent for the loaded window (deleted replies still count as the
+ *  thread exists; their bodies render as "message deleted" inside it). */
+async function loadReplyCounts(messageIds: string[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (messageIds.length === 0) return out;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('messages')
+    .select('parent_message_id')
+    .in('parent_message_id', messageIds);
+  for (const r of (data ?? []) as { parent_message_id: string | null }[]) {
+    if (r.parent_message_id) out.set(r.parent_message_id, (out.get(r.parent_message_id) ?? 0) + 1);
+  }
+  return out;
+}
+
+async function loadMentions(messageIds: string[]): Promise<Map<string, string[]>> {
+  const out = new Map<string, string[]>();
+  if (messageIds.length === 0) return out;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('message_mentions')
+    .select('message_id, mentioned_user_id')
+    .in('message_id', messageIds);
+  for (const r of (data ?? []) as { message_id: string; mentioned_user_id: string }[]) {
+    const list = out.get(r.message_id) ?? [];
+    list.push(r.mentioned_user_id);
+    out.set(r.message_id, list);
+  }
+  return out;
+}
+
+/** Load link rows for a message window and resolve each target's label + live
+ *  status with one batched query per target type. A target the caller can't see
+ *  (RLS) or that was deleted is dropped from the chip row. */
+async function loadLinks(messageIds: string[]): Promise<Map<string, MessageLink[]>> {
+  const out = new Map<string, MessageLink[]>();
+  if (messageIds.length === 0) return out;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('message_links')
+    .select('id, message_id, target_type, target_id')
+    .in('message_id', messageIds)
+    .order('created_at', { ascending: true });
+  const rows = (data ?? []) as { id: string; message_id: string; target_type: LinkTargetType; target_id: string }[];
+  if (rows.length === 0) return out;
+
+  const byType = new Map<LinkTargetType, string[]>();
+  for (const r of rows) {
+    const list = byType.get(r.target_type) ?? [];
+    list.push(r.target_id);
+    byType.set(r.target_type, list);
+  }
+
+  const resolved = new Map<string, { label: string; status: string | null }>();
+  const key = (t: string, id: string) => `${t}:${id}`;
+  await Promise.all(
+    [...byType.entries()].map(async ([type, ids]) => {
+      const unique = [...new Set(ids)];
+      if (type === 'task') {
+        const { data: d } = await supabase.from('tasks').select('id, title, status').in('id', unique);
+        for (const t of (d ?? []) as { id: string; title: string; status: string }[])
+          resolved.set(key(type, t.id), { label: t.title, status: t.status });
+      } else if (type === 'snag') {
+        const { data: d } = await supabase.from('snags').select('id, number, title, status').in('id', unique);
+        for (const t of (d ?? []) as { id: string; number: number; title: string; status: string }[])
+          resolved.set(key(type, t.id), { label: `Snag ${t.number} · ${t.title}`, status: t.status });
+      } else if (type === 'rfi') {
+        const { data: d } = await supabase.from('rfis').select('id, number, subject, status').in('id', unique);
+        for (const t of (d ?? []) as { id: string; number: number; subject: string; status: string }[])
+          resolved.set(key(type, t.id), { label: `RFI ${t.number} · ${t.subject}`, status: t.status });
+      } else if (type === 'payment') {
+        const { data: d } = await supabase
+          .from('contractor_payment_requests')
+          .select('id, title, status')
+          .in('id', unique);
+        for (const t of (d ?? []) as { id: string; title: string; status: string }[])
+          resolved.set(key(type, t.id), { label: t.title, status: t.status });
+      } else if (type === 'drawing') {
+        const { data: d } = await supabase.from('drawings').select('id, number, title').in('id', unique);
+        for (const t of (d ?? []) as { id: string; number: string; title: string }[])
+          resolved.set(key(type, t.id), { label: `${t.number} · ${t.title}`, status: null });
+      }
+    }),
+  );
+
+  for (const r of rows) {
+    const t = resolved.get(key(r.target_type, r.target_id));
+    if (!t) continue; // target deleted or not visible to this caller
+    const list = out.get(r.message_id) ?? [];
+    list.push({ id: r.id, targetType: r.target_type, targetId: r.target_id, label: t.label, status: t.status });
+    out.set(r.message_id, list);
+  }
+  return out;
+}
+
+/** The caller's own read cursor — drives the unread "New" divider. */
+export async function myReadSeq(conversationId: string, meId: string): Promise<number> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('chat_read_state')
+    .select('last_read_seq')
+    .eq('conversation_id', conversationId)
+    .eq('user_id', meId)
+    .maybeSingle();
+  return (data as { last_read_seq: number } | null)?.last_read_seq ?? 0;
+}
+
+/** All replies under one parent message (ascending) — the rail thread view. */
+export async function listThreadMessages(
+  conversationId: string,
+  meId: string,
+  parentMessageId: string,
+): Promise<ChatMessage[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('messages')
+    .select(MESSAGE_COLS)
+    .eq('conversation_id', conversationId)
+    .eq('parent_message_id', parentMessageId)
+    .order('seq', { ascending: true })
+    .limit(200);
+  return hydrate((data ?? []) as MessageRow[], meId);
+}
+
+/** Typeahead over the project's linkable work items ("#" in the composer).
+ *  One small ilike query per register; RLS scopes each to what the caller may
+ *  see, so a contractor's results are already filtered. */
+export interface LinkTargetOption {
+  targetType: LinkTargetType;
+  targetId: string;
+  label: string;
+  status: string | null;
+}
+
+export async function searchLinkTargets(projectId: string, query: string): Promise<LinkTargetOption[]> {
+  const q = query.trim();
+  const supabase = await createClient();
+  const like = q ? `%${q}%` : '%';
+  const [tasks, snags, rfis, payments, drawings] = await Promise.all([
+    supabase.from('tasks').select('id, title, status').eq('project_id', projectId).ilike('title', like).limit(5),
+    supabase.from('snags').select('id, number, title, status').eq('project_id', projectId).ilike('title', like).limit(4),
+    supabase.from('rfis').select('id, number, subject, status').eq('project_id', projectId).ilike('subject', like).limit(4),
+    supabase
+      .from('contractor_payment_requests')
+      .select('id, title, status')
+      .eq('project_id', projectId)
+      .ilike('title', like)
+      .limit(4),
+    supabase.from('drawings').select('id, number, title').eq('project_id', projectId).ilike('title', like).limit(4),
+  ]);
+  const out: LinkTargetOption[] = [];
+  for (const t of (tasks.data ?? []) as { id: string; title: string; status: string }[])
+    out.push({ targetType: 'task', targetId: t.id, label: t.title, status: t.status });
+  for (const s of (snags.data ?? []) as { id: string; number: number; title: string; status: string }[])
+    out.push({ targetType: 'snag', targetId: s.id, label: `Snag ${s.number} · ${s.title}`, status: s.status });
+  for (const r of (rfis.data ?? []) as { id: string; number: number; subject: string; status: string }[])
+    out.push({ targetType: 'rfi', targetId: r.id, label: `RFI ${r.number} · ${r.subject}`, status: r.status });
+  for (const p of (payments.data ?? []) as { id: string; title: string; status: string }[])
+    out.push({ targetType: 'payment', targetId: p.id, label: p.title, status: p.status });
+  for (const d of (drawings.data ?? []) as { id: string; number: string; title: string }[])
+    out.push({ targetType: 'drawing', targetId: d.id, label: `${d.number} · ${d.title}`, status: null });
+  return out.slice(0, 12);
 }
 
 /** Most recent messages (ascending), with sender names + aggregated reactions. */
@@ -182,7 +374,7 @@ async function loadAttachments(messageIds: string[]): Promise<Map<string, ChatAt
   const supabase = await createClient();
   const { data } = await supabase
     .from('message_attachments')
-    .select('id, message_id, kind, storage_path, mime, filename, size_bytes, duration_seconds, width, height')
+    .select('id, message_id, kind, storage_path, mime, filename, size_bytes, duration_seconds, width, height, lat, lng, taken_at')
     .in('message_id', messageIds)
     .order('created_at', { ascending: true });
   const rows = (data ?? []) as {
@@ -196,6 +388,9 @@ async function loadAttachments(messageIds: string[]): Promise<Map<string, ChatAt
     duration_seconds: number | null;
     width: number | null;
     height: number | null;
+    lat: number | null;
+    lng: number | null;
+    taken_at: string | null;
   }[];
   if (rows.length === 0) return out;
 
@@ -217,6 +412,9 @@ async function loadAttachments(messageIds: string[]): Promise<Map<string, ChatAt
       durationSeconds: r.duration_seconds,
       width: r.width,
       height: r.height,
+      lat: r.lat,
+      lng: r.lng,
+      takenAt: r.taken_at,
     };
     const list = out.get(r.message_id) ?? [];
     list.push(att);
