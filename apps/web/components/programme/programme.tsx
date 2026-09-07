@@ -53,7 +53,8 @@ const DAY_W = 26; // px per day
 const ROW_H = 34; // px per task row
 const LABEL_W = 200; // left label column
 const AXIS_H = 46; // date axis header (week date row + day-of-week row)
-const PAD_DAYS = 3; // breathing room either side of the range
+const PAD_START_DAYS = 3; // breathing room before the range
+const PAD_END_DAYS = 10; // runway after the range (drag space + uncut last label)
 
 const STATUS_BAR: Record<TaskStatus, string> = {
   todo: 'bg-zinc-400 dark:bg-zinc-500',
@@ -72,6 +73,14 @@ const STATUS_LABEL: Record<TaskStatus, string> = {
   blocked: 'Blocked',
   done: 'Done',
 };
+
+/** Smooth s-curve between two anchor points. Control points reach at least
+ *  24px (up to 60px) toward each other, which also draws a graceful loop when
+ *  the successor sits left of the predecessor. */
+function curvePath(x1: number, y1: number, x2: number, y2: number): string {
+  const reach = Math.min(Math.max(Math.abs(x2 - x1) / 2, 24), 60);
+  return `M ${x1} ${y1} C ${x1 + reach} ${y1}, ${x2 - reach} ${y2}, ${x2} ${y2}`;
+}
 
 function fmt(iso: string): string {
   const d = parseDate(iso);
@@ -273,7 +282,22 @@ export function Programme({
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<string | null>(null);
-  const [preview, setPreview] = useState<{ taskId: string; startIso: string; endIso: string } | null>(null);
+  const [preview, setPreview] = useState<{
+    taskId: string;
+    startIso: string;
+    endIso: string;
+    /** Live pixel geometry while the pointer is down — the bar follows the
+     *  finger/cursor continuously and only the dates snap to days. */
+    px?: { left: number; width: number };
+  } | null>(null);
+  // Committed-but-not-yet-refreshed windows: keeps a dropped bar at its new
+  // dates while the server round-trip completes (no snap-back flash).
+  const [optimistic, setOptimistic] = useState<Map<string, { startIso: string; endIso: string }>>(new Map());
+  // Fresh RSC data is the source of truth — drop the overlay when it arrives.
+  useEffect(() => {
+    setOptimistic((m) => (m.size === 0 ? m : new Map()));
+     
+  }, [data]);
   const [link, setLink] = useState<{ fromId: string; fromEdge: 'start' | 'finish'; x: number; y: number; overId: string | null } | null>(null);
   const [reorder, setReorder] = useState<{ taskId: string; overIndex: number } | null>(null);
   const [linkMenu, setLinkMenu] = useState<{ predecessorId: string; successorId: string; type: DependencyType; lag: number; x: number; y: number } | null>(null);
@@ -334,9 +358,9 @@ export function Programme({
   const geom = useMemo(() => {
     if (!data.rangeStartIso || !data.rangeEndIso) return null;
     const rangeStart = startOfDay(parseDate(data.rangeStartIso)!);
-    const start = addDays(rangeStart, -PAD_DAYS);
+    const start = addDays(rangeStart, -PAD_START_DAYS);
     const rangeEnd = startOfDay(parseDate(data.rangeEndIso)!);
-    const totalDays = differenceInDays(rangeEnd, start) + 1 + PAD_DAYS;
+    const totalDays = differenceInDays(rangeEnd, start) + 1 + PAD_END_DAYS;
     const width = totalDays * DAY_W;
     const offset = (iso: string) => {
       const d = parseDate(iso);
@@ -449,8 +473,10 @@ export function Programme({
   const invalidTargetsRef = useRef<Set<string>>(new Set());
 
   // The window to draw for a task: its previewed window while it's being dragged.
-  const winOf = (t: ProgrammeTask): { startIso: string; endIso: string } =>
-    preview && preview.taskId === t.id ? { startIso: preview.startIso, endIso: preview.endIso } : { startIso: t.startIso, endIso: t.endIso };
+  const winOf = (t: ProgrammeTask): { startIso: string; endIso: string } => {
+    if (preview && preview.taskId === t.id) return { startIso: preview.startIso, endIso: preview.endIso };
+    return optimistic.get(t.id) ?? { startIso: t.startIso, endIso: t.endIso };
+  };
 
   function flash(message: string) {
     setError(message);
@@ -474,6 +500,9 @@ export function Programme({
         flash(res.error ?? 'Could not reschedule');
         return;
       }
+      // Keep the bar where it was dropped until the refreshed data lands (the
+      // scheduler may still snap it to working days — that arrives with truth).
+      setOptimistic((m) => new Map(m).set(taskId, { startIso: start, endIso: end }));
       setPreview((p) => (p && p.taskId === taskId ? null : p));
       if (res.cascaded && res.cascaded > 0) {
         flash(`${res.cascaded} dependent task${res.cascaded === 1 ? '' : 's'} rescheduled`);
@@ -571,6 +600,13 @@ export function Programme({
     if (started && (session.mode === 'resize-start' || session.mode === 'resize-end')) return;
     e.preventDefault();
     e.stopPropagation();
+    // Pointer capture: touch drags keep streaming to us even when the finger
+    // wanders off the handle; without it mobile scroll steals the gesture.
+    try {
+      (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    } catch {
+      /* capture is best-effort */
+    }
     // Suspend live-refresh for the lifetime of this gesture.
     draggingRef.current = true;
     // Seed the invalid-target set for a link drag so the first move already knows
@@ -580,6 +616,11 @@ export function Programme({
     const startX = e.clientX;
     const startY = e.clientY;
     let moved = false;
+    // Pixel geometry at drag start, for the smooth (unsnapped) bar movement.
+    const origLeftPx = geom ? geom.offset(session.origStart) * DAY_W : 0;
+    const origDays = diffDaysIso(session.origEnd, session.origStart) + 1;
+    const origWidthPx = Math.max(origDays * DAY_W - 3, 8);
+    const todayPx = geom?.todayX ?? null;
     // For a bar-body drag, the dominant axis decides: horizontal = reschedule,
     // vertical = reorder the row. Locked once the gesture passes the threshold.
     let axis: 'x' | 'y' | undefined;
@@ -619,9 +660,11 @@ export function Programme({
         return;
       }
 
-      const days = Math.round((ev.clientX - startX) / DAY_W);
-      if (days !== 0) moved = true;
+      const rawDx = ev.clientX - startX;
+      const days = Math.round(rawDx / DAY_W);
+      if (Math.abs(rawDx) > 2) moved = true;
       const t = todayIso();
+      let px: { left: number; width: number };
       if (session.mode === 'move') {
         let s = shiftIso(session.origStart, days);
         let en = shiftIso(session.origEnd, days);
@@ -631,22 +674,33 @@ export function Programme({
           en = shiftIso(en, back);
         }
         cur = { startIso: s, endIso: en };
+        // The bar follows the pointer 1:1, clamped at the today line like the dates.
+        let left = origLeftPx + rawDx;
+        if (todayPx != null && left < todayPx) left = todayPx;
+        px = { left, width: origWidthPx };
       } else if (session.mode === 'resize-start') {
         let s = shiftIso(session.origStart, days);
         if (s < t) s = t;
         if (s > session.origEnd) s = session.origEnd;
         cur = { startIso: s, endIso: session.origEnd };
+        let left = origLeftPx + rawDx;
+        if (todayPx != null && left < todayPx) left = todayPx;
+        const rightPx = origLeftPx + origWidthPx;
+        if (left > rightPx - DAY_W + 3) left = rightPx - DAY_W + 3;
+        px = { left, width: rightPx - left };
       } else {
         let en = shiftIso(session.origEnd, days);
         if (en < session.origStart) en = session.origStart;
         cur = { startIso: session.origStart, endIso: en };
+        px = { left: origLeftPx, width: Math.max(origWidthPx + rawDx, DAY_W - 3) };
       }
-      setPreview({ taskId: session.taskId, startIso: cur.startIso, endIso: cur.endIso });
+      setPreview({ taskId: session.taskId, startIso: cur.startIso, endIso: cur.endIso, px });
     };
 
     const onUp = (ev: globalThis.PointerEvent) => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onCancel);
       // The gesture has fully ended: resume live-refresh (and flush a deferred one).
       endDrag();
       if (session.mode === 'link') {
@@ -685,8 +739,19 @@ export function Programme({
       }
     };
 
+    const onCancel = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onCancel);
+      setPreview(null);
+      setLink(null);
+      setReorder(null);
+      invalidTargetsRef.current = new Set();
+      endDrag();
+    };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onCancel);
   }
 
   if (data.tasks.length === 0) {
@@ -1032,7 +1097,7 @@ export function Programme({
           {/* Timeline */}
           <div className="min-w-0 flex-1 overflow-x-auto">
             {geom && (
-              <div className="relative" style={{ width: geom.width }}>
+              <div className="relative min-w-full" style={{ width: geom.width }}>
                 {/* Axis */}
                 <div style={{ height: AXIS_H }} className="relative border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/40">
                   {/* Week/date labels — top row */}
@@ -1042,7 +1107,7 @@ export function Programme({
                       className="absolute top-0 border-l border-zinc-200 pl-1 text-[10px] font-medium leading-[24px] text-zinc-500 dark:border-zinc-800 dark:text-zinc-400"
                       style={{ left: tick.x, height: 24 }}
                     >
-                      {tick.label}
+                      {tick.x <= geom.width - 44 && tick.label}
                     </div>
                   ))}
                   {/* Day-of-week — one per day, bottom row (weekends muted) */}
@@ -1129,8 +1194,8 @@ export function Programme({
                       const y1 = pi * ROW_H + ROW_H / 2;
                       const x2 = succAtStart ? geom.offset(sw.startIso) * DAY_W : (geom.offset(sw.endIso) + 1) * DAY_W;
                       const y2 = si * ROW_H + ROW_H / 2;
-                      const midX = Math.max(x1 + 8, x2 - 8);
-                      const d = `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`;
+                      const midX = (x1 + x2) / 2;
+                      const d = curvePath(x1, y1, x2, y2);
                       const crit = e.critical;
                       const showTag = e.type !== 'fs' || e.lagDays !== 0;
                       // Dim edges not fully inside the selected task's chain.
@@ -1144,6 +1209,7 @@ export function Programme({
                           <path
                             d={d}
                             fill="none"
+                            strokeLinecap="round"
                             className={crit ? 'stroke-red-500' : 'stroke-zinc-300 dark:stroke-zinc-600'}
                             strokeWidth={crit ? 2 : 1.5}
                             markerEnd={crit ? 'url(#pm-arrow-crit)' : 'url(#pm-arrow)'}
@@ -1172,14 +1238,13 @@ export function Programme({
                     })}
                     {/* In-progress link line */}
                     {link && linkSourcePoint && (
-                      <line
-                        x1={linkSourcePoint.x}
-                        y1={linkSourcePoint.y}
-                        x2={link.x}
-                        y2={link.y}
+                      <path
+                        d={curvePath(linkSourcePoint.x, linkSourcePoint.y, link.x, link.y)}
+                        fill="none"
                         className="stroke-brand-500"
                         strokeWidth={1.5}
                         strokeDasharray="4 3"
+                        strokeLinecap="round"
                       />
                     )}
                   </svg>
@@ -1187,10 +1252,11 @@ export function Programme({
                   {/* Bars */}
                   {data.tasks.map((t, i) => {
                     const w = winOf(t);
-                    const left = geom.offset(w.startIso) * DAY_W;
-                    const days = diffDaysIso(w.endIso, w.startIso) + 1;
-                    const width = Math.max(days * DAY_W - 3, 8);
                     const dragging = preview?.taskId === t.id;
+                    const livePx = dragging ? preview?.px : undefined;
+                    const left = livePx ? livePx.left : geom.offset(w.startIso) * DAY_W;
+                    const days = diffDaysIso(w.endIso, w.startIso) + 1;
+                    const width = livePx ? livePx.width : Math.max(days * DAY_W - 3, 8);
                     const reordering = reorder?.taskId === t.id;
                     // During a link drag, a self/duplicate/cycle target is un-droppable:
                     // dim it and show a not-allowed cursor (and never highlight it).
@@ -1204,9 +1270,15 @@ export function Programme({
                     return (
                       <div
                         key={t.id}
-                        className={`group absolute ${reordering ? 'opacity-40' : ''} ${linkInvalid ? 'cursor-not-allowed opacity-40' : ''} ${chainDimmed ? 'opacity-40' : ''}`}
+                        className={`group absolute ${dragging ? '' : 'transition-[left] duration-150 motion-reduce:transition-none'} ${reordering ? 'opacity-40' : ''} ${linkInvalid ? 'cursor-not-allowed opacity-40' : ''} ${chainDimmed ? 'opacity-40' : ''}`}
                         style={{ top: i * ROW_H + 6, left, height: ROW_H - 12 }}
                       >
+                        {/* Live date readout while dragging — the snap target. */}
+                        {dragging && (
+                          <span className="pointer-events-none absolute -top-5 left-0 z-40 whitespace-nowrap rounded bg-zinc-900 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-white shadow dark:bg-zinc-100 dark:text-zinc-900">
+                            {fmt(w.startIso)} – {fmt(w.endIso)}
+                          </span>
+                        )}
                         {/* Total float (slack) + its value */}
                         {floatW > 0 && (
                           <>
@@ -1225,7 +1297,7 @@ export function Programme({
                         )}
                         <div
                           style={{ width }}
-                          className={`relative flex h-full items-center overflow-hidden rounded text-[10px] font-medium text-white shadow-sm ${
+                          className={`relative flex h-full items-center overflow-hidden rounded text-[10px] font-medium text-white shadow-sm ${dragging ? 'shadow-md' : 'transition-[width] duration-150 motion-reduce:transition-none'} ${
                             STATUS_BAR[t.status]
                           } ${t.critical ? 'ring-2 ring-red-500 ring-offset-1 ring-offset-white dark:ring-offset-zinc-950' : ''} ${
                             t.scheduled ? '' : 'opacity-70'
@@ -1239,20 +1311,20 @@ export function Programme({
                           {canModerate && !started && (
                             <span
                               onPointerDown={(e) => startDrag(e, { mode: 'resize-start', taskId: t.id, origStart: w.startIso, origEnd: w.endIso })}
-                              className="absolute left-0 top-0 z-10 h-full w-1.5 cursor-ew-resize opacity-0 group-hover:opacity-100"
+                              className="absolute left-0 top-0 z-10 h-full w-1.5 cursor-ew-resize touch-none opacity-0 group-hover:opacity-100 [@media(pointer:coarse)]:w-3 [@media(pointer:coarse)]:opacity-100"
                               aria-hidden
                             />
                           )}
                           <span
                             onPointerDown={(e) => startDrag(e, { mode: 'move', taskId: t.id, origStart: w.startIso, origEnd: w.endIso })}
-                            className={`flex h-full min-w-0 flex-1 items-center px-1.5 ${canModerate ? (started ? 'cursor-default' : 'cursor-grab active:cursor-grabbing') : 'cursor-default'}`}
+                            className={`flex h-full min-w-0 flex-1 items-center px-1.5 ${canModerate ? (started ? 'cursor-default' : 'cursor-grab touch-none active:cursor-grabbing') : 'cursor-default'}`}
                           >
                             <span className="truncate">{t.title}</span>
                           </span>
                           {canModerate && !started && (
                             <span
                               onPointerDown={(e) => startDrag(e, { mode: 'resize-end', taskId: t.id, origStart: w.startIso, origEnd: w.endIso })}
-                              className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-ew-resize opacity-0 group-hover:opacity-100"
+                              className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-ew-resize touch-none opacity-0 group-hover:opacity-100 [@media(pointer:coarse)]:w-3 [@media(pointer:coarse)]:opacity-100"
                               aria-hidden
                             />
                           )}
@@ -1263,14 +1335,14 @@ export function Programme({
                           <>
                             <span
                               onPointerDown={(e) => startDrag(e, { mode: 'link', taskId: t.id, origStart: w.startIso, origEnd: w.endIso, fromEdge: 'start' })}
-                              className="absolute top-1/2 h-2.5 w-2.5 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-brand-500 bg-white opacity-0 group-hover:opacity-100 dark:bg-zinc-950"
+                              className="absolute top-1/2 h-2.5 w-2.5 -translate-y-1/2 cursor-crosshair touch-none rounded-full border-2 border-brand-500 bg-white opacity-0 group-hover:opacity-100 dark:bg-zinc-950 [@media(pointer:coarse)]:h-4 [@media(pointer:coarse)]:w-4 [@media(pointer:coarse)]:opacity-80"
                               style={{ left: -9 }}
                               title="Drag to a predecessor task"
                               aria-label="Link predecessor"
                             />
                             <span
                               onPointerDown={(e) => startDrag(e, { mode: 'link', taskId: t.id, origStart: w.startIso, origEnd: w.endIso, fromEdge: 'finish' })}
-                              className="absolute top-1/2 h-2.5 w-2.5 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-brand-500 bg-white opacity-0 group-hover:opacity-100 dark:bg-zinc-950"
+                              className="absolute top-1/2 h-2.5 w-2.5 -translate-y-1/2 cursor-crosshair touch-none rounded-full border-2 border-brand-500 bg-white opacity-0 group-hover:opacity-100 dark:bg-zinc-950 [@media(pointer:coarse)]:h-4 [@media(pointer:coarse)]:w-4 [@media(pointer:coarse)]:opacity-80"
                               style={{ left: width + 3 }}
                               title="Drag to a dependent task"
                               aria-label="Link successor"
