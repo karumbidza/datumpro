@@ -97,7 +97,7 @@ function sameDay(a: string, b: string): boolean {
 }
 function dayLabel(iso: string, nowMs: number | null): string {
   const d = new Date(iso);
-  const abs = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  const abs = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
   if (nowMs == null) return abs;
   const sd = (x: Date, y: Date) => x.getFullYear() === y.getFullYear() && x.getMonth() === y.getMonth() && x.getDate() === y.getDate();
   const today = new Date(nowMs);
@@ -357,63 +357,68 @@ function MessageRow({ m, prev, inThread, ctx }: { m: ChatMessage; prev: ChatMess
   const company = meta?.company ?? null;
   const role = meta ? rolePill(meta.role, meta.memberType).label : null;
   const replies = Math.max(m.replyCount, ctx.liveReplyCount.get(m.id) ?? 0);
+  const side = mine ? 'items-end' : 'items-start';
 
   return (
     <Fragment>
       {showDate && (
-        <div className="my-4 flex items-center gap-3" role="separator" aria-label={dayLabel(m.createdAt, ctx.now)}>
-          <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
-          <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">{dayLabel(m.createdAt, ctx.now)}</span>
-          <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+        <div className="my-5 text-center" role="separator" aria-label={dayLabel(m.createdAt, ctx.now)}>
+          <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{dayLabel(m.createdAt, ctx.now)}</span>
         </div>
       )}
       {!inThread && ctx.newDividerSeq != null && m.seq === ctx.newDividerSeq && (
         <div className="my-3 flex items-center gap-3" role="separator" aria-label="New messages">
           <span className="h-px flex-1 bg-red-300 dark:bg-red-500/50" />
           <span className="text-[11px] font-semibold text-red-600 dark:text-red-400">New</span>
+          <span className="h-px flex-1 bg-red-300 dark:bg-red-500/50" />
         </div>
       )}
-      <div
-        className={`group relative -mx-2 flex gap-2.5 rounded-lg px-2 ${showHeader && !showDate ? 'mt-2.5' : showDate ? '' : 'mt-px'} ${
-          mentionsMe ? 'bg-brand-50/70 dark:bg-brand-500/10' : 'hover:bg-zinc-50 dark:hover:bg-zinc-900/60'
-        } py-0.5`}
-      >
-        {/* Gutter: avatar on the group header, hover-timestamp on follow-ups. */}
-        <div className="w-8 flex-shrink-0 pt-0.5">
-          {showHeader ? (
-            <Avatar name={m.senderName} avatarUrl={meta?.avatarUrl} userId={m.senderId} size={30} />
-          ) : (
-            <span className="hidden pt-1 text-[10px] tabular-nums leading-4 text-zinc-500 group-hover:block dark:text-zinc-400">
-              {shortTime(m.createdAt)}
-            </span>
-          )}
-        </div>
+      <div className={`group relative flex gap-2.5 ${mine ? 'flex-row-reverse' : ''} ${showHeader && !showDate ? 'mt-4' : showDate ? '' : 'mt-1'}`}>
+        {/* Gutter: others get an avatar on the group header; grouped follow-ups
+            show the time on hover. Own messages have no gutter (Teams). */}
+        {!mine && (
+          <div className="w-8 flex-shrink-0 self-end pb-0.5">
+            {showHeader ? (
+              <Avatar name={m.senderName} avatarUrl={meta?.avatarUrl} userId={m.senderId} size={30} />
+            ) : (
+              <span className="hidden text-[10px] tabular-nums leading-4 text-zinc-500 group-hover:block dark:text-zinc-400">
+                {shortTime(m.createdAt)}
+              </span>
+            )}
+          </div>
+        )}
 
-        <div className="min-w-0 max-w-[72ch] flex-1">
+        <div className={`flex min-w-0 max-w-[min(72ch,85%)] flex-col ${side}`}>
           {showHeader && (
-            <p className="mb-0.5 flex flex-wrap items-baseline gap-x-1.5 text-[11px] leading-4 text-zinc-500 dark:text-zinc-400">
-              <span className={`text-[13px] font-semibold ${mine ? 'text-zinc-900 dark:text-zinc-50' : tint.name}`}>
-                {mine ? 'You' : m.senderName}
-              </span>
-              {company && <span>{company}</span>}
-              {role && <span>· {role}</span>}
-              <span className="tabular-nums" title={fullTime(m.createdAt)}>
-                · {shortTime(m.createdAt)}
-              </span>
+            <p className={`mb-1 flex flex-wrap items-baseline gap-x-1.5 text-[11px] leading-4 text-zinc-500 dark:text-zinc-400 ${mine ? 'flex-row-reverse' : ''}`}>
+              {mine ? (
+                <span className="tabular-nums" title={fullTime(m.createdAt)}>
+                  {shortTime(m.createdAt)}
+                </span>
+              ) : (
+                <>
+                  <span className={`text-[13px] font-semibold ${tint.name}`}>{m.senderName}</span>
+                  {company && <span>{company}</span>}
+                  {role && <span>· {role}</span>}
+                  <span className="tabular-nums" title={fullTime(m.createdAt)}>
+                    · {shortTime(m.createdAt)}
+                  </span>
+                </>
+              )}
               {m.editedAt && !m.deletedAt && <span>· edited</span>}
             </p>
           )}
 
-          {ctx.editingId === m.id ? (
-            <div className="flex items-center gap-1.5">
+          {editingRow(ctx, m) ? (
+            <div className="flex w-full items-center gap-1.5">
               <input
                 value={ctx.editingBody}
                 onChange={(e) => ctx.setEditingBody(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') void ctx.saveEdit();
+                  if (e.key === 'Enter') ctx.saveEdit();
                   if (e.key === 'Escape') ctx.setEditingId(null);
                 }}
-                className="w-full max-w-md rounded-md border border-brand-400 bg-white px-2 py-1 text-[15px] outline-none dark:border-brand-500 dark:bg-zinc-900"
+                className="w-full max-w-md rounded-lg border border-brand-400 bg-white px-3 py-2 text-[15px] outline-none dark:border-brand-500 dark:bg-zinc-900"
                 autoFocus
               />
               <button onClick={ctx.saveEdit} className="text-xs font-medium text-brand-600 hover:underline">
@@ -424,19 +429,23 @@ function MessageRow({ m, prev, inThread, ctx }: { m: ChatMessage; prev: ChatMess
               </button>
             </div>
           ) : m.deletedAt ? (
-            <p className="text-[15px] italic text-zinc-400 dark:text-zinc-500">message deleted</p>
+            <p className={`rounded-lg px-3.5 py-2 text-[15px] italic ${bubbleCls(mine, false)} text-zinc-500 dark:text-zinc-400`}>message deleted</p>
           ) : (
-            m.body && <p className="whitespace-pre-wrap break-words text-[15px] leading-[1.55] text-zinc-900 dark:text-zinc-100">{m.body}</p>
+            m.body && (
+              <div className={`rounded-lg px-3.5 py-2 ${bubbleCls(mine, mentionsMe)}`}>
+                <p className="whitespace-pre-wrap break-words text-[15px] leading-[1.5] text-zinc-900 dark:text-zinc-100">{m.body}</p>
+              </div>
+            )
           )}
 
           {!m.deletedAt && m.attachments.length > 0 && (
-            <div className="mt-1">
+            <div className={`mt-1 flex flex-col ${side}`}>
               <Attachments atts={m.attachments} />
             </div>
           )}
 
           {!m.deletedAt && m.links.length > 0 && (
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
+            <div className={`mt-1.5 flex flex-wrap gap-1.5 ${mine ? 'justify-end' : ''}`}>
               {m.links.map((l) => (
                 <LinkChip key={l.id} link={l} projectId={ctx.projectId} />
               ))}
@@ -444,7 +453,7 @@ function MessageRow({ m, prev, inThread, ctx }: { m: ChatMessage; prev: ChatMess
           )}
 
           {(m.reactions.length > 0 || (!inThread && replies > 0)) && (
-            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            <div className={`mt-1 flex flex-wrap items-center gap-1.5 ${mine ? 'justify-end' : ''}`}>
               {m.reactions.map((r) => (
                 <button
                   key={r.emoji}
@@ -473,21 +482,23 @@ function MessageRow({ m, prev, inThread, ctx }: { m: ChatMessage; prev: ChatMess
             </div>
           )}
 
-          {mine && !m.deletedAt && !inThread && (
-            <span className="sr-only">{ctx.othersRead >= m.seq ? 'Read by others' : 'Sent'}</span>
+          {/* Delivery state under own bubbles, Teams-style. */}
+          {mine && !m.deletedAt && !editingRow(ctx, m) && (
+            <span className="mt-0.5 flex items-center" title={ctx.othersRead >= m.seq ? 'Read' : 'Sent'}>
+              <CheckCheck size={13} className={ctx.othersRead >= m.seq ? 'text-sky-500' : 'text-zinc-400 dark:text-zinc-500'} />
+              <span className="sr-only">{ctx.othersRead >= m.seq ? 'Read by others' : 'Sent'}</span>
+            </span>
           )}
         </div>
 
-        {/* Read receipt for own messages, quiet in the row margin. */}
-        {mine && !m.deletedAt && (
-          <span className="hidden shrink-0 self-start pt-1 group-hover:flex" title={ctx.othersRead >= m.seq ? 'Read' : 'Sent'} aria-hidden>
-            <CheckCheck size={13} className={ctx.othersRead >= m.seq ? 'text-sky-500' : 'text-zinc-400 dark:text-zinc-500'} />
-          </span>
-        )}
-
         {/* Hover toolbar: six reactions, reply, overflow. */}
-        {!m.deletedAt && ctx.editingId !== m.id && (
-          <div data-msg-menu className="absolute -top-3.5 right-2 z-20 hidden items-center gap-0.5 rounded-full border border-zinc-200 bg-white px-1 py-0.5 shadow-sm group-hover:flex dark:border-zinc-700 dark:bg-zinc-900">
+        {!m.deletedAt && !editingRow(ctx, m) && (
+          <div
+            data-msg-menu
+            className={`absolute -top-3.5 z-20 hidden items-center gap-0.5 rounded-full border border-zinc-200 bg-white px-1 py-0.5 shadow-sm group-hover:flex dark:border-zinc-700 dark:bg-zinc-900 ${
+              mine ? 'left-2' : 'right-2'
+            }`}
+          >
             {EMOJIS.map((e) => (
               <button
                 key={e}
@@ -521,14 +532,20 @@ function MessageRow({ m, prev, inThread, ctx }: { m: ChatMessage; prev: ChatMess
           </div>
         )}
         {ctx.openMenuId === m.id && (
-          <div data-msg-menu role="menu" className="absolute right-2 top-4 z-30 w-40 overflow-hidden rounded-xl border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+          <div
+            data-msg-menu
+            role="menu"
+            className={`absolute top-4 z-30 w-40 overflow-hidden rounded-xl border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 ${
+              mine ? 'left-2' : 'right-2'
+            }`}
+          >
             <MenuItem
               icon={<Pin size={14} />}
               label={ctx.pinnedSet.has(m.id) ? 'Unpin' : 'Pin'}
               active={ctx.pinnedSet.has(m.id)}
               onClick={() => {
-                void ctx.togglePin(m.id);
-                ctx.setOpenMenuId(null);
+                ctx.togglePin(m.id);
+                ctx.setOpenMenuId(() => null);
               }}
             />
             {mine && (
@@ -538,7 +555,7 @@ function MessageRow({ m, prev, inThread, ctx }: { m: ChatMessage; prev: ChatMess
                 onClick={() => {
                   ctx.setEditingId(m.id);
                   ctx.setEditingBody(m.body ?? '');
-                  ctx.setOpenMenuId(null);
+                  ctx.setOpenMenuId(() => null);
                 }}
               />
             )}
@@ -549,7 +566,7 @@ function MessageRow({ m, prev, inThread, ctx }: { m: ChatMessage; prev: ChatMess
                 danger
                 onClick={() => {
                   void deleteMessage(m.id).then(() => ctx.applyOne(m.id));
-                  ctx.setOpenMenuId(null);
+                  ctx.setOpenMenuId(() => null);
                 }}
               />
             )}
@@ -560,6 +577,16 @@ function MessageRow({ m, prev, inThread, ctx }: { m: ChatMessage; prev: ChatMess
   );
 }
 
+/** Teams-style bubble surfaces: quiet grey for others, brand-tinted for own;
+ *  a message that @mentions you gets a brand ring so it still stands out. */
+function bubbleCls(mine: boolean, mentionsMe: boolean): string {
+  const base = mine ? 'bg-brand-50 dark:bg-brand-500/15' : 'bg-zinc-100 dark:bg-zinc-800/70';
+  return mentionsMe ? `${base} ring-1 ring-brand-400/70` : base;
+}
+
+function editingRow(ctx: RowCtx, m: ChatMessage): boolean {
+  return ctx.editingId === m.id;
+}
 
 /* ── Thread rail content ───────────────────────────────────────────────── */
 
@@ -1716,26 +1743,24 @@ export function ChatPanelV2({
 
             {/* Outbox: optimistic sends and the offline queue, in stream order. */}
             {outbox.map((o) => (
-              <div key={o.localId} className="-mx-2 mt-2.5 flex gap-2.5 rounded-lg px-2 py-0.5 opacity-80">
-                <div className="w-8 flex-shrink-0 pt-0.5">
-                  <Avatar name={meName} userId={currentUserId} size={30} />
-                </div>
-                <div className="min-w-0 max-w-[72ch] flex-1">
-                  <p className="mb-0.5 flex items-baseline gap-x-1.5 text-[11px] leading-4 text-zinc-500 dark:text-zinc-400">
-                    <span className="text-[13px] font-semibold text-zinc-900 dark:text-zinc-50">You</span>
-                    {o.state === 'sending' && <span>· sending…</span>}
-                    {o.state === 'queued' && (
-                      <span className="flex items-center gap-1 font-medium text-amber-700 dark:text-amber-400">
-                        <WifiOff size={10} /> · Will send when back online
-                      </span>
-                    )}
-                    {o.state === 'failed' && <span className="font-medium text-red-600 dark:text-red-400">· failed — will retry</span>}
-                  </p>
-                  {o.body && <p className="whitespace-pre-wrap break-words text-[15px] leading-[1.55] text-zinc-700 dark:text-zinc-300">{o.body}</p>}
-                  {o.links.length > 0 && (
-                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{o.links.map((l) => l.label).join(' · ')}</p>
+              <div key={o.localId} className="mt-3 flex flex-col items-end opacity-90">
+                <p className="mb-1 flex items-center gap-1 text-[11px] leading-4">
+                  {o.state === 'sending' && <span className="text-zinc-500 dark:text-zinc-400">sending…</span>}
+                  {o.state === 'queued' && (
+                    <span className="flex items-center gap-1 font-medium text-amber-700 dark:text-amber-400">
+                      <WifiOff size={10} /> Will send when back online
+                    </span>
                   )}
-                </div>
+                  {o.state === 'failed' && <span className="font-medium text-red-600 dark:text-red-400">failed — will retry</span>}
+                </p>
+                {o.body && (
+                  <div className="max-w-[min(72ch,85%)] rounded-lg bg-brand-50 px-3.5 py-2 dark:bg-brand-500/15">
+                    <p className="whitespace-pre-wrap break-words text-[15px] leading-[1.5] text-zinc-900 dark:text-zinc-100">{o.body}</p>
+                  </div>
+                )}
+                {o.links.length > 0 && (
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{o.links.map((l) => l.label).join(' · ')}</p>
+                )}
               </div>
             ))}
             <div ref={bottomRef} />
