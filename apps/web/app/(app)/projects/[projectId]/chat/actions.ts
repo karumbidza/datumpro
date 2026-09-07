@@ -7,9 +7,13 @@ import {
   listMessagesBefore,
   listMessagesSince,
   getMessage,
+  listThreadMessages,
+  searchLinkTargets as searchLinkTargetsData,
   searchMessages as searchMessagesData,
   type ChatMessage,
   type ChatSearchResult,
+  type LinkTargetOption,
+  type LinkTargetType,
 } from '@/lib/data/chat';
 import { listMemberActivity, type ActivityItem } from '@/lib/data/chat-roster';
 
@@ -43,6 +47,16 @@ export interface AttachmentInput {
   durationSeconds?: number | null;
   width?: number | null;
   height?: number | null;
+  /** Site-photo evidence metadata, when the capturing device provided it. */
+  lat?: number | null;
+  lng?: number | null;
+  takenAt?: string | null;
+}
+
+/** A work-item reference to attach as a chip ("#" typeahead in the composer). */
+export interface LinkInput {
+  targetType: LinkTargetType;
+  targetId: string;
 }
 
 /** Insert a message (optionally a threaded reply, optionally with attachments the
@@ -53,10 +67,13 @@ export async function sendMessage(
   body: string,
   parentMessageId?: string,
   attachments?: AttachmentInput[],
+  links?: LinkInput[],
+  mentionUserIds?: string[],
 ) {
   const trimmed = body.trim();
   const atts = attachments ?? [];
-  if (!trimmed && atts.length === 0) return null;
+  const linkRows = links ?? [];
+  if (!trimmed && atts.length === 0 && linkRows.length === 0) return null;
   const { supabase, user } = await requireUser();
   const { data, error } = await supabase
     .from('messages')
@@ -83,11 +100,47 @@ export async function sendMessage(
         duration_seconds: a.durationSeconds ?? null,
         width: a.width ?? null,
         height: a.height ?? null,
+        lat: a.lat ?? null,
+        lng: a.lng ?? null,
+        taken_at: a.takenAt ?? null,
       })),
     );
     if (attErr) throw new Error(attErr.message);
   }
+
+  if (linkRows.length > 0) {
+    const { error: linkErr } = await supabase.from('message_links').insert(
+      linkRows.map((l) => ({
+        message_id: message.id,
+        target_type: l.targetType,
+        target_id: l.targetId,
+        created_by: user.id,
+      })),
+    );
+    if (linkErr) throw new Error(linkErr.message);
+  }
+
+  const mentions = [...new Set(mentionUserIds ?? [])].filter((id) => id !== user.id);
+  if (mentions.length > 0) {
+    // Best-effort: a mention row failing (e.g. user just removed) must not lose
+    // the message itself.
+    await supabase
+      .from('message_mentions')
+      .insert(mentions.map((uid) => ({ message_id: message.id, mentioned_user_id: uid })));
+  }
   return message;
+}
+
+/** Replies under one message (ascending) — the rail thread view. */
+export async function loadThread(conversationId: string, parentMessageId: string): Promise<ChatMessage[]> {
+  const { user } = await requireUser();
+  return listThreadMessages(conversationId, user.id, parentMessageId);
+}
+
+/** "#" typeahead over the project's linkable work items (RLS-scoped per caller). */
+export async function searchLinkTargets(projectId: string, query: string): Promise<LinkTargetOption[]> {
+  await requireUser();
+  return searchLinkTargetsData(projectId, query);
 }
 
 /** A page of older messages (seq < beforeSeq) for infinite-scroll-up. */

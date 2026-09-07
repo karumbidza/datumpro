@@ -15,7 +15,7 @@ import { listChatRoster } from '@/lib/data/chat-roster';
 import { getProjectSchedule } from '@/lib/data/scheduling';
 import { listTaskMedia, listSubtaskMedia } from '@/lib/data/quotes';
 import { listTenderInvites, listTaskDocuments } from '@/lib/data/tenders';
-import { getTaskConversationId, listMessages, othersMaxReadSeq } from '@/lib/data/chat';
+import { getTaskConversationId, listMessages, othersMaxReadSeq, myReadSeq } from '@/lib/data/chat';
 import { TenderPanel } from '@/components/task/tender-panel';
 import { BidPanel } from '@/components/task/bid-panel';
 import { SubtaskPanel } from '@/components/task/subtask-panel';
@@ -23,6 +23,8 @@ import { listSubtasks } from '@/lib/data/subtasks';
 import { getTaskPaymentInfo } from '@/lib/data/owed';
 import { TaskPaymentPanel } from '@/components/task/task-payment-panel';
 import { ChatPanel } from '@/components/chat/chat-panel';
+import { ChatPanelV2 } from '@/components/chat/v2/chat-panel-v2';
+import { chatV2Enabled } from '@/lib/chat-flag';
 import { stepsByEntity } from '@/lib/data/approvals';
 import { LiveRefresh } from '@/components/live-refresh';
 import { TaskTabs, type TaskTab } from '@/components/task/task-tabs';
@@ -100,13 +102,14 @@ export default async function TaskDetailPage({
   for (const d of taskDocs) if (d.contractorId) (docsByBidder[d.contractorId] ??= []).push(d);
 
   // Task DM (created on assignment; visible only to staff / PM / the assigned contractor).
-  let dm: { id: string; messages: Awaited<ReturnType<typeof listMessages>>; othersRead: number } | null = null;
+  let dm: { id: string; messages: Awaited<ReturnType<typeof listMessages>>; othersRead: number; myRead: number } | null = null;
   if (dmConversationId) {
-    const [messages, othersRead] = await Promise.all([
+    const [messages, othersRead, myRead] = await Promise.all([
       listMessages(dmConversationId, user.id),
       othersMaxReadSeq(dmConversationId, user.id),
+      myReadSeq(dmConversationId, user.id),
     ]);
-    dm = { id: dmConversationId, messages, othersRead };
+    dm = { id: dmConversationId, messages, othersRead, myRead };
   }
   const chatNames = Object.fromEntries(members.map((m) => [m.userId, m.name]));
   const meName = chatNames[user.id] ?? user.email?.split('@')[0] ?? 'You';
@@ -214,7 +217,24 @@ export default async function TaskDetailPage({
     tabs.push({
       key: 'discussion',
       label: 'Discussion',
-      content: (
+      content: chatV2Enabled() ? (
+        <ChatPanelV2
+          className="h-[520px]"
+          title="Task Discussion"
+          subtitle="Private to the project manager and the assigned contractor."
+          conversationId={dm.id}
+          orgId={task.org_id}
+          projectId={projectId}
+          currentUserId={user.id}
+          meName={meName}
+          initialMessages={dm.messages}
+          othersReadSeq={dm.othersRead}
+          myReadSeq={dm.myRead}
+          canPost
+          canModerate={canManage}
+          members={taskRoster}
+        />
+      ) : (
         <ChatPanel
           className="h-[520px]"
           title="Task Discussion"

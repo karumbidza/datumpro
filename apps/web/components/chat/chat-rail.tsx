@@ -299,6 +299,7 @@ export function ChatRail({
   onFind,
   onClose,
   showRegisterLinks,
+  hideQuickActions,
 }: {
   people: PeopleProps;
   projectId: string;
@@ -312,6 +313,8 @@ export function ChatRail({
   onClose?: () => void;
   /** Main Project Chat only: swap the action row for register shortcuts. */
   showRegisterLinks?: boolean;
+  /** Chat v2: no action row at all — registers move to text links in About. */
+  hideQuickActions?: boolean;
 }) {
   const [tab, setTab] = useState<RailTab>('people');
   const TABS: { key: RailTab; label: string }[] = [
@@ -323,7 +326,9 @@ export function ChatRail({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <QuickActions projectId={projectId} onFind={onFind} onFiles={() => setTab('files')} registerLinks={showRegisterLinks} />
+      {!hideQuickActions && (
+        <QuickActions projectId={projectId} onFind={onFind} onFiles={() => setTab('files')} registerLinks={showRegisterLinks} />
+      )}
       <div className="flex items-center gap-1 overflow-x-auto border-b border-zinc-200 px-2 py-1.5 dark:border-zinc-800">
         {TABS.map((t) => (
           <button
@@ -361,6 +366,31 @@ export function ChatRail({
         {tab === 'about' && (
           <div className="min-h-0 flex-1 overflow-y-auto">
             <AboutRail projectId={projectId} conversationId={conversationId} about={about} canEdit={canEditAbout} />
+            {hideQuickActions && showRegisterLinks && (
+              <div className="border-t border-zinc-100 px-4 py-3 dark:border-zinc-800">
+                <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  Registers
+                </p>
+                <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                  {[
+                    ['Site diary', 'diary'],
+                    ['Drawings', 'drawings'],
+                    ['Transmittals', 'transmittals'],
+                    ['Snags', 'snags'],
+                    ['RFIs', 'rfis'],
+                    ['Calendar', 'calendar'],
+                  ].map(([label, slug]) => (
+                    <Link
+                      key={slug}
+                      href={`/projects/${projectId}/${slug}`}
+                      className="text-brand-600 hover:underline dark:text-brand-400"
+                    >
+                      {label}
+                    </Link>
+                  ))}
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>
