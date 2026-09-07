@@ -316,6 +316,399 @@ function MenuItem({ icon, label, onClick, danger, active }: { icon: React.ReactN
   );
 }
 
+
+/** Everything a message row needs from the panel. Passed as one object so the
+ *  row component itself stays a stable module-level type. */
+interface RowCtx {
+  now: number | null;
+  newDividerSeq: number | null;
+  currentUserId: string;
+  projectId: string;
+  rosterById: Map<string, RosterMember>;
+  liveReplyCount: Map<string, number>;
+  editingId: string | null;
+  editingBody: string;
+  setEditingBody: (v: string) => void;
+  setEditingId: (v: string | null) => void;
+  saveEdit: () => void;
+  othersRead: number;
+  openMenuId: string | null;
+  setOpenMenuId: React.Dispatch<React.SetStateAction<string | null>>;
+  onReact: (id: string, emoji: string) => void;
+  openThread: (id: string) => void;
+  pinnedSet: Set<string>;
+  togglePin: (id: string) => void;
+  canModerate: boolean;
+  applyOne: (id: string) => Promise<void>;
+}
+
+/* ── Message row (module scope: a stable component type — defining this
+   inside the panel remounted every row per keystroke, making waveforms
+   flicker while typing) ───────────────────────────────────────────────────────── */
+
+function MessageRow({ m, prev, inThread, ctx }: { m: ChatMessage; prev: ChatMessage | null; inThread?: boolean; ctx: RowCtx }) {
+  const mine = m.senderId === ctx.currentUserId;
+  const mentionsMe = m.mentionedUserIds.includes(ctx.currentUserId);
+  const showDate = !inThread && (!prev || !sameDay(prev.createdAt, m.createdAt));
+  const showHeader =
+    showDate || !prev || prev.senderId !== m.senderId || new Date(m.createdAt).getTime() - new Date(prev.createdAt).getTime() > GROUP_GAP_MS;
+  const meta = ctx.rosterById.get(m.senderId);
+  const tint = senderTint(m.senderId);
+  const company = meta?.company ?? null;
+  const role = meta ? rolePill(meta.role, meta.memberType).label : null;
+  const replies = Math.max(m.replyCount, ctx.liveReplyCount.get(m.id) ?? 0);
+
+  return (
+    <Fragment>
+      {showDate && (
+        <div className="my-4 flex items-center gap-3" role="separator" aria-label={dayLabel(m.createdAt, ctx.now)}>
+          <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+          <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">{dayLabel(m.createdAt, ctx.now)}</span>
+          <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+        </div>
+      )}
+      {!inThread && ctx.newDividerSeq != null && m.seq === ctx.newDividerSeq && (
+        <div className="my-3 flex items-center gap-3" role="separator" aria-label="New messages">
+          <span className="h-px flex-1 bg-red-300 dark:bg-red-500/50" />
+          <span className="text-[11px] font-semibold text-red-600 dark:text-red-400">New</span>
+        </div>
+      )}
+      <div
+        className={`group relative -mx-2 flex gap-2.5 rounded-lg px-2 ${showHeader && !showDate ? 'mt-2.5' : showDate ? '' : 'mt-px'} ${
+          mentionsMe ? 'bg-brand-50/70 dark:bg-brand-500/10' : 'hover:bg-zinc-50 dark:hover:bg-zinc-900/60'
+        } py-0.5`}
+      >
+        {/* Gutter: avatar on the group header, hover-timestamp on follow-ups. */}
+        <div className="w-8 flex-shrink-0 pt-0.5">
+          {showHeader ? (
+            <Avatar name={m.senderName} avatarUrl={meta?.avatarUrl} userId={m.senderId} size={30} />
+          ) : (
+            <span className="hidden pt-1 text-[10px] tabular-nums leading-4 text-zinc-500 group-hover:block dark:text-zinc-400">
+              {shortTime(m.createdAt)}
+            </span>
+          )}
+        </div>
+
+        <div className="min-w-0 max-w-[72ch] flex-1">
+          {showHeader && (
+            <p className="mb-0.5 flex flex-wrap items-baseline gap-x-1.5 text-[11px] leading-4 text-zinc-500 dark:text-zinc-400">
+              <span className={`text-[13px] font-semibold ${mine ? 'text-zinc-900 dark:text-zinc-50' : tint.name}`}>
+                {mine ? 'You' : m.senderName}
+              </span>
+              {company && <span>{company}</span>}
+              {role && <span>· {role}</span>}
+              <span className="tabular-nums" title={fullTime(m.createdAt)}>
+                · {shortTime(m.createdAt)}
+              </span>
+              {m.editedAt && !m.deletedAt && <span>· edited</span>}
+            </p>
+          )}
+
+          {ctx.editingId === m.id ? (
+            <div className="flex items-center gap-1.5">
+              <input
+                value={ctx.editingBody}
+                onChange={(e) => ctx.setEditingBody(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void ctx.saveEdit();
+                  if (e.key === 'Escape') ctx.setEditingId(null);
+                }}
+                className="w-full max-w-md rounded-md border border-brand-400 bg-white px-2 py-1 text-[15px] outline-none dark:border-brand-500 dark:bg-zinc-900"
+                autoFocus
+              />
+              <button onClick={ctx.saveEdit} className="text-xs font-medium text-brand-600 hover:underline">
+                Save
+              </button>
+              <button onClick={() => ctx.setEditingId(null)} className="text-xs text-zinc-500 hover:underline">
+                Cancel
+              </button>
+            </div>
+          ) : m.deletedAt ? (
+            <p className="text-[15px] italic text-zinc-400 dark:text-zinc-500">message deleted</p>
+          ) : (
+            m.body && <p className="whitespace-pre-wrap break-words text-[15px] leading-[1.55] text-zinc-900 dark:text-zinc-100">{m.body}</p>
+          )}
+
+          {!m.deletedAt && m.attachments.length > 0 && (
+            <div className="mt-1">
+              <Attachments atts={m.attachments} />
+            </div>
+          )}
+
+          {!m.deletedAt && m.links.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {m.links.map((l) => (
+                <LinkChip key={l.id} link={l} projectId={ctx.projectId} />
+              ))}
+            </div>
+          )}
+
+          {(m.reactions.length > 0 || (!inThread && replies > 0)) && (
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              {m.reactions.map((r) => (
+                <button
+                  key={r.emoji}
+                  onClick={() => ctx.onReact(m.id, r.emoji)}
+                  aria-label={`${r.emoji} ${r.count} — toggle reaction`}
+                  className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs transition-colors ${
+                    r.mine
+                      ? 'border-brand-300 bg-brand-50 text-brand-700 dark:border-brand-500/50 dark:bg-brand-500/15 dark:text-brand-300'
+                      : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300'
+                  }`}
+                >
+                  <span>{r.emoji}</span>
+                  <span className="tabular-nums">{r.count}</span>
+                </button>
+              ))}
+              {!inThread && replies > 0 && (
+                <button
+                  type="button"
+                  onClick={() => ctx.openThread(m.id)}
+                  className="flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-xs font-medium text-brand-700 transition-colors hover:border-brand-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-brand-300"
+                >
+                  <MessageCircle size={11} />
+                  {replies} {replies === 1 ? 'reply' : 'replies'}
+                </button>
+              )}
+            </div>
+          )}
+
+          {mine && !m.deletedAt && !inThread && (
+            <span className="sr-only">{ctx.othersRead >= m.seq ? 'Read by others' : 'Sent'}</span>
+          )}
+        </div>
+
+        {/* Read receipt for own messages, quiet in the row margin. */}
+        {mine && !m.deletedAt && (
+          <span className="hidden shrink-0 self-start pt-1 group-hover:flex" title={ctx.othersRead >= m.seq ? 'Read' : 'Sent'} aria-hidden>
+            <CheckCheck size={13} className={ctx.othersRead >= m.seq ? 'text-sky-500' : 'text-zinc-400 dark:text-zinc-500'} />
+          </span>
+        )}
+
+        {/* Hover toolbar: six reactions, reply, overflow. */}
+        {!m.deletedAt && ctx.editingId !== m.id && (
+          <div data-msg-menu className="absolute -top-3.5 right-2 z-20 hidden items-center gap-0.5 rounded-full border border-zinc-200 bg-white px-1 py-0.5 shadow-sm group-hover:flex dark:border-zinc-700 dark:bg-zinc-900">
+            {EMOJIS.map((e) => (
+              <button
+                key={e}
+                onClick={() => ctx.onReact(m.id, e)}
+                aria-label={`React ${e}`}
+                className="rounded-full p-0.5 text-sm leading-none transition-transform hover:scale-125 motion-reduce:transition-none"
+              >
+                {e}
+              </button>
+            ))}
+            {!inThread && (
+              <button
+                type="button"
+                onClick={() => ctx.openThread(m.id)}
+                aria-label="Reply in thread"
+                className="rounded-full p-1 text-zinc-500 hover:text-brand-600 dark:text-zinc-400"
+              >
+                <Reply size={13} />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => ctx.setOpenMenuId((cur) => (cur === m.id ? null : m.id))}
+              aria-label="More actions"
+              aria-haspopup="menu"
+              aria-expanded={ctx.openMenuId === m.id}
+              className="rounded-full p-1 text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-100"
+            >
+              <ChevronDown size={13} />
+            </button>
+          </div>
+        )}
+        {ctx.openMenuId === m.id && (
+          <div data-msg-menu role="menu" className="absolute right-2 top-4 z-30 w-40 overflow-hidden rounded-xl border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+            <MenuItem
+              icon={<Pin size={14} />}
+              label={ctx.pinnedSet.has(m.id) ? 'Unpin' : 'Pin'}
+              active={ctx.pinnedSet.has(m.id)}
+              onClick={() => {
+                void ctx.togglePin(m.id);
+                ctx.setOpenMenuId(null);
+              }}
+            />
+            {mine && (
+              <MenuItem
+                icon={<Pencil size={14} />}
+                label="Edit"
+                onClick={() => {
+                  ctx.setEditingId(m.id);
+                  ctx.setEditingBody(m.body ?? '');
+                  ctx.setOpenMenuId(null);
+                }}
+              />
+            )}
+            {(mine || ctx.canModerate) && (
+              <MenuItem
+                icon={<Trash2 size={14} />}
+                label="Delete"
+                danger
+                onClick={() => {
+                  void deleteMessage(m.id).then(() => ctx.applyOne(m.id));
+                  ctx.setOpenMenuId(null);
+                }}
+              />
+            )}
+          </div>
+        )}
+      </div>
+    </Fragment>
+  );
+}
+
+
+/* ── Thread rail content ───────────────────────────────────────────────── */
+
+function ThreadRail({
+ctx,
+parent,
+replies,
+canPost,
+value,
+onChange,
+sending,
+onSend,
+onClose,
+}: {
+ctx: RowCtx;
+parent: ChatMessage;
+replies: ChatMessage[];
+canPost: boolean;
+value: string;
+onChange: (v: string) => void;
+sending: boolean;
+onSend: () => void;
+onClose: () => void;
+}) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex h-[52px] shrink-0 items-center gap-2 border-b border-zinc-200 px-3 dark:border-zinc-800">
+        <button
+          type="button"
+          onClick={() => onClose()}
+          aria-label="Close thread"
+          className="flex items-center gap-1 rounded-md p-1 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+        >
+          <ChevronLeft size={16} /> Back
+        </button>
+        <span className="text-sm font-semibold">Thread</span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        <MessageRow m={parent} prev={null} inThread ctx={ctx} />
+        {replies.length > 0 && (
+          <div className="my-2 flex items-center gap-2 text-[11px] text-zinc-500 dark:text-zinc-400">
+            <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+            {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
+            <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+          </div>
+        )}
+        {replies.map((r, i) => (
+          <MessageRow key={r.id} m={r} prev={i > 0 ? replies[i - 1]! : null} inThread ctx={ctx} />
+        ))}
+      </div>
+      {canPost && (
+        <div className="border-t border-zinc-200 p-2.5 dark:border-zinc-800">
+          <div className="flex items-end gap-2 rounded-lg border border-zinc-300 focus-within:border-brand-600 dark:border-zinc-700">
+            <textarea
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  onSend();
+                }
+              }}
+              rows={1}
+              placeholder="Reply in thread…"
+              aria-label="Reply in thread"
+              className="max-h-28 w-full resize-none bg-transparent px-2.5 py-2 text-sm outline-none"
+            />
+            <button
+              type="button"
+              onClick={onSend}
+              disabled={sending || !value.trim()}
+              aria-label="Send reply"
+              className="m-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand-600 text-white transition-colors hover:bg-brand-700 disabled:opacity-40"
+            >
+              <Send size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/* ── Empty state ───────────────────────────────────────────────────────── */
+
+function EmptyState({
+title,
+people,
+canPost,
+projectId,
+onlineIds,
+onSharePhoto,
+onMention,
+}: {
+title?: string;
+people: RosterMember[];
+canPost: boolean;
+projectId: string;
+onlineIds: Set<string>;
+onSharePhoto: () => void;
+onMention: () => void;
+}) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center px-6 py-10 text-center">
+      <p className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
+        {title ?? 'This conversation'}
+        {people.length > 0 && <span className="font-normal text-zinc-500 dark:text-zinc-400"> · {people.length} people</span>}
+      </p>
+      <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Post the first site update.</p>
+      {canPost && (
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={onSharePhoto}
+            className="flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 transition-colors hover:border-brand-400 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 dark:border-zinc-700 dark:text-zinc-200"
+          >
+            <ImageIcon size={14} /> Share a photo
+          </button>
+          <Link
+            href={`/projects/${projectId}/diary`}
+            className="flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 transition-colors hover:border-brand-400 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 dark:border-zinc-700 dark:text-zinc-200"
+          >
+            <FileText size={14} /> Post a site diary note
+          </Link>
+          <button
+            type="button"
+            onClick={onMention}
+            className="flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 transition-colors hover:border-brand-400 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 dark:border-zinc-700 dark:text-zinc-200"
+          >
+            <AtSign size={14} /> Mention a contractor
+          </button>
+        </div>
+      )}
+      {people.length > 0 && (
+        <div className="mt-8 flex items-center justify-center -space-x-1.5">
+          {people.slice(0, 8).map((p) => (
+            <span key={p.userId} title={p.name} className="rounded-full ring-2 ring-white dark:ring-zinc-950">
+              <Avatar name={p.name} avatarUrl={p.avatarUrl} userId={p.userId} size={28} online={onlineIds.has(p.userId)} />
+            </span>
+          ))}
+          {people.length > 8 && <span className="pl-3 text-xs text-zinc-500 dark:text-zinc-400">+{people.length - 8}</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 /* ── Props ────────────────────────────────────────────────────────────────── */
 
 interface PendingAttachment {
@@ -1158,337 +1551,30 @@ export function ChatPanelV2({
   const threadParent = thread ? msgById.get(thread) : null;
   const threadReplies = thread ? messages.filter((m) => m.parentMessageId === thread) : [];
 
-  /* ── Message row ───────────────────────────────────────────────────────── */
-
-  function MessageRow({ m, prev, inThread }: { m: ChatMessage; prev: ChatMessage | null; inThread?: boolean }) {
-    const mine = m.senderId === currentUserId;
-    const mentionsMe = m.mentionedUserIds.includes(currentUserId);
-    const showDate = !inThread && (!prev || !sameDay(prev.createdAt, m.createdAt));
-    const showHeader =
-      showDate || !prev || prev.senderId !== m.senderId || new Date(m.createdAt).getTime() - new Date(prev.createdAt).getTime() > GROUP_GAP_MS;
-    const meta = rosterById.get(m.senderId);
-    const tint = senderTint(m.senderId);
-    const company = meta?.company ?? null;
-    const role = meta ? rolePill(meta.role, meta.memberType).label : null;
-    const replies = Math.max(m.replyCount, liveReplyCount.get(m.id) ?? 0);
-
-    return (
-      <Fragment>
-        {showDate && (
-          <div className="my-4 flex items-center gap-3" role="separator" aria-label={dayLabel(m.createdAt, now)}>
-            <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
-            <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">{dayLabel(m.createdAt, now)}</span>
-            <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
-          </div>
-        )}
-        {!inThread && newDividerSeq != null && m.seq === newDividerSeq && (
-          <div className="my-3 flex items-center gap-3" role="separator" aria-label="New messages">
-            <span className="h-px flex-1 bg-red-300 dark:bg-red-500/50" />
-            <span className="text-[11px] font-semibold text-red-600 dark:text-red-400">New</span>
-          </div>
-        )}
-        <div
-          className={`group relative -mx-2 flex gap-2.5 rounded-lg px-2 ${showHeader && !showDate ? 'mt-2.5' : showDate ? '' : 'mt-px'} ${
-            mentionsMe ? 'bg-brand-50/70 dark:bg-brand-500/10' : 'hover:bg-zinc-50 dark:hover:bg-zinc-900/60'
-          } py-0.5`}
-        >
-          {/* Gutter: avatar on the group header, hover-timestamp on follow-ups. */}
-          <div className="w-8 flex-shrink-0 pt-0.5">
-            {showHeader ? (
-              <Avatar name={m.senderName} avatarUrl={meta?.avatarUrl} userId={m.senderId} size={30} />
-            ) : (
-              <span className="hidden pt-1 text-[10px] tabular-nums leading-4 text-zinc-500 group-hover:block dark:text-zinc-400">
-                {shortTime(m.createdAt)}
-              </span>
-            )}
-          </div>
-
-          <div className="min-w-0 max-w-[72ch] flex-1">
-            {showHeader && (
-              <p className="mb-0.5 flex flex-wrap items-baseline gap-x-1.5 text-[11px] leading-4 text-zinc-500 dark:text-zinc-400">
-                <span className={`text-[13px] font-semibold ${mine ? 'text-zinc-900 dark:text-zinc-50' : tint.name}`}>
-                  {mine ? 'You' : m.senderName}
-                </span>
-                {company && <span>{company}</span>}
-                {role && <span>· {role}</span>}
-                <span className="tabular-nums" title={fullTime(m.createdAt)}>
-                  · {shortTime(m.createdAt)}
-                </span>
-                {m.editedAt && !m.deletedAt && <span>· edited</span>}
-              </p>
-            )}
-
-            {editingId === m.id ? (
-              <div className="flex items-center gap-1.5">
-                <input
-                  value={editingBody}
-                  onChange={(e) => setEditingBody(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') void saveEdit();
-                    if (e.key === 'Escape') setEditingId(null);
-                  }}
-                  className="w-full max-w-md rounded-md border border-brand-400 bg-white px-2 py-1 text-[15px] outline-none dark:border-brand-500 dark:bg-zinc-900"
-                  autoFocus
-                />
-                <button onClick={saveEdit} className="text-xs font-medium text-brand-600 hover:underline">
-                  Save
-                </button>
-                <button onClick={() => setEditingId(null)} className="text-xs text-zinc-500 hover:underline">
-                  Cancel
-                </button>
-              </div>
-            ) : m.deletedAt ? (
-              <p className="text-[15px] italic text-zinc-400 dark:text-zinc-500">message deleted</p>
-            ) : (
-              m.body && <p className="whitespace-pre-wrap break-words text-[15px] leading-[1.55] text-zinc-900 dark:text-zinc-100">{m.body}</p>
-            )}
-
-            {!m.deletedAt && m.attachments.length > 0 && (
-              <div className="mt-1">
-                <Attachments atts={m.attachments} />
-              </div>
-            )}
-
-            {!m.deletedAt && m.links.length > 0 && (
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {m.links.map((l) => (
-                  <LinkChip key={l.id} link={l} projectId={projectId} />
-                ))}
-              </div>
-            )}
-
-            {(m.reactions.length > 0 || (!inThread && replies > 0)) && (
-              <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                {m.reactions.map((r) => (
-                  <button
-                    key={r.emoji}
-                    onClick={() => onReact(m.id, r.emoji)}
-                    aria-label={`${r.emoji} ${r.count} — toggle reaction`}
-                    className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs transition-colors ${
-                      r.mine
-                        ? 'border-brand-300 bg-brand-50 text-brand-700 dark:border-brand-500/50 dark:bg-brand-500/15 dark:text-brand-300'
-                        : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300'
-                    }`}
-                  >
-                    <span>{r.emoji}</span>
-                    <span className="tabular-nums">{r.count}</span>
-                  </button>
-                ))}
-                {!inThread && replies > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => openThread(m.id)}
-                    className="flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-xs font-medium text-brand-700 transition-colors hover:border-brand-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-brand-300"
-                  >
-                    <MessageCircle size={11} />
-                    {replies} {replies === 1 ? 'reply' : 'replies'}
-                  </button>
-                )}
-              </div>
-            )}
-
-            {mine && !m.deletedAt && !inThread && (
-              <span className="sr-only">{othersRead >= m.seq ? 'Read by others' : 'Sent'}</span>
-            )}
-          </div>
-
-          {/* Read receipt for own messages, quiet in the row margin. */}
-          {mine && !m.deletedAt && (
-            <span className="hidden shrink-0 self-start pt-1 group-hover:flex" title={othersRead >= m.seq ? 'Read' : 'Sent'} aria-hidden>
-              <CheckCheck size={13} className={othersRead >= m.seq ? 'text-sky-500' : 'text-zinc-400 dark:text-zinc-500'} />
-            </span>
-          )}
-
-          {/* Hover toolbar: six reactions, reply, overflow. */}
-          {!m.deletedAt && editingId !== m.id && (
-            <div data-msg-menu className="absolute -top-3.5 right-2 z-20 hidden items-center gap-0.5 rounded-full border border-zinc-200 bg-white px-1 py-0.5 shadow-sm group-hover:flex dark:border-zinc-700 dark:bg-zinc-900">
-              {EMOJIS.map((e) => (
-                <button
-                  key={e}
-                  onClick={() => onReact(m.id, e)}
-                  aria-label={`React ${e}`}
-                  className="rounded-full p-0.5 text-sm leading-none transition-transform hover:scale-125 motion-reduce:transition-none"
-                >
-                  {e}
-                </button>
-              ))}
-              {!inThread && (
-                <button
-                  type="button"
-                  onClick={() => openThread(m.id)}
-                  aria-label="Reply in thread"
-                  className="rounded-full p-1 text-zinc-500 hover:text-brand-600 dark:text-zinc-400"
-                >
-                  <Reply size={13} />
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setOpenMenuId((cur) => (cur === m.id ? null : m.id))}
-                aria-label="More actions"
-                aria-haspopup="menu"
-                aria-expanded={openMenuId === m.id}
-                className="rounded-full p-1 text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-100"
-              >
-                <ChevronDown size={13} />
-              </button>
-            </div>
-          )}
-          {openMenuId === m.id && (
-            <div data-msg-menu role="menu" className="absolute right-2 top-4 z-30 w-40 overflow-hidden rounded-xl border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
-              <MenuItem
-                icon={<Pin size={14} />}
-                label={pinnedSet.has(m.id) ? 'Unpin' : 'Pin'}
-                active={pinnedSet.has(m.id)}
-                onClick={() => {
-                  void togglePin(m.id);
-                  setOpenMenuId(null);
-                }}
-              />
-              {mine && (
-                <MenuItem
-                  icon={<Pencil size={14} />}
-                  label="Edit"
-                  onClick={() => {
-                    setEditingId(m.id);
-                    setEditingBody(m.body ?? '');
-                    setOpenMenuId(null);
-                  }}
-                />
-              )}
-              {(mine || canModerate) && (
-                <MenuItem
-                  icon={<Trash2 size={14} />}
-                  label="Delete"
-                  danger
-                  onClick={() => {
-                    void deleteMessage(m.id).then(() => applyOne(m.id));
-                    setOpenMenuId(null);
-                  }}
-                />
-              )}
-            </div>
-          )}
-        </div>
-      </Fragment>
-    );
-  }
-
-  /* ── Thread rail content ───────────────────────────────────────────────── */
-
-  function ThreadRail() {
-    if (!threadParent) return null;
-    return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex h-[52px] shrink-0 items-center gap-2 border-b border-zinc-200 px-3 dark:border-zinc-800">
-          <button
-            type="button"
-            onClick={() => setThread(null)}
-            aria-label="Close thread"
-            className="flex items-center gap-1 rounded-md p-1 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-          >
-            <ChevronLeft size={16} /> Back
-          </button>
-          <span className="text-sm font-semibold">Thread</span>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          <MessageRow m={threadParent} prev={null} inThread />
-          {threadReplies.length > 0 && (
-            <div className="my-2 flex items-center gap-2 text-[11px] text-zinc-500 dark:text-zinc-400">
-              <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
-              {threadReplies.length} {threadReplies.length === 1 ? 'reply' : 'replies'}
-              <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
-            </div>
-          )}
-          {threadReplies.map((r, i) => (
-            <MessageRow key={r.id} m={r} prev={i > 0 ? threadReplies[i - 1]! : null} inThread />
-          ))}
-        </div>
-        {canPost && (
-          <div className="border-t border-zinc-200 p-2.5 dark:border-zinc-800">
-            <div className="flex items-end gap-2 rounded-lg border border-zinc-300 focus-within:border-brand-600 dark:border-zinc-700">
-              <textarea
-                value={threadInput}
-                onChange={(e) => setThreadInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    void submitThreadReply();
-                  }
-                }}
-                rows={1}
-                placeholder="Reply in thread…"
-                aria-label="Reply in thread"
-                className="max-h-28 w-full resize-none bg-transparent px-2.5 py-2 text-sm outline-none"
-              />
-              <button
-                type="button"
-                onClick={submitThreadReply}
-                disabled={threadSending || !threadInput.trim()}
-                aria-label="Send reply"
-                className="m-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand-600 text-white transition-colors hover:bg-brand-700 disabled:opacity-40"
-              >
-                <Send size={14} />
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  /* ── Empty state ───────────────────────────────────────────────────────── */
-
-  function EmptyState() {
-    const people = roster ?? [];
-    return (
-      <div className="flex h-full flex-col items-center justify-center px-6 py-10 text-center">
-        <p className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
-          {title ?? 'This conversation'}
-          {people.length > 0 && <span className="font-normal text-zinc-500 dark:text-zinc-400"> · {people.length} people</span>}
-        </p>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Post the first site update.</p>
-        {canPost && (
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-            <button
-              type="button"
-              onClick={() => photoInputRef.current?.click()}
-              className="flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 transition-colors hover:border-brand-400 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 dark:border-zinc-700 dark:text-zinc-200"
-            >
-              <ImageIcon size={14} /> Share a photo
-            </button>
-            <Link
-              href={`/projects/${projectId}/diary`}
-              className="flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 transition-colors hover:border-brand-400 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 dark:border-zinc-700 dark:text-zinc-200"
-            >
-              <FileText size={14} /> Post a site diary note
-            </Link>
-            <button
-              type="button"
-              onClick={() => {
-                setInput((v) => (v.endsWith('@') || v === '' ? `${v}@` : `${v} @`));
-                composerRef.current?.focus();
-                setTa({ mode: 'mention', query: '', tokenStart: input.length });
-              }}
-              className="flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 transition-colors hover:border-brand-400 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 dark:border-zinc-700 dark:text-zinc-200"
-            >
-              <AtSign size={14} /> Mention a contractor
-            </button>
-          </div>
-        )}
-        {people.length > 0 && (
-          <div className="mt-8 flex items-center justify-center -space-x-1.5">
-            {people.slice(0, 8).map((p) => (
-              <span key={p.userId} title={p.name} className="rounded-full ring-2 ring-white dark:ring-zinc-950">
-                <Avatar name={p.name} avatarUrl={p.avatarUrl} userId={p.userId} size={28} online={onlineIds.has(p.userId)} />
-              </span>
-            ))}
-            {people.length > 8 && <span className="pl-3 text-xs text-zinc-500 dark:text-zinc-400">+{people.length - 8}</span>}
-          </div>
-        )}
-      </div>
-    );
-  }
+  /* Row context: plain object, rebuilt per render — the component TYPES above
+     are stable, so rows update in place instead of remounting. */
+  const rowCtx: RowCtx = {
+    now,
+    newDividerSeq,
+    currentUserId,
+    projectId,
+    rosterById,
+    liveReplyCount,
+    editingId,
+    editingBody,
+    setEditingBody,
+    setEditingId,
+    saveEdit: () => void saveEdit(),
+    othersRead,
+    openMenuId,
+    setOpenMenuId,
+    onReact: (id, emoji) => void onReact(id, emoji),
+    openThread,
+    pinnedSet,
+    togglePin: (id) => void togglePin(id),
+    canModerate,
+    applyOne,
+  };
 
   /* ── Render ────────────────────────────────────────────────────────────── */
 
@@ -1611,9 +1697,21 @@ export function ChatPanelV2({
               </div>
             )}
             {streamMessages.length === 0 && outbox.length === 0 ? (
-              <EmptyState />
+              <EmptyState
+                title={title}
+                people={roster ?? []}
+                canPost={canPost}
+                projectId={projectId}
+                onlineIds={onlineIds}
+                onSharePhoto={() => photoInputRef.current?.click()}
+                onMention={() => {
+                  setInput((v) => (v.endsWith('@') || v === '' ? `${v}@` : `${v} @`));
+                  composerRef.current?.focus();
+                  setTa({ mode: 'mention', query: '', tokenStart: input.length });
+                }}
+              />
             ) : (
-              streamMessages.map((m, i) => <MessageRow key={m.id} m={m} prev={i > 0 ? streamMessages[i - 1]! : null} />)
+              streamMessages.map((m, i) => <MessageRow key={m.id} m={m} prev={i > 0 ? streamMessages[i - 1]! : null} ctx={rowCtx} />)
             )}
 
             {/* Outbox: optimistic sends and the offline queue, in stream order. */}
@@ -1846,8 +1944,18 @@ export function ChatPanelV2({
           {/* Desktop rail (Details toggle). The thread takes it over while open. */}
           {railVisible && (
             <aside aria-label="Conversation details" className="hidden min-h-0 w-[300px] flex-shrink-0 flex-col border-l border-zinc-200 bg-white lg:flex dark:border-zinc-800 dark:bg-zinc-950">
-              {thread ? (
-                <ThreadRail />
+              {thread && threadParent ? (
+                <ThreadRail
+                  ctx={rowCtx}
+                  parent={threadParent}
+                  replies={threadReplies}
+                  canPost={canPost}
+                  value={threadInput}
+                  onChange={setThreadInput}
+                  sending={threadSending}
+                  onSend={() => void submitThreadReply()}
+                  onClose={() => setThread(null)}
+                />
               ) : (
                 <ChatRail
                   people={railProps}
@@ -1871,8 +1979,18 @@ export function ChatPanelV2({
             <div className="fixed inset-0 z-40 flex lg:hidden">
               <button type="button" aria-label="Close panel" onClick={() => setRailOpen(false)} className="flex-1 bg-black/30" />
               <aside aria-label="Conversation details" className="flex w-full max-w-[340px] flex-col bg-white shadow-xl dark:bg-zinc-950">
-                {thread ? (
-                  <ThreadRail />
+                {thread && threadParent ? (
+                  <ThreadRail
+                    ctx={rowCtx}
+                    parent={threadParent}
+                    replies={threadReplies}
+                    canPost={canPost}
+                    value={threadInput}
+                    onChange={setThreadInput}
+                    sending={threadSending}
+                    onSend={() => void submitThreadReply()}
+                    onClose={() => setThread(null)}
+                  />
                 ) : (
                   <ChatRail
                     people={railProps}

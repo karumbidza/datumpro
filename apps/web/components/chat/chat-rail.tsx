@@ -329,13 +329,19 @@ export function ChatRail({
       {!hideQuickActions && (
         <QuickActions projectId={projectId} onFind={onFind} onFiles={() => setTab('files')} registerLinks={showRegisterLinks} />
       )}
-      <div className="flex items-center gap-1 overflow-x-auto border-b border-zinc-200 px-2 py-1.5 dark:border-zinc-800">
+      {/* v2 (hideQuickActions): the strip matches the chat header's 52px row so
+          the border lines up across the two panes. */}
+      <div
+        className={`flex items-center gap-0.5 overflow-x-auto border-b border-zinc-200 px-2 dark:border-zinc-800 ${
+          hideQuickActions ? 'h-[52px] shrink-0' : 'py-1.5'
+        }`}
+      >
         {TABS.map((t) => (
           <button
             key={t.key}
             type="button"
             onClick={() => setTab(t.key)}
-            className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+            className={`whitespace-nowrap rounded-md px-2 py-1 text-xs font-medium transition ${
               tab === t.key
                 ? 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-white'
                 : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
@@ -352,7 +358,7 @@ export function ChatRail({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col">
-        {tab === 'people' && <PeopleRail {...people} onClose={onClose} />}
+        {tab === 'people' && <PeopleRail {...people} onClose={onClose} hideTitle={hideQuickActions} />}
         {tab === 'pinned' && (
           <div className="min-h-0 flex-1 overflow-y-auto">
             <PinnedRail pinned={pinned} onUnpin={onUnpin} />

@@ -3,12 +3,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { Play, Pause } from '@/components/icons';
 
+/** Decoded peaks per URL, so a remounted row never re-fetches/re-decodes (and
+ *  never flashes the placeholder bars again). Session-lived; signed URLs are
+ *  stable within a page load. */
+const peakCache = new Map<string, { peaks: number[]; duration: number }>();
+
 /** Playable voice-note waveform. Decodes the audio once (WebAudio) to draw peak
  *  bars; falls back to a plain <audio> element if decoding fails (codec/CORS).
  *  Site crews send voice constantly, so this is a first-class message body. */
 export function VoiceNote({ url, durationSeconds }: { url: string; durationSeconds: number | null }) {
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [peaks, setPeaks] = useState<number[] | null>(null);
+  const [peaks, setPeaks] = useState<number[] | null>(() => peakCache.get(url)?.peaks ?? null);
   const [decodeFailed, setDecodeFailed] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0); // 0..1
@@ -17,6 +22,12 @@ export function VoiceNote({ url, durationSeconds }: { url: string; durationSecon
   const BARS = 44;
 
   useEffect(() => {
+    const cached = peakCache.get(url);
+    if (cached) {
+      setPeaks(cached.peaks);
+      if (!durationSeconds) setDuration(cached.duration);
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -39,7 +50,12 @@ export function VoiceNote({ url, durationSeconds }: { url: string; durationSecon
           out.push(max);
         }
         const top = Math.max(...out, 0.01);
-        setPeaks(out.map((v) => Math.max(0.12, v / top)));
+        // Square-root scaling lifts quiet speech into visible bars — linear
+        // normalisation renders soft passages/trailing silence as a dotted
+        // line, which reads as broken.
+        const scaled = out.map((v) => Math.max(0.18, Math.sqrt(v / top)));
+        peakCache.set(url, { peaks: scaled, duration: audio.duration });
+        setPeaks(scaled);
         if (!durationSeconds) setDuration(audio.duration);
       } catch {
         if (!cancelled) setDecodeFailed(true);

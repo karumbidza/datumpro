@@ -29,6 +29,8 @@ interface RailCommon {
   loadActivity: (userId: string) => Promise<ActivityItem[]>;
   /** Mobile only — closes the whole rail overlay. */
   onClose?: () => void;
+  /** Chat v2: the rail tab strip already says "People" — skip the inner title. */
+  hideTitle?: boolean;
 }
 
 export function PeopleRail(props: RailCommon) {
@@ -40,7 +42,7 @@ export function PeopleRail(props: RailCommon) {
   );
 }
 
-function MemberList({ members, onlineIds, currentUserId, onSelect, onClose }: RailCommon) {
+function MemberList({ members, onlineIds, currentUserId, onSelect, onClose, hideTitle }: RailCommon) {
   const online = members
     .filter((m) => onlineIds.has(m.userId))
     .sort((a, b) => Number(a.role !== 'pm') - Number(b.role !== 'pm'));
@@ -48,6 +50,7 @@ function MemberList({ members, onlineIds, currentUserId, onSelect, onClose }: Ra
 
   return (
     <>
+      {!hideTitle && (
       <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3.5 dark:border-zinc-800">
         <h3 className="text-sm font-semibold text-zinc-900 dark:text-white">People</h3>
         <div className="flex items-center gap-2">
@@ -64,6 +67,7 @@ function MemberList({ members, onlineIds, currentUserId, onSelect, onClose }: Ra
           )}
         </div>
       </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-2">
         {online.length > 0 && (
