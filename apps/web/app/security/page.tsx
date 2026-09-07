@@ -1,23 +1,23 @@
 import Link from 'next/link';
-import { Card } from '@/components/ui/card';
+import { MarketingShell, focusRing } from '@/components/marketing/chrome';
 
 export const metadata = { title: 'Security & Data — DatumPro' };
 
 const points: { id: string; title: string; body: string }[] = [
   {
     id: 'isolation',
-    title: 'Your data is isolated per organization',
-    body: 'Every company is a separate tenant. Access is enforced at the database with row-level security on each record — not just hidden in the UI. One organization can never read another’s data.',
+    title: 'Your data is isolated per organisation',
+    body: 'Every company is a separate tenant. Access is enforced at the database with row-level security on each record — not just hidden in the UI. One organisation can never read another’s data.',
   },
   {
     id: 'roles',
-    title: 'Role-based access & separation of duties',
+    title: 'Role-based access and separation of duties',
     body: 'Owners, admins, finance, project managers and members each get exactly the access their role needs. Money actions and approvals are deliberately separated so no single person can both raise and approve spend.',
   },
   {
     id: 'accountability',
     title: 'Named accountability',
-    body: 'Every organization has a named owner and a member roster. Invitations are tied to a specific email address, so you always know who has access and who invited them.',
+    body: 'Every organisation has a named owner and a member roster. Invitations are tied to a specific email address, so you always know who has access and who invited them.',
   },
   {
     id: 'residency',
@@ -28,31 +28,32 @@ const points: { id: string; title: string; body: string }[] = [
 
 export default function SecurityPage() {
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
-      <p className="text-xs font-medium uppercase tracking-wide text-brand-600 dark:text-brand-400">Trust &amp; security</p>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight">How DatumPro protects your organization</h1>
-      <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-        Built for corporates, construction firms, NGOs and government teams that need their data handled with care.
-      </p>
+    <MarketingShell>
+      <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8">
+        <h1 className="max-w-[18ch] text-4xl font-medium leading-[1.08] tracking-[-0.02em] sm:text-5xl" style={{ textWrap: 'balance' }}>
+          How DatumPro protects your organisation.
+        </h1>
+        <p className="mt-5 max-w-[58ch] text-lg leading-relaxed text-zinc-600 dark:text-zinc-400">
+          Built for corporates, construction firms, NGOs and government teams that need their data handled with care.
+        </p>
 
-      <div className="mt-8 space-y-4">
-        {points.map((p) => (
-          <div key={p.id} id={p.id} className="scroll-mt-20">
-            <Card>
-              <h2 className="text-base font-semibold">{p.title}</h2>
-              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">{p.body}</p>
-            </Card>
-          </div>
-        ))}
+        <div className="mt-14 max-w-3xl">
+          {points.map((p, i) => (
+            <section key={p.id} id={p.id} className={`scroll-mt-20 py-8 ${i > 0 ? 'border-t border-zinc-200 dark:border-zinc-800' : ''}`}>
+              <h2 className="text-2xl font-medium tracking-[-0.015em]">{p.title}</h2>
+              <p className="mt-3 max-w-[62ch] text-[17px] leading-relaxed text-zinc-600 dark:text-zinc-400">{p.body}</p>
+            </section>
+          ))}
+        </div>
+
+        <p className="mt-10 max-w-[58ch] text-[17px] leading-relaxed text-zinc-600 dark:text-zinc-400">
+          Security question or procurement requirement?{' '}
+          <Link href="/enterprise" className={`font-medium text-brand-700 hover:underline dark:text-brand-400 ${focusRing}`}>
+            Get in touch
+          </Link>
+          .
+        </p>
       </div>
-
-      <p className="mt-8 text-sm text-zinc-500 dark:text-zinc-400">
-        Security question or procurement requirement?{' '}
-        <Link href="/sign-in" className="underline">
-          Get in touch
-        </Link>
-        .
-      </p>
-    </main>
+    </MarketingShell>
   );
 }
