@@ -45,6 +45,36 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* ── Marketing landing (app/page.tsx) ─────────────────────────────────────
+   The landing speaks in Newsreader (editorial serif, optical sizing) while
+   every product recreation inside it stays on the app's own --font-sans —
+   the page is the document, the product shots are the evidence. Scoped under
+   .landing so no app surface changes. */
+.landing {
+  font-family: var(--font-newsreader), 'Iowan Old Style', Georgia, serif;
+  font-variant-numeric: lining-nums;
+}
+.landing ::selection {
+  background: #bfdbfe; /* brand-200 */
+  color: #18181b;
+}
+.dark .landing ::selection {
+  background: #1e40af; /* brand-700 */
+  color: #fafafa;
+}
+
+/* One orchestrated load moment: hero lines rise, then the dashboard settles. */
+@keyframes land-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.land-rise {
+  animation: land-rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .land-rise { animation: none; }
+}
+
 /* Branded loader — the logo's chart nodes lighting up in sequence. */
 @keyframes brand-pulse {
   0%, 100% { opacity: 0.25; }
