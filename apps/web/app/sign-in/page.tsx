@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { PASSWORD_MIN_LENGTH, passwordIssue } from '@datumpro/shared/validation';
 import { ForgotPasswordFlow } from './forgot-password-flow';
 import { Req } from '@/components/ui/form';
+import { newsreader } from '@/components/marketing/font';
 
 // 48px min tap target (h-12) — comfortable for thumbs, per the mobile-first form spec.
 const fieldClass =
@@ -141,16 +142,16 @@ export default function SignInPage({
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center bg-white px-6 py-12 dark:bg-zinc-950">
+    <main className={`relative flex min-h-screen items-center justify-center bg-white px-6 py-12 dark:bg-zinc-950 ${newsreader.variable}`}>
       <div className="relative z-10 w-full max-w-[400px]">
         {/* Brand + heading (centered) */}
         <div className="flex flex-col items-center text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-mark.svg" alt="DatumPro" className="mb-6 h-12 w-12 rounded-xl shadow-sm" />
-          <h1 className="font-display text-2xl font-semibold leading-[1.2] tracking-[-0.02em] text-zinc-900 dark:text-white">
+          <h1 className="text-3xl font-medium leading-[1.15] tracking-[-0.02em] text-zinc-900 [font-family:var(--font-newsreader),Georgia,serif] dark:text-white">
             {view === 'forgot' ? 'Reset your password' : fromInvite ? 'Accept your invitation' : 'Sign in'}
           </h1>
-          <p className="mt-2 max-w-[340px] text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="mt-2 max-w-[340px] text-sm text-zinc-600 dark:text-zinc-400">
             {view === 'forgot' ? (
               'We’ll email you a 6-digit code to set a new password.'
             ) : fromInvite ? (
@@ -179,7 +180,7 @@ export default function SignInPage({
             type="button"
             onClick={() => oauth('google')}
             disabled={busy}
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-white text-sm font-semibold text-zinc-900 transition hover:border-zinc-300 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-900"
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white text-sm font-semibold text-zinc-900 transition hover:border-zinc-400 hover:bg-zinc-50 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 dark:border-zinc-700 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-900"
           >
             <GoogleIcon />
             Continue with Google
@@ -187,7 +188,7 @@ export default function SignInPage({
         </div>
 
         {/* Divider */}
-        <div className="my-5 flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400">
+        <div className="my-5 flex items-center gap-3 text-xs text-zinc-600 dark:text-zinc-400">
           <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
           or with email
           <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
@@ -290,14 +291,14 @@ export default function SignInPage({
                     type="button"
                     onClick={signUp}
                     disabled={busy}
-                    className="h-12 flex-1 rounded-lg bg-brand-500 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
+                    className="h-12 flex-1 rounded-lg bg-brand-600 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
                   >
                     {busy ? 'Creating…' : 'Create account'}
                   </button>
                   <button
                     type="submit"
                     disabled={busy}
-                    className="h-12 rounded-lg border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-900"
+                    className="h-12 rounded-lg border border-zinc-300 bg-white px-4 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-50 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 dark:border-zinc-700 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-900"
                   >
                     {busy ? '…' : 'I have an account'}
                   </button>
@@ -307,7 +308,7 @@ export default function SignInPage({
                   <button
                     type="submit"
                     disabled={busy}
-                    className="h-12 flex-1 rounded-lg bg-brand-500 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
+                    className="h-12 flex-1 rounded-lg bg-brand-600 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
                   >
                     {busy ? '…' : 'Sign in'}
                   </button>
@@ -315,7 +316,7 @@ export default function SignInPage({
                     type="button"
                     onClick={signUp}
                     disabled={busy}
-                    className="h-12 rounded-lg border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-900"
+                    className="h-12 rounded-lg border border-zinc-300 bg-white px-4 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-50 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 dark:border-zinc-700 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-900"
                   >
                     Create account
                   </button>
@@ -347,7 +348,7 @@ export default function SignInPage({
       </div>
 
       {/* Legal + enterprise entry point — pinned to the bottom of the canvas */}
-      <div className="absolute inset-x-0 bottom-6 z-10 mx-auto flex w-full max-w-[400px] flex-wrap items-center justify-between gap-2 px-6 text-xs text-zinc-500 dark:text-zinc-400">
+      <div className="absolute inset-x-0 bottom-6 z-10 mx-auto flex w-full max-w-[400px] flex-wrap items-center justify-between gap-2 px-6 text-xs text-zinc-600 dark:text-zinc-400">
         <span>
           © 2026 DatumPro ·{' '}
           <a href="/terms" className="font-medium underline underline-offset-2 hover:text-brand-600">

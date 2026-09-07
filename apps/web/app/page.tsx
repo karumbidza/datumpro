@@ -1,26 +1,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { Newsreader } from 'next/font/google';
 import { getAuthUser } from '@/lib/data/org';
-import { ManageCookiesLink } from '@/components/consent/manage-cookies-link';
+import { MarketingFooter, MarketingNav, focusRing } from '@/components/marketing/chrome';
+import { newsreader } from '@/components/marketing/font';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { requestDemo } from './request-demo-action';
 
 const BASE = process.env.NEXT_PUBLIC_APP_URL || 'https://datumpro.app';
-
-/* The landing's voice: Newsreader with its optical-size axis, so headlines get
-   the high-contrast display cut and body copy the sturdier text cut of the same
-   family. Scoped to this route via the .landing class in globals.css — the app
-   itself never sees it. */
-/* Roman only — the italic cut costs another ~150KB of preloaded font for a
-   handful of words, which pushes LCP past the performance floor on mobile. */
-const newsreader = Newsreader({
-  subsets: ['latin'],
-  axes: ['opsz'],
-  variable: '--font-newsreader',
-  display: 'swap',
-});
 
 /* ── SEO ─────────────────────────────────────────────────────────────────── */
 
@@ -141,7 +128,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   return (
     <main className={`landing ${newsreader.variable} bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50`}>
       <JsonLd />
-      <TopNav />
+      <MarketingNav />
       <Hero />
       <ClaimWork />
       <ClaimMoney />
@@ -151,15 +138,12 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
       <PricingLine />
       <DemoRequest status={demo} />
       <Faq />
-      <Footer />
+      <MarketingFooter />
     </main>
   );
 }
 
 /* Shared bits ─────────────────────────────────────────────────────────────── */
-
-const focusRing =
-  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 dark:focus-visible:outline-brand-400';
 
 function ArrowIcon({ className = 'h-4 w-4' }: { className?: string }) {
   return (
@@ -167,48 +151,6 @@ function ArrowIcon({ className = 'h-4 w-4' }: { className?: string }) {
       <path d="M5 12h14" />
       <path d="m12 5 7 7-7 7" />
     </svg>
-  );
-}
-
-/* ── Nav ─────────────────────────────────────────────────────────────────── */
-
-function TopNav() {
-  return (
-    <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/95 dark:border-zinc-800 dark:bg-zinc-950/95">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-        <Link href="/" className={`flex items-center gap-2.5 ${focusRing}`}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-mark.svg" alt="" className="h-7 w-7 rounded-md" />
-          <span className="text-lg font-medium tracking-tight">DatumPro</span>
-        </Link>
-        <nav className="hidden items-center gap-7 lg:flex" aria-label="Main">
-          {[
-            ['The work', '#work'],
-            ['The money', '#money'],
-            ['The record', '#record'],
-            ['FAQ', '#faq'],
-          ].map(([label, href]) => (
-            <a key={label} href={href} className={`text-[15px] text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50 ${focusRing}`}>
-              {label}
-            </a>
-          ))}
-          <Link href="/enterprise" className={`text-[15px] text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50 ${focusRing}`}>
-            Enterprise
-          </Link>
-        </nav>
-        <div className="flex items-center gap-5">
-          <Link href="/sign-in" className={`hidden text-[15px] text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50 sm:inline-block ${focusRing}`}>
-            Sign in
-          </Link>
-          <a
-            href="#demo"
-            className={`inline-flex h-10 items-center justify-center rounded-lg bg-brand-600 px-4 text-[15px] font-medium text-white transition-colors hover:bg-brand-700 ${focusRing}`}
-          >
-            Request a demo
-          </a>
-        </div>
-      </div>
-    </header>
   );
 }
 
@@ -805,37 +747,5 @@ function Faq() {
         </div>
       </div>
     </section>
-  );
-}
-
-/* ── Footer ──────────────────────────────────────────────────────────────── */
-
-function Footer() {
-  return (
-    <footer className="border-t border-zinc-200 dark:border-zinc-800">
-      <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-6 px-4 py-10 text-sm text-zinc-600 dark:text-zinc-400 sm:flex-row sm:items-center sm:px-6 lg:px-8">
-        <div className="flex items-center gap-2.5">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-mark.svg" alt="" className="h-6 w-6 rounded-md" />
-          <span className="font-medium text-zinc-900 dark:text-zinc-50">DatumPro</span>
-          <span>· © 2026 · by Quillstone Digital</span>
-        </div>
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-          <Link href="/enterprise" className={`hover:text-zinc-900 dark:hover:text-zinc-50 ${focusRing}`}>
-            Enterprise
-          </Link>
-          <Link href="/security" className={`hover:text-zinc-900 dark:hover:text-zinc-50 ${focusRing}`}>
-            Security
-          </Link>
-          <Link href="/terms" className={`hover:text-zinc-900 dark:hover:text-zinc-50 ${focusRing}`}>
-            Terms
-          </Link>
-          <Link href="/privacy" className={`hover:text-zinc-900 dark:hover:text-zinc-50 ${focusRing}`}>
-            Privacy
-          </Link>
-          <ManageCookiesLink className={`hover:text-zinc-900 dark:hover:text-zinc-50 ${focusRing}`} />
-        </div>
-      </div>
-    </footer>
   );
 }

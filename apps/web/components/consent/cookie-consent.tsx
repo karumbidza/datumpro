@@ -104,15 +104,27 @@ export function CookieConsent() {
           how the site is used and improve it. You can change or withdraw your choice at any time.
         </p>
 
+        {/* Reading a policy must not be blocked by the modal itself: these
+            links hide it (without storing a choice) so the page is readable;
+            with no stored choice it will ask again on the next full load. */}
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-          <Link href="/privacy" className="text-zinc-500 underline hover:text-brand-600 dark:text-zinc-400">
+          <Link
+            href="/privacy"
+            onClick={() => setVisible(false)}
+            className="text-zinc-500 underline hover:text-brand-600 dark:text-zinc-400"
+          >
             Privacy Policy
           </Link>
-          <Link href="/terms" className="text-zinc-500 underline hover:text-brand-600 dark:text-zinc-400">
+          <Link
+            href="/terms"
+            onClick={() => setVisible(false)}
+            className="text-zinc-500 underline hover:text-brand-600 dark:text-zinc-400"
+          >
             Terms
           </Link>
           <Link
             href="/privacy#cookies"
+            onClick={() => setVisible(false)}
             className="text-zinc-500 underline hover:text-brand-600 dark:text-zinc-400"
           >
             More details

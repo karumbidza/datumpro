@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { DraftNotice } from '@/components/legal/draft-notice';
+import { MarketingShell } from '@/components/marketing/chrome';
 import { LEGAL, SUBPROCESSORS } from '@/lib/legal';
 
 export const metadata: Metadata = {
@@ -11,24 +12,24 @@ export const metadata: Metadata = {
 
 function H2({ id, children }: { id: string; children: React.ReactNode }) {
   return (
-    <h2 id={id} className="mt-10 scroll-mt-20 text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+    <h2 id={id} className="mt-12 scroll-mt-24 text-2xl font-medium tracking-[-0.015em] text-zinc-900 dark:text-zinc-50">
       {children}
     </h2>
   );
 }
 
 function P({ children }: { children: React.ReactNode }) {
-  return <p className="mt-3 text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">{children}</p>;
+  return <p className="mt-4 max-w-[65ch] text-[17px] leading-relaxed text-zinc-600 dark:text-zinc-400">{children}</p>;
 }
 
 export default function PrivacyPage() {
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
+    <MarketingShell>
+      <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
       <DraftNotice />
 
-      <p className="text-xs font-medium uppercase tracking-wide text-brand-600 dark:text-brand-400">Legal</p>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight">Privacy Policy</h1>
-      <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Last updated: {LEGAL.lastUpdated}</p>
+      <h1 className="text-4xl font-medium leading-[1.08] tracking-[-0.02em] sm:text-5xl">Privacy Policy.</h1>
+      <p className="mt-4 text-sm tabular-nums text-zinc-600 dark:text-zinc-400">Last updated: {LEGAL.lastUpdated}</p>
 
       <P>
         This Privacy Policy explains how {LEGAL.legalEntity} — which provides {LEGAL.product} through its
@@ -184,9 +185,10 @@ export default function PrivacyPage() {
         <a href={`mailto:${LEGAL.privacyEmail}`} className="underline">{LEGAL.privacyEmail}</a>.
       </P>
 
-      <p className="mt-10 text-sm text-zinc-500 dark:text-zinc-400">
+      <p className="mt-12 border-t border-zinc-200 pt-8 text-[17px] text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
         See also our <Link href="/terms" className="underline">Terms of Service</Link>.
       </p>
-    </main>
+      </div>
+    </MarketingShell>
   );
 }
