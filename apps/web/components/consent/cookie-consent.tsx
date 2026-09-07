@@ -60,14 +60,18 @@ export function CookieConsent() {
       aria-modal="true"
       aria-labelledby="cookie-consent-title"
     >
-      {/* Dimmed backdrop */}
-      <button
-        type="button"
-        aria-label={dismissable ? 'Close' : undefined}
-        tabIndex={dismissable ? 0 : -1}
-        onClick={close}
-        className={`absolute inset-0 bg-zinc-950/50 backdrop-blur-sm ${dismissable ? 'cursor-pointer' : 'cursor-default'}`}
-      />
+      {/* Dimmed backdrop — a real button only when it can actually dismiss;
+          otherwise a decorative div (a nameless button fails button-name). */}
+      {dismissable ? (
+        <button
+          type="button"
+          aria-label="Close"
+          onClick={close}
+          className="absolute inset-0 cursor-pointer bg-zinc-950/50 backdrop-blur-sm"
+        />
+      ) : (
+        <div aria-hidden className="absolute inset-0 bg-zinc-950/50 backdrop-blur-sm" />
+      )}
 
       {/* Card */}
       <div className="relative w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
