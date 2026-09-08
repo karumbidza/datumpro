@@ -22,12 +22,17 @@ export interface ProgrammeTask {
   critical: boolean;
   floatDays: number;
   waitingOn: string[]; // predecessor titles not yet done
+  /** Checklist completion 0–100 (done tasks are 100); null when the task has
+   *  no checklist and isn't done — we never invent a number. */
+  progressPct: number | null;
 }
 
 export interface ProgrammeEdge {
   predecessorId: string;
   successorId: string;
   lagDays: number;
+  /** Lag as % of the predecessor's duration; overrides lagDays when set. */
+  lagPercent: number | null;
   type: DependencyType;
   /** A driving link on the critical path: both ends critical and this link is
    *  the binding constraint on the successor's start/finish. */

@@ -32,8 +32,21 @@ export interface SchedDependency {
   predecessorId: string;
   /** Days of lag (or lead, when negative) on the relationship. */
   lagDays: number;
+  /** Lag as a percentage (0–100] of the predecessor's duration. When set it
+   *  overrides lagDays, and re-derives automatically if the predecessor is
+   *  resized ("start at 60% of X"). */
+  lagPercent?: number | null;
   /** Relationship type. Absent ⇒ finish-to-start (back-compat). */
   type?: DependencyType;
+}
+
+/** The effective lag of a dependency in whole days: the % of the predecessor's
+ *  duration when lagPercent is set, else the fixed lagDays. */
+export function effectiveLagDays(dep: SchedDependency, predecessorDurationDays: number): number {
+  if (dep.lagPercent != null && Number.isFinite(dep.lagPercent)) {
+    return Math.round((dep.lagPercent / 100) * Math.max(0, predecessorDurationDays));
+  }
+  return dep.lagDays;
 }
 
 export interface SchedTask {
@@ -100,8 +113,11 @@ export function computeSchedule(
     for (const d of t.dependencies) {
       if (!byId.has(d.predecessorId)) continue; // ignore dangling edges
       const type = d.type ?? 'fs';
-      successors.get(d.predecessorId)!.push({ id: t.id, lag: d.lagDays, type });
-      predecessors.get(t.id)!.push({ id: d.predecessorId, lag: d.lagDays, type });
+      // Percent lags resolve against the predecessor's current duration here,
+      // once, so both passes see the same effective day value.
+      const lag = effectiveLagDays(d, dur(d.predecessorId));
+      successors.get(d.predecessorId)!.push({ id: t.id, lag, type });
+      predecessors.get(t.id)!.push({ id: d.predecessorId, lag, type });
       indegree.set(t.id, (indegree.get(t.id) ?? 0) + 1);
     }
   }

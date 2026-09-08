@@ -96,7 +96,7 @@ export async function computeProjectPlan(
   // 4) Dependencies — group by successor.
   const { data: depRows } = await supabase
     .from('task_dependencies')
-    .select('predecessor_id, successor_id, lag_days, type')
+    .select('predecessor_id, successor_id, lag_days, lag_percent, type')
     .in('successor_id', ids);
 
   const depsBySuccessor = new Map<string, SchedTask['dependencies']>();
@@ -106,6 +106,7 @@ export async function computeProjectPlan(
     list.push({
       predecessorId: d.predecessor_id as string,
       lagDays: num(d.lag_days) ?? 0,
+      lagPercent: num(d.lag_percent),
       type: (d.type as SchedTask['dependencies'][number]['type']) ?? 'fs',
     });
     depsBySuccessor.set(successorId, list);
