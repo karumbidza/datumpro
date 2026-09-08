@@ -282,7 +282,7 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
                 style={{ height: rowHeights.get(i) }}
                 className={isSection ? 'bg-zinc-50 dark:bg-zinc-900/50' : isSkip ? 'opacity-45' : ''}
               >
-                <td className="relative border-b border-r border-zinc-200 p-0 dark:border-zinc-800">
+                <td className="relative border-b border-r border-zinc-200 p-0 align-top dark:border-zinc-800">
                   <select
                     value={r.kind}
                     onFocus={() => setActive({ row: i, col: 0 })}
@@ -299,7 +299,7 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
                     className="absolute inset-x-0 bottom-0 z-10 h-1.5 cursor-row-resize touch-none select-none hover:bg-brand-400/50"
                   />
                 </td>
-                <td className="border-b border-r border-zinc-200 p-0 dark:border-zinc-800">
+                <td className="border-b border-r border-zinc-200 p-0 align-top dark:border-zinc-800">
                   <input
                     value={isSection ? '' : r.itemNo}
                     disabled={disabled}
@@ -309,16 +309,16 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
                     className="w-16 bg-transparent px-2 py-1.5 font-mono text-xs outline-none focus:ring-1 focus:ring-inset focus:ring-brand-500"
                   />
                 </td>
-                <td className="border-b border-r border-zinc-200 p-0 dark:border-zinc-800">
+                <td className="border-b border-r border-zinc-200 p-0 align-top dark:border-zinc-800">
                   <textarea
                     value={r.description}
                     onFocus={() => setActive({ row: i, col: 2 })}
                     onChange={(e) => setRow(i, { description: e.target.value })}
                     rows={1}
-                    className={`h-full w-full resize-none bg-transparent px-2 py-1.5 leading-snug outline-none focus:ring-1 focus:ring-inset focus:ring-brand-500 ${isSection ? 'font-semibold' : ''}`}
+                    className={`w-full resize-none bg-transparent px-2 py-1.5 leading-snug outline-none [field-sizing:content] focus:ring-1 focus:ring-inset focus:ring-brand-500 ${isSection ? 'font-semibold' : ''}`}
                   />
                 </td>
-                <td className="border-b border-r border-zinc-200 p-0 dark:border-zinc-800">
+                <td className="border-b border-r border-zinc-200 p-0 align-top dark:border-zinc-800">
                   <input
                     value={isSection ? '' : r.unit}
                     disabled={disabled}
@@ -327,7 +327,7 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
                     className="w-full bg-transparent px-2 py-1.5 text-center outline-none focus:ring-1 focus:ring-inset focus:ring-brand-500 disabled:bg-transparent"
                   />
                 </td>
-                <td className="border-b border-r border-zinc-200 p-0 dark:border-zinc-800">
+                <td className="border-b border-r border-zinc-200 p-0 align-top dark:border-zinc-800">
                   <input
                     value={isSection ? '' : r.qty ? String(r.qty) : ''}
                     disabled={disabled}
@@ -338,7 +338,7 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
                     className="w-full bg-transparent px-2 py-1.5 text-right font-mono tabular-nums outline-none focus:ring-1 focus:ring-inset focus:ring-brand-500"
                   />
                 </td>
-                <td className="border-b border-r border-zinc-200 p-0 dark:border-zinc-800">
+                <td className="border-b border-r border-zinc-200 p-0 align-top dark:border-zinc-800">
                   <input
                     value={isSection ? '' : r.rate ? String(r.rate) : ''}
                     disabled={disabled}
@@ -349,7 +349,7 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
                     className="w-full bg-transparent px-2 py-1.5 text-right font-mono tabular-nums outline-none focus:ring-1 focus:ring-inset focus:ring-brand-500"
                   />
                 </td>
-                <td className="border-b border-r border-zinc-200 p-0 dark:border-zinc-800">
+                <td className="border-b border-r border-zinc-200 p-0 align-top dark:border-zinc-800">
                   <input
                     value={isSection ? '' : r.amount ? String(r.amount) : ''}
                     disabled={disabled}
@@ -360,7 +360,7 @@ export function ReviewGrid({ boqId, rows, setRow, currency }: {
                     className={`w-full bg-transparent px-2 py-1.5 text-right font-mono tabular-nums outline-none focus:ring-1 focus:ring-inset focus:ring-brand-500 ${measured ? 'text-zinc-400' : ''}`}
                   />
                 </td>
-                <td className="border-b border-zinc-200 px-2 py-1.5 text-right font-mono tabular-nums dark:border-zinc-800">
+                <td className="border-b border-zinc-200 px-2 py-1.5 text-right align-top font-mono tabular-nums dark:border-zinc-800">
                   {disabled ? '' : fmtMoney(lineCents(r), currency)}
                 </td>
               </tr>

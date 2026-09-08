@@ -13,8 +13,6 @@ import {
   deleteItem,
   moveItem,
   duplicateBoq,
-  addSectionDep,
-  removeSectionDep,
 } from '../actions';
 import {
   BOQ_UNITS,
@@ -34,7 +32,6 @@ import { useColumnResize } from '@/lib/use-column-resize';
 
 type Item = { id: string; sectionId: string; itemNo: string | null; description: string; uom: string; qty: number; rateCents: number; durationDays: number | null };
 type Section = { id: string; name: string; parentId: string | null };
-type Dep = { sectionId: string; dependsOnId: string };
 
 const TENDER_BADGE: Partial<Record<TenderStatus, string>> = {
   open: 'Out to tender',
@@ -77,8 +74,6 @@ export function BoqBuilder({
       durationDays: it.durationDays,
     })),
   );
-  const [deps, setDeps] = useState<Dep[]>(() => boq.deps.map((d) => ({ sectionId: d.sectionId, dependsOnId: d.dependsOnId })));
-  const [depError, setDepError] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const toggleCollapsed = (id: string) =>
     setCollapsed((prev) => {
@@ -119,20 +114,6 @@ export function BoqBuilder({
     itemsOf(sid).reduce((a, it) => a + (it.durationDays ?? 0), 0) +
     childSections(sid).reduce((a, c) => a + sectionDays(c.id), 0);
 
-  const onAddDep = (sectionId: string, dependsOnId: string) => {
-    if (!dependsOnId) return;
-    setDepError(null);
-    start(async () => {
-      const res = await addSectionDep(boq.id, sectionId, dependsOnId);
-      if (res && 'error' in res) setDepError(res.error);
-      else setDeps((p) => [...p, { sectionId, dependsOnId }]);
-    });
-  };
-  const onRemoveDep = (sectionId: string, dependsOnId: string) =>
-    start(async () => {
-      await removeSectionDep(boq.id, sectionId, dependsOnId);
-      setDeps((p) => p.filter((d) => !(d.sectionId === sectionId && d.dependsOnId === dependsOnId)));
-    });
 
   // ── mutations (local state first, persisted via server actions) ─────────────
   const persistItem = (id: string, p: { description?: string; uom?: string | null; qty?: number; budgetRateCents?: number; durationDays?: number | null }) =>
@@ -230,46 +211,7 @@ export function BoqBuilder({
               {my.length + kids.length} entr{my.length + kids.length === 1 ? 'y' : 'ies'}
             </span>
           </div>
-          {/* Programme links: "this section starts after …" chips + picker. */}
-          <div className="mt-0.5 flex flex-wrap items-center gap-1.5" style={{ paddingLeft: depth * 18 + 4 }}>
-            {deps
-              .filter((d) => d.sectionId === s.id)
-              .map((d) => (
-                <span
-                  key={d.dependsOnId}
-                  className="inline-flex items-center gap-1 rounded bg-zinc-200/70 px-1.5 py-0.5 text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
-                >
-                  after {sections.find((x) => x.id === d.dependsOnId)?.name ?? 'section'}
-                  {canEdit && (
-                    <button
-                      type="button"
-                      aria-label="Remove link"
-                      onClick={() => onRemoveDep(s.id, d.dependsOnId)}
-                      className="rounded px-0.5 hover:text-red-600"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </span>
-              ))}
-            {canEdit && sections.length > 1 && (
-              <select
-                value=""
-                aria-label="Starts after section"
-                onChange={(e) => onAddDep(s.id, e.target.value)}
-                className="rounded border border-dashed border-zinc-300 bg-transparent px-1 py-0.5 text-[11px] text-zinc-500 dark:border-zinc-700"
-              >
-                <option value="">+ starts after…</option>
-                {sections
-                  .filter((x) => x.id !== s.id && !deps.some((d) => d.sectionId === s.id && d.dependsOnId === x.id))
-                  .map((x) => (
-                    <option key={x.id} value={x.id}>
-                      {x.name}
-                    </option>
-                  ))}
-              </select>
-            )}
-          </div>
+          {/* Section sequencing lives on the Programme (Gantt) — not here. */}
         </td>
         <td className={`${rowB} px-2.5 py-2 text-right font-mono text-sm font-bold tabular-nums text-brand-600 dark:text-brand-500`}>
           {fmtMoney(sectionTotal(s.id), cur)}
@@ -508,12 +450,6 @@ export function BoqBuilder({
             Generate tasks →
           </Link>
         </div>
-      )}
-
-      {depError && (
-        <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
-          {depError}
-        </p>
       )}
 
       {/* the bill */}
