@@ -27,6 +27,29 @@ const ROLE_OPTIONS: [Role, string][] = [
   ['section', 'Section'],
 ];
 
+/** Column-letter label, Excel style (A…Z, AA…). */
+function colLetter(i: number): string {
+  let out = '';
+  let n = i;
+  do {
+    out = String.fromCharCode(65 + (n % 26)) + out;
+    n = Math.floor(n / 26) - 1;
+  } while (n >= 0);
+  return out;
+}
+
+/** Colour family per mapped role: the header select and the entire column share
+ *  it, so "what is mapped where" is visible at a glance. */
+const ROLE_TINT: Record<Role, { col: string; chip: string }> = {
+  ignore: { col: '', chip: '' },
+  item_no: { col: 'bg-zinc-100/70 dark:bg-zinc-800/40', chip: 'bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200' },
+  description: { col: 'bg-brand-50/70 dark:bg-brand-500/10', chip: 'bg-brand-100 text-brand-800 dark:bg-brand-500/20 dark:text-brand-300' },
+  unit: { col: 'bg-violet-50/60 dark:bg-violet-500/10', chip: 'bg-violet-100 text-violet-800 dark:bg-violet-500/20 dark:text-violet-300' },
+  qty: { col: 'bg-emerald-50/60 dark:bg-emerald-500/10', chip: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300' },
+  rate: { col: 'bg-teal-50/60 dark:bg-teal-500/10', chip: 'bg-teal-100 text-teal-800 dark:bg-teal-500/20 dark:text-teal-300' },
+  amount: { col: 'bg-green-50/70 dark:bg-green-500/10', chip: 'bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-300' },
+  section: { col: 'bg-amber-50/60 dark:bg-amber-500/10', chip: 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300' },
+};
 const str = (c: Cell | undefined): string => (c == null ? '' : String(c).trim());
 const toNum = (c: Cell | undefined): number => {
   if (typeof c === 'number') return c;
@@ -397,7 +420,15 @@ export function BoqImporter({ boqId, currency }: { boqId: string; currency: stri
 
   // ── MAP ─────────────────────────────────────────────────────────────────────
   if (step === 'map') {
-    const previewRows = grid.slice(0, Math.min(grid.length, headerSkip + 6));
+    // A real slice of the sheet, Excel-style: enough rows to recognise the bill.
+    const previewRows = grid.slice(0, Math.min(grid.length, Math.max(14, headerSkip + 8)));
+    const mapped = ROLE_OPTIONS.filter(([v]) => v !== 'ignore').map(([v, l]) => ({
+      role: v,
+      label: l,
+      col: roles.indexOf(v),
+    }));
+    const hasDescription = roles.includes('description');
+    const hasMoney = roles.includes('amount') || (roles.includes('qty') && roles.includes('rate'));
     return (
       <div className="mt-6 space-y-5">
         <FormError error={error} />
@@ -447,17 +478,6 @@ export function BoqImporter({ boqId, currency }: { boqId: string; currency: stri
             </label>
           )}
           <label className="flex items-center gap-2 text-sm">
-            <span className="text-zinc-500 dark:text-zinc-400">Header rows to skip</span>
-            <input
-              type="number"
-              min={0}
-              max={20}
-              value={headerSkip}
-              onChange={(e) => setHeaderSkip(Math.max(0, Math.min(20, Number(e.target.value) || 0)))}
-              className={`${inputCompactClass} w-16`}
-            />
-          </label>
-          <label className="flex items-center gap-2 text-sm">
             <span className="text-zinc-500 dark:text-zinc-400">Sections</span>
             <select value={sectionMode} onChange={(e) => setSectionMode(e.target.value as 'auto' | 'column')} className={inputCompactClass}>
               <option value="auto">Auto — a row with no numbers is a heading</option>
@@ -466,55 +486,116 @@ export function BoqImporter({ boqId, currency }: { boqId: string; currency: stri
           </label>
         </div>
 
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Set what each column is. Map <b>Amount</b> for lump-sum bills (where qty/rate say “Item/Sum”); map <b>Qty</b> and <b>Rate</b> for measured work. Greyed rows are skipped as headers.
-        </p>
+        {/* Mapping summary — the foolproof readout of what goes where. */}
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2.5 dark:border-zinc-800 dark:bg-zinc-950">
+          <span className="text-xs font-medium text-zinc-600 dark:text-zinc-300">Mapped:</span>
+          {mapped.filter((m) => m.col >= 0).length === 0 && (
+            <span className="text-xs text-zinc-400 dark:text-zinc-500">nothing yet — use the pickers on the column letters below</span>
+          )}
+          {mapped
+            .filter((m) => m.col >= 0)
+            .map((m) => (
+              <span key={m.role} className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium ${ROLE_TINT[m.role].chip}`}>
+                {m.label} → {colLetter(m.col)}
+              </span>
+            ))}
+          <span className="ml-auto text-xs">
+            {!hasDescription ? (
+              <span className="font-medium text-amber-600 dark:text-amber-400">Pick the Description column to continue</span>
+            ) : !hasMoney ? (
+              <span className="text-zinc-500 dark:text-zinc-400">Tip: map Amount (lump-sum) or Qty + Rate (measured) for prices</span>
+            ) : (
+              <span className="font-medium text-green-700 dark:text-green-400">✓ Ready to review</span>
+            )}
+          </span>
+        </div>
 
         <div className="overflow-x-auto rounded-lg border border-zinc-300 dark:border-zinc-700">
-          <table className="min-w-full border-collapse text-xs">
+          <table className="min-w-full border-collapse text-xs" style={{ tableLayout: 'auto' }}>
             <thead>
+              {/* Excel chrome: the column letters, each carrying its mapping picker. */}
               <tr>
-                {Array.from({ length: colCount }, (_, c) => (
-                  <th key={c} className="border-b border-r border-zinc-300 bg-zinc-100 p-1.5 dark:border-zinc-700 dark:bg-zinc-800/70">
-                    <select
-                      value={roles[c] ?? 'ignore'}
-                      onChange={(e) => setRoles((p) => p.map((r, i) => (i === c ? (e.target.value as Role) : r)))}
-                      className={`${inputCompactClass} min-w-[104px] ${roles[c] && roles[c] !== 'ignore' ? 'font-semibold text-brand-600 dark:text-brand-500' : 'text-zinc-500'}`}
-                    >
-                      {ROLE_OPTIONS.map(([v, l]) => (
-                        <option key={v} value={v}>
-                          {l}
-                        </option>
-                      ))}
-                    </select>
-                  </th>
-                ))}
+                <th className="w-10 border-b border-r border-zinc-300 bg-zinc-100 p-1 text-center align-middle dark:border-zinc-700 dark:bg-zinc-800/70" aria-label="Row numbers" />
+                {Array.from({ length: colCount }, (_, c) => {
+                  const role = roles[c] ?? 'ignore';
+                  const isMapped = role !== 'ignore';
+                  return (
+                    <th key={c} className={`border-b border-r border-zinc-300 p-0 text-center dark:border-zinc-700 ${isMapped ? ROLE_TINT[role].col : 'bg-zinc-100 dark:bg-zinc-800/70'}`}>
+                      <div className="flex flex-col gap-0.5 p-1">
+                        <span className={`text-[11px] font-semibold ${isMapped ? 'text-zinc-700 dark:text-zinc-200' : 'text-zinc-400 dark:text-zinc-500'}`}>
+                          {colLetter(c)}
+                        </span>
+                        <select
+                          value={role}
+                          aria-label={`Column ${colLetter(c)} maps to`}
+                          onChange={(e) => setRoles((p) => p.map((r, i) => (i === c ? (e.target.value as Role) : r)))}
+                          className={`${inputCompactClass} min-w-[96px] ${isMapped ? 'font-semibold' : 'text-zinc-400 dark:text-zinc-500'}`}
+                        >
+                          {ROLE_OPTIONS.map(([v, l]) => (
+                            <option key={v} value={v}>
+                              {v === 'ignore' ? '—' : l}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
-              {previewRows.map((r, ri) => (
-                <tr key={ri} className={ri < headerSkip ? 'text-zinc-400 line-through' : ''}>
-                  {Array.from({ length: colCount }, (_, c) => (
-                    <td key={c} className="max-w-[220px] truncate border-b border-r border-zinc-200 px-2 py-1 dark:border-zinc-800">
-                      {str(r[c])}
+              {previewRows.map((r, ri) => {
+                const isHeader = ri < headerSkip;
+                return (
+                  <tr key={ri} className={isHeader ? 'bg-zinc-50 text-zinc-400 dark:bg-zinc-900/40' : ''}>
+                    {/* Row number — click it to say "data starts here" (rows above
+                        become headers and are skipped). */}
+                    <td className="w-10 border-b border-r border-zinc-300 p-0 text-center dark:border-zinc-700">
+                      <button
+                        type="button"
+                        onClick={() => setHeaderSkip(ri)}
+                        title={isHeader ? `Rows above ${ri + 1} are skipped as headers` : `Data starts here — skip rows above row ${ri + 1}`}
+                        aria-label={`Set data to start at row ${ri + 1}`}
+                        className={`w-full px-1 py-1 font-mono text-[11px] tabular-nums transition-colors hover:bg-brand-50 hover:text-brand-700 dark:hover:bg-brand-500/10 ${
+                          ri === headerSkip ? 'bg-brand-50 font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-300' : 'text-zinc-400 dark:text-zinc-500'
+                        }`}
+                      >
+                        {ri + 1}
+                      </button>
                     </td>
-                  ))}
-                </tr>
-              ))}
+                    {Array.from({ length: colCount }, (_, c) => {
+                      const role = roles[c] ?? 'ignore';
+                      return (
+                        <td
+                          key={c}
+                          className={`max-w-[260px] whitespace-normal border-b border-r border-zinc-200 px-2 py-1 align-top leading-snug dark:border-zinc-800 ${
+                            role !== 'ignore' && !isHeader ? ROLE_TINT[role].col : ''
+                          } ${isHeader ? 'line-through' : ''}`}
+                        >
+                          {str(r[c])}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          Pick a role under each column letter — the colour runs down the column so you can check it against the
+          content. Click a row number to mark where the data starts; rows above it are skipped as headers
+          {headerSkip > 0 ? ` (currently ${headerSkip}).` : '.'} Map <b>Amount</b> for lump-sum bills, or <b>Qty</b> and{' '}
+          <b>Rate</b> for measured work.
+        </p>
 
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => setStep('upload')}>
             ← Change file
           </Button>
-          <Button size="sm" onClick={buildReview} disabled={!roles.includes('description') || includedCount === 0}>
+          <Button size="sm" onClick={buildReview} disabled={!hasDescription || includedCount === 0}>
             Continue to review →
           </Button>
-          {!roles.includes('description') && (
-            <span className="text-xs text-amber-600 dark:text-amber-400">Map a Description column first.</span>
-          )}
         </div>
       </div>
     );
