@@ -134,12 +134,47 @@ export async function rescheduleTask(formData: FormData): Promise<Result> {
 /** Link two tasks: a finish-to-start dependency (predecessor must finish before
  *  successor starts, +lag). The DB cycle trigger blocks loops; RLS blocks
  *  non-managers. Cascades dependents when auto-schedule is on. */
+
+/** Parse the optional lag-percent field ("start at N% of the predecessor").
+ *  Returns null when absent/blank; clamps to (0, 100]. */
+function parseLagPercent(v: FormDataEntryValue | null): number | null {
+  const raw = String(v ?? '').trim();
+  if (!raw) return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.min(100, n);
+}
+
+/** Day-equivalent of a percent lag against the predecessor's current planned
+ *  window — stored in lag_days as a snapshot for SQL consumers (the TS engines
+ *  use lag_percent dynamically). */
+async function percentSnapshotDays(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  predecessorId: string,
+  pct: number,
+): Promise<number> {
+  const { data } = await supabase
+    .from('tasks')
+    .select('planned_start_date, planned_end_date, due_date')
+    .eq('id', predecessorId)
+    .maybeSingle();
+  const t = data as { planned_start_date: string | null; planned_end_date: string | null; due_date: string | null } | null;
+  const start = t?.planned_start_date ?? null;
+  const end = t?.planned_end_date ?? t?.due_date ?? null;
+  let duration = 1;
+  if (start && end && end >= start) {
+    duration = Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86_400_000) + 1;
+  }
+  return Math.round((pct / 100) * duration);
+}
+
 export async function createDependency(formData: FormData): Promise<Result> {
   const { supabase } = await requireUser();
   const projectId = String(formData.get('projectId') ?? '');
   const predecessorId = String(formData.get('predecessorId') ?? '');
   const successorId = String(formData.get('successorId') ?? '');
   const lagRaw = Number(formData.get('lagDays') ?? 0);
+  const lagPercent = parseLagPercent(formData.get('lagPercent'));
   const type = parseType(formData.get('type'));
   if (!projectId || !predecessorId || !successorId) return { ok: false, error: 'Missing task.' };
   if (predecessorId === successorId) return { ok: false, error: 'A task can’t depend on itself.' };
@@ -152,11 +187,18 @@ export async function createDependency(formData: FormData): Promise<Result> {
   const orgId = (taskRow as { org_id: string } | null)?.org_id;
   if (!orgId) return { ok: false, error: 'Task not found.' };
 
+  const lagDays =
+    lagPercent != null
+      ? await percentSnapshotDays(supabase, predecessorId, lagPercent)
+      : Number.isFinite(lagRaw)
+        ? Math.trunc(lagRaw)
+        : 0;
   const { error } = await supabase.from('task_dependencies').insert({
     org_id: orgId,
     predecessor_id: predecessorId,
     successor_id: successorId,
-    lag_days: Number.isFinite(lagRaw) ? Math.trunc(lagRaw) : 0,
+    lag_days: lagDays,
+    lag_percent: lagPercent,
     type,
   });
   if (error) {
@@ -197,11 +239,18 @@ export async function updateDependency(formData: FormData): Promise<Result> {
   const successorId = String(formData.get('successorId') ?? '');
   const type = parseType(formData.get('type'));
   const lagRaw = Number(formData.get('lagDays') ?? 0);
+  const lagPercent = parseLagPercent(formData.get('lagPercent'));
   if (!projectId || !predecessorId || !successorId) return { ok: false, error: 'Missing link.' };
 
+  const lagDays =
+    lagPercent != null
+      ? await percentSnapshotDays(supabase, predecessorId, lagPercent)
+      : Number.isFinite(lagRaw)
+        ? Math.trunc(lagRaw)
+        : 0;
   const { error } = await supabase
     .from('task_dependencies')
-    .update({ type, lag_days: Number.isFinite(lagRaw) ? Math.trunc(lagRaw) : 0 })
+    .update({ type, lag_days: lagDays, lag_percent: lagPercent })
     .eq('predecessor_id', predecessorId)
     .eq('successor_id', successorId);
   if (error) return { ok: false, error: error.message };

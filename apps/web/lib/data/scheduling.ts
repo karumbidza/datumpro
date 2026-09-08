@@ -63,7 +63,7 @@ export async function getProjectSchedule(projectId: string): Promise<ProjectSche
   const ids = tasks.map((t) => t.id);
   const { data: depData } = await supabase
     .from('task_dependencies')
-    .select('predecessor_id, successor_id, lag_days, type')
+    .select('predecessor_id, successor_id, lag_days, lag_percent, type')
     .in('successor_id', ids);
 
   // Cost-weighted Earned Value only for viewers allowed to see costs (staff / the
@@ -82,10 +82,11 @@ export async function getProjectSchedule(projectId: string): Promise<ProjectSche
     }
   }
 
-  const depsBySuccessor = new Map<string, { predecessorId: string; lagDays: number; type: DependencyType }[]>();
-  for (const d of (depData ?? []) as { predecessor_id: string; successor_id: string; lag_days: number; type: DependencyType | null }[]) {
+  const depsBySuccessor = new Map<string, { predecessorId: string; lagDays: number; lagPercent: number | null; type: DependencyType }[]>();
+  for (const d of (depData ?? []) as { predecessor_id: string; successor_id: string; lag_days: number; lag_percent: number | string | null; type: DependencyType | null }[]) {
     const list = depsBySuccessor.get(d.successor_id) ?? [];
-    list.push({ predecessorId: d.predecessor_id, lagDays: d.lag_days, type: d.type ?? 'fs' });
+    const pct = d.lag_percent == null ? null : Number(d.lag_percent);
+    list.push({ predecessorId: d.predecessor_id, lagDays: d.lag_days, lagPercent: Number.isFinite(pct as number) ? pct : null, type: d.type ?? 'fs' });
     depsBySuccessor.set(d.successor_id, list);
   }
 

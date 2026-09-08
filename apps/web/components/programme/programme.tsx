@@ -26,8 +26,9 @@ const DEP_OPTIONS: { value: DependencyType; label: string }[] = [
   { value: 'ff', label: 'Finish → Finish' },
   { value: 'sf', label: 'Start → Finish' },
 ];
-function depTag(type: DependencyType, lag: number): string {
+function depTag(type: DependencyType, lag: number, lagPercent?: number | null): string {
   const base = type.toUpperCase();
+  if (lagPercent != null) return `${base}@${Math.round(lagPercent)}%`;
   return lag > 0 ? `${base}+${lag}` : lag < 0 ? `${base}${lag}` : base;
 }
 // Human relationship label ("Finish → Start") for the relationships panel.
@@ -35,12 +36,19 @@ function typeLabel(type: DependencyType): string {
   return DEP_OPTIONS.find((o) => o.value === type)?.label ?? type.toUpperCase();
 }
 // Plain-English sentence describing a dependency link for hover tooltips.
-function linkSentence(type: DependencyType, lagDays: number, predTitle: string, succTitle: string): string {
+function linkSentence(type: DependencyType, lagDays: number, predTitle: string, succTitle: string, lagPercent?: number | null): string {
   const pred = predTitle.length > 30 ? `${predTitle.slice(0, 30)}…` : predTitle;
   const succ = succTitle.length > 30 ? `${succTitle.slice(0, 30)}…` : succTitle;
+  if (lagPercent != null && type === 'ss') return `${succ} starts when ${pred} is ${Math.round(lagPercent)}% through`;
   const dayWord = (n: number) => `${n} ${Math.abs(n) === 1 ? 'day' : 'days'}`;
   const lagPhrase =
-    lagDays > 0 ? ` + ${dayWord(lagDays)}` : lagDays < 0 ? ` − ${dayWord(-lagDays)} overlap` : '';
+    lagPercent != null
+      ? ` + ${Math.round(lagPercent)}% of its duration`
+      : lagDays > 0
+        ? ` + ${dayWord(lagDays)}`
+        : lagDays < 0
+          ? ` − ${dayWord(-lagDays)} overlap`
+          : '';
   switch (type) {
     case 'fs': return `${succ} starts after ${pred} finishes${lagPhrase}`;
     case 'ss': return `${succ} starts when ${pred} starts${lagPhrase}`;
@@ -74,12 +82,35 @@ const STATUS_LABEL: Record<TaskStatus, string> = {
   done: 'Done',
 };
 
-/** Smooth s-curve between two anchor points. Control points reach at least
- *  24px (up to 60px) toward each other, which also draws a graceful loop when
- *  the successor sits left of the predecessor. */
+/** Smooth s-curve — used for the freehand line while DRAWING a link. */
 function curvePath(x1: number, y1: number, x2: number, y2: number): string {
   const reach = Math.min(Math.max(Math.abs(x2 - x1) / 2, 24), 60);
   return `M ${x1} ${y1} C ${x1 + reach} ${y1}, ${x2 - reach} ${y2}, ${x2} ${y2}`;
+}
+
+/** Rounded-orthogonal connector for committed dependencies: out of the
+ *  predecessor, turn, run vertically to the successor's row, turn, in — with
+ *  soft corners. When the successor sits left of (or too close to) the
+ *  predecessor, route around through the lane between the rows. */
+function orthoPath(x1: number, y1: number, x2: number, y2: number): string {
+  const stub = 12;
+  const dy = y2 >= y1 ? 1 : -1;
+  const r = Math.min(6, Math.abs(y2 - y1) / 2 || 6);
+  if (x2 - x1 >= stub * 2) {
+    const mx = Math.max(x1 + stub, Math.min(x1 + stub, x2 - stub));
+    return `M ${x1} ${y1} H ${mx - r} q ${r} 0 ${r} ${r * dy} V ${y2 - r * dy} q 0 ${r * dy} ${r} ${r * dy} H ${x2}`;
+  }
+  const outX = x1 + stub;
+  const inX = x2 - stub;
+  const midY = y1 + dy * (ROW_H / 2 + 2);
+  return [
+    `M ${x1} ${y1}`,
+    `H ${outX - r} q ${r} 0 ${r} ${r * dy}`,
+    `V ${midY - r * dy} q 0 ${r * dy} ${-r} ${r * dy}`,
+    `H ${inX + r} q ${-r} 0 ${-r} ${r * dy}`,
+    `V ${y2 - r * dy} q 0 ${r * dy} ${r} ${r * dy}`,
+    `H ${x2}`,
+  ].join(' ');
 }
 
 function fmt(iso: string): string {
@@ -177,6 +208,7 @@ function LinkEditor({
   succTitle,
   initialType,
   initialLag,
+  initialLagPercent = null,
   onDone,
   onCancel,
 }: {
@@ -188,11 +220,14 @@ function LinkEditor({
   succTitle: string;
   initialType: DependencyType;
   initialLag: number;
+  initialLagPercent?: number | null;
   onDone: (cascaded?: number) => void;
   onCancel: () => void;
 }) {
   const [type, setType] = useState<DependencyType>(initialType);
   const [lag, setLag] = useState(String(initialLag));
+  const [lagMode, setLagMode] = useState<'days' | 'percent'>(initialLagPercent != null ? 'percent' : 'days');
+  const [lagPct, setLagPct] = useState(initialLagPercent != null ? String(initialLagPercent) : '50');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isCreate = mode === 'create';
@@ -209,6 +244,7 @@ function LinkEditor({
       if (withFields) {
         fd.set('type', type);
         fd.set('lagDays', String(Number.parseInt(lag, 10) || 0));
+        if (lagMode === 'percent') fd.set('lagPercent', lagPct);
       }
       const res = await action(fd);
       if (!res.ok) {
@@ -239,8 +275,36 @@ function LinkEditor({
           </option>
         ))}
       </select>
-      <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Lag (days)</label>
-      <input type="number" value={lag} onChange={(e) => setLag(e.target.value)} className={`${inputClass} mb-2`} />
+      <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">Offset</label>
+      <div className="mb-2 flex gap-1.5">
+        {lagMode === 'days' ? (
+          <input type="number" value={lag} onChange={(e) => setLag(e.target.value)} aria-label="Lag in days" className={inputClass} />
+        ) : (
+          <input
+            type="number"
+            min={1}
+            max={100}
+            value={lagPct}
+            onChange={(e) => setLagPct(e.target.value)}
+            aria-label="Percent of the predecessor"
+            className={inputClass}
+          />
+        )}
+        <select
+          value={lagMode}
+          onChange={(e) => setLagMode(e.target.value as 'days' | 'percent')}
+          aria-label="Offset unit"
+          className={inputClass}
+        >
+          <option value="days">days</option>
+          <option value="percent">% of predecessor</option>
+        </select>
+      </div>
+      {lagMode === 'percent' && (
+        <p className="mb-2 text-[10px] leading-snug text-zinc-500 dark:text-zinc-400">
+          The offset tracks the predecessor: resize it and this link re-derives automatically.
+        </p>
+      )}
       <div className="flex items-center justify-between gap-2">
         <Button type="button" size="sm" disabled={busy} onClick={() => run(isCreate ? createDependency : updateDependency, true)}>
           {busy ? 'Saving…' : isCreate ? 'Create' : 'Save'}
@@ -300,7 +364,7 @@ export function Programme({
   }, [data]);
   const [link, setLink] = useState<{ fromId: string; fromEdge: 'start' | 'finish'; x: number; y: number; overId: string | null } | null>(null);
   const [reorder, setReorder] = useState<{ taskId: string; overIndex: number } | null>(null);
-  const [linkMenu, setLinkMenu] = useState<{ predecessorId: string; successorId: string; type: DependencyType; lag: number; x: number; y: number } | null>(null);
+  const [linkMenu, setLinkMenu] = useState<{ predecessorId: string; successorId: string; type: DependencyType; lag: number; lagPercent: number | null; x: number; y: number } | null>(null);
   // A link drag has landed on a valid target: show the create-mode picker at the drop
   // so the user chooses type + lag before the dependency is written (instead of FS/0).
   const [pendingLink, setPendingLink] = useState<{ predecessorId: string; successorId: string; x: number; y: number } | null>(null);
@@ -984,14 +1048,15 @@ export function Programme({
           const t = data.tasks[i];
           const x = t && geom ? (geom.offset(winOf(t).endIso) + 1) * DAY_W : 0;
           const y = i * ROW_H + ROW_H / 2;
-          setLinkMenu({ predecessorId: e.predecessorId, successorId: e.successorId, type: e.type, lag: e.lagDays, x, y });
+          setLinkMenu({ predecessorId: e.predecessorId, successorId: e.successorId, type: e.type, lag: e.lagDays, lagPercent: e.lagPercent, x, y });
         };
         const Row = ({ e, otherId }: { e: (typeof data.edges)[number]; otherId: string }) => (
           <li className="flex items-center gap-2 py-1">
             <span className="min-w-0 flex-1 truncate text-xs text-zinc-700 dark:text-zinc-200">
               {titleById.get(otherId) ?? 'Task'}
               <span className="ml-1.5 text-[11px] text-zinc-400 dark:text-zinc-500">
-                {typeLabel(e.type)}{e.lagDays ? `, ${e.lagDays > 0 ? '+' : ''}${e.lagDays}d` : ''}
+                {typeLabel(e.type)}
+                {e.lagPercent != null ? ` @ ${Math.round(e.lagPercent)}%` : e.lagDays ? `, ${e.lagDays > 0 ? '+' : ''}${e.lagDays}d` : ''}
               </span>
             </span>
             {canModerate && (
@@ -1136,6 +1201,22 @@ export function Programme({
                       <span className="absolute -top-0 left-1 text-[9px] font-medium text-brand-600 dark:text-brand-400">Today</span>
                     </div>
                   )}
+                  {/* Ghost date guides — dashed verticals at the dragged bar's
+                      snapped start/end so the exact landing dates are obvious. */}
+                  {preview && (
+                    <>
+                      <div
+                        className="pointer-events-none absolute top-0 z-20 h-full border-l border-dashed border-brand-500/70"
+                        style={{ left: geom.offset(preview.startIso) * DAY_W }}
+                        aria-hidden
+                      />
+                      <div
+                        className="pointer-events-none absolute top-0 z-20 h-full border-l border-dashed border-brand-500/70"
+                        style={{ left: (geom.offset(preview.endIso) + 1) * DAY_W }}
+                        aria-hidden
+                      />
+                    </>
+                  )}
                   {/* Link target row highlight */}
                   {link?.overId != null && rowIndexById.get(link.overId) != null && (
                     <div
@@ -1195,14 +1276,14 @@ export function Programme({
                       const x2 = succAtStart ? geom.offset(sw.startIso) * DAY_W : (geom.offset(sw.endIso) + 1) * DAY_W;
                       const y2 = si * ROW_H + ROW_H / 2;
                       const midX = (x1 + x2) / 2;
-                      const d = curvePath(x1, y1, x2, y2);
+                      const d = orthoPath(x1, y1, x2, y2);
                       const crit = e.critical;
-                      const showTag = e.type !== 'fs' || e.lagDays !== 0;
+                      const showTag = e.type !== 'fs' || e.lagDays !== 0 || e.lagPercent != null;
                       // Dim edges not fully inside the selected task's chain.
                       const edgeDimmed = chainSet != null && !(chainSet.has(e.predecessorId) && chainSet.has(e.successorId));
                       const predTitle = titleById.get(e.predecessorId) ?? 'Task';
                       const succTitle = titleById.get(e.successorId) ?? 'Task';
-                      const tooltip = linkSentence(e.type, e.lagDays, predTitle, succTitle);
+                      const tooltip = linkSentence(e.type, e.lagDays, predTitle, succTitle, e.lagPercent);
                       return (
                         <g key={i} className={edgeDimmed ? 'opacity-30' : ''}>
                           <title>{tooltip}</title>
@@ -1216,7 +1297,7 @@ export function Programme({
                           />
                           {showTag && (
                             <text x={midX + 3} y={(y1 + y2) / 2 - 3} fontSize={9} className="fill-zinc-500 dark:fill-zinc-400">
-                              {depTag(e.type, e.lagDays)}
+                              {depTag(e.type, e.lagDays, e.lagPercent)}
                             </text>
                           )}
                           {canModerate && (
@@ -1227,7 +1308,7 @@ export function Programme({
                               strokeWidth={11}
                               className="pointer-events-auto cursor-pointer"
                               onClick={() =>
-                                setLinkMenu({ predecessorId: e.predecessorId, successorId: e.successorId, type: e.type, lag: e.lagDays, x: midX, y: (y1 + y2) / 2 })
+                                setLinkMenu({ predecessorId: e.predecessorId, successorId: e.successorId, type: e.type, lag: e.lagDays, lagPercent: e.lagPercent, x: midX, y: (y1 + y2) / 2 })
                               }
                             >
                               <title>{tooltip}</title>
@@ -1315,12 +1396,19 @@ export function Programme({
                               aria-hidden
                             />
                           )}
+                          {/* Verified checklist completion, filled from the left. */}
+                          {t.progressPct != null && t.progressPct > 0 && (
+                            <span
+                              className="pointer-events-none absolute inset-y-0 left-0 bg-black/25"
+                              style={{ width: `${Math.min(100, t.progressPct)}%` }}
+                              aria-hidden
+                            />
+                          )}
                           <span
                             onPointerDown={(e) => startDrag(e, { mode: 'move', taskId: t.id, origStart: w.startIso, origEnd: w.endIso })}
-                            className={`flex h-full min-w-0 flex-1 items-center px-1.5 ${canModerate ? (started ? 'cursor-default' : 'cursor-grab touch-none active:cursor-grabbing') : 'cursor-default'}`}
-                          >
-                            <span className="truncate">{t.title}</span>
-                          </span>
+                            className={`h-full min-w-0 flex-1 ${canModerate ? (started ? 'cursor-default' : 'cursor-grab touch-none active:cursor-grabbing') : 'cursor-default'}`}
+                            aria-label={`${t.title} bar`}
+                          />
                           {canModerate && !started && (
                             <span
                               onPointerDown={(e) => startDrag(e, { mode: 'resize-end', taskId: t.id, origStart: w.startIso, origEnd: w.endIso })}
@@ -1329,6 +1417,21 @@ export function Programme({
                             />
                           )}
                         </div>
+
+                        {/* Bar-side label: name, verified %, assignee — reads even
+                            when the task column is scrolled away. */}
+                        {!dragging && (
+                          <span
+                            className="pointer-events-none absolute top-1/2 z-10 flex max-w-[300px] -translate-y-1/2 items-baseline gap-1.5 whitespace-nowrap pl-1.5"
+                            style={{ left: width + floatW + (floatW > 0 ? 26 : 4) }}
+                          >
+                            <span className="truncate text-[10px] font-semibold text-zinc-700 dark:text-zinc-200">{t.title}</span>
+                            {t.progressPct != null && (
+                              <span className="text-[10px] font-medium tabular-nums text-zinc-500 dark:text-zinc-400">{t.progressPct}%</span>
+                            )}
+                            {t.assigneeName && <span className="truncate text-[10px] text-zinc-400 dark:text-zinc-500">{t.assigneeName}</span>}
+                          </span>
+                        )}
 
                         {/* Connector handles — drag to another bar to link (finish→start) */}
                         {canModerate && (
@@ -1378,6 +1481,7 @@ export function Programme({
                         succTitle={titleById.get(linkMenu.successorId) ?? 'Task'}
                         initialType={linkMenu.type}
                         initialLag={linkMenu.lag}
+                        initialLagPercent={linkMenu.lagPercent}
                         onDone={(cascaded) => {
                           setLinkMenu(null);
                           if (cascaded && cascaded > 0) {

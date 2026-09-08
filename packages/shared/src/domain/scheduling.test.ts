@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   computeSchedule,
+  effectiveLagDays,
   computeProgress,
   scheduleHealth,
   inclusiveDays,
@@ -137,4 +138,46 @@ it('floors non-pinned tasks at minStartOffset but lets a pinned (started) task s
   expect(r.tasks['started']!.es).toBe(0); // pinned → bypasses the floor
   expect(r.tasks['fresh']!.es).toBe(5);   // non-pinned → floored at today's offset
   expect(r.tasks['succ']!.es).toBe(5);    // max(started.ef=3, floor 5) = 5
+});
+
+describe('percent lag', () => {
+  const task = (
+    id: string,
+    durationDays: number,
+    dependencies: { predecessorId: string; lagDays: number; lagPercent?: number | null; type?: 'fs' | 'ss' | 'ff' | 'sf' }[] = [],
+  ) => ({
+    id,
+    durationDays,
+    status: 'todo' as const,
+    weight: durationDays,
+    dependencies,
+  });
+
+  it('derives the effective lag from the predecessor duration', () => {
+    expect(effectiveLagDays({ predecessorId: 'a', lagDays: 0, lagPercent: 50 }, 10)).toBe(5);
+    expect(effectiveLagDays({ predecessorId: 'a', lagDays: 0, lagPercent: 60 }, 10)).toBe(6);
+    expect(effectiveLagDays({ predecessorId: 'a', lagDays: 3, lagPercent: null }, 10)).toBe(3);
+    expect(effectiveLagDays({ predecessorId: 'a', lagDays: 3 }, 10)).toBe(3);
+  });
+
+  it('an SS percent link starts the successor at N% of the predecessor', () => {
+    const result = computeSchedule([
+      task('a', 10),
+      task('b', 4, [{ predecessorId: 'a', lagDays: 0, lagPercent: 50, type: 'ss' }]),
+    ]);
+    expect(result.tasks['b']!.es).toBe(5); // 50% through the 10-day predecessor
+  });
+
+  it('resizing the predecessor re-derives the percent offset', () => {
+    const before = computeSchedule([
+      task('a', 10),
+      task('b', 4, [{ predecessorId: 'a', lagDays: 0, lagPercent: 60, type: 'ss' }]),
+    ]);
+    const after = computeSchedule([
+      task('a', 20),
+      task('b', 4, [{ predecessorId: 'a', lagDays: 0, lagPercent: 60, type: 'ss' }]),
+    ]);
+    expect(before.tasks['b']!.es).toBe(6);
+    expect(after.tasks['b']!.es).toBe(12); // 60% of the new 20-day duration
+  });
 });

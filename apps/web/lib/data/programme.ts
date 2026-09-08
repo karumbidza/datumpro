@@ -44,15 +44,30 @@ const EMPTY: ProgrammeData = {
  *  the project start / projected-vs-baseline finish. RLS scopes the reads. */
 export async function getProgrammeData(projectId: string): Promise<ProgrammeData> {
   const supabase = await createClient();
-  const [calendarTasks, schedule, projectRes, orderRes] = await Promise.all([
+  const [calendarTasks, schedule, projectRes, orderRes, subtaskRes] = await Promise.all([
     listCalendarTasks(projectId),
     getProjectSchedule(projectId),
     supabase.from('projects').select('auto_schedule, baselined_at').eq('id', projectId).maybeSingle(),
     supabase.from('tasks').select('id, programme_order, baseline_start_date, baseline_end_date').eq('project_id', projectId),
+    // Checklist completion per task — the honest source for the bar's % figure.
+    supabase.from('task_subtasks').select('task_id, is_done, tasks!inner(project_id)').eq('tasks.project_id', projectId),
   ]);
   const projectRow = projectRes.data as { auto_schedule: boolean; baselined_at: string | null } | null;
   const autoSchedule = projectRow?.auto_schedule ?? false;
   const baselinedAt = projectRow?.baselined_at ?? null;
+  const progressById = new Map<string, { done: number; total: number }>();
+  for (const r of (subtaskRes.data ?? []) as unknown as { task_id: string; is_done: boolean }[]) {
+    const cur = progressById.get(r.task_id) ?? { done: 0, total: 0 };
+    cur.total += 1;
+    if (r.is_done) cur.done += 1;
+    progressById.set(r.task_id, cur);
+  }
+  const progressPctOf = (id: string, status: string): number | null => {
+    if (status === 'done') return 100;
+    const p = progressById.get(id);
+    if (!p || p.total === 0) return null;
+    return Math.round((p.done / p.total) * 100);
+  };
   const orderById = new Map<string, number>();
   const baselineById = new Map<string, { start: string | null; end: string | null }>();
   for (const r of (orderRes.data ?? []) as {
@@ -94,6 +109,7 @@ export async function getProgrammeData(projectId: string): Promise<ProgrammeData
       critical: meta?.critical ?? false,
       floatDays: meta?.floatDays ?? 0,
       waitingOn: meta?.waitingOn ?? [],
+      progressPct: progressPctOf(t.id, t.status),
     });
     scheduledIds.add(t.id);
     if (!rangeStartIso || win.startIso < rangeStartIso) rangeStartIso = win.startIso;
@@ -119,7 +135,7 @@ export async function getProgrammeData(projectId: string): Promise<ProgrammeData
   if (scheduledIds.size > 0) {
     const { data: depData } = await supabase
       .from('task_dependencies')
-      .select('predecessor_id, successor_id, lag_days, type')
+      .select('predecessor_id, successor_id, lag_days, lag_percent, type')
       .in('successor_id', [...scheduledIds]);
     // A link is a driving critical link when both ends are critical AND it is the
     // binding constraint on the successor (the relationship's implied anchor
@@ -140,14 +156,17 @@ export async function getProgrammeData(projectId: string): Promise<ProgrammeData
           return s.es === p.ef + lag; // fs
       }
     };
-    edges = ((depData ?? []) as { predecessor_id: string; successor_id: string; lag_days: number; type: ProgrammeEdge['type'] | null }[])
+    edges = ((depData ?? []) as { predecessor_id: string; successor_id: string; lag_days: number; lag_percent: number | string | null; type: ProgrammeEdge['type'] | null }[])
       .filter((d) => scheduledIds.has(d.predecessor_id))
       .map((d) => {
         const type = d.type ?? 'fs';
+        const pctRaw = d.lag_percent == null ? null : Number(d.lag_percent);
+        const lagPercent = pctRaw != null && Number.isFinite(pctRaw) ? pctRaw : null;
         return {
           predecessorId: d.predecessor_id,
           successorId: d.successor_id,
           lagDays: d.lag_days,
+          lagPercent,
           type,
           critical: isDriving(d.predecessor_id, d.successor_id, type, d.lag_days),
         };
