@@ -54,7 +54,17 @@ export interface BidWorkspace {
   /** ISO currency code of the underlying BOQ (e.g. "USD"). */
   currency: string;
   sections: BidSection[];
-  myRates: Record<string, { rateCents: number; noBid: boolean; note: string | null; durationDays: number | null }>;
+  myRates: Record<string, MyRate>;
+}
+
+/** One bidder-entered line: rate + optional duration and a start/finish date. */
+export interface MyRate {
+  rateCents: number;
+  noBid: boolean;
+  note: string | null;
+  durationDays: number | null;
+  startDate: string | null;
+  endDate: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -235,7 +245,7 @@ export async function getBidWorkspace(token: string): Promise<BidWorkspace | nul
   // 4. Load this bidder's existing rates (RLS scopes to own rows).
   const { data: rateRows } = await supabase
     .from('boq_bid_items')
-    .select('boq_item_id, rate_cents, no_bid, note, duration_days')
+    .select('boq_item_id, rate_cents, no_bid, note, duration_days, start_date, end_date')
     .eq('bidder_id', b.id);
 
   type RateRow = {
@@ -244,15 +254,19 @@ export async function getBidWorkspace(token: string): Promise<BidWorkspace | nul
     no_bid: boolean | null;
     note: string | null;
     duration_days: number | null;
+    start_date: string | null;
+    end_date: string | null;
   };
 
-  const myRates: Record<string, { rateCents: number; noBid: boolean; note: string | null; durationDays: number | null }> = {};
+  const myRates: Record<string, MyRate> = {};
   for (const r of (rateRows ?? []) as unknown as RateRow[]) {
     myRates[r.boq_item_id] = {
       rateCents: n(r.rate_cents),
       noBid: !!r.no_bid,
       note: r.note,
       durationDays: r.duration_days,
+      startDate: r.start_date,
+      endDate: r.end_date,
     };
   }
 
@@ -300,6 +314,10 @@ export interface CompareBidder {
    *  bidder's durations — a working-day count, calendar-agnostic. Null when the
    *  bidder gave no durations. */
   programmeDays: number | null;
+  /** The bidder's proposed programme window from their per-line dates: earliest
+   *  start / latest finish (ISO). Null when the bidder gave no dates. */
+  proposedStart: string | null;
+  proposedFinish: string | null;
   rates: Record<string, { rateCents: number; amountCents: number; noBid: boolean; durationDays: number | null }>;
 }
 export interface TenderComparison {
@@ -438,13 +456,15 @@ export async function getTenderComparison(
     rate_cents: number | string | null;
     no_bid: boolean | null;
     duration_days: number | null;
+    start_date: string | null;
+    end_date: string | null;
   };
 
   let bidItemRows: BidItemRow[] = [];
   if (bidderIds.length > 0) {
     const { data: bidItemsRaw } = await supabase
       .from('boq_bid_items')
-      .select('bidder_id, boq_item_id, rate_cents, no_bid, duration_days')
+      .select('bidder_id, boq_item_id, rate_cents, no_bid, duration_days, start_date, end_date')
       .in('bidder_id', bidderIds);
     bidItemRows = (bidItemsRaw ?? []) as unknown as BidItemRow[];
   }
@@ -466,6 +486,8 @@ export async function getTenderComparison(
     let pricedLines = 0;
     const secDays = new Map<string, number>();
     let totalDays = 0;
+    let proposedStart: string | null = null;
+    let proposedFinish: string | null = null;
     for (const row of rows) {
       const noBid = !!row.no_bid;
       const rateCents = n(row.rate_cents);
@@ -479,6 +501,11 @@ export async function getTenderComparison(
         totalDays += durationDays;
         const sec = sectionOfItem.get(row.boq_item_id);
         if (sec) secDays.set(sec, (secDays.get(sec) ?? 0) + durationDays);
+      }
+      // Proposed programme window: earliest start / latest finish across priced lines.
+      if (!noBid) {
+        if (row.start_date && (!proposedStart || row.start_date < proposedStart)) proposedStart = row.start_date;
+        if (row.end_date && (!proposedFinish || row.end_date > proposedFinish)) proposedFinish = row.end_date;
       }
     }
     // Programme length: longest dependency path, days additive (cycles are
@@ -512,6 +539,8 @@ export async function getTenderComparison(
       isComplete,
       totalDays,
       programmeDays,
+      proposedStart,
+      proposedFinish,
       rates,
     };
   });

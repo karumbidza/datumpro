@@ -22,6 +22,11 @@ interface LocalItem {
   rateCents: number;
   /** Proposed working days for this line (sealed with the rate). */
   durationDays: number | null;
+  /** Proposed start / finish date for this line (ISO YYYY-MM-DD), sealed with
+   *  the rate. On award, each section's task takes the earliest start / latest
+   *  finish of its lines to seed the programme. */
+  startDate: string | null;
+  endDate: string | null;
 }
 
 interface LocalSection {
@@ -66,6 +71,8 @@ export function BidWorkspaceView({
         qty: it.qty,
         rateCents: ws.myRates[it.itemId]?.rateCents ?? 0,
         durationDays: ws.myRates[it.itemId]?.durationDays ?? null,
+        startDate: ws.myRates[it.itemId]?.startDate ?? null,
+        endDate: ws.myRates[it.itemId]?.endDate ?? null,
       })),
     })),
   );
@@ -110,29 +117,40 @@ export function BidWorkspaceView({
       ),
     );
 
-  // The upsert writes the whole line, so rate and days always travel together —
-  // whichever cell blurred, the other keeps its current value.
+  // The upsert writes the WHOLE line, so every save must carry all four fields —
+  // otherwise blurring the rate would wipe the dates. `persist` merges the one
+  // cell that changed onto the line's current values and saves them together.
   const lineOf = (sectionId: string, itemId: string) =>
     sections.find((s) => s.sectionId === sectionId)?.items.find((it) => it.itemId === itemId);
 
-  const onRateBlur = (sectionId: string, itemId: string, raw: string) => {
-    const rateCents = Math.round((Number(raw) || 0) * 100);
-    const durationDays = lineOf(sectionId, itemId)?.durationDays ?? null;
-    patchItem(sectionId, itemId, { rateCents });
+  const persist = (sectionId: string, itemId: string, patch: Partial<LocalItem>) => {
+    patchItem(sectionId, itemId, patch);
+    const cur = { ...lineOf(sectionId, itemId), ...patch } as LocalItem;
     startTransition(async () => {
-      await saveBidRate({ token, boqItemId: itemId, rateCents, durationDays });
+      await saveBidRate({
+        token,
+        boqItemId: itemId,
+        rateCents: cur.rateCents ?? 0,
+        durationDays: cur.durationDays ?? null,
+        startDate: cur.startDate ?? null,
+        endDate: cur.endDate ?? null,
+      });
     });
   };
 
+  const onRateBlur = (sectionId: string, itemId: string, raw: string) =>
+    persist(sectionId, itemId, { rateCents: Math.round((Number(raw) || 0) * 100) });
+
   const onDaysBlur = (sectionId: string, itemId: string, raw: string) => {
-    const trimmed = raw.trim();
-    const durationDays = trimmed === '' ? null : Math.max(0, Math.round(Number(trimmed) || 0));
-    const rateCents = lineOf(sectionId, itemId)?.rateCents ?? 0;
-    patchItem(sectionId, itemId, { durationDays });
-    startTransition(async () => {
-      await saveBidRate({ token, boqItemId: itemId, rateCents, durationDays });
-    });
+    const t = raw.trim();
+    persist(sectionId, itemId, { durationDays: t === '' ? null : Math.max(0, Math.round(Number(t) || 0)) });
   };
+
+  const onStartBlur = (sectionId: string, itemId: string, raw: string) =>
+    persist(sectionId, itemId, { startDate: raw.trim() === '' ? null : raw.trim() });
+
+  const onEndBlur = (sectionId: string, itemId: string, raw: string) =>
+    persist(sectionId, itemId, { endDate: raw.trim() === '' ? null : raw.trim() });
 
   // ---------------------------------------------------------------------------
   // Submit
@@ -149,16 +167,22 @@ export function BidWorkspaceView({
       qty: it.qty,
       rateCents: it.rateCents,
       durationDays: it.durationDays,
+      startDate: it.startDate,
+      endDate: it.endDate,
     })),
   );
-  const applyUploaded = (saved: { itemId: string; rateCents: number; durationDays: number | null }[]) => {
+  const applyUploaded = (
+    saved: { itemId: string; rateCents: number; durationDays: number | null; startDate: string | null; endDate: string | null }[],
+  ) => {
     const byId = new Map(saved.map((l) => [l.itemId, l]));
     setSections((prev) =>
       prev.map((s) => ({
         ...s,
         items: s.items.map((it) => {
           const up = byId.get(it.itemId);
-          return up ? { ...it, rateCents: up.rateCents, durationDays: up.durationDays } : it;
+          return up
+            ? { ...it, rateCents: up.rateCents, durationDays: up.durationDays, startDate: up.startDate, endDate: up.endDate }
+            : it;
         }),
       })),
     );
@@ -275,7 +299,7 @@ export function BidWorkspaceView({
 
       {/* Bill grid */}
       <div className="overflow-x-auto rounded-lg border border-zinc-300 dark:border-zinc-700">
-        <table className="w-full min-w-[680px] border-collapse text-sm">
+        <table className="w-full min-w-[880px] border-collapse text-sm">
           <colgroup>
             <col className="w-16" />
             <col />
@@ -283,6 +307,8 @@ export function BidWorkspaceView({
             <col className="w-24" />
             <col className="w-28" />
             <col className="w-16" />
+            <col className="w-36" />
+            <col className="w-36" />
             <col className="w-32" />
           </colgroup>
           <thead>
@@ -308,6 +334,12 @@ export function BidWorkspaceView({
               >
                 Days
               </th>
+              <th className="border-b border-r border-zinc-300 px-2.5 py-2.5 text-left font-semibold dark:border-zinc-700" title="Proposed start date for this line">
+                Start
+              </th>
+              <th className="border-b border-r border-zinc-300 px-2.5 py-2.5 text-left font-semibold dark:border-zinc-700" title="Proposed finish date for this line">
+                Finish
+              </th>
               <th className="border-b border-zinc-300 px-2.5 py-2.5 text-right font-semibold dark:border-zinc-700">
                 Your total
               </th>
@@ -325,12 +357,14 @@ export function BidWorkspaceView({
                 sectionTotal={sectionTotal(s)}
                 onRateBlur={onRateBlur}
                 onDaysBlur={onDaysBlur}
+                onStartBlur={onStartBlur}
+                onEndBlur={onEndBlur}
               />
             ))}
             {sections.length === 0 && (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={9}
                   className="px-3 py-10 text-center text-sm text-zinc-500 dark:text-zinc-400"
                 >
                   No items in this bill of quantities.
@@ -340,7 +374,7 @@ export function BidWorkspaceView({
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-zinc-300 bg-zinc-100 font-semibold dark:border-zinc-700 dark:bg-zinc-800/70">
-              <td className="px-2.5 py-3" colSpan={6}>
+              <td className="px-2.5 py-3" colSpan={8}>
                 Bid total
                 <span className="ml-2 font-mono text-xs font-medium text-zinc-500 dark:text-zinc-400">
                   {itemCount} item{itemCount === 1 ? '' : 's'} ·{' '}
@@ -372,6 +406,8 @@ function SectionRows({
   sectionTotal,
   onRateBlur,
   onDaysBlur,
+  onStartBlur,
+  onEndBlur,
 }: {
   index: number;
   section: LocalSection;
@@ -381,6 +417,8 @@ function SectionRows({
   sectionTotal: number;
   onRateBlur: (sectionId: string, itemId: string, raw: string) => void;
   onDaysBlur: (sectionId: string, itemId: string, raw: string) => void;
+  onStartBlur: (sectionId: string, itemId: string, raw: string) => void;
+  onEndBlur: (sectionId: string, itemId: string, raw: string) => void;
 }) {
   const rowBorder = 'border-b border-zinc-200 dark:border-zinc-800';
   const colBorder = 'border-r border-zinc-200 dark:border-zinc-800';
@@ -402,7 +440,7 @@ function SectionRows({
         </td>
         <td
           className={`${rowBorder} px-2.5 py-2 text-right font-mono text-sm font-bold tabular-nums text-brand-600 dark:text-brand-500`}
-          colSpan={2}
+          colSpan={4}
         >
           {fmtMoney(sectionTotal, currency)}
         </td>
@@ -456,6 +494,31 @@ function SectionRows({
               aria-label="Your proposed working days"
               onBlur={(e) => onDaysBlur(section.sectionId, it.itemId, e.target.value)}
               className={numCell}
+            />
+          </td>
+          {/* Proposed start date — editable only while open */}
+          <td className={`${rowBorder} ${colBorder} p-0`}>
+            <input
+              key={`s-${it.itemId}`}
+              type="date"
+              defaultValue={it.startDate ?? ''}
+              disabled={closed}
+              aria-label="Proposed start date"
+              onBlur={(e) => onStartBlur(section.sectionId, it.itemId, e.target.value)}
+              className={`${cell} font-mono text-xs`}
+            />
+          </td>
+          {/* Proposed finish date — editable only while open */}
+          <td className={`${rowBorder} ${colBorder} p-0`}>
+            <input
+              key={`e-${it.itemId}`}
+              type="date"
+              defaultValue={it.endDate ?? ''}
+              disabled={closed}
+              min={it.startDate ?? undefined}
+              aria-label="Proposed finish date"
+              onBlur={(e) => onEndBlur(section.sectionId, it.itemId, e.target.value)}
+              className={`${cell} font-mono text-xs`}
             />
           </td>
           {/* Live total */}
