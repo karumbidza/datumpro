@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { inputClass } from '@/components/ui/form';
-import { AlertTriangle, GanttChart, HelpCircle } from '@/components/icons';
+import { AlertTriangle, Download, GanttChart, HelpCircle } from '@/components/icons';
 import { parseDate, startOfDay, addDays, differenceInDays, formatDayMonth } from '@/lib/date';
 import type { TaskStatus, DependencyType } from '@datumpro/shared/domain';
 import type { ProgrammeData, ProgrammeTask } from '@/lib/data/programme-types';
@@ -116,6 +116,21 @@ function orthoPath(x1: number, y1: number, x2: number, y2: number): string {
 function fmt(iso: string): string {
   const d = parseDate(iso);
   return d ? formatDayMonth(d) : iso;
+}
+
+/** Working days (Mon–Fri) spanned by a window, inclusive — the MS-Project
+ *  duration convention. Weekends match the axis's weekend shading (local getDay,
+ *  see @/lib/date). At least 1 (a task that lands only on a weekend still reads 1d). */
+function workingDays(startIso: string, endIso: string): number {
+  const s = parseDate(startIso);
+  const e = parseDate(endIso);
+  if (!s || !e || e < s) return 1;
+  let n = 0;
+  for (let d = s; d <= e; d = addDays(d, 1)) {
+    const wd = d.getDay();
+    if (wd !== 0 && wd !== 6) n++;
+  }
+  return Math.max(1, n);
 }
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -934,6 +949,16 @@ export function Programme({
               Auto-schedule dependents
             </button>
           )}
+          <a
+            href={`/print/programme/${projectId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open a printable programme sheet — then Save as PDF (landscape)."
+            className="inline-flex items-center gap-1 rounded-md border border-zinc-200 px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800/40"
+          >
+            <Download size={13} />
+            Export PDF
+          </a>
           <button
             type="button"
             onClick={() => setShowLegend((v) => !v)}
@@ -1148,9 +1173,7 @@ export function Programme({
             </div>
             {data.tasks.map((t, i) => {
               const w = winOf(t);
-              const s = parseDate(w.startIso);
-              const e = parseDate(w.endIso);
-              const durDays = s && e ? Math.round((e.getTime() - s.getTime()) / 86_400_000) + 1 : 1;
+              const durDays = workingDays(w.startIso, w.endIso);
               return (
                 <button
                   key={t.id}
