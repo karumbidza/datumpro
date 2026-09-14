@@ -59,7 +59,7 @@ function linkSentence(type: DependencyType, lagDays: number, predTitle: string, 
 
 const DAY_W = 26; // px per day
 const ROW_H = 34; // px per task row
-const LABEL_W = 200; // left label column
+const LABEL_W = 360; // left grid column (# · task · duration · start · finish)
 const AXIS_H = 46; // date axis header (week date row + day-of-week row)
 const PAD_START_DAYS = 3; // breathing room before the range
 const PAD_END_DAYS = 10; // runway after the range (drag space + uncut last label)
@@ -1132,31 +1132,60 @@ export function Programme({
       {/* The chart: fixed label column + horizontally-scrolling timeline. */}
       <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
         <div className="flex">
-          {/* Labels — task name + assignee */}
+          {/* Grid — # · task name + assignee · duration · start · finish. The
+              numeric columns mirror a construction programme's task table; the
+              timeline to the right keeps all its drag/link interactions. */}
           <div className="shrink-0 border-r border-zinc-200 dark:border-zinc-800" style={{ width: LABEL_W }}>
-            <div style={{ height: AXIS_H }} className="border-b border-zinc-200 bg-zinc-50 px-3 text-[11px] font-medium uppercase tracking-wide leading-[46px] text-zinc-400 dark:border-zinc-800 dark:bg-zinc-900/40">
-              Task
+            <div
+              style={{ height: AXIS_H }}
+              className="flex items-end border-b border-zinc-200 bg-zinc-50 pb-1.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:border-zinc-800 dark:bg-zinc-900/40"
+            >
+              <span className="w-8 shrink-0 px-1 text-right">#</span>
+              <span className="min-w-0 flex-1 px-2">Task</span>
+              <span className="w-11 shrink-0 px-1 text-right">Dur</span>
+              <span className="w-[62px] shrink-0 px-1 text-right">Start</span>
+              <span className="w-[62px] shrink-0 px-1 text-right">Finish</span>
             </div>
-            {data.tasks.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => canModerate && setSelected(t.id === selected ? null : t.id)}
-                style={{ height: ROW_H }}
-                className={`flex w-full items-center gap-1.5 overflow-hidden border-b border-zinc-100 px-3 text-left dark:border-zinc-800/70 ${
-                  canModerate ? 'hover:bg-zinc-50 dark:hover:bg-zinc-800/40' : 'cursor-default'
-                } ${t.id === selected ? 'bg-brand-50 dark:bg-brand-500/10' : ''}`}
-                title={t.assigneeName ? `${t.title} · ${t.assigneeName}` : t.title}
-              >
-                {t.critical && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" aria-label="Critical" />}
-                <span className="min-w-0 flex-1 leading-tight">
-                  <span className="block truncate text-xs text-zinc-700 dark:text-zinc-200">{t.title}</span>
-                  <span className="block truncate text-[10px] text-zinc-400 dark:text-zinc-500">
-                    {t.assigneeName ?? 'Unassigned'}
+            {data.tasks.map((t, i) => {
+              const w = winOf(t);
+              const s = parseDate(w.startIso);
+              const e = parseDate(w.endIso);
+              const durDays = s && e ? Math.round((e.getTime() - s.getTime()) / 86_400_000) + 1 : 1;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => canModerate && setSelected(t.id === selected ? null : t.id)}
+                  style={{ height: ROW_H }}
+                  className={`flex w-full items-center overflow-hidden border-b border-zinc-100 text-left dark:border-zinc-800/70 ${
+                    canModerate ? 'hover:bg-zinc-50 dark:hover:bg-zinc-800/40' : 'cursor-default'
+                  } ${t.id === selected ? 'bg-brand-50 dark:bg-brand-500/10' : ''}`}
+                  title={t.assigneeName ? `${t.title} · ${t.assigneeName}` : t.title}
+                >
+                  <span className="w-8 shrink-0 px-1 text-right font-mono text-[10px] tabular-nums text-zinc-400 dark:text-zinc-500">
+                    {i + 1}
                   </span>
-                </span>
-              </button>
-            ))}
+                  <span className="flex min-w-0 flex-1 items-center gap-1.5 px-2 leading-tight">
+                    {t.critical && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" aria-label="Critical" />}
+                    <span className="min-w-0">
+                      <span className="block truncate text-xs text-zinc-700 dark:text-zinc-200">{t.title}</span>
+                      <span className="block truncate text-[10px] text-zinc-400 dark:text-zinc-500">
+                        {t.assigneeName ?? 'Unassigned'}
+                      </span>
+                    </span>
+                  </span>
+                  <span className="w-11 shrink-0 px-1 text-right font-mono text-[10px] tabular-nums text-zinc-500 dark:text-zinc-400">
+                    {durDays}d
+                  </span>
+                  <span className="w-[62px] shrink-0 px-1 text-right font-mono text-[10px] tabular-nums text-zinc-500 dark:text-zinc-400">
+                    {fmt(w.startIso)}
+                  </span>
+                  <span className="w-[62px] shrink-0 px-1 text-right font-mono text-[10px] tabular-nums text-zinc-500 dark:text-zinc-400">
+                    {fmt(w.endIso)}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Timeline */}
