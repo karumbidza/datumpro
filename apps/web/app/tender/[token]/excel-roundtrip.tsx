@@ -13,13 +13,31 @@ export interface RoundtripLine {
   qty: number;
   rateCents: number;
   durationDays: number | null;
+  startDate: string | null;
+  endDate: string | null;
 }
 
+type ParsedLine = { itemId: string; rateCents: number; durationDays: number | null; startDate: string | null; endDate: string | null };
+
 interface Parsed {
-  lines: { itemId: string; rateCents: number; durationDays: number | null }[];
+  lines: ParsedLine[];
   updated: number;
   unchanged: number;
   ignored: number;
+}
+
+/** Normalise a spreadsheet cell to an ISO date (YYYY-MM-DD) or null. Handles an
+ *  Excel date serial (a number) and a typed string. */
+function toIsoDate(v: unknown): string | null {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number' && Number.isFinite(v)) {
+    const d = new Date(Math.round((v - 25569) * 86_400_000)); // 25569 = Excel serial for 1970-01-01
+    return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+  }
+  const s = String(v).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
 }
 
 /** Download the bill as .xlsx (rates/days prefilled from the draft), fill it
@@ -39,7 +57,7 @@ export function ExcelRoundtrip({
   tenderId: string;
   title: string;
   lines: RoundtripLine[];
-  onApplied: (saved: { itemId: string; rateCents: number; durationDays: number | null }[]) => void;
+  onApplied: (saved: ParsedLine[]) => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [parsed, setParsed] = useState<Parsed | null>(null);
@@ -48,7 +66,7 @@ export function ExcelRoundtrip({
 
   async function exportXlsx() {
     const XLSX = await import('xlsx');
-    const header = ['Item No', 'Section', 'Description', 'Unit', 'Qty', 'Rate', 'Days', '_line'];
+    const header = ['Item No', 'Section', 'Description', 'Unit', 'Qty', 'Rate', 'Days', 'Start', 'Finish', '_line'];
     const rows = lines.map((l) => [
       l.itemNo,
       l.section,
@@ -57,6 +75,8 @@ export function ExcelRoundtrip({
       l.qty,
       l.rateCents ? l.rateCents / 100 : '',
       l.durationDays ?? '',
+      l.startDate ?? '',
+      l.endDate ?? '',
       l.itemId,
     ]);
     const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
@@ -68,6 +88,8 @@ export function ExcelRoundtrip({
       { wch: 10 },
       { wch: 12 },
       { wch: 8 },
+      { wch: 12 },
+      { wch: 12 },
       { hidden: true },
     ];
     const meta = XLSX.utils.aoa_to_sheet([['tender', tenderId]]);
@@ -121,6 +143,8 @@ export function ExcelRoundtrip({
       const cId = col('_line');
       const cRate = col('rate');
       const cDays = col('days');
+      const cStart = col('start');
+      const cEnd = col('finish');
       if (cId < 0 || cRate < 0) {
         setError('The template columns were changed — download a fresh copy and refill it.');
         return;
@@ -152,9 +176,17 @@ export function ExcelRoundtrip({
         const rateCents = rateRaw === '' ? 0 : Math.max(0, Math.round((Number(rateRaw) || 0) * 100));
         const daysRaw = cDays >= 0 ? String(row[cDays] ?? '').trim() : '';
         const durationDays = daysRaw === '' ? null : Math.max(0, Math.round(Number(daysRaw) || 0));
-        if (rateCents === line.rateCents && durationDays === line.durationDays) unchanged += 1;
+        const startDate = cStart >= 0 ? toIsoDate(row[cStart]) : null;
+        const endDate = cEnd >= 0 ? toIsoDate(row[cEnd]) : null;
+        if (
+          rateCents === line.rateCents &&
+          durationDays === line.durationDays &&
+          startDate === line.startDate &&
+          endDate === line.endDate
+        )
+          unchanged += 1;
         else updated += 1;
-        out.push({ itemId: id, rateCents, durationDays });
+        out.push({ itemId: id, rateCents, durationDays, startDate, endDate });
       }
 
       if (out.length === 0 || out.length < contentRows / 2) {
@@ -202,7 +234,7 @@ export function ExcelRoundtrip({
           }}
         />
         <span className="text-xs text-zinc-500 dark:text-zinc-400">
-          Fill Rate and Days offline, then upload — the file only fits this tender.
+          Fill Rate, Days and Start/Finish dates offline, then upload — the file only fits this tender.
         </span>
       </div>
 

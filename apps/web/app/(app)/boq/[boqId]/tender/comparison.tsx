@@ -18,6 +18,12 @@ function fmtVariancePct(pct: number): string {
   return `${sign}${Math.abs(pct * 100).toFixed(1)}%`;
 }
 
+/** Format an ISO date (YYYY-MM-DD) as "DD Mon" without a timezone shift. */
+function fmtDate(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+}
+
 /** Gentle budget-sanity tint: green at/under budget, amber up to 2× budget, red
  *  beyond. Empty when there's no budget to compare against. */
 function budgetTint(amountCents: number, budgetCents: number): string {
@@ -151,6 +157,11 @@ export function Comparison({ data, boqId, canManage }: Props) {
                         <span className="font-mono tabular-nums text-[11px] normal-case text-zinc-500 dark:text-zinc-400">
                           ~{bidder.totalDays}d work
                           {bidder.programmeDays != null ? ` · ~${bidder.programmeDays}d programme` : ''}
+                        </span>
+                      )}
+                      {bidder.proposedStart && bidder.proposedFinish && (
+                        <span className="font-mono tabular-nums text-[11px] normal-case text-zinc-500 dark:text-zinc-400">
+                          Programme {fmtDate(bidder.proposedStart)} → {fmtDate(bidder.proposedFinish)}
                         </span>
                       )}
                       {showAwardForm && (

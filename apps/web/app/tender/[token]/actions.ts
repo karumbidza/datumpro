@@ -32,7 +32,10 @@ export async function saveBidRate(input: unknown): Promise<{ error?: string }> {
   if (!parsed.success) {
     return { error: parsed.error.issues.map((i) => i.message).join(', ') };
   }
-  const { token, boqItemId, rateCents, noBid, note, durationDays } = parsed.data;
+  const { token, boqItemId, rateCents, noBid, note, durationDays, startDate, endDate } = parsed.data;
+  if (startDate && endDate && endDate < startDate) {
+    return { error: 'The finish date is before the start date.' };
+  }
 
   const supabase = await createClient();
   const bidder = await resolveBidder(supabase, token);
@@ -47,6 +50,8 @@ export async function saveBidRate(input: unknown): Promise<{ error?: string }> {
       no_bid: noBid ?? false,
       note: note ?? null,
       duration_days: durationDays ?? null,
+      start_date: startDate ?? null,
+      end_date: endDate ?? null,
     },
     { onConflict: 'bidder_id,boq_item_id' },
   );
@@ -76,6 +81,8 @@ export async function saveBidLines(
       item_id: l.itemId,
       rate_cents: l.rateCents,
       duration_days: l.durationDays ?? null,
+      start_date: l.startDate ?? null,
+      end_date: l.endDate ?? null,
     })),
   });
   if (error) return { error: error.message };

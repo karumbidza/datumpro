@@ -280,6 +280,13 @@ export const inviteBidderSchema = z.object({
 });
 export type InviteBidderInput = z.infer<typeof inviteBidderSchema>;
 
+/** ISO calendar date (YYYY-MM-DD), or null/absent. */
+const isoDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD')
+  .optional()
+  .nullable();
+
 /** A bidder saving one line's rate. */
 export const saveBidRateSchema = z.object({
   token: z.string().min(10),
@@ -289,6 +296,9 @@ export const saveBidRateSchema = z.object({
   note: z.string().trim().max(500).optional().nullable(),
   /** Proposed working days for this line — sealed with the rate. */
   durationDays: z.number().int().min(0).max(3650).optional().nullable(),
+  /** Proposed start / finish date for this line — sealed with the rate. */
+  startDate: isoDate,
+  endDate: isoDate,
 });
 export type SaveBidRateInput = z.infer<typeof saveBidRateSchema>;
 
@@ -301,6 +311,8 @@ export const saveBidLinesSchema = z.object({
         itemId: z.string().uuid(),
         rateCents: z.number().int().min(0),
         durationDays: z.number().int().min(0).max(3650).optional().nullable(),
+        startDate: isoDate,
+        endDate: isoDate,
       }),
     )
     .min(1)

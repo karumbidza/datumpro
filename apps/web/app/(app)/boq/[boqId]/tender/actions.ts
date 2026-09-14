@@ -413,18 +413,35 @@ export async function awardTender(formData: FormData): Promise<void> {
     console.error('[tender] auto start-delivery threw (award stands):', e);
   }
 
-  // Auto-schedule the generated tasks into a program of works (planned_start/end/due
-  // via the forward pass over BOQ durations + dependencies). Best-effort: a schedule
-  // failure must not undo the award or the tasks.
+  // Populate the program of works. If the winning bid carried per-line dates,
+  // export_award_to_project already seeded each section-task's planned window
+  // from them (earliest start / latest finish) — so we must NOT run the
+  // duration-based forward pass, which would overwrite the bidder's programme.
+  // Only when the winner gave no dates do we fall back to schedule_boq_tasks
+  // (planned_start/end/due via the working-day forward pass over durations +
+  // dependencies). Either way it's best-effort — a failure never undoes the award.
   if (deliveredProjectId) {
+    let winnerHasDates = false;
     try {
-      await supabase.rpc('schedule_boq_tasks', {
-        p_project_id: deliveredProjectId,
-        p_boq_id: boqId,
-        p_start_date: startDate,
-      });
-    } catch (e) {
-      console.error('[tender] auto-schedule failed (award + tasks stand):', e);
+      const { count } = await supabase
+        .from('boq_bid_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('bidder_id', bidderId)
+        .not('start_date', 'is', null);
+      winnerHasDates = (count ?? 0) > 0;
+    } catch {
+      /* if we can't tell, fall through to the forward pass */
+    }
+    if (!winnerHasDates) {
+      try {
+        await supabase.rpc('schedule_boq_tasks', {
+          p_project_id: deliveredProjectId,
+          p_boq_id: boqId,
+          p_start_date: startDate,
+        });
+      } catch (e) {
+        console.error('[tender] auto-schedule failed (award + tasks stand):', e);
+      }
     }
   }
 
