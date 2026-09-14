@@ -5,6 +5,11 @@ import type { ProgrammeData } from '@/lib/data/programme-types';
 import type { TaskStatus } from '@datumpro/shared/domain';
 import { parseDate, addDays, formatDayMonth } from '@/lib/date';
 
+type PTask = ProgrammeData['tasks'][number];
+type PRow =
+  | { kind: 'summary'; id: string; label: string; startIso: string; endIso: string; critical: boolean; count: number }
+  | { kind: 'task'; task: PTask };
+
 const DAY_W = 10; // px per day (print-dense)
 const ROW_H = 20;
 const GRID_W = 360;
@@ -70,7 +75,46 @@ export function ProgrammePrint({ projectName, data }: { projectName: string; dat
     const todayOff = Math.round((+t0 - +axisStart) / 86_400_000);
     const todayX = todayOff >= 0 && todayOff <= totalDays ? todayOff * DAY_W : null;
 
-    return { axisStart, totalDays, nWeeks, offset, months, weeks, days, timeW: totalDays * DAY_W, todayX };
+    // WBS display rows (summary + task), matching the live Programme view.
+    const rows: PRow[] = [];
+    const hasWbs = data.tasks.some((t) => t.wbsId);
+    if (!hasWbs) {
+      for (const t of data.tasks) rows.push({ kind: 'task', task: t });
+    } else {
+      const order: string[] = [];
+      const groups = new Map<string, PTask[]>();
+      for (const t of data.tasks) {
+        const k = t.wbsId ?? '__none__';
+        if (!groups.has(k)) {
+          groups.set(k, []);
+          order.push(k);
+        }
+        groups.get(k)!.push(t);
+      }
+      for (const k of order) {
+        const ts = groups.get(k)!;
+        if (k !== '__none__') {
+          let s = ts[0]!.startIso;
+          let e = ts[0]!.endIso;
+          let c = false;
+          for (const t of ts) {
+            if (t.startIso < s) s = t.startIso;
+            if (t.endIso > e) e = t.endIso;
+            if (t.critical) c = true;
+          }
+          rows.push({ kind: 'summary', id: k, label: ts[0]!.wbsLabel ?? 'Section', startIso: s, endIso: e, critical: c, count: ts.length });
+        }
+        for (const t of ts) rows.push({ kind: 'task', task: t });
+      }
+    }
+    const seqByRow: number[] = [];
+    let seq = 0;
+    rows.forEach((r) => {
+      if (r.kind === 'task') seq++;
+      seqByRow.push(r.kind === 'task' ? seq : 0);
+    });
+
+    return { axisStart, totalDays, nWeeks, offset, months, weeks, days, timeW: totalDays * DAY_W, todayX, rows, seqByRow, grouped: hasWbs };
   }, [data]);
 
   const today = fmt(new Date().toISOString().slice(0, 10));
@@ -117,18 +161,32 @@ export function ProgrammePrint({ projectName, data }: { projectName: string; dat
                 <span className="c-d">Start</span>
                 <span className="c-d">Finish</span>
               </div>
-              {data.tasks.map((t, i) => (
-                <div className="pp-grow" style={{ height: ROW_H }} key={t.id}>
-                  <span className="c-id">{i + 1}</span>
-                  <span className="c-nm">
-                    {t.critical && <span className="dot" />}
-                    <span className="nm-t" title={t.title}>{t.title}</span>
-                  </span>
-                  <span className="c-n">{workingDays(t.startIso, t.endIso)}d</span>
-                  <span className="c-d">{fmt(t.startIso)}</span>
-                  <span className="c-d">{fmt(t.endIso)}</span>
-                </div>
-              ))}
+              {model.rows.map((r, di) =>
+                r.kind === 'summary' ? (
+                  <div className="pp-grow pp-srow" style={{ height: ROW_H }} key={`s-${r.id}`}>
+                    <span className="c-id" />
+                    <span className="c-nm">
+                      {r.critical && <span className="dot" />}
+                      <span className="nm-t s" title={r.label}>{r.label}</span>
+                      <span className="ct">({r.count})</span>
+                    </span>
+                    <span className="c-n s">{workingDays(r.startIso, r.endIso)}d</span>
+                    <span className="c-d">{fmt(r.startIso)}</span>
+                    <span className="c-d">{fmt(r.endIso)}</span>
+                  </div>
+                ) : (
+                  <div className={`pp-grow${model.grouped ? ' ind' : ''}`} style={{ height: ROW_H }} key={r.task.id}>
+                    <span className="c-id">{model.seqByRow[di]}</span>
+                    <span className="c-nm">
+                      {r.task.critical && <span className="dot" />}
+                      <span className="nm-t" title={r.task.title}>{r.task.title}</span>
+                    </span>
+                    <span className="c-n">{workingDays(r.task.startIso, r.task.endIso)}d</span>
+                    <span className="c-d">{fmt(r.task.startIso)}</span>
+                    <span className="c-d">{fmt(r.task.endIso)}</span>
+                  </div>
+                ),
+              )}
             </div>
 
             <div className="pp-time" style={{ width: model.timeW }}>
@@ -159,7 +217,17 @@ export function ProgrammePrint({ projectName, data }: { projectName: string; dat
                       `repeating-linear-gradient(90deg,var(--ln) 0,var(--ln) 1px,transparent 1px,transparent ${DAY_W * 7}px)`,
                   }}
                 />
-                {data.tasks.map((t) => {
+                {model.rows.map((r) => {
+                  if (r.kind === 'summary') {
+                    const x = model.offset(r.startIso) * DAY_W;
+                    const w = Math.max(8, (model.offset(r.endIso) - model.offset(r.startIso) + 1) * DAY_W);
+                    return (
+                      <div className="pp-trow srow" style={{ height: ROW_H }} key={`s-${r.id}`}>
+                        <div className="pp-sbar" style={{ left: x, width: w }} />
+                      </div>
+                    );
+                  }
+                  const t = r.task;
                   const x = model.offset(t.startIso) * DAY_W;
                   const w = Math.max(3, (model.offset(t.endIso) - model.offset(t.startIso) + 1) * DAY_W);
                   const hasBase = t.baselineStartIso && t.baselineEndIso;
@@ -224,6 +292,16 @@ const CSS = `
   font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding-bottom:5px}
 .pp-grow{display:flex;align-items:center;border-bottom:1px solid var(--ln);font-size:12px}
 .pp-grow:nth-child(even){background:#fafbfc}
+.pp-srow{background:var(--band)!important}
+.pp-srow .nm-t.s{font-family:'Barlow Condensed',sans-serif;font-weight:700;text-transform:uppercase;letter-spacing:.02em;color:#232c38}
+.pp-srow .ct{font-size:9px;color:var(--faint);margin-left:4px;flex:0 0 auto}
+.pp-srow .c-n.s{font-weight:700;color:#3a4653}
+.pp-grow.ind .c-nm{padding-left:18px}
+.pp-sbar{position:absolute;top:50%;transform:translateY(-50%);height:6px;background:#232c38;z-index:2}
+.pp-sbar::before,.pp-sbar::after{content:"";position:absolute;top:0;width:0;height:0;border-top:7px solid #232c38;border-left:4px solid transparent;border-right:4px solid transparent}
+.pp-sbar::before{left:-1px}
+.pp-sbar::after{right:-1px}
+.pp-trow.srow{background:var(--band)}
 .c-id{flex:0 0 28px;text-align:right;padding-right:6px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--faint)}
 .c-nm{flex:1;min-width:0;display:flex;align-items:center;gap:5px;padding:0 6px}
 .c-nm .nm-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

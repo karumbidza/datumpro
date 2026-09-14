@@ -48,7 +48,7 @@ export async function getProgrammeData(projectId: string): Promise<ProgrammeData
     listCalendarTasks(projectId),
     getProjectSchedule(projectId),
     supabase.from('projects').select('auto_schedule, baselined_at').eq('id', projectId).maybeSingle(),
-    supabase.from('tasks').select('id, programme_order, baseline_start_date, baseline_end_date').eq('project_id', projectId),
+    supabase.from('tasks').select('id, programme_order, baseline_start_date, baseline_end_date, boq_section_id').eq('project_id', projectId),
     // Checklist completion per task — the honest source for the bar's % figure.
     supabase.from('task_subtasks').select('task_id, is_done, tasks!inner(project_id)').eq('tasks.project_id', projectId),
   ]);
@@ -70,14 +70,17 @@ export async function getProgrammeData(projectId: string): Promise<ProgrammeData
   };
   const orderById = new Map<string, number>();
   const baselineById = new Map<string, { start: string | null; end: string | null }>();
+  const sectionIdByTask = new Map<string, string | null>();
   for (const r of (orderRes.data ?? []) as {
     id: string;
     programme_order: number | null;
     baseline_start_date: string | null;
     baseline_end_date: string | null;
+    boq_section_id: string | null;
   }[]) {
     if (r.programme_order != null) orderById.set(r.id, r.programme_order);
     if (r.baseline_start_date || r.baseline_end_date) baselineById.set(r.id, { start: r.baseline_start_date, end: r.baseline_end_date });
+    sectionIdByTask.set(r.id, r.boq_section_id);
   }
   if (calendarTasks.length === 0) return { ...EMPTY, autoSchedule, baselinedAt };
 
@@ -110,6 +113,8 @@ export async function getProgrammeData(projectId: string): Promise<ProgrammeData
       floatDays: meta?.floatDays ?? 0,
       waitingOn: meta?.waitingOn ?? [],
       progressPct: progressPctOf(t.id, t.status),
+      wbsId: null,
+      wbsLabel: null,
     });
     scheduledIds.add(t.id);
     if (!rangeStartIso || win.startIso < rangeStartIso) rangeStartIso = win.startIso;
@@ -117,6 +122,32 @@ export async function getProgrammeData(projectId: string): Promise<ProgrammeData
     // Keep baseline ghosts inside the drawn range.
     if (base?.start && (!rangeStartIso || base.start < rangeStartIso)) rangeStartIso = base.start;
     if (base?.end && (!rangeEndIso || base.end > rangeEndIso)) rangeEndIso = base.end;
+  }
+
+  // WBS grouping: roll each BOQ-generated task up under its section's PARENT
+  // section, so the programme can show collapsible summary rows (Tank Farm →
+  // its tasks, etc.). Only visible where boq_sections RLS admits the reader
+  // (PM / admin / staff); everyone else gets a flat programme, which is fine.
+  const secIds = [...new Set([...sectionIdByTask.values()].filter((v): v is string => !!v))];
+  if (secIds.length > 0) {
+    const { data: secRows } = await supabase.from('boq_sections').select('id, parent_id, name').in('id', secIds);
+    const secById = new Map(
+      ((secRows ?? []) as { id: string; parent_id: string | null; name: string }[]).map((s) => [s.id, s]),
+    );
+    const parentIds = [...new Set([...secById.values()].map((s) => s.parent_id).filter((v): v is string => !!v))];
+    const parentName = new Map<string, string>();
+    if (parentIds.length > 0) {
+      const { data: parentRows } = await supabase.from('boq_sections').select('id, name').in('id', parentIds);
+      for (const p of (parentRows ?? []) as { id: string; name: string }[]) parentName.set(p.id, p.name);
+    }
+    for (const t of tasks) {
+      const secId = sectionIdByTask.get(t.id);
+      const sec = secId ? secById.get(secId) : undefined;
+      if (sec?.parent_id) {
+        t.wbsId = sec.parent_id;
+        t.wbsLabel = parentName.get(sec.parent_id) ?? sec.name;
+      }
+    }
   }
 
   // Stable manual order (programme_order), falling back to start then title for

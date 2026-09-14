@@ -25,6 +25,11 @@ export interface ProgrammeTask {
   /** Checklist completion 0–100 (done tasks are 100); null when the task has
    *  no checklist and isn't done — we never invent a number. */
   progressPct: number | null;
+  /** WBS group for summary rows: the BOQ parent-section id + name the task rolls
+   *  up under. null when the project isn't BOQ-sectioned (or the section has no
+   *  parent) — those tasks render flat, with no summary row. */
+  wbsId: string | null;
+  wbsLabel: string | null;
 }
 
 export interface ProgrammeEdge {

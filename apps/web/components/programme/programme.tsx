@@ -463,11 +463,68 @@ export function Programme({
     return { start, totalDays, width, offset, ticks, days, todayX: withinRange ? todayX : null };
   }, [data.rangeStartIso, data.rangeEndIso]);
 
-  const rowIndexById = useMemo(() => {
-    const m = new Map<string, number>();
-    data.tasks.forEach((t, i) => m.set(t.id, i));
-    return m;
+  // Display rows = optional WBS summary rows interleaved with task rows. When the
+  // project is BOQ-sectioned, each parent section becomes a rolled-up summary row
+  // above its tasks; otherwise the list is flat (task rows only). All vertical
+  // geometry (bars, baseline ghosts, dependency arrows, link/reorder overlays)
+  // is keyed on the DISPLAY index via rowIndexById, so inserting summary rows
+  // shifts everything consistently. displayToTaskIndex maps a display row back to
+  // a task-array index for reorder.
+  type DisplayRow =
+    | { kind: 'summary'; id: string; label: string; startIso: string; endIso: string; critical: boolean; count: number }
+    | { kind: 'task'; task: ProgrammeTask };
+  const layout = useMemo(() => {
+    const rows: DisplayRow[] = [];
+    const hasWbs = data.tasks.some((t) => t.wbsId);
+    if (!hasWbs) {
+      for (const t of data.tasks) rows.push({ kind: 'task', task: t });
+    } else {
+      const order: string[] = [];
+      const groups = new Map<string, ProgrammeTask[]>();
+      for (const t of data.tasks) {
+        const key = t.wbsId ?? '__none__';
+        if (!groups.has(key)) {
+          groups.set(key, []);
+          order.push(key);
+        }
+        groups.get(key)!.push(t);
+      }
+      for (const key of order) {
+        const ts = groups.get(key)!;
+        if (key !== '__none__') {
+          let s = ts[0]!.startIso;
+          let e = ts[0]!.endIso;
+          let crit = false;
+          for (const t of ts) {
+            if (t.startIso < s) s = t.startIso;
+            if (t.endIso > e) e = t.endIso;
+            if (t.critical) crit = true;
+          }
+          rows.push({ kind: 'summary', id: key, label: ts[0]!.wbsLabel ?? 'Section', startIso: s, endIso: e, critical: crit, count: ts.length });
+        }
+        for (const t of ts) rows.push({ kind: 'task', task: t });
+      }
+    }
+    const dataIndexById = new Map<string, number>();
+    data.tasks.forEach((t, i) => dataIndexById.set(t.id, i));
+    const idIndex = new Map<string, number>();
+    const displayToTaskIndex: number[] = []; // display row -> data.tasks index (for reorder)
+    const seqByDisplay: number[] = []; // display row -> 1-based task number (0 for a summary)
+    let seq = 0;
+    let lastDataIdx = 0;
+    rows.forEach((r, i) => {
+      if (r.kind === 'task') {
+        seq++;
+        lastDataIdx = dataIndexById.get(r.task.id) ?? lastDataIdx;
+        idIndex.set(r.task.id, i);
+      }
+      displayToTaskIndex.push(lastDataIdx);
+      seqByDisplay.push(r.kind === 'task' ? seq : 0);
+    });
+    return { rows, idIndex, displayToTaskIndex, seqByDisplay };
   }, [data.tasks]);
+  const rowIndexById = layout.idIndex;
+  const grouped = layout.rows.some((r) => r.kind === 'summary');
   const titleById = useMemo(() => {
     const m = new Map<string, string>();
     data.tasks.forEach((t) => m.set(t.id, t.title));
@@ -616,16 +673,20 @@ export function Programme({
     router.refresh();
   }
 
+  // Display-row index under the pointer (may be a summary row). Callers convert to
+  // a task via taskAtClientY, or to a task-array index via layout.displayToTaskIndex.
   function indexAtClientY(clientY: number): number | null {
     const rows = rowsRef.current;
     if (!rows) return null;
     const rect = rows.getBoundingClientRect();
     const idx = Math.floor((clientY - rect.top) / ROW_H);
-    return Math.max(0, Math.min(data.tasks.length - 1, idx));
+    return Math.max(0, Math.min(layout.rows.length - 1, idx));
   }
   function taskAtClientY(clientY: number): ProgrammeTask | null {
     const idx = indexAtClientY(clientY);
-    return idx == null ? null : data.tasks[idx]!;
+    if (idx == null) return null;
+    const r = layout.rows[idx];
+    return r && r.kind === 'task' ? r.task : null;
   }
 
   async function runReorder(taskId: string, toIndex: number) {
@@ -801,7 +862,7 @@ export function Programme({
       if (session.mode === 'move' && axis === 'y') {
         const target = indexAtClientY(ev.clientY);
         setReorder(null);
-        if (target != null) void runReorder(session.taskId, target);
+        if (target != null) void runReorder(session.taskId, layout.displayToTaskIndex[target] ?? 0);
         return;
       }
       if (!moved) {
@@ -847,7 +908,7 @@ export function Programme({
     );
   }
 
-  const rowsH = data.tasks.length * ROW_H;
+  const rowsH = layout.rows.length * ROW_H;
   // "B starts after A" reading of the link being drawn (FS is the default).
   const linkLabel = (() => {
     if (!link) return null;
@@ -1171,9 +1232,38 @@ export function Programme({
               <span className="w-[62px] shrink-0 px-1 text-right">Start</span>
               <span className="w-[62px] shrink-0 px-1 text-right">Finish</span>
             </div>
-            {data.tasks.map((t, i) => {
+            {layout.rows.map((r, di) => {
+              if (r.kind === 'summary') {
+                const durDays = workingDays(r.startIso, r.endIso);
+                return (
+                  <div
+                    key={`sum-${r.id}`}
+                    style={{ height: ROW_H }}
+                    className="flex w-full items-center overflow-hidden border-b border-zinc-200 bg-zinc-100/70 dark:border-zinc-800 dark:bg-zinc-800/40"
+                    title={r.label}
+                  >
+                    <span className="w-8 shrink-0" />
+                    <span className="flex min-w-0 flex-1 items-center gap-1.5 px-2">
+                      {r.critical && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" aria-label="Critical" />}
+                      <span className="truncate text-[11px] font-bold uppercase tracking-wide text-zinc-700 dark:text-zinc-100">{r.label}</span>
+                      <span className="shrink-0 text-[10px] text-zinc-400 dark:text-zinc-500">({r.count})</span>
+                    </span>
+                    <span className="w-11 shrink-0 px-1 text-right font-mono text-[10px] font-semibold tabular-nums text-zinc-500 dark:text-zinc-300">
+                      {durDays}d
+                    </span>
+                    <span className="w-[62px] shrink-0 px-1 text-right font-mono text-[10px] tabular-nums text-zinc-500 dark:text-zinc-400">
+                      {fmt(r.startIso)}
+                    </span>
+                    <span className="w-[62px] shrink-0 px-1 text-right font-mono text-[10px] tabular-nums text-zinc-500 dark:text-zinc-400">
+                      {fmt(r.endIso)}
+                    </span>
+                  </div>
+                );
+              }
+              const t = r.task;
               const w = winOf(t);
               const durDays = workingDays(w.startIso, w.endIso);
+              const num = layout.seqByDisplay[di] ?? 0;
               return (
                 <button
                   key={t.id}
@@ -1186,9 +1276,9 @@ export function Programme({
                   title={t.assigneeName ? `${t.title} · ${t.assigneeName}` : t.title}
                 >
                   <span className="w-8 shrink-0 px-1 text-right font-mono text-[10px] tabular-nums text-zinc-400 dark:text-zinc-500">
-                    {i + 1}
+                    {num}
                   </span>
-                  <span className="flex min-w-0 flex-1 items-center gap-1.5 px-2 leading-tight">
+                  <span className={`flex min-w-0 flex-1 items-center gap-1.5 px-2 leading-tight ${grouped ? 'pl-4' : ''}`}>
                     {t.critical && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" aria-label="Critical" />}
                     <span className="min-w-0">
                       <span className="block truncate text-xs text-zinc-700 dark:text-zinc-200">{t.title}</span>
@@ -1286,8 +1376,10 @@ export function Programme({
 
                   {/* Baseline ghosts — the frozen plan, drawn as a thin bar below each task */}
                   {showBaseline &&
-                    data.tasks.map((t, i) => {
+                    data.tasks.map((t) => {
                       if (!t.baselineStartIso || !t.baselineEndIso) return null;
+                      const ri = rowIndexById.get(t.id);
+                      if (ri == null) return null;
                       const bl = geom.offset(t.baselineStartIso) * DAY_W;
                       const bdays = diffDaysIso(t.baselineEndIso, t.baselineStartIso) + 1;
                       const bw = Math.max(bdays * DAY_W - 3, 6);
@@ -1296,7 +1388,7 @@ export function Programme({
                         <div
                           key={`bl-${t.id}`}
                           className={`absolute rounded-sm ${slipped ? 'bg-red-400/40 dark:bg-red-500/40' : 'bg-zinc-400/50 dark:bg-zinc-500/50'}`}
-                          style={{ left: bl, top: i * ROW_H + ROW_H - 7, width: bw, height: 4 }}
+                          style={{ left: bl, top: ri * ROW_H + ROW_H - 7, width: bw, height: 4 }}
                           title={`Baseline: ${fmt(t.baselineStartIso)}–${fmt(t.baselineEndIso)}`}
                         />
                       );
@@ -1382,8 +1474,27 @@ export function Programme({
                     )}
                   </svg>
 
+                  {/* WBS summary rows — a faint band + a rolled-up section bar */}
+                  {grouped &&
+                    layout.rows.map((r, di) => {
+                      if (r.kind !== 'summary') return null;
+                      const x = geom.offset(r.startIso) * DAY_W;
+                      const sw = Math.max((geom.offset(r.endIso) - geom.offset(r.startIso) + 1) * DAY_W, 8);
+                      return (
+                        <div key={`sum-tl-${r.id}`} className="pointer-events-none">
+                          <div className="absolute left-0 bg-zinc-100/70 dark:bg-zinc-800/40" style={{ top: di * ROW_H, height: ROW_H, width: geom.width }} />
+                          <div
+                            className="absolute z-[1] rounded-[1px] bg-zinc-700 dark:bg-zinc-300"
+                            style={{ top: di * ROW_H + ROW_H / 2 - 3, left: x, width: sw, height: 6 }}
+                            title={`${r.label} · ${fmt(r.startIso)}–${fmt(r.endIso)}`}
+                          />
+                        </div>
+                      );
+                    })}
+
                   {/* Bars */}
-                  {data.tasks.map((t, i) => {
+                  {data.tasks.map((t) => {
+                    const ri = rowIndexById.get(t.id) ?? 0;
                     const w = winOf(t);
                     const dragging = preview?.taskId === t.id;
                     const livePx = dragging ? preview?.px : undefined;
@@ -1404,7 +1515,7 @@ export function Programme({
                       <div
                         key={t.id}
                         className={`group absolute ${dragging ? '' : 'transition-[left] duration-150 motion-reduce:transition-none'} ${reordering ? 'opacity-40' : ''} ${linkInvalid ? 'cursor-not-allowed opacity-40' : ''} ${chainDimmed ? 'opacity-40' : ''}`}
-                        style={{ top: i * ROW_H + 6, left, height: ROW_H - 12 }}
+                        style={{ top: ri * ROW_H + 6, left, height: ROW_H - 12 }}
                       >
                         {/* Live date readout while dragging — the snap target. */}
                         {dragging && (
