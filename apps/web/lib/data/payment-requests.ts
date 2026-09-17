@@ -136,9 +136,9 @@ export async function listProjectPaymentRequests(projectId: string): Promise<Pay
   if (ids.length) {
     const { data: profs } = await supabase
       .from('profiles')
-      .select('id, display_name, email')
+      .select('id, display_name')
       .in('id', ids);
-    for (const p of profs ?? []) names.set(p.id, p.display_name || p.email || 'Contractor');
+    for (const p of profs ?? []) names.set(p.id, p.display_name || 'Contractor');
   }
   const hydrated = await hydrate(rows, names);
   const order: Record<PaymentRequestStatus, number> = { requested: 0, approved: 1, paid: 2, rejected: 3, cancelled: 4 };

@@ -68,7 +68,7 @@ export async function inviteMember(formData: FormData) {
       const [{ data: org }, { data: inviter }] = await Promise.all([
         supabase.from('organizations').select('name').eq('id', orgId).single(),
         user
-          ? supabase.from('profiles').select('display_name, email').eq('id', user.id).single()
+          ? supabase.from('profiles').select('display_name').eq('id', user.id).single()
           : Promise.resolve({ data: null }),
       ]);
       const inviterName =
@@ -202,12 +202,11 @@ export async function sendMemberPasswordReset(formData: FormData) {
     .maybeSingle();
   if (!membership) fail('That person is not a member of this organisation.');
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('email')
-    .eq('id', userId)
-    .maybeSingle();
-  const email = (profile as { email?: string | null } | null)?.email ?? null;
+  // email is no longer selectable off profiles by the authenticated role (audit
+  // UB-AUD-1709 #1); resolve it through the authorized RPC — the caller is an
+  // owner/admin of a shared org (checked above), so it returns the member's email.
+  const { data: emailRows } = await supabase.rpc('visible_member_emails', { p_ids: [userId] });
+  const email = ((emailRows ?? []) as { id: string; email: string | null }[])[0]?.email ?? null;
   if (!email) fail('That member has no email on file.');
 
   const { error } = await supabase.auth.resetPasswordForEmail(email);
@@ -331,7 +330,7 @@ export async function resendInvitation(formData: FormData) {
     const [{ data: org }, { data: inviter }] = await Promise.all([
       supabase.from('organizations').select('name').eq('id', inv.org_id).single(),
       user
-        ? supabase.from('profiles').select('display_name, email').eq('id', user.id).single()
+        ? supabase.from('profiles').select('display_name').eq('id', user.id).single()
         : Promise.resolve({ data: null }),
     ]);
     const inviterName =

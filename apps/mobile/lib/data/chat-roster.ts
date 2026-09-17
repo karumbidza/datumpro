@@ -37,7 +37,7 @@ export async function getConversationRoster(conversationId: string): Promise<Ros
 
   const { data: profs } = await supabase
     .from('profiles')
-    .select('id, display_name, email, phone, company, avatar_url, last_active_at')
+    .select('id, display_name, phone, company, avatar_url, last_active_at')
     .in('id', ids);
   const pmap = new Map(
     ((profs ?? []) as {

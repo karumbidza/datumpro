@@ -63,7 +63,7 @@ async function resolveNames(ids: (string | null)[]): Promise<Map<string, string>
   const unique = [...new Set(ids.filter(Boolean))] as string[];
   const map = new Map<string, string>();
   if (!unique.length) return map;
-  const { data } = await supabase.from('profiles').select('id, display_name, email').in('id', unique);
+  const { data } = await supabase.from('profiles').select('id, display_name').in('id', unique);
   for (const p of (data ?? []) as { id: string; display_name: string | null; email: string | null }[]) {
     map.set(p.id, p.display_name || p.email || 'Member');
   }

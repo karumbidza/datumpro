@@ -28,7 +28,7 @@ export async function listExtensions(taskId: string): Promise<ExtensionRequest[]
   const ids = [...new Set(raw.map((r) => r.requested_by).filter(Boolean))] as string[];
   let names = new Map<string, string>();
   if (ids.length) {
-    const { data: profs } = await supabase.from('profiles').select('id, display_name, email').in('id', ids);
+    const { data: profs } = await supabase.from('profiles').select('id, display_name').in('id', ids);
     names = new Map(
       ((profs ?? []) as { id: string; display_name: string | null; email: string | null }[]).map((p) => [
         p.id,

@@ -2158,6 +2158,71 @@ end $$;
 reset role;
 reset request.jwt.claims;
 
+-- ── Audit UB-AUD-1709 #1: profiles.email lockdown + authorized resolver ───────
+-- Isolated fixtures (fresh UUIDs, added after all exact-count assertions so they
+-- can't disturb them). handle_new_user seeds profiles.email from auth.users.
+insert into auth.users (id, email) values
+  ('f5ec0000-0000-0000-0000-0000000000e1','user-e1@test.dev'),
+  ('f5ec0000-0000-0000-0000-0000000000e2','user-e2@test.dev');
+insert into public.organizations (id, name, require_mfa) values
+  ('f5ec1110-0000-0000-0000-000000000000','Org E', false);
+insert into public.org_members (org_id, user_id, role, member_type, status) values
+  ('f5ec1110-0000-0000-0000-000000000000','f5ec0000-0000-0000-0000-0000000000e1','owner','owner','active'),
+  ('f5ec1110-0000-0000-0000-000000000000','f5ec0000-0000-0000-0000-0000000000e2','member','staff','active');
+
+-- (1) A non-manager (staff/contractor) resolves ONLY their own email — never a
+--     co-member's — via the authorized RPC.
+set role authenticated;
+set request.jwt.claims = '{"sub":"f5ec0000-0000-0000-0000-0000000000e2","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.visible_member_emails(
+     array['f5ec0000-0000-0000-0000-0000000000e1','f5ec0000-0000-0000-0000-0000000000e2']::uuid[])
+   where id = 'f5ec0000-0000-0000-0000-0000000000e1' and email is not null) = 0,
+  'audit#1: non-manager cannot resolve a co-member email via visible_member_emails');
+select pg_temp.ok(
+  (select count(*) from public.visible_member_emails(
+     array['f5ec0000-0000-0000-0000-0000000000e2']::uuid[])
+   where email = 'user-e2@test.dev') = 1,
+  'audit#1: a user resolves their own email via visible_member_emails');
+reset role;
+reset request.jwt.claims;
+
+-- (2) A manager (owner) resolves co-members' emails.
+set role authenticated;
+set request.jwt.claims = '{"sub":"f5ec0000-0000-0000-0000-0000000000e1","role":"authenticated","aal":"aal1"}';
+select pg_temp.ok(
+  (select count(*) from public.visible_member_emails(
+     array['f5ec0000-0000-0000-0000-0000000000e1','f5ec0000-0000-0000-0000-0000000000e2']::uuid[])
+   where email is not null) = 2,
+  'audit#1: an owner/manager resolves co-members'' emails');
+reset role;
+reset request.jwt.claims;
+
+-- (3) The email column itself is not SELECTable by the authenticated role. The
+--     suite grants blanket table privileges at setup to exercise RLS, so
+--     re-apply the migration's column lockdown here to assert the mechanism.
+revoke select on public.profiles from authenticated;
+grant select (id, display_name, avatar_url, created_at, username, phone,
+              company_name, trade, avatar_thumb_url, avatar_updated_at,
+              last_active_at, company) on public.profiles to authenticated;
+set role authenticated;
+set request.jwt.claims = '{"sub":"f5ec0000-0000-0000-0000-0000000000e2","role":"authenticated","aal":"aal1"}';
+do $$
+declare denied boolean := false;
+begin
+  begin
+    perform email from public.profiles where id = 'f5ec0000-0000-0000-0000-0000000000e1';
+  exception when insufficient_privilege then denied := true;
+  end;
+  if not denied then raise exception 'FAIL: audit#1: authenticated could SELECT profiles.email'; end if;
+  raise notice 'PASS: audit#1: profiles.email not SELECTable by authenticated (column privilege)';
+end $$;
+select pg_temp.ok(
+  (select count(*) from public.profiles where id = 'f5ec0000-0000-0000-0000-0000000000e2') = 1,
+  'audit#1: non-email columns remain SELECTable by authenticated');
+reset role;
+reset request.jwt.claims;
+
 rollback;
 
 \echo '────────────────────────────────────────────'

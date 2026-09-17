@@ -78,6 +78,16 @@ const securityHeaders = [
   { key: 'X-DNS-Prefetch-Control', value: 'off' },
 ];
 
+// Auth screens carry recovery tokens in the URL/form state and per-user content;
+// they must never be cached by browsers or shared/proxy caches (audit UB-AUD-1709
+// #4 — /reset-password was served `public, max-age=0`). Force no-store on them.
+const noStoreHeaders = [
+  { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate, proxy-revalidate' },
+  { key: 'Pragma', value: 'no-cache' },
+  { key: 'Expires', value: '0' },
+];
+const authRoutes = ['/sign-in', '/reset-password', '/mfa', '/invite/:path*'];
+
 const nextConfig = {
   reactStrictMode: true,
   // The shared package ships TypeScript source; let Next transpile it.
@@ -88,7 +98,10 @@ const nextConfig = {
   // bundled, which the dynamic requires would otherwise break.
   serverExternalPackages: ['officecrypto-tool'],
   async headers() {
-    return [{ source: '/:path*', headers: securityHeaders }];
+    return [
+      { source: '/:path*', headers: securityHeaders },
+      ...authRoutes.map((source) => ({ source, headers: noStoreHeaders })),
+    ];
   },
 };
 

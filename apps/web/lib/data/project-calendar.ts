@@ -43,7 +43,7 @@ export async function listCalendarTasks(projectId: string): Promise<CalendarTask
   if (assigneeIds.length > 0) {
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, display_name, email')
+      .select('id, display_name')
       .in('id', assigneeIds);
     names = new Map(
       ((profiles ?? []) as { id: string; display_name: string | null; email: string | null }[]).map(

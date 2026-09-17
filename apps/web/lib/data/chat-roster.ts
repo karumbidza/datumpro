@@ -44,7 +44,7 @@ export async function listChatRoster(
   const [{ data: profileRows }, { data: taskRows }] = await Promise.all([
     supabase
       .from('profiles')
-      .select('id, email, phone, company, avatar_url, last_active_at')
+      .select('id, phone, company, avatar_url, last_active_at')
       .in('id', ids),
     supabase
       .from('tasks')
