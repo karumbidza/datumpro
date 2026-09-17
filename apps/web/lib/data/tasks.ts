@@ -108,7 +108,7 @@ export async function listOrgMembers(orgId: string): Promise<OrgMember[]> {
 
   const { data: profiles } = await supabase
     .from('profiles')
-    .select('id, display_name, email')
+    .select('id, display_name')
     .in('id', rows.map((m) => m.user_id));
   const byId = new Map(
     ((profiles ?? []) as { id: string; display_name: string | null; email: string | null }[]).map(
@@ -201,7 +201,7 @@ export async function listTaskActivity(taskId: string): Promise<TaskActivityRow[
   if (ids.length > 0) {
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, display_name, email')
+      .select('id, display_name')
       .in('id', ids);
     names = new Map(
       ((profiles ?? []) as { id: string; display_name: string | null; email: string | null }[]).map(
@@ -251,7 +251,7 @@ export async function listProjectActivity(projectId: string, limit = 10): Promis
   if (ids.length > 0) {
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, display_name, email')
+      .select('id, display_name')
       .in('id', ids);
     names = new Map(
       ((profiles ?? []) as { id: string; display_name: string | null; email: string | null }[]).map(
@@ -302,7 +302,7 @@ export async function listExtensionRequests(taskId: string): Promise<ExtensionRe
   if (ids.length > 0) {
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, display_name, email')
+      .select('id, display_name')
       .in('id', ids);
     names = new Map(
       ((profiles ?? []) as { id: string; display_name: string | null; email: string | null }[]).map(

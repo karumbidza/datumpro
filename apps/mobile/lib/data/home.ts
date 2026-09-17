@@ -153,7 +153,7 @@ export async function getHomeData(orgId: string | null = null): Promise<HomeData
 
   const [{ data: profile }, { data: projectRows }, { data: taskRows }, { data: orgRoles }, { data: pmSeats }] =
     await Promise.all([
-      supabase.from('profiles').select('display_name, email').eq('id', me).maybeSingle(),
+      supabase.from('profiles').select('display_name').eq('id', me).maybeSingle(),
       projectQ,
       taskQ,
       supabase.from('org_members').select('role').eq('user_id', me).eq('status', 'active'),

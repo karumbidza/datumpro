@@ -89,7 +89,7 @@ export function ChatThread({
     if (!meId) return;
     void supabase
       .from('profiles')
-      .select('display_name, email')
+      .select('display_name')
       .eq('id', meId)
       .maybeSingle()
       .then(({ data }) => {

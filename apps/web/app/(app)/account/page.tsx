@@ -18,7 +18,7 @@ export default async function AccountPage() {
   if (!user) redirect('/sign-in');
 
   const [{ data: profile }, ctx] = await Promise.all([
-    supabase.from('profiles').select('display_name, email, company, phone').eq('id', user.id).single(),
+    supabase.from('profiles').select('display_name, company, phone').eq('id', user.id).single(),
     getActiveContext(),
   ]);
   const p = profile as {

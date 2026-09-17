@@ -20,7 +20,7 @@ async function requireUser() {
 }
 
 async function actorName(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<string> {
-  const { data } = await supabase.from('profiles').select('display_name, email').eq('id', userId).maybeSingle();
+  const { data } = await supabase.from('profiles').select('display_name').eq('id', userId).maybeSingle();
   const p = data as { display_name: string | null; email: string | null } | null;
   return p?.display_name || p?.email?.split('@')[0] || 'someone';
 }

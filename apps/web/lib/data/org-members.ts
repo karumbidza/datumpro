@@ -50,20 +50,23 @@ export async function listOrgMembers(orgId: string): Promise<OrgMemberRow[]> {
   }[];
   if (members.length === 0) return [];
 
-  const { data: profileData } = await supabase
-    .from('profiles')
-    .select('id, display_name, email, company')
-    .in(
-      'id',
-      members.map((m) => m.user_id),
-    );
+  const memberIds = members.map((m) => m.user_id);
+  // Names/company are co-org readable; emails come from the authorized RPC
+  // (owner/admin/pm/finance see co-members' emails) since the profiles table no
+  // longer exposes email to the authenticated role directly.
+  const [{ data: profileData }, { data: emailRows }] = await Promise.all([
+    supabase.from('profiles').select('id, display_name, company').in('id', memberIds),
+    supabase.rpc('visible_member_emails', { p_ids: memberIds }),
+  ]);
   const profiles = new Map(
     ((profileData ?? []) as {
       id: string;
       display_name: string | null;
-      email: string | null;
       company: string | null;
     }[]).map((p) => [p.id, p]),
+  );
+  const emailById = new Map(
+    ((emailRows ?? []) as { id: string; email: string | null }[]).map((e) => [e.id, e.email]),
   );
 
   // Project assignments for the whole roster in ONE query (projects embeds via
@@ -93,8 +96,8 @@ export async function listOrgMembers(orgId: string): Promise<OrgMemberRow[]> {
     const p = profiles.get(m.user_id);
     return {
       userId: m.user_id,
-      name: p?.display_name || p?.email || 'Member',
-      email: p?.email ?? null,
+      name: p?.display_name || emailById.get(m.user_id) || 'Member',
+      email: emailById.get(m.user_id) ?? null,
       company: p?.company ?? null,
       role: (m.role ?? 'member') as OrgRole,
       memberType: (m.member_type ?? 'staff') as MemberType,

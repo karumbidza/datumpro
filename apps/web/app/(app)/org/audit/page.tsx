@@ -38,7 +38,7 @@ export default async function AuditPage() {
   // Resolve actor display names in one round-trip (RLS lets admins read co-member profiles).
   const actorIds = [...new Set(rows.map((r) => r.actor_id).filter((x): x is string => !!x))];
   const { data: profiles } = actorIds.length
-    ? await supabase.from('profiles').select('id, display_name, email').in('id', actorIds)
+    ? await supabase.from('profiles').select('id, display_name').in('id', actorIds)
     : { data: [] as { id: string; display_name: string | null; email: string | null }[] };
   const nameOf = new Map(
     ((profiles ?? []) as { id: string; display_name: string | null; email: string | null }[]).map((p) => [

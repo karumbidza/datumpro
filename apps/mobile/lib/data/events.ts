@@ -60,7 +60,7 @@ export async function getProjectEvent(eventId: string): Promise<ProjectEventDeta
   const ids = [...new Set([e.created_by, ...attIds].filter(Boolean))] as string[];
   const names = new Map<string, string>();
   if (ids.length) {
-    const { data: profs } = await supabase.from('profiles').select('id, display_name, email').in('id', ids);
+    const { data: profs } = await supabase.from('profiles').select('id, display_name').in('id', ids);
     for (const p of (profs ?? []) as { id: string; display_name: string | null; email: string | null }[]) {
       names.set(p.id, p.display_name || p.email || 'Member');
     }

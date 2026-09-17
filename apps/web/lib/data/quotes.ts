@@ -19,7 +19,7 @@ async function nameMap(ids: (string | null)[]): Promise<Map<string, string>> {
   const unique = [...new Set(ids.filter(Boolean))] as string[];
   if (unique.length === 0) return new Map();
   const supabase = await createClient();
-  const { data } = await supabase.from('profiles').select('id, display_name, email').in('id', unique);
+  const { data } = await supabase.from('profiles').select('id, display_name').in('id', unique);
   return new Map(
     ((data ?? []) as { id: string; display_name: string | null; email: string | null }[]).map((p) => [
       p.id,

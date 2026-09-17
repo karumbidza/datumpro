@@ -40,7 +40,7 @@ export async function stepsByEntity(
   if (approverIds.length) {
     const { data: profs } = await supabase
       .from('profiles')
-      .select('id, display_name, email')
+      .select('id, display_name')
       .in('id', approverIds);
     for (const p of (profs ?? []) as { id: string; display_name: string | null; email: string | null }[]) {
       names.set(p.id, p.display_name ?? p.email ?? 'Member');

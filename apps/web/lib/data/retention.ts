@@ -113,7 +113,7 @@ export async function getProjectRetention(projectId: string): Promise<ProjectRet
   const allIds = [...new Set([...contractorIds, ...deductedByContractor.keys()])];
   const names = new Map<string, string>();
   if (allIds.length) {
-    const { data: profs } = await supabase.from('profiles').select('id, display_name, email').in('id', allIds);
+    const { data: profs } = await supabase.from('profiles').select('id, display_name').in('id', allIds);
     for (const pr of (profs ?? []) as { id: string; display_name: string | null; email: string | null }[]) {
       names.set(pr.id, pr.display_name || pr.email || 'Contractor');
     }

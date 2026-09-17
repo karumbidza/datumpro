@@ -109,9 +109,9 @@ export async function listOrgDocuments(orgId: string): Promise<ContractorDocumen
   if (ids.length) {
     const { data: profs } = await supabase
       .from('profiles')
-      .select('id, display_name, email')
+      .select('id, display_name')
       .in('id', ids);
-    for (const p of profs ?? []) names.set(p.id, p.display_name || p.email || 'Contractor');
+    for (const p of profs ?? []) names.set(p.id, p.display_name || 'Contractor');
   }
   const hydrated = await hydrate(rows, names);
   const order: Record<ContractorDocStatus, number> = { submitted: 0, rejected: 1, verified: 2 };

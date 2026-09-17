@@ -74,6 +74,9 @@ export function MarketingFooter() {
           <Link href="/privacy" className={`hover:text-zinc-900 dark:hover:text-zinc-50 ${focusRing}`}>
             Privacy
           </Link>
+          <Link href="/cookies" className={`hover:text-zinc-900 dark:hover:text-zinc-50 ${focusRing}`}>
+            Cookies
+          </Link>
           <ManageCookiesLink className={`hover:text-zinc-900 dark:hover:text-zinc-50 ${focusRing}`} />
         </div>
       </div>

@@ -38,7 +38,7 @@ export default function More() {
     const user = await currentUser();
     if (!user) return;
     const [{ data: p }, { data: members }, unread] = await Promise.all([
-      supabase.from('profiles').select('display_name, email').eq('id', user.id).maybeSingle(),
+      supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle(),
       supabase.from('org_members').select('role, organizations(name)').eq('user_id', user.id).eq('status', 'active'),
       unreadNotificationCount(),
     ]);

@@ -61,7 +61,7 @@ export async function getProjectAdvances(projectId: string): Promise<ProjectAdva
   const ids = [...new Set([...advances.map((a) => a.contractor_id), ...members.map((m) => m.user_id)])];
   const names = new Map<string, string>();
   if (ids.length) {
-    const { data: profs } = await supabase.from('profiles').select('id, display_name, email').in('id', ids);
+    const { data: profs } = await supabase.from('profiles').select('id, display_name').in('id', ids);
     for (const p of (profs ?? []) as { id: string; display_name: string | null; email: string | null }[]) {
       names.set(p.id, p.display_name || p.email || 'Contractor');
     }

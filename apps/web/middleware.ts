@@ -32,6 +32,35 @@ async function apiRateLimit(request: NextRequest): Promise<NextResponse | null> 
   });
 }
 
+/** Per-IP throttle + advertised RateLimit headers on the auth screens
+ *  (audit UB-AUD-1709 #3 — /reset-password showed no rate-limit signals). The
+ *  credential exchange itself runs against Supabase Auth (GoTrue has its own
+ *  limits), so this caps page/abuse volume with a generous ceiling and, on every
+ *  response, advertises the policy via standard `RateLimit-*` headers. Returns a
+ *  429 to serve, or the headers to attach to the normal response. */
+const AUTH_ROUTES = new Set(['/sign-in', '/reset-password']);
+const AUTH_LIMIT = 30; // requests per minute per IP
+async function authRateLimit(
+  request: NextRequest,
+): Promise<{ block?: NextResponse; headers?: Record<string, string> }> {
+  if (!AUTH_ROUTES.has(request.nextUrl.pathname)) return {};
+  const ip = clientIp(request.headers);
+  const { ok, remaining, reset } = await rateLimit(`auth:${ip}`, AUTH_LIMIT, 60);
+  const resetSec = String(Math.max(1, Math.ceil((reset - Date.now()) / 1000)));
+  const headers: Record<string, string> = {
+    'RateLimit-Limit': String(AUTH_LIMIT),
+    'RateLimit-Remaining': String(Math.max(0, remaining)),
+    'RateLimit-Reset': resetSec,
+  };
+  if (ok) return { headers };
+  return {
+    block: new NextResponse('Too Many Requests', {
+      status: 429,
+      headers: { ...headers, 'Retry-After': resetSec },
+    }),
+  };
+}
+
 /** Refreshes the Supabase session cookie on every request and gates every
  *  authenticated area (see `protectedPrefixes`). Unauthed users hitting a
  *  protected path are redirected to /sign-in with a `?next=` back-link. */
@@ -40,7 +69,14 @@ export async function middleware(request: NextRequest) {
   const limited = await apiRateLimit(request);
   if (limited) return limited;
 
+  // Auth screens: throttle + advertise RateLimit headers.
+  const auth = await authRateLimit(request);
+  if (auth.block) return auth.block;
+
   const response = NextResponse.next({ request });
+  if (auth.headers) {
+    for (const [k, v] of Object.entries(auth.headers)) response.headers.set(k, v);
+  }
 
   const supabase = createServerClient(
     env.NEXT_PUBLIC_SUPABASE_URL,

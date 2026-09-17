@@ -87,7 +87,7 @@ export async function listTenderInvites(taskId: string): Promise<TenderInvite[]>
   if (invites.length === 0) return [];
 
   const ids = [...new Set(invites.map((i) => i.contractor_id))];
-  const { data: profs } = await supabase.from('profiles').select('id, display_name, email').in('id', ids);
+  const { data: profs } = await supabase.from('profiles').select('id, display_name').in('id', ids);
   const nameById = new Map(
     ((profs ?? []) as { id: string; display_name: string | null; email: string | null }[]).map((p) => [
       p.id,

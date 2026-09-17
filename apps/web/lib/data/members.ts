@@ -71,14 +71,20 @@ async function profileNames(
 ): Promise<Map<string, { name: string; email: string | null }>> {
   if (ids.length === 0) return new Map();
   const supabase = await createClient();
-  const { data } = await supabase
-    .from('profiles')
-    .select('id, display_name, email')
-    .in('id', ids);
+  // Names are co-org readable; emails come from the authorized RPC (managers see
+  // co-members' emails, everyone sees their own) so we never leak contact details
+  // the DB no longer exposes on the profiles table directly.
+  const [{ data }, { data: emailRows }] = await Promise.all([
+    supabase.from('profiles').select('id, display_name').in('id', ids),
+    supabase.rpc('visible_member_emails', { p_ids: ids }),
+  ]);
+  const emailById = new Map(
+    ((emailRows ?? []) as { id: string; email: string | null }[]).map((e) => [e.id, e.email]),
+  );
   return new Map(
-    ((data ?? []) as { id: string; display_name: string | null; email: string | null }[]).map((p) => [
+    ((data ?? []) as { id: string; display_name: string | null }[]).map((p) => [
       p.id,
-      { name: p.display_name || p.email || 'Member', email: p.email },
+      { name: p.display_name || emailById.get(p.id) || 'Member', email: emailById.get(p.id) ?? null },
     ]),
   );
 }

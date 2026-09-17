@@ -9,7 +9,7 @@ export interface Member {
 export async function listProjectMembers(projectId: string): Promise<Member[]> {
   const { data } = await supabase
     .from('project_members')
-    .select('user_id, profiles(display_name, email)')
+    .select('user_id, profiles(display_name)')
     .eq('project_id', projectId);
   return ((data ?? []) as {
     user_id: string;
